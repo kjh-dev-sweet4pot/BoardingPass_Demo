@@ -1,6 +1,5 @@
 # Boarding Pass (Alpha)
 
-인플루언서가 인스타그램 핸들로 본인확인 후 수령 상품을 확인하는 Next.js + Supabase 앱입니다.
 
 ## 포털
 
