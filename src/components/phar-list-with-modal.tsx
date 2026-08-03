@@ -17,6 +17,20 @@ function formatKst(iso: string | null) {
   return new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
+function formatIgHandle(
+  influencer?: {
+    instagram_handle?: string | null;
+    instagram_handle_normalized?: string | null;
+  } | null,
+) {
+  const raw =
+    influencer?.instagram_handle_normalized ||
+    influencer?.instagram_handle ||
+    "";
+  const normalized = raw.replace(/^@+/, "").trim();
+  return normalized ? `@${normalized}` : null;
+}
+
 export function PharListWithModal({
   items,
 }: {
@@ -80,32 +94,41 @@ export function PharListWithModal({
             조건에 맞는 배정이 없습니다.
           </li>
         )}
-        {items.map((item) => (
-          <li key={item.id}>
-            <button
-              type="button"
-              onClick={() => setOpenId(item.influencer_id)}
-              className="grid w-full gap-2 border border-[var(--line)] bg-[var(--surface)] p-5 text-left transition hover:border-[var(--accent)] md:grid-cols-[1fr_auto]"
-            >
-              <div>
-                <p className="text-lg font-medium">
-                  {item.influencers?.name || "인플루언서"} ·{" "}
-                  {item.products?.name || "상품"}
-                </p>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  {item.stores?.name || "매장"} · 수량 {item.quantity}
-                  {item.visit_code ? ` · code ${item.visit_code}` : ""}
-                  {" · "}
-                  {formatKst(item.created_at)}
-                </p>
-                <p className="mt-2 text-xs text-[var(--accent)]">상세 보기</p>
-              </div>
-              <div className="text-sm text-[var(--accent)]">
-                {ALLOCATION_STATUS_LABEL[item.status]}
-              </div>
-            </button>
-          </li>
-        ))}
+        {items.map((item) => {
+          const handle = formatIgHandle(item.influencers);
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                onClick={() => setOpenId(item.influencer_id)}
+                className="grid w-full gap-2 border border-[var(--line)] bg-[var(--surface)] p-5 text-left transition hover:border-[var(--accent)] md:grid-cols-[1fr_auto]"
+              >
+                <div>
+                  <p className="text-lg font-medium">
+                    {item.influencers?.name || "인플루언서"}
+                    {handle ? (
+                      <span className="ml-2 text-base font-normal text-[var(--accent)]">
+                        {handle}
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    {item.products?.name || "상품"} ·{" "}
+                    {item.stores?.name || "매장"} · 수량 {item.quantity}
+                    {item.visit_code ? ` · code ${item.visit_code}` : ""}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    {formatKst(item.created_at)}
+                  </p>
+                  <p className="mt-2 text-xs text-[var(--accent)]">상세 보기</p>
+                </div>
+                <div className="text-sm text-[var(--accent)]">
+                  {ALLOCATION_STATUS_LABEL[item.status]}
+                </div>
+              </button>
+            </li>
+          );
+        })}
       </ul>
 
       {openId && (
@@ -131,6 +154,11 @@ export function PharListWithModal({
                 >
                   {detail?.influencer.name || "불러오는 중…"}
                 </h2>
+                {detail && (
+                  <p className="mt-2 text-lg text-[var(--accent)]">
+                    {formatIgHandle(detail.influencer) || "핸들 없음"}
+                  </p>
+                )}
               </div>
               <button
                 type="button"
@@ -156,9 +184,9 @@ export function PharListWithModal({
 
                 <dl className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <dt className="text-xs text-[var(--muted)]">Instagram</dt>
-                    <dd className="mt-1 text-sm">
-                      @{detail.influencer.instagram_handle_normalized}
+                    <dt className="text-xs text-[var(--muted)]">SNS 핸들</dt>
+                    <dd className="mt-1 text-sm font-medium">
+                      {formatIgHandle(detail.influencer) || "등록된 핸들 없음"}
                     </dd>
                   </div>
                   <div>

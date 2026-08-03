@@ -37,7 +37,7 @@ export default async function PharPage({
   if (!configured) {
     return (
       <AppShell eyebrow="Phar" title="매장 배정 현황">
-        <Notice error="Supabase 환경변수가 설정되지 않았습니다." />
+        <Notice error="ERR ENV..." />
       </AppShell>
     );
   }
