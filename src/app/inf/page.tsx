@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 export default async function InfPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; message?: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const params = await searchParams;
   const { configured } = getSupabaseEnv();
@@ -77,7 +77,7 @@ export default async function InfPage({
         ) : undefined
       }
     >
-      <Notice error={params.error || loadError} message={params.message} />
+      <Notice error={params.error || loadError} />
 
       {!verified ? (
         <section className="mx-auto max-w-md border border-[var(--line)] bg-[var(--surface)] p-6">

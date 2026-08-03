@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { INF_COOKIE } from "@/lib/session";
+import { normalizeHandle } from "@/lib/auth";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -25,27 +26,36 @@ export async function POST(request: Request) {
 
   try {
     const supabase = createClient(url, key);
-    const { data, error } = await supabase.rpc("verify_influencer_by_handle", {
-      p_instagram_handle: handle,
-    });
+    const normalized = normalizeHandle(handle);
+
+    const { data: influencer, error } = await supabase
+      .from("influencers")
+      .select("id")
+      .eq("instagram_handle_normalized", normalized)
+      .maybeSingle();
 
     if (error) {
       return redirectTo(`/inf?error=${encodeURIComponent(error.message)}`);
     }
 
-    const payload = typeof data === "string" ? JSON.parse(data) : data;
-    const influencerId = payload?.influencer?.id as string | undefined;
-
-    if (!influencerId) {
+    if (!influencer?.id) {
       return redirectTo(
         `/inf?error=${encodeURIComponent("등록된 인스타그램 핸들과 일치하지 않습니다.")}`,
       );
     }
 
-    const response = redirectTo(
-      `/inf?message=${encodeURIComponent("본인확인이 완료되었습니다.")}`,
-    );
-    response.cookies.set(INF_COOKIE, influencerId, {
+    await supabase
+      .from("allocations")
+      .update({
+        status: "verified",
+        verified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("influencer_id", influencer.id)
+      .eq("status", "pending");
+
+    const response = redirectTo("/inf");
+    response.cookies.set(INF_COOKIE, influencer.id, {
       httpOnly: true,
       sameSite: "lax",
       path: "/",

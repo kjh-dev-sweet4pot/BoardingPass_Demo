@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isAdminSession } from "@/lib/session";
-import type { SnsPlatform } from "@/lib/types";
 
 async function ensureAdmin() {
   if (!(await isAdminSession())) redirect("/admin/login");
@@ -42,53 +41,24 @@ export async function createInfluencer(formData: FormData) {
   const supabase = await createClient();
   const name = String(formData.get("name") || "").trim();
   const notes = String(formData.get("notes") || "").trim() || null;
-  const handle = String(
+  const instagram_handle = String(
     formData.get("instagram_handle") || formData.get("handle") || "",
   ).trim();
 
-  if (!handle) {
+  if (!instagram_handle) {
     redirect(`/admin?error=${encodeURIComponent("인스타그램 핸들을 입력하세요.")}`);
   }
 
-  const { data: influencer, error } = await supabase
-    .from("influencers")
-    .insert({ name, notes })
-    .select("id")
-    .single();
-
-  if (error || !influencer) {
-    redirect(
-      `/admin?error=${encodeURIComponent(error?.message || "생성 실패")}`,
-    );
-  }
-
-  const { error: snsError } = await supabase.from("sns_identities").insert({
-    influencer_id: influencer.id,
-    platform: "instagram",
-    handle,
-  });
-  if (snsError) {
-    redirect(`/admin?error=${encodeURIComponent(snsError.message)}`);
-  }
-
-  revalidatePath("/admin");
-  redirect("/admin?tab=influencers");
-}
-
-export async function addSnsIdentity(formData: FormData) {
-  await ensureAdmin();
-  const supabase = await createClient();
-  const influencerId = String(formData.get("influencer_id") || "");
-  const platform = String(formData.get("platform") || "") as SnsPlatform;
-  const handle = String(formData.get("handle") || "").trim();
-
-  const { error } = await supabase.from("sns_identities").insert({
-    influencer_id: influencerId,
-    platform,
-    handle,
+  const { error } = await supabase.from("influencers").insert({
+    name,
+    notes,
+    instagram_handle,
   });
 
-  if (error) redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  if (error) {
+    redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  }
+
   revalidatePath("/admin");
   redirect("/admin?tab=influencers");
 }

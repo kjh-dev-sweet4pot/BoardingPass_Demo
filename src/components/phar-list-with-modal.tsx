@@ -3,15 +3,12 @@
 import { useEffect, useState } from "react";
 import {
   ALLOCATION_STATUS_LABEL,
-  SNS_PLATFORM_LABEL,
   type AllocationWithRelations,
   type Influencer,
-  type SnsIdentity,
 } from "@/lib/types";
 
 type DetailPayload = {
   influencer: Influencer;
-  identities: SnsIdentity[];
   allocations: AllocationWithRelations[];
 };
 
@@ -147,9 +144,7 @@ export function PharListWithModal({
             {loading && (
               <p className="text-sm text-[var(--muted)]">불러오는 중…</p>
             )}
-            {error && (
-              <p className="text-sm text-[var(--danger)]">{error}</p>
-            )}
+            {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
 
             {detail && !loading && (
               <div className="space-y-6">
@@ -161,28 +156,15 @@ export function PharListWithModal({
 
                 <dl className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <dt className="text-xs text-[var(--muted)]">SNS</dt>
+                    <dt className="text-xs text-[var(--muted)]">Instagram</dt>
                     <dd className="mt-1 text-sm">
-                      {detail.identities.length === 0
-                        ? "등록된 핸들 없음"
-                        : detail.identities
-                            .map(
-                              (s) =>
-                                `${SNS_PLATFORM_LABEL[s.platform]} @${s.handle_normalized}`,
-                            )
-                            .join(" · ")}
+                      @{detail.influencer.instagram_handle_normalized}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-xs text-[var(--muted)]">등록일</dt>
                     <dd className="mt-1 text-sm">
                       {formatKst(detail.influencer.created_at)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-[var(--muted)]">계정 연결</dt>
-                    <dd className="mt-1 text-sm">
-                      {detail.influencer.profile_id ? "연결됨" : "미연결"}
                     </dd>
                   </div>
                   <div>

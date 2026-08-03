@@ -20,15 +20,9 @@ export async function GET(
 
   const [
     { data: influencer, error: infError },
-    { data: identities },
     { data: allocations, error: allocError },
   ] = await Promise.all([
     supabase.from("influencers").select("*").eq("id", id).maybeSingle(),
-    supabase
-      .from("sns_identities")
-      .select("*")
-      .eq("influencer_id", id)
-      .order("created_at", { ascending: true }),
     supabase
       .from("allocations")
       .select("*, products(*), stores(*)")
@@ -49,7 +43,6 @@ export async function GET(
 
   return NextResponse.json({
     influencer,
-    identities: identities || [],
     allocations: allocations || [],
   });
 }

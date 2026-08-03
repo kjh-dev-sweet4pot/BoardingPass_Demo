@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  addSnsIdentity,
   createAllocation,
   createInfluencer,
   createProduct,
@@ -20,11 +19,9 @@ import { isAdminSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import {
   ALLOCATION_STATUS_LABEL,
-  SNS_PLATFORM_LABEL,
   type AllocationWithRelations,
   type Influencer,
   type Product,
-  type SnsIdentity,
   type Store,
 } from "@/lib/types";
 
@@ -52,13 +49,11 @@ export default async function AdminPage({
     { data: stores },
     { data: products },
     { data: influencers },
-    { data: identities },
     { data: allocations },
   ] = await Promise.all([
     supabase.from("stores").select("*").order("created_at", { ascending: false }),
     supabase.from("products").select("*").order("created_at", { ascending: false }),
     supabase.from("influencers").select("*").order("created_at", { ascending: false }),
-    supabase.from("sns_identities").select("*").order("created_at", { ascending: false }),
     supabase
       .from("allocations")
       .select("*, products(*), stores(*), influencers(*)")
@@ -101,10 +96,7 @@ export default async function AdminPage({
         <ProductsPanel products={(products as Product[]) || []} />
       )}
       {tab === "influencers" && (
-        <InfluencersPanel
-          influencers={(influencers as Influencer[]) || []}
-          identities={(identities as SnsIdentity[]) || []}
-        />
+        <InfluencersPanel influencers={(influencers as Influencer[]) || []} />
       )}
       {tab === "allocations" && (
         <AllocationsPanel
@@ -179,95 +171,45 @@ function ProductsPanel({ products }: { products: Product[] }) {
   );
 }
 
-function InfluencersPanel({
-  influencers,
-  identities,
-}: {
-  influencers: Influencer[];
-  identities: SnsIdentity[];
-}) {
+function InfluencersPanel({ influencers }: { influencers: Influencer[] }) {
   return (
-    <div className="space-y-8">
-      <div className="grid gap-8 lg:grid-cols-2">
-        <form action={createInfluencer} className="flex flex-col gap-4 border border-[var(--line)] bg-[var(--surface)] p-5">
-          <h2 className="text-lg" style={{ fontFamily: "var(--font-display), serif" }}>
-            인플루언서 등록
-          </h2>
-          <Field label="이름">
-            <input className={fieldClass} name="name" required />
-          </Field>
-          <Field label="인스타그램 핸들">
-            <input
-              className={fieldClass}
-              name="instagram_handle"
-              placeholder="@handle"
-              required
-            />
-          </Field>
-          <Field label="메모">
-            <input className={fieldClass} name="notes" />
-          </Field>
-          <button className={primaryBtnClass} type="submit">
-            저장
-          </button>
-        </form>
-
-        <form action={addSnsIdentity} className="flex flex-col gap-4 border border-[var(--line)] bg-[var(--surface)] p-5">
-          <h2 className="text-lg" style={{ fontFamily: "var(--font-display), serif" }}>
-            SNS 핸들 추가
-          </h2>
-          <Field label="인플루언서">
-            <select className={fieldClass} name="influencer_id" required>
-              <option value="">선택</option>
-              {influencers.map((inf) => (
-                <option key={inf.id} value={inf.id}>
-                  {inf.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="플랫폼">
-            <select className={fieldClass} name="platform" defaultValue="xiaohongshu">
-              {Object.entries(SNS_PLATFORM_LABEL).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="핸들">
-            <input className={fieldClass} name="handle" required />
-          </Field>
-          <button className={primaryBtnClass} type="submit">
-            추가
-          </button>
-        </form>
-      </div>
+    <div className="grid gap-8 lg:grid-cols-[320px_1fr]">
+      <form action={createInfluencer} className="flex flex-col gap-4 border border-[var(--line)] bg-[var(--surface)] p-5">
+        <h2 className="text-lg" style={{ fontFamily: "var(--font-display), serif" }}>
+          인플루언서 등록
+        </h2>
+        <Field label="이름">
+          <input className={fieldClass} name="name" required />
+        </Field>
+        <Field label="인스타그램 핸들">
+          <input
+            className={fieldClass}
+            name="instagram_handle"
+            placeholder="@handle"
+            required
+          />
+        </Field>
+        <Field label="메모">
+          <input className={fieldClass} name="notes" />
+        </Field>
+        <button className={primaryBtnClass} type="submit">
+          저장
+        </button>
+      </form>
 
       <ul className="space-y-3">
-        {influencers.map((inf) => {
-          const sns = identities.filter((i) => i.influencer_id === inf.id);
-          return (
-            <li key={inf.id} className="border border-[var(--line)] bg-[var(--surface)] p-5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="text-lg">{inf.name}</h3>
-                <span className="text-xs text-[var(--muted)]">
-                  {inf.profile_id ? "계정 연결됨" : "미연결"}
-                </span>
-              </div>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                {sns.length
-                  ? sns
-                      .map(
-                        (s) =>
-                          `${SNS_PLATFORM_LABEL[s.platform]} @${s.handle_normalized}`,
-                      )
-                      .join(" · ")
-                  : "SNS 없음"}
-              </p>
-            </li>
-          );
-        })}
+        {influencers.length === 0 && (
+          <li className="text-sm text-[var(--muted)]">등록된 인플루언서가 없습니다.</li>
+        )}
+        {influencers.map((inf) => (
+          <li key={inf.id} className="border border-[var(--line)] bg-[var(--surface)] p-5">
+            <h3 className="text-lg">{inf.name}</h3>
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              Instagram @{inf.instagram_handle_normalized}
+              {inf.notes ? ` · ${inf.notes}` : ""}
+            </p>
+          </li>
+        ))}
       </ul>
     </div>
   );
@@ -295,7 +237,7 @@ function AllocationsPanel({
             <option value="">선택</option>
             {influencers.map((inf) => (
               <option key={inf.id} value={inf.id}>
-                {inf.name}
+                {inf.name} (@{inf.instagram_handle_normalized})
               </option>
             ))}
           </select>
