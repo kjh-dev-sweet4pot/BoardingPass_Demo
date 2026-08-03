@@ -14,15 +14,6 @@
 
 `stores` · `products` · `influencers` · `allocations`
 
-## 설정
-
-1. Supabase SQL Editor에서 순서대로 실행:
-   - `supabase/reset_minimal.sql` (기존 데이터 삭제)
-   - `supabase/schema.sql`
-   - `supabase/seed.sql` (목업)
-2. `.env.local` 에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. `npm install` → `npm run dev`
-
 ## 본인확인 흐름
 
 1. Admin이 인플루언서(이름 + 인스타 핸들)와 배정 등록
