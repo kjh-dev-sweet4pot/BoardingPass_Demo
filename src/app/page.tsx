@@ -17,7 +17,7 @@ const portals = [
     href: "/phar",
     label: "Phar",
     title: "약사",
-    body: "로그인 없이 매장 배정 현황을 조회합니다.",
+    body: "날짜·지점별로 매장 배정 현황을 조회합니다.",
   },
 ];
 
@@ -34,8 +34,7 @@ export default function HomePage() {
         Boarding Pass
       </h1>
       <p className="mt-4 max-w-xl text-base leading-7 text-[var(--muted)]">
-        매장 방문 인플루언서가 인스타 핸들로 본인확인 후 수령 상품을 확인하고,
-        약사가 반출을 이어가는 운영 보드입니다.
+       
       </p>
 
       <div className="mt-14 grid gap-4 md:grid-cols-3">

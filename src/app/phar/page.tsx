@@ -1,20 +1,35 @@
 import Link from "next/link";
+import { PharListWithModal } from "@/components/phar-list-with-modal";
 import {
   AppShell,
+  Field,
   Notice,
+  fieldClass,
+  primaryBtnClass,
   secondaryBtnClass,
 } from "@/components/ui";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import {
-  ALLOCATION_STATUS_LABEL,
   type AllocationWithRelations,
+  type Store,
 } from "@/lib/types";
+
+function dayRangeUtc(dateYmd: string) {
+  const start = new Date(`${dateYmd}T00:00:00+09:00`);
+  const end = new Date(`${dateYmd}T23:59:59.999+09:00`);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
 
 export default async function PharPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; message?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    message?: string;
+    date?: string;
+    store?: string;
+  }>;
 }) {
   const params = await searchParams;
   const { configured } = getSupabaseEnv();
@@ -27,13 +42,32 @@ export default async function PharPage({
     );
   }
 
+  const selectedDate = (params.date || "").trim();
+  const selectedStore = (params.store || "").trim();
+
   const supabase = await createClient();
-  const { data: allocations, error } = await supabase
+  const { data: stores } = await supabase
+    .from("stores")
+    .select("*")
+    .order("name", { ascending: true });
+
+  let query = supabase
     .from("allocations")
     .select("*, products(*), stores(*), influencers(*)")
     .order("created_at", { ascending: false });
 
+  if (selectedStore) {
+    query = query.eq("store_id", selectedStore);
+  }
+
+  if (selectedDate) {
+    const { start, end } = dayRangeUtc(selectedDate);
+    query = query.gte("created_at", start).lte("created_at", end);
+  }
+
+  const { data: allocations, error } = await query;
   const list = (allocations as AllocationWithRelations[]) || [];
+  const storeList = (stores as Store[]) || [];
 
   return (
     <AppShell
@@ -46,36 +80,52 @@ export default async function PharPage({
       }
     >
       <Notice error={params.error || error?.message} message={params.message} />
-      <p className="mb-6 text-sm text-[var(--muted)]">
-        로그인 없이 배정 현황을 조회합니다. 반출 확정은 다음 단계에서
-        추가합니다.
+
+      <form
+        method="get"
+        action="/phar"
+        className="mb-8 grid gap-4 border border-[var(--line)] bg-[var(--surface)] p-5 md:grid-cols-[1fr_1fr_auto_auto] md:items-end"
+      >
+        <Field label="날짜">
+          <input
+            className={fieldClass}
+            type="date"
+            name="date"
+            defaultValue={selectedDate}
+          />
+        </Field>
+        <Field label="지점">
+          <select
+            className={fieldClass}
+            name="store"
+            defaultValue={selectedStore}
+          >
+            <option value="">전체 지점</option>
+            {storeList.map((store) => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <button className={primaryBtnClass} type="submit">
+          조회
+        </button>
+        <Link href="/phar" className={`${secondaryBtnClass} text-center`}>
+          초기화
+        </Link>
+      </form>
+
+      <p className="mb-4 text-sm text-[var(--muted)]">
+        {selectedDate ? `${selectedDate} · ` : "전체 날짜 · "}
+        {selectedStore
+          ? storeList.find((s) => s.id === selectedStore)?.name || "선택 지점"
+          : "전체 지점"}
+        {" · "}
+        {list.length}건
       </p>
 
-      <ul className="space-y-3">
-        {list.length === 0 && (
-          <li className="text-sm text-[var(--muted)]">표시할 배정이 없습니다.</li>
-        )}
-        {list.map((item) => (
-          <li
-            key={item.id}
-            className="grid gap-2 border border-[var(--line)] bg-[var(--surface)] p-5 md:grid-cols-[1fr_auto]"
-          >
-            <div>
-              <p className="text-lg font-medium">
-                {item.influencers?.name || "인플루언서"} ·{" "}
-                {item.products?.name || "상품"}
-              </p>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                {item.stores?.name || "매장"} · 수량 {item.quantity}
-                {item.visit_code ? ` · code ${item.visit_code}` : ""}
-              </p>
-            </div>
-            <div className="text-sm text-[var(--accent)]">
-              {ALLOCATION_STATUS_LABEL[item.status]}
-            </div>
-          </li>
-        ))}
-      </ul>
+      <PharListWithModal items={list} />
     </AppShell>
   );
 }
