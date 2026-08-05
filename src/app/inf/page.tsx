@@ -1,5 +1,5 @@
+import { InfAllocationList } from "@/components/inf-allocation-list";
 import {
-  ALLOCATION_STATUS_LABEL,
   type AllocationWithRelations,
   type Influencer,
 } from "@/lib/types";
@@ -134,35 +134,11 @@ function InfluencerPass({
           {influencer.name}
         </h2>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          본인확인 완료. 아래 상품을 매장에서 확인하세요.
+          본인확인 완료. 아래 상품을 확인한 후 매장에서 수령하세요. 
         </p>
       </section>
 
-      {allocations.length === 0 ? (
-        <p className="text-sm text-[var(--muted)]">배정된 상품이 없습니다.</p>
-      ) : (
-        <ul className="space-y-3">
-          {allocations.map((item) => (
-            <li
-              key={item.id}
-              className="grid gap-2 border border-[var(--line)] bg-[var(--surface)] p-5 md:grid-cols-[1fr_auto]"
-            >
-              <div>
-                <p className="text-lg font-medium">
-                  {item.products?.name || "상품"}
-                </p>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  {item.stores?.name || "매장"} · 수량 {item.quantity}
-                  {item.products?.sku ? ` · SKU ${item.products.sku}` : ""}
-                </p>
-              </div>
-              <div className="text-sm text-[var(--accent)]">
-                {ALLOCATION_STATUS_LABEL[item.status]}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <InfAllocationList initialAllocations={allocations} />
     </div>
   );
 }
