@@ -927,17 +927,6 @@ function PickupSheet({
             <InfoRow label="인플루언서">
               {influencer.name}{" "}
               <span className="text-[#7c6ef5]">{formatIgHandle(influencer)}</span>
-              {formatSnsUrl(influencer.sns_url) && (
-                <a
-                  href={formatSnsUrl(influencer.sns_url)!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-1 text-xs text-[#aaa] underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  프로필
-                </a>
-              )}
             </InfoRow>
             <InfoRow label="수량">{selected.quantity}개</InfoRow>
             {selected.visit_code && (
