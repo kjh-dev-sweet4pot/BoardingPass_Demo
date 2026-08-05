@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   ALLOCATION_STATUS_LABEL,
+  type AllocationStatus,
   type AllocationWithRelations,
   type Influencer,
 } from "@/lib/types";
@@ -11,6 +12,14 @@ type DetailPayload = {
   influencer: Influencer;
   allocations: AllocationWithRelations[];
 };
+
+const filterControlClass =
+  "h-9 w-full min-w-0 appearance-none rounded-none border border-[var(--line)] bg-white px-2.5 text-xs font-normal normal-case tracking-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]";
+
+const filterSelectClass = `${filterControlClass} bg-[length:12px] bg-[right_8px_center] bg-no-repeat pr-7`;
+
+const selectChevron =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%235d6b63' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")";
 
 function formatKst(iso: string | null) {
   if (!iso) return "—";
@@ -44,6 +53,28 @@ function statusTone(status: AllocationWithRelations["status"]) {
   return "border-[var(--line)] bg-white text-[var(--muted)]";
 }
 
+function matchesInfluencerSearch(item: AllocationWithRelations, q: string) {
+  if (!q) return true;
+  const handle = formatIgHandle(item.influencers) || "";
+  const haystack = [
+    item.influencers?.name || "",
+    handle,
+    item.influencers?.instagram_handle || "",
+    item.influencers?.instagram_handle_normalized || "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
+function matchesProductSearch(item: AllocationWithRelations, q: string) {
+  if (!q) return true;
+  const haystack = [item.products?.name || "", item.products?.sku || ""]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
 export function PharListWithModal({
   items,
 }: {
@@ -53,6 +84,75 @@ export function PharListWithModal({
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [influencerQ, setInfluencerQ] = useState("");
+  const [productQ, setProductQ] = useState("");
+  const [storeId, setStoreId] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [visitDate, setVisitDate] = useState("");
+  const [status, setStatus] = useState("");
+
+  const deferredInfluencerQ = useDeferredValue(
+    influencerQ.trim().toLowerCase(),
+  );
+  const deferredProductQ = useDeferredValue(productQ.trim().toLowerCase());
+
+  const storeOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of items) {
+      if (item.store_id && item.stores?.name) {
+        map.set(item.store_id, item.stores.name);
+      }
+    }
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  }, [items]);
+
+  const quantityOptions = useMemo(() => {
+    const set = new Set<number>();
+    for (const item of items) set.add(item.quantity);
+    return [...set].sort((a, b) => a - b);
+  }, [items]);
+
+  const statusOptions = useMemo(() => {
+    const set = new Set<AllocationStatus>();
+    for (const item of items) set.add(item.status);
+    return [...set].sort((a, b) =>
+      ALLOCATION_STATUS_LABEL[a].localeCompare(
+        ALLOCATION_STATUS_LABEL[b],
+        "ko",
+      ),
+    );
+  }, [items]);
+
+  const filtered = useMemo(() => {
+    return items.filter((item) => {
+      if (!matchesInfluencerSearch(item, deferredInfluencerQ)) return false;
+      if (!matchesProductSearch(item, deferredProductQ)) return false;
+      if (storeId && item.store_id !== storeId) return false;
+      if (quantity && String(item.quantity) !== quantity) return false;
+      if (visitDate && (item.visit_date || "") !== visitDate) return false;
+      if (status && item.status !== status) return false;
+      return true;
+    });
+  }, [
+    items,
+    deferredInfluencerQ,
+    deferredProductQ,
+    storeId,
+    quantity,
+    visitDate,
+    status,
+  ]);
+
+  const hasFilters =
+    Boolean(influencerQ.trim()) ||
+    Boolean(productQ.trim()) ||
+    Boolean(storeId) ||
+    Boolean(quantity) ||
+    Boolean(visitDate) ||
+    Boolean(status);
 
   useEffect(() => {
     if (!openId) {
@@ -99,15 +199,39 @@ export function PharListWithModal({
     };
   }, [openId]);
 
+  function clearFilters() {
+    setInfluencerQ("");
+    setProductQ("");
+    setStoreId("");
+    setQuantity("");
+    setVisitDate("");
+    setStatus("");
+  }
+
   return (
     <>
-      {items.length === 0 ? (
-        <p className="text-sm text-[var(--muted)]">
-          조건에 맞는 배정이 없습니다.
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--muted)]">
+        <p>
+          {hasFilters
+            ? `${filtered.length}건 / 전체 ${items.length}건`
+            : `${items.length}건`}
         </p>
+        {hasFilters ? (
+          <button
+            type="button"
+            className="text-xs text-[var(--accent)] hover:underline"
+            onClick={clearFilters}
+          >
+            필터 초기화
+          </button>
+        ) : null}
+      </div>
+
+      {items.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
       ) : (
         <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
-          <table className="min-w-[920px] w-full border-collapse text-left text-sm">
+          <table className="w-full min-w-[860px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/50 text-xs tracking-[0.08em] text-[var(--muted)] uppercase">
                 <th className="px-4 py-3 font-medium">이름</th>
@@ -119,54 +243,145 @@ export function PharListWithModal({
                 <th className="px-4 py-3 font-medium">상태</th>
                 <th className="px-4 py-3 font-medium text-right">상세</th>
               </tr>
+              <tr className="border-b border-[var(--line)] bg-[var(--surface)]">
+                <th colSpan={2} className="px-2 py-2 font-normal">
+                  <input
+                    className={filterControlClass}
+                    type="search"
+                    value={influencerQ}
+                    onChange={(e) => setInfluencerQ(e.target.value)}
+                    placeholder="이름 · 계정"
+                    aria-label="이름, 계정 통합 검색"
+                  />
+                </th>
+                <th className="px-2 py-2 font-normal">
+                  <input
+                    className={filterControlClass}
+                    type="search"
+                    value={productQ}
+                    onChange={(e) => setProductQ(e.target.value)}
+                    placeholder="상품"
+                    aria-label="상품 검색"
+                  />
+                </th>
+                <th className="px-2 py-2 font-normal">
+                  <select
+                    className={filterSelectClass}
+                    style={{ backgroundImage: selectChevron }}
+                    value={storeId}
+                    onChange={(e) => setStoreId(e.target.value)}
+                    aria-label="매장 필터"
+                  >
+                    <option value="">매장 전체</option>
+                    {storeOptions.map((store) => (
+                      <option key={store.id} value={store.id}>
+                        {store.name}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th className="px-2 py-2 font-normal">
+                  <select
+                    className={filterSelectClass}
+                    style={{ backgroundImage: selectChevron }}
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    aria-label="수량 필터"
+                  >
+                    <option value="">수량 전체</option>
+                    {quantityOptions.map((qty) => (
+                      <option key={qty} value={qty}>
+                        {qty}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th className="px-2 py-2 font-normal">
+                  <input
+                    className={filterControlClass}
+                    type="date"
+                    value={visitDate}
+                    onChange={(e) => setVisitDate(e.target.value)}
+                    aria-label="방문일 필터"
+                  />
+                </th>
+                <th className="px-2 py-2 font-normal">
+                  <select
+                    className={filterSelectClass}
+                    style={{ backgroundImage: selectChevron }}
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    aria-label="상태 필터"
+                  >
+                    <option value="">상태 전체</option>
+                    {statusOptions.map((value) => (
+                      <option key={value} value={value}>
+                        {ALLOCATION_STATUS_LABEL[value]}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th className="px-2 py-2" />
+              </tr>
             </thead>
             <tbody>
-              {items.map((item) => {
-                const handle = formatIgHandle(item.influencers);
-                return (
-                  <tr
-                    key={item.id}
-                    className="cursor-pointer border-b border-[var(--line)] last:border-b-0 transition hover:bg-[var(--accent-soft)]/40"
-                    onClick={() => setOpenId(item.influencer_id)}
+              {filtered.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-8 text-center text-sm text-[var(--muted)]"
                   >
-                    <td className="px-4 py-3.5 font-medium text-[var(--ink)]">
-                      {item.influencers?.name || "인플루언서"}
-                    </td>
-                    <td className="px-4 py-3.5 text-[var(--accent)]">
-                      {handle || "—"}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className="text-[var(--ink)]">
-                        {item.products?.name || "상품"}
-                      </span>
-                      {item.products?.sku ? (
-                        <span className="mt-0.5 block text-xs text-[var(--muted)]">
-                          SKU {item.products.sku}
+                    조건에 맞는 배정이 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((item) => {
+                  const handle = formatIgHandle(item.influencers);
+                  return (
+                    <tr
+                      key={item.id}
+                      className="cursor-pointer border-b border-[var(--line)] last:border-b-0 transition hover:bg-[var(--accent-soft)]/40"
+                      onClick={() => setOpenId(item.influencer_id)}
+                    >
+                      <td className="px-4 py-3.5 font-medium text-[var(--ink)]">
+                        {item.influencers?.name || "인플루언서"}
+                      </td>
+                      <td className="px-4 py-3.5 text-[var(--accent)]">
+                        {handle || "—"}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className="text-[var(--ink)]">
+                          {item.products?.name || "상품"}
                         </span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3.5 text-[var(--muted)]">
-                      {item.stores?.name || "매장"}
-                    </td>
-                    <td className="px-4 py-3.5 text-right tabular-nums text-[var(--ink)]">
-                      {item.quantity}
-                    </td>
-                    <td className="px-4 py-3.5 tabular-nums text-[var(--muted)]">
-                      {item.visit_date || "—"}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`inline-block border px-2.5 py-1 text-xs font-medium ${statusTone(item.status)}`}
-                      >
-                        {ALLOCATION_STATUS_LABEL[item.status]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right text-xs text-[var(--accent)]">
-                      보기 →
-                    </td>
-                  </tr>
-                );
-              })}
+                        {item.products?.sku ? (
+                          <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                            SKU {item.products.sku}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3.5 text-[var(--muted)]">
+                        {item.stores?.name || "매장"}
+                      </td>
+                      <td className="px-4 py-3.5 text-right tabular-nums text-[var(--ink)]">
+                        {item.quantity}
+                      </td>
+                      <td className="px-4 py-3.5 tabular-nums text-[var(--muted)]">
+                        {item.visit_date || "—"}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`inline-block border px-2.5 py-1 text-xs font-medium ${statusTone(item.status)}`}
+                        >
+                          {ALLOCATION_STATUS_LABEL[item.status]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right text-xs text-[var(--accent)]">
+                        보기 →
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

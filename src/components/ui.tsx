@@ -6,17 +6,22 @@ export function AppShell({
   children,
   actions,
   wide = false,
+  full = false,
 }: {
   eyebrow: string;
   title: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
   wide?: boolean;
+  /** 뷰포트 전체 폭 사용 (운영 콘솔 등) */
+  full?: boolean;
 }) {
   return (
     <main
-      className={`mx-auto min-h-screen w-full px-6 py-10 ${
-        wide ? "max-w-6xl" : "max-w-5xl"
+      className={`min-h-screen w-full py-10 ${
+        full
+          ? "mx-0 max-w-none px-4 sm:px-6 lg:px-8"
+          : `mx-auto px-6 ${wide ? "max-w-6xl" : "max-w-5xl"}`
       }`}
     >
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--line)] pb-6">
