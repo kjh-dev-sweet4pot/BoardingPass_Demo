@@ -265,6 +265,9 @@ function AllocationsPanel({
         <Field label="수량">
           <input className={fieldClass} name="quantity" type="number" min={1} defaultValue={1} />
         </Field>
+        <Field label="방문 예정일">
+          <input className={fieldClass} name="visit_date" type="date" required />
+        </Field>
         <Field label="방문 코드">
           <input className={fieldClass} name="visit_code" placeholder="선택" />
         </Field>
@@ -289,6 +292,7 @@ function AllocationsPanel({
             </div>
             <p className="mt-2 text-sm text-[var(--muted)]">
               {a.stores?.name} · 수량 {a.quantity}
+              {a.visit_date ? ` · 방문 ${a.visit_date}` : ""}
               {a.visit_code ? ` · code ${a.visit_code}` : ""}
             </p>
           </li>

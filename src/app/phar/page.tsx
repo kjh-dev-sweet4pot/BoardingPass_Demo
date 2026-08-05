@@ -15,12 +15,6 @@ import {
   type Store,
 } from "@/lib/types";
 
-function dayRangeUtc(dateYmd: string) {
-  const start = new Date(`${dateYmd}T00:00:00+09:00`);
-  const end = new Date(`${dateYmd}T23:59:59.999+09:00`);
-  return { start: start.toISOString(), end: end.toISOString() };
-}
-
 export default async function PharPage({
   searchParams,
 }: {
@@ -61,8 +55,7 @@ export default async function PharPage({
   }
 
   if (selectedDate) {
-    const { start, end } = dayRangeUtc(selectedDate);
-    query = query.gte("created_at", start).lte("created_at", end);
+    query = query.eq("visit_date", selectedDate);
   }
 
   const { data: allocations, error } = await query;

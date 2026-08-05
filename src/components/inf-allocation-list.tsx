@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ALLOCATION_STATUS_LABEL,
   type AllocationWithRelations,
+  type Influencer,
 } from "@/lib/types";
 import { primaryBtnClass, secondaryBtnClass } from "@/components/ui";
 
@@ -13,30 +14,56 @@ function formatKst(iso: string | null) {
   return new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
+function formatIgHandle(influencer: Influencer) {
+  const raw =
+    influencer.instagram_handle_normalized ||
+    influencer.instagram_handle ||
+    "";
+  const normalized = raw.replace(/^@+/, "").trim();
+  return normalized ? `@${normalized}` : "—";
+}
+
+function isPickedUp(item: AllocationWithRelations) {
+  return item.status === "picked_up" || Boolean(item.picked_up_at);
+}
+
+function sortByPickup(items: AllocationWithRelations[]) {
+  return [...items].sort((a, b) => {
+    const aDone = isPickedUp(a) ? 1 : a.status === "cancelled" ? 2 : 0;
+    const bDone = isPickedUp(b) ? 1 : b.status === "cancelled" ? 2 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
+
+type Step = "review" | "confirm";
+
 export function InfAllocationList({
+  influencer,
   initialAllocations,
 }: {
+  influencer: Influencer;
   initialAllocations: AllocationWithRelations[];
 }) {
   const router = useRouter();
-  const [allocations, setAllocations] = useState(initialAllocations);
+  const [allocations, setAllocations] = useState(() =>
+    sortByPickup(initialAllocations),
+  );
   const [selected, setSelected] = useState<AllocationWithRelations | null>(
     null,
   );
+  const [step, setStep] = useState<Step>("review");
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setAllocations(initialAllocations);
+    setAllocations(sortByPickup(initialAllocations));
   }, [initialAllocations]);
 
   useEffect(() => {
     if (!selected) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setSelected(null);
-        setError(null);
-      }
+      if (e.key === "Escape") closeModal();
     };
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -46,6 +73,18 @@ export function InfAllocationList({
       document.body.style.overflow = prev;
     };
   }, [selected]);
+
+  function closeModal() {
+    setSelected(null);
+    setStep("review");
+    setError(null);
+  }
+
+  function openItem(item: AllocationWithRelations) {
+    setSelected(item);
+    setStep("review");
+    setError(null);
+  }
 
   async function confirmPickup() {
     if (!selected) return;
@@ -61,11 +100,14 @@ export function InfAllocationList({
 
       const updated = body.allocation as AllocationWithRelations;
       setAllocations((prev) =>
-        prev.map((a) => (a.id === updated.id ? { ...a, ...updated } : a)),
+        sortByPickup(
+          prev.map((a) => (a.id === updated.id ? { ...a, ...updated } : a)),
+        ),
       );
       setSelected((prev) =>
         prev && prev.id === updated.id ? { ...prev, ...updated } : prev,
       );
+      setStep("review");
       router.refresh();
     } catch (err: unknown) {
       setError(
@@ -82,42 +124,94 @@ export function InfAllocationList({
     );
   }
 
+  const alreadyPickedUp = selected ? isPickedUp(selected) : false;
+  const cancelled = selected?.status === "cancelled";
+  const pendingCount = allocations.filter(
+    (a) => !isPickedUp(a) && a.status !== "cancelled",
+  ).length;
+  const pickedCount = allocations.filter((a) => isPickedUp(a)).length;
+
   return (
     <>
+      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+        <span className="inline-flex items-center gap-2 border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-[var(--accent)]">
+          <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
+          수령 대기 {pendingCount}
+        </span>
+        <span className="inline-flex items-center gap-2 border border-[#8a7a5c] bg-[#efe8d8] px-3 py-1.5 text-[#5c4f35]">
+          <span className="h-2 w-2 rounded-full bg-[#8a7a5c]" />
+          수령 완료 {pickedCount}
+        </span>
+      </div>
       <p className="mb-3 text-sm text-[var(--muted)]">
-        상품을 누르면 약사가 수령을 확인할 수 있습니다.
+        상품을 누르면 내용을 확인한 뒤 약사가 수령을 체크할 수 있습니다. 수령
+        확인 후에는 취소할 수 없습니다.
       </p>
       <ul className="space-y-3">
-        {allocations.map((item) => (
-          <li key={item.id}>
-            <button
-              type="button"
-              onClick={() => {
-                setSelected(item);
-                setError(null);
-              }}
-              className="grid w-full gap-2 border border-[var(--line)] bg-[var(--surface)] p-5 text-left transition hover:border-[var(--accent)] md:grid-cols-[1fr_auto]"
-            >
-              <div>
-                <p className="text-lg font-medium">
-                  {item.products?.name || "상품"}
-                </p>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  {item.stores?.name || "매장"} · 수량 {item.quantity}
-                  {item.products?.sku ? ` · SKU ${item.products.sku}` : ""}
-                </p>
-                {item.picked_up_at && (
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    수령 {formatKst(item.picked_up_at)}
+        {allocations.map((item) => {
+          const done = isPickedUp(item);
+          const isCancelled = item.status === "cancelled";
+
+          const cardClass = done
+            ? "border-[#c4b79a] bg-[#f3eee3] hover:border-[#8a7a5c]"
+            : isCancelled
+              ? "border-[var(--line)] bg-[var(--surface)] opacity-60 hover:border-[var(--line)]"
+              : "border-[var(--accent)] bg-[var(--accent-soft)] hover:brightness-[0.98]";
+
+          const badgeClass = done
+            ? "border border-[#8a7a5c] bg-[#efe8d8] text-[#5c4f35]"
+            : isCancelled
+              ? "border border-[var(--line)] bg-[var(--surface)] text-[var(--muted)]"
+              : "border border-[var(--accent)] bg-white/70 text-[var(--accent)]";
+
+          const statusLabel = done
+            ? "수령 완료"
+            : isCancelled
+              ? ALLOCATION_STATUS_LABEL.cancelled
+              : "수령 대기";
+
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                onClick={() => openItem(item)}
+                className={`grid w-full gap-2 border p-5 text-left transition md:grid-cols-[1fr_auto] ${cardClass}`}
+              >
+                <div>
+                  <p
+                    className={`text-xs font-medium tracking-[0.14em] uppercase ${
+                      done
+                        ? "text-[#8a7a5c]"
+                        : isCancelled
+                          ? "text-[var(--muted)]"
+                          : "text-[var(--accent)]"
+                    }`}
+                  >
+                    {statusLabel}
                   </p>
-                )}
-              </div>
-              <div className="text-sm text-[var(--accent)]">
-                {ALLOCATION_STATUS_LABEL[item.status]}
-              </div>
-            </button>
-          </li>
-        ))}
+                  <p className="mt-1 text-lg font-medium text-[var(--ink)]">
+                    {item.products?.name || "상품"}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    {item.stores?.name || "매장"} · 수량 {item.quantity}
+                    {item.products?.sku ? ` · SKU ${item.products.sku}` : ""}
+                    {item.visit_date ? ` · 방문 ${item.visit_date}` : ""}
+                  </p>
+                  {item.picked_up_at && (
+                    <p className="mt-1 text-xs text-[#5c4f35]">
+                      수령 {formatKst(item.picked_up_at)}
+                    </p>
+                  )}
+                </div>
+                <div
+                  className={`self-start px-3 py-1.5 text-sm font-medium ${badgeClass}`}
+                >
+                  {statusLabel}
+                </div>
+              </button>
+            </li>
+          );
+        })}
       </ul>
 
       {selected && (
@@ -125,95 +219,184 @@ export function InfAllocationList({
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
           role="dialog"
           aria-modal="true"
-          aria-label="수령 확인"
-          onClick={() => {
-            setSelected(null);
-            setError(null);
-          }}
+          aria-label={step === "confirm" ? "수령 최종 확인" : "수령 정보 확인"}
+          onClick={closeModal}
         >
           <div
-            className="w-full max-w-md border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl"
+            className="max-h-[85vh] w-full max-w-md overflow-y-auto border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs tracking-[0.2em] text-[var(--accent)] uppercase">
-                  Pickup
+                  {step === "confirm" ? "Confirm" : "Review"}
                 </p>
                 <h3
                   className="mt-1 text-2xl text-[var(--ink)]"
                   style={{ fontFamily: "var(--font-display), serif" }}
                 >
-                  {selected.products?.name || "상품"}
+                  {step === "confirm" ? "수령 최종 확인" : "수령 정보 확인"}
                 </h3>
                 <p className="mt-2 text-sm text-[var(--muted)]">
-                  {selected.stores?.name || "매장"} · 수량 {selected.quantity}
-                  {selected.products?.sku
-                    ? ` · SKU ${selected.products.sku}`
-                    : ""}
+                  {step === "confirm"
+                    ? "아래 내용이 맞는지 다시 확인한 뒤 수령을 확정하세요."
+                    : "상품·수량·매장 정보를 확인하세요."}
                 </p>
               </div>
               <button
                 type="button"
                 className="text-sm text-[var(--muted)] hover:text-[var(--ink)]"
-                onClick={() => {
-                  setSelected(null);
-                  setError(null);
-                }}
+                onClick={closeModal}
               >
                 닫기
               </button>
             </div>
 
-            <dl className="mb-5 grid gap-3 sm:grid-cols-2">
-              <div>
-                <dt className="text-xs text-[var(--muted)]">상태</dt>
-                <dd className="mt-1 text-sm font-medium text-[var(--accent)]">
-                  {ALLOCATION_STATUS_LABEL[selected.status]}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-[var(--muted)]">수령 시간</dt>
-                <dd className="mt-1 text-sm">
-                  {formatKst(selected.picked_up_at)}
-                </dd>
-              </div>
-            </dl>
+            <div className="mb-5 border border-[var(--line)] bg-white/60 p-4">
+              <p className="mb-3 text-xs tracking-[0.16em] text-[var(--muted)] uppercase">
+                요약
+              </p>
+              <dl className="grid gap-3">
+                <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
+                  <dt className="text-xs text-[var(--muted)]">인플루언서</dt>
+                  <dd className="text-sm font-medium">
+                    {influencer.name}
+                    <span className="ml-2 font-normal text-[var(--accent)]">
+                      {formatIgHandle(influencer)}
+                    </span>
+                  </dd>
+                </div>
+                <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
+                  <dt className="text-xs text-[var(--muted)]">상품</dt>
+                  <dd className="text-sm font-medium">
+                    {selected.products?.name || "상품"}
+                  </dd>
+                </div>
+                {selected.products?.sku && (
+                  <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
+                    <dt className="text-xs text-[var(--muted)]">SKU</dt>
+                    <dd className="text-sm">{selected.products.sku}</dd>
+                  </div>
+                )}
+                {selected.products?.description && (
+                  <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
+                    <dt className="text-xs text-[var(--muted)]">설명</dt>
+                    <dd className="text-sm text-[var(--muted)]">
+                      {selected.products.description}
+                    </dd>
+                  </div>
+                )}
+                <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
+                  <dt className="text-xs text-[var(--muted)]">수량</dt>
+                  <dd className="text-sm font-medium">{selected.quantity}</dd>
+                </div>
+                <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
+                  <dt className="text-xs text-[var(--muted)]">매장</dt>
+                  <dd className="text-sm">
+                    {selected.stores?.name || "매장"}
+                    {selected.stores?.address
+                      ? ` · ${selected.stores.address}`
+                      : ""}
+                  </dd>
+                </div>
+                {selected.visit_date && (
+                  <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
+                    <dt className="text-xs text-[var(--muted)]">방문 예정일</dt>
+                    <dd className="text-sm font-medium">{selected.visit_date}</dd>
+                  </div>
+                )}
+                {selected.visit_code && (
+                  <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
+                    <dt className="text-xs text-[var(--muted)]">방문 코드</dt>
+                    <dd className="text-sm font-medium">{selected.visit_code}</dd>
+                  </div>
+                )}
+                <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
+                  <dt className="text-xs text-[var(--muted)]">수령 여부</dt>
+                  <dd
+                    className={`text-sm font-medium ${
+                      alreadyPickedUp
+                        ? "text-[#5c4f35]"
+                        : cancelled
+                          ? "text-[var(--muted)]"
+                          : "text-[var(--accent)]"
+                    }`}
+                  >
+                    {alreadyPickedUp
+                      ? "수령 완료"
+                      : cancelled
+                        ? ALLOCATION_STATUS_LABEL.cancelled
+                        : "수령 대기"}
+                  </dd>
+                </div>
+                {selected.picked_up_at && (
+                  <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
+                    <dt className="text-xs text-[var(--muted)]">수령 시간</dt>
+                    <dd className="text-sm">
+                      {formatKst(selected.picked_up_at)}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </div>
 
             {error && <p className="mb-4 text-sm text-[var(--danger)]">{error}</p>}
 
-            {selected.status === "picked_up" ? (
-              <p className="border border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--accent)]">
+            {alreadyPickedUp ? (
+              <p className="border border-[#8a7a5c] bg-[#efe8d8] px-4 py-3 text-sm text-[#5c4f35]">
                 수령 확인 완료
                 {selected.picked_up_at
                   ? ` · ${formatKst(selected.picked_up_at)}`
                   : ""}
               </p>
-            ) : selected.status === "cancelled" ? (
+            ) : cancelled ? (
               <p className="text-sm text-[var(--muted)]">
                 취소된 배정은 수령 확인할 수 없습니다.
               </p>
-            ) : (
+            ) : step === "review" ? (
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
                   className={primaryBtnClass}
-                  disabled={confirming}
-                  onClick={confirmPickup}
+                  onClick={() => setStep("confirm")}
                 >
-                  {confirming ? "확인 중…" : "약사 수령 확인"}
+                  다음 : 수령확인 
                 </button>
                 <button
                   type="button"
                   className={secondaryBtnClass}
-                  disabled={confirming}
-                  onClick={() => {
-                    setSelected(null);
-                    setError(null);
-                  }}
+                  onClick={closeModal}
                 >
-                  취소
+                  닫기
                 </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="border border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--accent)]">
+                  수령 확정 후에는 취소할 수 없습니다. 위 요약이 맞다면 최종
+                  확인을 눌러 주세요.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    className={primaryBtnClass}
+                    disabled={confirming}
+                    onClick={confirmPickup}
+                  >
+                    {confirming ? "확인 중…" : "최종 수령 확인"}
+                  </button>
+                  <button
+                    type="button"
+                    className={secondaryBtnClass}
+                    disabled={confirming}
+                    onClick={() => {
+                      setStep("review");
+                      setError(null);
+                    }}
+                  >
+                    뒤로
+                  </button>
+                </div>
               </div>
             )}
           </div>

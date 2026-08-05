@@ -72,6 +72,20 @@ export async function createAllocation(formData: FormData) {
   const store_id = String(formData.get("store_id") || "");
   const quantity = Number(formData.get("quantity") || 1);
   const visit_code = String(formData.get("visit_code") || "").trim() || null;
+  const visit_date_raw = String(formData.get("visit_date") || "").trim();
+  const visit_date = visit_date_raw || null;
+
+  if (!visit_date) {
+    redirect(
+      `/admin?tab=allocations&error=${encodeURIComponent("방문 예정일을 입력하세요.")}`,
+    );
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(visit_date)) {
+    redirect(
+      `/admin?tab=allocations&error=${encodeURIComponent("방문 예정일 형식이 올바르지 않습니다.")}`,
+    );
+  }
 
   const { error } = await supabase.from("allocations").insert({
     influencer_id,
@@ -79,6 +93,7 @@ export async function createAllocation(formData: FormData) {
     store_id,
     quantity,
     visit_code,
+    visit_date,
     status: "pending",
   });
 

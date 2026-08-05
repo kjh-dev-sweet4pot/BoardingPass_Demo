@@ -138,7 +138,10 @@ function InfluencerPass({
         </p>
       </section>
 
-      <InfAllocationList initialAllocations={allocations} />
+      <InfAllocationList
+        influencer={influencer}
+        initialAllocations={allocations}
+      />
     </div>
   );
 }

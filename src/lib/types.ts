@@ -38,6 +38,8 @@ export type Allocation = {
   quantity: number;
   status: AllocationStatus;
   visit_code: string | null;
+  /** 방문 예정일 (YYYY-MM-DD) */
+  visit_date: string | null;
   verified_at: string | null;
   picked_up_at: string | null;
   created_at: string;
