@@ -7,6 +7,7 @@ import {
   createStore,
 } from "@/app/actions/admin";
 import { signOut } from "@/app/actions/auth";
+import { AdminImportPanel } from "@/components/admin-import-panel";
 import {
   AppShell,
   Field,
@@ -27,6 +28,7 @@ import {
 
 const TABS = [
   "allocations",
+  "import",
   "influencers",
   "products",
   "stores",
@@ -91,6 +93,7 @@ export default async function AdminPage({
         ))}
       </nav>
 
+      {tab === "import" && <AdminImportPanel />}
       {tab === "stores" && <StoresPanel stores={(stores as Store[]) || []} />}
       {tab === "products" && (
         <ProductsPanel products={(products as Product[]) || []} />
