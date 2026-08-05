@@ -29,28 +29,30 @@ async function findOrCreateInfluencer(
 
   const { data: existing } = await supabase
     .from("influencers")
-    .select("id, notes")
+    .select("id, sns_url")
     .eq("instagram_handle_normalized", row.snsid)
     .maybeSingle();
 
   if (existing?.id) {
-    if (row.snsurl && !(existing.notes || "").includes(row.snsurl)) {
-      const notes = [existing.notes, `URL: ${row.snsurl}`]
-        .filter(Boolean)
-        .join(" · ");
-      await supabase.from("influencers").update({ notes }).eq("id", existing.id);
+    if (row.snsurl && row.snsurl !== existing.sns_url) {
+      await supabase
+        .from("influencers")
+        .update({
+          sns_url: row.snsurl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
     }
     cache.set(row.snsid, existing.id);
     return existing.id as string;
   }
 
-  const notes = row.snsurl ? `URL: ${row.snsurl}` : null;
   const { data: created, error } = await supabase
     .from("influencers")
     .insert({
       name: row.name,
       instagram_handle: row.snsid,
-      notes,
+      sns_url: row.snsurl,
     })
     .select("id")
     .single();

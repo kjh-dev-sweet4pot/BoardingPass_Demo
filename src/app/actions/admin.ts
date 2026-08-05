@@ -48,22 +48,22 @@ export async function createManualAllocation(formData: FormData) {
   if (!Number.isFinite(quantity) || quantity < 1) fail("수량이 올바르지 않습니다.");
 
   const displayName = name || snsid;
-  const notes = snsurl ? `URL: ${snsurl}` : null;
 
   let influencerId: string;
   const { data: existingInf } = await supabase
     .from("influencers")
-    .select("id, notes")
+    .select("id, sns_url")
     .eq("instagram_handle_normalized", snsid)
     .maybeSingle();
 
   if (existingInf?.id) {
     influencerId = existingInf.id;
-    if (snsurl && !(existingInf.notes || "").includes(snsurl)) {
+    if (snsurl && snsurl !== existingInf.sns_url) {
       await supabase
         .from("influencers")
         .update({
-          notes: [existingInf.notes, `URL: ${snsurl}`].filter(Boolean).join(" · "),
+          sns_url: snsurl,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", influencerId);
     }
@@ -73,7 +73,7 @@ export async function createManualAllocation(formData: FormData) {
       .insert({
         name: displayName,
         instagram_handle: snsid,
-        notes,
+        sns_url: snsurl,
       })
       .select("id")
       .single();

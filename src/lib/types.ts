@@ -17,6 +17,8 @@ export type Influencer = {
   name: string;
   instagram_handle: string;
   instagram_handle_normalized: string;
+  /** SNS 프로필 URL */
+  sns_url: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

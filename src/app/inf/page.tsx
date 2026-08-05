@@ -134,8 +134,22 @@ function InfluencerPass({
           {influencer.name}
         </h2>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          본인확인 완료. 아래 상품을 확인한 후 매장에서 수령하세요. 
+          본인확인 완료. 아래 상품을 확인한 후 매장에서 수령하세요.
         </p>
+        {influencer.sns_url ? (
+          <a
+            href={
+              /^https?:\/\//i.test(influencer.sns_url)
+                ? influencer.sns_url
+                : `https://${influencer.sns_url}`
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-block text-sm text-[var(--accent)] underline underline-offset-2"
+          >
+            SNS 프로필 열기
+          </a>
+        ) : null}
       </section>
 
       <InfAllocationList

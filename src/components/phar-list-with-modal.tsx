@@ -40,6 +40,13 @@ function formatIgHandle(
   return normalized ? `@${normalized}` : null;
 }
 
+function formatSnsUrl(url?: string | null) {
+  const raw = (url || "").trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw}`;
+}
+
 function statusTone(status: AllocationWithRelations["status"]) {
   if (status === "picked_up") {
     return "border-[#c4b79a] bg-[#efe8d8] text-[#5c4f35]";
@@ -346,9 +353,21 @@ export function PharListWithModal({
                       <td className="px-4 py-3.5 font-medium text-[var(--ink)]">
                         {item.influencers?.name || "인플루언서"}
                       </td>
-                      <td className="px-4 py-3.5 text-[var(--accent)]">
-                        {handle || "—"}
-                      </td>
+                    <td className="px-4 py-3.5 text-[var(--accent)]">
+                      {formatSnsUrl(item.influencers?.sns_url) ? (
+                        <a
+                          href={formatSnsUrl(item.influencers?.sns_url)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {handle || "프로필"}
+                        </a>
+                      ) : (
+                        handle || "—"
+                      )}
+                    </td>
                       <td className="px-4 py-3.5">
                         <span className="text-[var(--ink)]">
                           {item.products?.name || "상품"}
@@ -415,6 +434,17 @@ export function PharListWithModal({
                     {formatIgHandle(detail.influencer) || "핸들 없음"}
                   </p>
                 )}
+                {detail && formatSnsUrl(detail.influencer.sns_url) && (
+                  <a
+                    href={formatSnsUrl(detail.influencer.sns_url)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 block text-sm text-[var(--muted)] underline underline-offset-2 hover:text-[var(--accent)]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {formatSnsUrl(detail.influencer.sns_url)}
+                  </a>
+                )}
               </div>
               <button
                 type="button"
@@ -438,11 +468,29 @@ export function PharListWithModal({
                   </p>
                 )}
 
-                <dl className="grid gap-4 border border-[var(--line)] bg-white/50 px-4 py-3 sm:grid-cols-3">
+                <dl className="grid gap-4 border border-[var(--line)] bg-white/50 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <dt className="text-xs text-[var(--muted)]">SNS 핸들</dt>
                     <dd className="mt-1 text-sm font-medium">
                       {formatIgHandle(detail.influencer) || "등록된 핸들 없음"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--muted)]">SNS URL</dt>
+                    <dd className="mt-1 text-sm font-medium break-all">
+                      {formatSnsUrl(detail.influencer.sns_url) ? (
+                        <a
+                          href={formatSnsUrl(detail.influencer.sns_url)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[var(--accent)] underline underline-offset-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          프로필 열기
+                        </a>
+                      ) : (
+                        "—"
+                      )}
                     </dd>
                   </div>
                   <div>

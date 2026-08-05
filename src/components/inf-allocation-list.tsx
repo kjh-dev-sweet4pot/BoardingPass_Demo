@@ -54,6 +54,13 @@ function formatIgHandle(influencer: Influencer) {
   return normalized ? `@${normalized}` : "—";
 }
 
+function formatSnsUrl(url?: string | null) {
+  const raw = (url || "").trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw}`;
+}
+
 function isPickedUp(item: AllocationWithRelations) {
   return item.status === "picked_up" || Boolean(item.picked_up_at);
 }
@@ -367,6 +374,16 @@ export function InfAllocationList({
                     <span className="ml-2 font-normal text-[var(--accent)]">
                       {formatIgHandle(influencer)}
                     </span>
+                    {formatSnsUrl(influencer.sns_url) ? (
+                      <a
+                        href={formatSnsUrl(influencer.sns_url)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-2 text-xs font-normal text-[var(--muted)] underline underline-offset-2 hover:text-[var(--accent)]"
+                      >
+                        프로필
+                      </a>
+                    ) : null}
                   </dd>
                 </div>
                 <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
