@@ -14,6 +14,37 @@ function formatKst(iso: string | null) {
   return new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
+function todayYmdKst() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function visitDateYmd(item: AllocationWithRelations) {
+  return item.visit_date ? String(item.visit_date).slice(0, 10) : null;
+}
+
+function isVisitToday(item: AllocationWithRelations) {
+  const visit = visitDateYmd(item);
+  return Boolean(visit && visit === todayYmdKst());
+}
+
+function formatVisitDateKo(ymd: string | null) {
+  if (!ymd) return null;
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return ymd;
+  return `${m}월 ${d}일`;
+}
+
+function visitBlockedMessage(item: AllocationWithRelations) {
+  const label = formatVisitDateKo(visitDateYmd(item));
+  if (!label) return "방문 예정일이 등록되지 않아 수령할 수 없습니다.";
+  return `${label} 방문시 수령할 수 있습니다!`;
+}
+
 function formatIgHandle(influencer: Influencer) {
   const raw =
     influencer.instagram_handle_normalized ||
@@ -29,14 +60,20 @@ function isPickedUp(item: AllocationWithRelations) {
 
 function sortByPickup(items: AllocationWithRelations[]) {
   return [...items].sort((a, b) => {
-    const aDone = isPickedUp(a) ? 1 : a.status === "cancelled" ? 2 : 0;
-    const bDone = isPickedUp(b) ? 1 : b.status === "cancelled" ? 2 : 0;
-    if (aDone !== bDone) return aDone - bDone;
+    const rank = (item: AllocationWithRelations) => {
+      if (isPickedUp(item)) return 2;
+      if (item.status === "cancelled") return 3;
+      if (isVisitToday(item)) return 0;
+      return 1;
+    };
+    const diff = rank(a) - rank(b);
+    if (diff !== 0) return diff;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 }
 
 type Step = "review" | "confirm";
+type ModalMode = "pickup" | "blocked";
 
 export function InfAllocationList({
   influencer,
@@ -52,6 +89,7 @@ export function InfAllocationList({
   const [selected, setSelected] = useState<AllocationWithRelations | null>(
     null,
   );
+  const [modalMode, setModalMode] = useState<ModalMode>("pickup");
   const [step, setStep] = useState<Step>("review");
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,18 +114,29 @@ export function InfAllocationList({
 
   function closeModal() {
     setSelected(null);
+    setModalMode("pickup");
     setStep("review");
     setError(null);
   }
 
   function openItem(item: AllocationWithRelations) {
+    const done = isPickedUp(item);
+    const blocked =
+      !done && item.status !== "cancelled" && !isVisitToday(item);
+
     setSelected(item);
+    setModalMode(blocked ? "blocked" : "pickup");
     setStep("review");
     setError(null);
   }
 
   async function confirmPickup() {
     if (!selected) return;
+    if (!isVisitToday(selected)) {
+      setError(visitBlockedMessage(selected));
+      return;
+    }
+
     setConfirming(true);
     setError(null);
 
@@ -127,7 +176,7 @@ export function InfAllocationList({
   const alreadyPickedUp = selected ? isPickedUp(selected) : false;
   const cancelled = selected?.status === "cancelled";
   const pendingCount = allocations.filter(
-    (a) => !isPickedUp(a) && a.status !== "cancelled",
+    (a) => !isPickedUp(a) && a.status !== "cancelled" && isVisitToday(a),
   ).length;
   const pickedCount = allocations.filter((a) => isPickedUp(a)).length;
 
@@ -136,7 +185,7 @@ export function InfAllocationList({
       <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
         <span className="inline-flex items-center gap-2 border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-[var(--accent)]">
           <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
-          수령 대기 {pendingCount}
+          오늘 수령 가능 {pendingCount}
         </span>
         <span className="inline-flex items-center gap-2 border border-[#8a7a5c] bg-[#efe8d8] px-3 py-1.5 text-[#5c4f35]">
           <span className="h-2 w-2 rounded-full bg-[#8a7a5c]" />
@@ -144,31 +193,35 @@ export function InfAllocationList({
         </span>
       </div>
       <p className="mb-3 text-sm text-[var(--muted)]">
-        상품을 누르면 내용을 확인한 뒤 약사가 수령을 체크할 수 있습니다. 수령
-        확인 후에는 취소할 수 없습니다.
+        오늘 방문 예정인 상품만 수령 확인할 수 있습니다. 수령 확인 후에는
+        취소할 수 없습니다.
       </p>
       <ul className="space-y-3">
         {allocations.map((item) => {
           const done = isPickedUp(item);
           const isCancelled = item.status === "cancelled";
+          const notToday =
+            !done && !isCancelled && !isVisitToday(item);
 
           const cardClass = done
             ? "border-[#c4b79a] bg-[#f3eee3] hover:border-[#8a7a5c]"
-            : isCancelled
-              ? "border-[var(--line)] bg-[var(--surface)] opacity-60 hover:border-[var(--line)]"
+            : isCancelled || notToday
+              ? "cursor-pointer border-[#cfd4d1] bg-[#e8ebe9] text-[var(--muted)] hover:border-[#b5bbb8]"
               : "border-[var(--accent)] bg-[var(--accent-soft)] hover:brightness-[0.98]";
 
           const badgeClass = done
             ? "border border-[#8a7a5c] bg-[#efe8d8] text-[#5c4f35]"
-            : isCancelled
-              ? "border border-[var(--line)] bg-[var(--surface)] text-[var(--muted)]"
+            : isCancelled || notToday
+              ? "border border-[#c5cbc7] bg-[#dfe3e1] text-[#6b736e]"
               : "border border-[var(--accent)] bg-white/70 text-[var(--accent)]";
 
           const statusLabel = done
             ? "수령 완료"
             : isCancelled
               ? ALLOCATION_STATUS_LABEL.cancelled
-              : "수령 대기";
+              : notToday
+                ? "방문 예정"
+                : "수령 대기";
 
           return (
             <li key={item.id}>
@@ -182,14 +235,20 @@ export function InfAllocationList({
                     className={`text-xs font-medium tracking-[0.14em] uppercase ${
                       done
                         ? "text-[#8a7a5c]"
-                        : isCancelled
-                          ? "text-[var(--muted)]"
+                        : isCancelled || notToday
+                          ? "text-[#6b736e]"
                           : "text-[var(--accent)]"
                     }`}
                   >
                     {statusLabel}
                   </p>
-                  <p className="mt-1 text-lg font-medium text-[var(--ink)]">
+                  <p
+                    className={`mt-1 text-lg font-medium ${
+                      notToday || isCancelled
+                        ? "text-[#5d6660]"
+                        : "text-[var(--ink)]"
+                    }`}
+                  >
                     {item.products?.name || "상품"}
                   </p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
@@ -197,6 +256,11 @@ export function InfAllocationList({
                     {item.products?.sku ? ` · SKU ${item.products.sku}` : ""}
                     {item.visit_date ? ` · 방문 ${item.visit_date}` : ""}
                   </p>
+                  {notToday && (
+                    <p className="mt-1 text-xs text-[#6b736e]">
+                      {visitBlockedMessage(item)}
+                    </p>
+                  )}
                   {item.picked_up_at && (
                     <p className="mt-1 text-xs text-[#5c4f35]">
                       수령 {formatKst(item.picked_up_at)}
@@ -214,7 +278,46 @@ export function InfAllocationList({
         })}
       </ul>
 
-      {selected && (
+      {selected && modalMode === "blocked" && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="방문 예정 안내"
+          onClick={closeModal}
+        >
+          <div
+            className="w-full max-w-md border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-xs tracking-[0.2em] text-[var(--muted)] uppercase">
+              Notice
+            </p>
+            <h3
+              className="mt-1 text-2xl text-[var(--ink)]"
+              style={{ fontFamily: "var(--font-display), serif" }}
+            >
+              오늘은 수령할 수 없습니다
+            </h3>
+            <p className="mt-4 border border-[#cfd4d1] bg-[#e8ebe9] px-4 py-3 text-sm text-[#5d6660]">
+              {visitBlockedMessage(selected)}
+            </p>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              {selected.products?.name || "상품"} ·{" "}
+              {selected.stores?.name || "매장"} · 수량 {selected.quantity}
+            </p>
+            <button
+              type="button"
+              className={`${secondaryBtnClass} mt-5`}
+              onClick={closeModal}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {selected && modalMode === "pickup" && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
           role="dialog"
@@ -240,7 +343,7 @@ export function InfAllocationList({
                 <p className="mt-2 text-sm text-[var(--muted)]">
                   {step === "confirm"
                     ? "아래 내용이 맞는지 다시 확인한 뒤 수령을 확정하세요."
-                    : "상품·수량·매장 정보를 확인하세요."}
+                    : "관계자에게 제시 후 상품을 수령하세요."}
                 </p>
               </div>
               <button
@@ -360,7 +463,7 @@ export function InfAllocationList({
                   className={primaryBtnClass}
                   onClick={() => setStep("confirm")}
                 >
-                  다음 : 수령확인 
+                  다음 : 수령확인
                 </button>
                 <button
                   type="button"
