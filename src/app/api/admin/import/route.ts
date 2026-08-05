@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isAdminSession } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import {
@@ -15,8 +15,12 @@ type ImportResult = {
   error?: string;
 };
 
+/** DB 스키마 제네릭이 없으면 from()/select() 결과가 never로 추론됨 */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AdminSupabase = SupabaseClient<any>;
+
 async function findOrCreateInfluencer(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AdminSupabase,
   row: ParsedImportRow,
   cache: Map<string, string>,
 ) {
@@ -37,7 +41,7 @@ async function findOrCreateInfluencer(
       await supabase.from("influencers").update({ notes }).eq("id", existing.id);
     }
     cache.set(row.snsid, existing.id);
-    return existing.id;
+    return existing.id as string;
   }
 
   const notes = row.snsurl ? `URL: ${row.snsurl}` : null;
@@ -57,7 +61,7 @@ async function findOrCreateInfluencer(
 }
 
 async function findOrCreateStore(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AdminSupabase,
   name: string,
   cache: Map<string, string>,
 ) {
@@ -89,7 +93,7 @@ async function findOrCreateStore(
 }
 
 async function findOrCreateProduct(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AdminSupabase,
   name: string,
   cache: Map<string, string>,
 ) {
@@ -164,7 +168,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createClient(url, key);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: AdminSupabase = createClient<any>(url, key);
   const influencerCache = new Map<string, string>();
   const storeCache = new Map<string, string>();
   const productCache = new Map<string, string>();
