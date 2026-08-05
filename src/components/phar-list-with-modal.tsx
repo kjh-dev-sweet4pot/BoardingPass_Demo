@@ -31,6 +31,19 @@ function formatIgHandle(
   return normalized ? `@${normalized}` : null;
 }
 
+function statusTone(status: AllocationWithRelations["status"]) {
+  if (status === "picked_up") {
+    return "border-[#c4b79a] bg-[#efe8d8] text-[#5c4f35]";
+  }
+  if (status === "cancelled") {
+    return "border-[var(--line)] bg-[#e8ebe9] text-[var(--muted)]";
+  }
+  if (status === "verified" || status === "ready") {
+    return "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]";
+  }
+  return "border-[var(--line)] bg-white text-[var(--muted)]";
+}
+
 export function PharListWithModal({
   items,
 }: {
@@ -88,48 +101,76 @@ export function PharListWithModal({
 
   return (
     <>
-      <ul className="space-y-3">
-        {items.length === 0 && (
-          <li className="text-sm text-[var(--muted)]">
-            조건에 맞는 배정이 없습니다.
-          </li>
-        )}
-        {items.map((item) => {
-          const handle = formatIgHandle(item.influencers);
-          return (
-            <li key={item.id}>
-              <button
-                type="button"
-                onClick={() => setOpenId(item.influencer_id)}
-                className="grid w-full gap-2 border border-[var(--line)] bg-[var(--surface)] p-5 text-left transition hover:border-[var(--accent)] md:grid-cols-[1fr_auto]"
-              >
-                <div>
-                  <p className="text-lg font-medium">
-                    {item.influencers?.name || "인플루언서"}
-                    {handle ? (
-                      <span className="ml-2 text-base font-normal text-[var(--accent)]">
-                        {handle}
+      {items.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]">
+          조건에 맞는 배정이 없습니다.
+        </p>
+      ) : (
+        <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
+          <table className="min-w-[920px] w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/50 text-xs tracking-[0.08em] text-[var(--muted)] uppercase">
+                <th className="px-4 py-3 font-medium">이름</th>
+                <th className="px-4 py-3 font-medium">계정</th>
+                <th className="px-4 py-3 font-medium">상품</th>
+                <th className="px-4 py-3 font-medium">매장</th>
+                <th className="px-4 py-3 font-medium text-right">수량</th>
+                <th className="px-4 py-3 font-medium">방문일</th>
+                <th className="px-4 py-3 font-medium">상태</th>
+                <th className="px-4 py-3 font-medium text-right">상세</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => {
+                const handle = formatIgHandle(item.influencers);
+                return (
+                  <tr
+                    key={item.id}
+                    className="cursor-pointer border-b border-[var(--line)] last:border-b-0 transition hover:bg-[var(--accent-soft)]/40"
+                    onClick={() => setOpenId(item.influencer_id)}
+                  >
+                    <td className="px-4 py-3.5 font-medium text-[var(--ink)]">
+                      {item.influencers?.name || "인플루언서"}
+                    </td>
+                    <td className="px-4 py-3.5 text-[var(--accent)]">
+                      {handle || "—"}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className="text-[var(--ink)]">
+                        {item.products?.name || "상품"}
                       </span>
-                    ) : null}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    {item.products?.name || "상품"} ·{" "}
-                    {item.stores?.name || "매장"} · 수량 {item.quantity}
-                    {item.visit_code ? ` · code ${item.visit_code}` : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    {formatKst(item.created_at)}
-                  </p>
-                  <p className="mt-2 text-xs text-[var(--accent)]">상세 보기</p>
-                </div>
-                <div className="text-sm text-[var(--accent)]">
-                  {ALLOCATION_STATUS_LABEL[item.status]}
-                </div>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                      {item.products?.sku ? (
+                        <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                          SKU {item.products.sku}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3.5 text-[var(--muted)]">
+                      {item.stores?.name || "매장"}
+                    </td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-[var(--ink)]">
+                      {item.quantity}
+                    </td>
+                    <td className="px-4 py-3.5 tabular-nums text-[var(--muted)]">
+                      {item.visit_date || "—"}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span
+                        className={`inline-block border px-2.5 py-1 text-xs font-medium ${statusTone(item.status)}`}
+                      >
+                        {ALLOCATION_STATUS_LABEL[item.status]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-xs text-[var(--accent)]">
+                      보기 →
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {openId && (
         <div
@@ -140,10 +181,10 @@ export function PharListWithModal({
           onClick={() => setOpenId(null)}
         >
           <div
-            className="max-h-[85vh] w-full max-w-xl overflow-y-auto border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl"
+            className="max-h-[85vh] w-full max-w-3xl overflow-y-auto border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 flex items-start justify-between gap-4">
+            <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs tracking-[0.2em] text-[var(--accent)] uppercase">
                   Influencer
@@ -155,7 +196,7 @@ export function PharListWithModal({
                   {detail?.influencer.name || "불러오는 중…"}
                 </h2>
                 {detail && (
-                  <p className="mt-2 text-lg text-[var(--accent)]">
+                  <p className="mt-1 text-lg text-[var(--accent)]">
                     {formatIgHandle(detail.influencer) || "핸들 없음"}
                   </p>
                 )}
@@ -182,7 +223,7 @@ export function PharListWithModal({
                   </p>
                 )}
 
-                <dl className="grid gap-3 sm:grid-cols-2">
+                <dl className="grid gap-4 border border-[var(--line)] bg-white/50 px-4 py-3 sm:grid-cols-3">
                   <div>
                     <dt className="text-xs text-[var(--muted)]">SNS 핸들</dt>
                     <dd className="mt-1 text-sm font-medium">
@@ -210,41 +251,68 @@ export function PharListWithModal({
                   >
                     수령 배정
                   </h3>
-                  <ul className="space-y-2">
-                    {detail.allocations.length === 0 && (
-                      <li className="text-sm text-[var(--muted)]">
-                        배정된 상품이 없습니다.
-                      </li>
-                    )}
-                    {detail.allocations.map((item) => (
-                      <li
-                        key={item.id}
-                        className="border border-[var(--line)] bg-white/60 p-4"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="font-medium">
-                            {item.products?.name || "상품"}
-                          </p>
-                          <span className="text-sm text-[var(--accent)]">
-                            {ALLOCATION_STATUS_LABEL[item.status]}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm text-[var(--muted)]">
-                          {item.stores?.name || "매장"} · 수량 {item.quantity}
-                          {item.products?.sku
-                            ? ` · SKU ${item.products.sku}`
-                            : ""}
-                          {item.visit_code ? ` · code ${item.visit_code}` : ""}
-                        </p>
-                        <p className="mt-1 text-xs text-[var(--muted)]">
-                          배정 {formatKst(item.created_at)}
-                          {item.verified_at
-                            ? ` · 확인 ${formatKst(item.verified_at)}`
-                            : ""}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
+                  {detail.allocations.length === 0 ? (
+                    <p className="text-sm text-[var(--muted)]">
+                      배정된 상품이 없습니다.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto border border-[var(--line)]">
+                      <table className="min-w-[640px] w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/40 text-xs text-[var(--muted)]">
+                            <th className="px-3 py-2 font-medium">상품</th>
+                            <th className="px-3 py-2 font-medium">매장</th>
+                            <th className="px-3 py-2 font-medium text-right">
+                              수량
+                            </th>
+                            <th className="px-3 py-2 font-medium">방문일</th>
+                            <th className="px-3 py-2 font-medium">상태</th>
+                            <th className="px-3 py-2 font-medium">수령</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detail.allocations.map((item) => (
+                            <tr
+                              key={item.id}
+                              className="border-b border-[var(--line)] last:border-b-0"
+                            >
+                              <td className="px-3 py-2.5">
+                                <span className="font-medium">
+                                  {item.products?.name || "상품"}
+                                </span>
+                                {item.products?.sku ? (
+                                  <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                                    SKU {item.products.sku}
+                                  </span>
+                                ) : null}
+                              </td>
+                              <td className="px-3 py-2.5 text-[var(--muted)]">
+                                {item.stores?.name || "매장"}
+                              </td>
+                              <td className="px-3 py-2.5 text-right tabular-nums">
+                                {item.quantity}
+                              </td>
+                              <td className="px-3 py-2.5 tabular-nums text-[var(--muted)]">
+                                {item.visit_date || "—"}
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span
+                                  className={`inline-block border px-2 py-0.5 text-xs font-medium ${statusTone(item.status)}`}
+                                >
+                                  {ALLOCATION_STATUS_LABEL[item.status]}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-xs text-[var(--muted)]">
+                                {item.picked_up_at
+                                  ? formatKst(item.picked_up_at)
+                                  : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

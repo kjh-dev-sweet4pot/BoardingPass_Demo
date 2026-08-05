@@ -5,14 +5,20 @@ export function AppShell({
   title,
   children,
   actions,
+  wide = false,
 }: {
   eyebrow: string;
   title: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
+  wide?: boolean;
 }) {
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-6 py-10">
+    <main
+      className={`mx-auto min-h-screen w-full px-6 py-10 ${
+        wide ? "max-w-6xl" : "max-w-5xl"
+      }`}
+    >
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--line)] pb-6">
         <div>
           <Link href="/" className="text-xs tracking-[0.22em] text-[var(--muted)] uppercase">

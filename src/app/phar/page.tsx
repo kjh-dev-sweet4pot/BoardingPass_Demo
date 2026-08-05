@@ -30,7 +30,7 @@ export default async function PharPage({
 
   if (!configured) {
     return (
-      <AppShell eyebrow="Phar" title="매장 배정 현황">
+      <AppShell wide eyebrow="Phar" title="매장 배정 현황">
         <Notice error="ERR ENV..." />
       </AppShell>
     );
@@ -64,6 +64,7 @@ export default async function PharPage({
 
   return (
     <AppShell
+      wide
       eyebrow="Phar"
       title="매장 배정 현황"
       actions={
