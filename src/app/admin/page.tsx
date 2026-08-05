@@ -69,13 +69,16 @@ export default async function AdminPage({
             </h2>
             <form action={createManualAllocation} className="mt-4 grid gap-3">
               <Field label="이름">
-                <input className={fieldClass} name="name" placeholder="이름" />
+                <input 
+                className={fieldClass} 
+                name="name" 
+                placeholder="김미나" />
               </Field>
               <Field label="SNS_handle">
                 <input
                   className={fieldClass}
                   name="snsid"
-                  placeholder="@mina_beauty"
+                  placeholder="@velyMina"
                   required
                 />
               </Field>
@@ -83,7 +86,7 @@ export default async function AdminPage({
                 <input
                   className={fieldClass}
                   name="snsurl"
-                  placeholder="https://instagram.com/..."
+                  placeholder="https://instagram.com/@velymMna..."
                 />
               </Field>
               <Field label="방문 예정일">
@@ -106,7 +109,7 @@ export default async function AdminPage({
               </Field>
               {storeList.length === 0 && (
                 <p className="text-xs text-[var(--danger)]">
-                  등록된 지점이 없습니다. DB stores 테이블에 지점을 먼저 추가해
+                  등록된 지점이 없습니다. DB 내 stores 테이블에 지점을 먼저 추가해
                   주세요.
                 </p>
               )}
@@ -114,7 +117,7 @@ export default async function AdminPage({
                 <input
                   className={fieldClass}
                   name="product"
-                  placeholder="텔로액트 두피 스케일러"
+                  placeholder="OO뷰티 클렌징폼 2개"
                   required
                 />
               </Field>
@@ -150,7 +153,6 @@ export default async function AdminPage({
               배정 현황
             </h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              컬럼 필터로 검색 · 행 클릭 시 상세
             </p>
           </div>
 
