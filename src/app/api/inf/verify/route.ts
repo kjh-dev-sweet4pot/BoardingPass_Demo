@@ -4,6 +4,15 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 import { INF_COOKIE } from "@/lib/session";
 import { normalizeHandle } from "@/lib/auth";
 
+function todayYmdKst() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 export async function POST(request: Request) {
   const formData = await request.formData();
   const handle = String(formData.get("instagram_handle") || "").trim();
@@ -44,15 +53,20 @@ export async function POST(request: Request) {
       );
     }
 
+    const today = todayYmdKst();
+    const now = new Date().toISOString();
+
+    // 방문 예정일이 오늘인 pending 배정만 매장 방문 완료(visited)로 변경
     await supabase
       .from("allocations")
       .update({
-        status: "verified",
-        verified_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        status: "visited",
+        verified_at: now,
+        updated_at: now,
       })
       .eq("influencer_id", influencer.id)
-      .eq("status", "pending");
+      .eq("status", "pending")
+      .eq("visit_date", today);
 
     const response = redirectTo("/inf");
     response.cookies.set(INF_COOKIE, influencer.id, {

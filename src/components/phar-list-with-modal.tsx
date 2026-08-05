@@ -47,7 +47,7 @@ function statusTone(status: AllocationWithRelations["status"]) {
   if (status === "cancelled") {
     return "border-[var(--line)] bg-[#e8ebe9] text-[var(--muted)]";
   }
-  if (status === "verified" || status === "ready") {
+  if (status === "visited" || status === "ready") {
     return "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]";
   }
   return "border-[var(--line)] bg-white text-[var(--muted)]";

@@ -1,6 +1,6 @@
 export type AllocationStatus =
   | "pending"
-  | "verified"
+  | "visited"
   | "ready"
   | "picked_up"
   | "cancelled";
@@ -54,7 +54,7 @@ export type AllocationWithRelations = Allocation & {
 
 export const ALLOCATION_STATUS_LABEL: Record<AllocationStatus, string> = {
   pending: "대기",
-  verified: "본인확인 완료",
+  visited: "매장 방문 완료",
   ready: "반출 준비",
   picked_up: "반출 완료",
   cancelled: "취소",
