@@ -45,9 +45,19 @@ function formatVisitDayOfWeek(ymd: string | null) {
   return ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
 }
 
-function visitBlockedMessage(item: AllocationWithRelations) {
-  const label = formatVisitDateKo(visitDateYmd(item));
-  return `${label} 방문시 수령할 수 있습니다!`;
+/** 지점명만 표시 (이름 뒤에 붙은 주소 제거) */
+function formatStoreName(
+  store?: { name?: string | null; address?: string | null } | null,
+) {
+  const name = (store?.name || "매장").trim();
+  const address = (store?.address || "").trim();
+  if (address) {
+    const stripped = name.replace(address, "").trim().replace(/[·,\s/-]+$/g, "").trim();
+    if (stripped) return stripped;
+  }
+  const afterBranch = name.match(/^(.+점)\s+.+/);
+  if (afterBranch) return afterBranch[1];
+  return name;
 }
 
 function formatIgHandle(influencer: Influencer) {
@@ -98,7 +108,7 @@ function buildTripGroups(allocations: AllocationWithRelations[]): TripGroup[] {
     if (item.status === "cancelled") continue;
     const date = visitDateYmd(item);
     const storeId = item.store_id || "unknown";
-    const storeName = item.stores?.name || "매장";
+    const storeName = formatStoreName(item.stores);
     const key = `${date ?? "none"}__${storeId}`;
 
     if (!map.has(key)) {
@@ -157,7 +167,6 @@ function StoreIconSm() {
 type View = "welcome" | "trips" | "list";
 type Tab  = "active" | "done";
 type Step = "review" | "confirm";
-type ModalMode = "pickup" | "blocked";
 
 /* ─── 메인 컴포넌트 ──────────────────────────────────── */
 export function InfAllocationList({
@@ -172,9 +181,10 @@ export function InfAllocationList({
   const [view, setView] = useState<View>("welcome");
   const [selectedTrip, setSelectedTrip] = useState<TripGroup | null>(null);
   const [tab, setTab] = useState<Tab>("active");
+  const [welcomeReady, setWelcomeReady] = useState(false);
+  const [introPlayed, setIntroPlayed] = useState(false);
 
   const [selected, setSelected] = useState<AllocationWithRelations | null>(null);
-  const [modalMode, setModalMode] = useState<ModalMode>("pickup");
   const [step, setStep] = useState<Step>("review");
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -182,6 +192,33 @@ export function InfAllocationList({
   useEffect(() => {
     setAllocations(sortItems(initialAllocations));
   }, [initialAllocations]);
+
+  useEffect(() => {
+    if (view !== "welcome") return;
+
+    if (introPlayed) {
+      setWelcomeReady(true);
+      return;
+    }
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) {
+      setWelcomeReady(true);
+      setIntroPlayed(true);
+      return;
+    }
+
+    setWelcomeReady(false);
+    const timer = window.setTimeout(() => {
+      setWelcomeReady(true);
+      setIntroPlayed(true);
+    }, 1100);
+
+    return () => window.clearTimeout(timer);
+  }, [view, introPlayed]);
 
   useEffect(() => {
     if (!selected) return;
@@ -197,16 +234,12 @@ export function InfAllocationList({
 
   function closeModal() {
     setSelected(null);
-    setModalMode("pickup");
     setStep("review");
     setError(null);
   }
 
   function openItem(item: AllocationWithRelations) {
-    const done = isPickedUp(item);
-    const blocked = !done && item.status !== "cancelled" && !isVisitToday(item);
     setSelected(item);
-    setModalMode(blocked ? "blocked" : "pickup");
     setStep("review");
     setError(null);
   }
@@ -214,12 +247,14 @@ export function InfAllocationList({
   function openTrip(trip: TripGroup) {
     setSelectedTrip(trip);
     setTab("active");
-    setView("list");
+    const first =
+      trip.items.find((a) => !isPickedUp(a) && a.status !== "cancelled") ||
+      trip.items[0];
+    if (first) openItem(first);
   }
 
   async function confirmPickup() {
     if (!selected) return;
-    if (!isVisitToday(selected)) { setError(visitBlockedMessage(selected)); return; }
     setConfirming(true);
     setError(null);
     try {
@@ -241,9 +276,6 @@ export function InfAllocationList({
   }
 
   const tripGroups = buildTripGroups(allocations);
-  const todayItems = allocations.filter(
-    (a) => !isPickedUp(a) && a.status !== "cancelled" && isVisitToday(a),
-  );
 
   const defaultTrip = tripGroups.find((g) => g.isToday) ?? tripGroups[0] ?? null;
 
@@ -271,177 +303,218 @@ export function InfAllocationList({
   if (view === "welcome") {
     return (
       <div className="flex flex-1 flex-col">
-        <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
-          {/* 체크 아이콘 */}
-          <div className="relative flex h-20 w-20 items-center justify-center">
-            <div className="absolute inset-0 rounded-full bg-[#7c6ef5]/10" />
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <circle cx="20" cy="20" r="16" stroke="#7c6ef5" strokeWidth="2" strokeOpacity=".3" />
-              <path
-                d="M13 20l5.5 5.5 9.5-10"
-                stroke="#7c6ef5"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-
-          <div>
-            <h1 className="text-2xl font-bold text-[#1a1a2e]">
-              안녕하세요, {influencer.name}님!
-            </h1>
-            {effectiveTrip && (
-              <p className="mt-2 text-xs font-semibold text-[#7c6ef5]">
-                {effectiveTrip.storeName}에 오신걸 환영합니다 !
-              </p>
-            )}
-            <p className="mt-1.5 text-sm text-[#999]">본인 확인이 완료되었습니다.</p>
-            {influencer.sns_url && (
-              <a
-                href={formatSnsUrl(influencer.sns_url)!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 inline-block text-xs text-[#7c6ef5] underline underline-offset-2"
-              >
-                SNS 프로필
-              </a>
-            )}
-          </div>
-
-          {/* 방문 일정 리스트 */}
-          <div className="w-full px-1">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold text-[#1a1a2e]">방문 일정</p>
-              <span className="text-xs text-[#aaa]">{tripGroups.length}개</span>
+        <div
+          className={`inf-welcome-stack flex flex-1 flex-col items-center px-6 text-center ${
+            welcomeReady
+              ? "justify-start gap-4 pt-8"
+              : "justify-center gap-5"
+          }`}
+        >
+          {/* 체크 + 인사 */}
+          <div className="flex flex-col items-center gap-4">
+            <div
+              className={`relative flex h-20 w-20 items-center justify-center ${
+                introPlayed ? "" : "inf-check-wrap"
+              }`}
+            >
+              <div className="absolute inset-0 rounded-full bg-[#7c6ef5]/10" />
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                <circle
+                  className={introPlayed ? undefined : "inf-check-ring"}
+                  cx="20"
+                  cy="20"
+                  r="16"
+                  stroke="#7c6ef5"
+                  strokeWidth="2"
+                  strokeOpacity=".45"
+                  fill="none"
+                />
+                <path
+                  className={introPlayed ? undefined : "inf-check-mark"}
+                  d="M13 20l5.5 5.5 9.5-10"
+                  stroke="#7c6ef5"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
             </div>
 
-            <div className="max-h-[230px] overflow-y-auto pr-1">
-              {tripGroups.length === 0 ? (
-                <p className="py-10 text-center text-xs text-[#ccc]">
-                  예정된 방문 일정이 없습니다.
+            <div className={introPlayed ? undefined : "inf-greet-text"}>
+              <h1 className="text-2xl font-bold text-[#1a1a2e]">
+                안녕하세요, {influencer.name}님!
+              </h1>
+              {effectiveTrip && (
+                <p className="mt-2 text-xs font-semibold text-[#7c6ef5]">
+                  {effectiveTrip.storeName}에 오신걸 환영합니다 !
                 </p>
-              ) : (
-                <ul className="space-y-3">
-                  {tripGroups.map((trip) => {
-                    const allDone = trip.doneQty >= trip.totalQty;
-                    const dateLabel = formatVisitDateKo(trip.visitDate);
-                    const dayLabel = formatVisitDayOfWeek(trip.visitDate);
-                    const isSelected = effectiveTrip?.key === trip.key;
-
-                    return (
-                      <li key={trip.key}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedTrip(trip);
-                            setTab("active");
-                          }}
-                          className={`flex w-full items-stretch overflow-hidden rounded-2xl border bg-white transition active:bg-[#fafafa] ${
-                            isSelected
-                              ? "border-[#7c6ef5] bg-[#f5f3ff]"
-                              : "border-[#f0f0f0]"
-                          }`}
-                        >
-                          <div
-                            className={`flex w-[72px] shrink-0 flex-col items-center justify-center gap-0.5 py-5 ${
-                              trip.isToday ? "bg-[#7c6ef5]" : "bg-[#f5f5f5]"
-                            }`}
-                          >
-                            <span
-                              className={`text-[10px] font-semibold ${
-                                trip.isToday ? "text-white/70" : "text-[#bbb]"
-                              }`}
-                            >
-                              {dayLabel}요일
-                            </span>
-                            <span
-                              className={`text-lg font-bold leading-tight ${
-                                trip.isToday ? "text-white" : "text-[#555]"
-                              }`}
-                            >
-                              {dateLabel}
-                            </span>
-                            {trip.isToday && (
-                              <span className="mt-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white">
-                                오늘
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex flex-1 items-center gap-3 px-4 py-4">
-                            <div className="flex-1 text-left">
-                              <div className="flex items-center gap-1.5">
-                                <StoreIconSm />
-                                <p className="text-sm font-semibold text-[#1a1a2e]">
-                                  {trip.storeName}
-                                </p>
-                              </div>
-                              <p className="mt-1 text-xs text-[#aaa]">
-                                상품 {trip.items.length}종 · 총 {trip.totalQty}개
-                              </p>
-                            </div>
-
-                            <div className="flex flex-col items-end gap-1">
-                              {allDone ? (
-                                <span className="rounded-full bg-[#f3eee3] px-2.5 py-1 text-[10px] font-semibold text-[#8a7a5c]">
-                                  완료
-                                </span>
-                              ) : trip.isToday ? (
-                                <span className="rounded-full bg-[#f3f0fe] px-2.5 py-1 text-[10px] font-semibold text-[#7c6ef5]">
-                                  수령 가능
-                                </span>
-                              ) : (
-                                <span className="rounded-full bg-[#f5f5f5] px-2.5 py-1 text-[10px] font-semibold text-[#aaa]">
-                                  방문 예정
-                                </span>
-                              )}
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 14 14"
-                                fill="none"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  d="M5 3l4 4-4 4"
-                                  stroke="#ccc"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                />
-                              </svg>
-                            </div>
-                          </div>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+              )}
+              <p className="mt-1.5 text-sm text-[#999]">본인 확인이 완료되었습니다.</p>
+              {influencer.sns_url && (
+                <a
+                  href={formatSnsUrl(influencer.sns_url)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-block text-xs text-[#7c6ef5] underline underline-offset-2"
+                >
+                  SNS 프로필
+                </a>
               )}
             </div>
           </div>
 
-          <p className="text-xs text-[#bbb]">
-            일정을 선택한 후 매장에서 수령할 상품을 확인하세요
-          </p>
+          {/* 방문 일정 — intro 후 펼침 */}
+          <div
+            className={`inf-schedule-panel w-full ${welcomeReady ? "is-open" : ""}`}
+          >
+            <div className="inf-schedule-inner">
+              <div className="w-full px-1 pb-1 pt-2">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-[#1a1a2e]">방문 일정</p>
+                  <span className="text-xs text-[#aaa]">{tripGroups.length}개</span>
+                </div>
+
+                <div className="max-h-[230px] overflow-y-auto pr-1">
+                  {tripGroups.length === 0 ? (
+                    <p className="py-10 text-center text-xs text-[#ccc]">
+                      예정된 방문 일정이 없습니다.
+                    </p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {tripGroups.map((trip) => {
+                        const allDone = trip.doneQty >= trip.totalQty;
+                        const dateLabel = formatVisitDateKo(trip.visitDate);
+                        const dayLabel = formatVisitDayOfWeek(trip.visitDate);
+                        const isSelected = effectiveTrip?.key === trip.key;
+
+                        return (
+                          <li key={trip.key}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTrip(trip);
+                                setTab("active");
+                              }}
+                              className={`flex w-full items-stretch overflow-hidden rounded-2xl border bg-white transition active:bg-[#fafafa] ${
+                                isSelected
+                                  ? "border-[#7c6ef5] bg-[#f5f3ff]"
+                                  : "border-[#f0f0f0]"
+                              }`}
+                            >
+                              <div
+                                className={`flex w-[72px] shrink-0 flex-col items-center justify-center gap-0.5 py-5 ${
+                                  trip.isToday ? "bg-[#7c6ef5]" : "bg-[#f5f5f5]"
+                                }`}
+                              >
+                                <span
+                                  className={`text-[10px] font-semibold ${
+                                    trip.isToday ? "text-white/70" : "text-[#bbb]"
+                                  }`}
+                                >
+                                  {dayLabel}요일
+                                </span>
+                                <span
+                                  className={`text-lg font-bold leading-tight ${
+                                    trip.isToday ? "text-white" : "text-[#555]"
+                                  }`}
+                                >
+                                  {dateLabel}
+                                </span>
+                                {trip.isToday && (
+                                  <span className="mt-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white">
+                                    오늘
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex flex-1 items-center gap-3 px-4 py-4">
+                                <div className="flex-1 text-left">
+                                  <div className="flex items-center gap-1.5">
+                                    <StoreIconSm />
+                                    <p className="text-sm font-semibold text-[#1a1a2e]">
+                                      {trip.storeName}
+                                    </p>
+                                  </div>
+                                  <p className="mt-1 text-xs text-[#aaa]">
+                                    상품 {trip.items.length}종 · 총 {trip.totalQty}개
+                                  </p>
+                                </div>
+
+                                <div className="flex flex-col items-end gap-1">
+                                  {allDone ? (
+                                    <span className="rounded-full bg-[#f3eee3] px-2.5 py-1 text-[10px] font-semibold text-[#8a7a5c]">
+                                      완료
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-[#f3f0fe] px-2.5 py-1 text-[10px] font-semibold text-[#7c6ef5]">
+                                      수령 가능
+                                    </span>
+                                  )}
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 14 14"
+                                    fill="none"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      d="M5 3l4 4-4 4"
+                                      stroke="#ccc"
+                                      strokeWidth="1.5"
+                                      strokeLinecap="round"
+                                    />
+                                  </svg>
+                                </div>
+                              </div>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <p className="mt-4 text-xs text-[#bbb]">
+                  일정을 선택한 후 매장에서 수령할 상품을 확인하세요
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* 상품 확인하기 버튼 */}
-        <div className="px-6 pb-12 pt-4">
+        <div
+          className={`inf-footer-actions px-6 pb-12 pt-4 ${welcomeReady ? "is-open" : ""}`}
+        >
           <button
             type="button"
             onClick={() => {
               if (!effectiveTrip) return;
-              setSelectedTrip(effectiveTrip);
-              setTab("active");
-              setView("list");
+              openTrip(effectiveTrip);
             }}
-            disabled={!effectiveTrip}
+            disabled={!effectiveTrip || !welcomeReady}
             className="w-full rounded-2xl bg-[#7c6ef5] py-4 text-sm font-semibold text-white transition active:brightness-90 disabled:opacity-50"
           >
             상품 확인하기
           </button>
         </div>
+
+        {selected && (
+          <PickupSheet
+            influencer={influencer}
+            selected={selected}
+            step={step}
+            confirming={confirming}
+            error={error}
+            alreadyPickedUp={alreadyPickedUp}
+            cancelled={cancelled}
+            onClose={closeModal}
+            onStep={setStep}
+            onConfirm={confirmPickup}
+            onClearError={() => setError(null)}
+          />
+        )}
       </div>
     );
   }
@@ -545,13 +618,9 @@ export function InfAllocationList({
                             <span className="rounded-full bg-[#f3eee3] px-2.5 py-1 text-[10px] font-semibold text-[#8a7a5c]">
                               완료
                             </span>
-                          ) : trip.isToday ? (
+                          ) : (
                             <span className="rounded-full bg-[#f3f0fe] px-2.5 py-1 text-[10px] font-semibold text-[#7c6ef5]">
                               수령 가능
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-[#f5f5f5] px-2.5 py-1 text-[10px] font-semibold text-[#aaa]">
-                              방문 예정
                             </span>
                           )}
                           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -569,6 +638,22 @@ export function InfAllocationList({
 
         {/* 하단 네비 */}
         <BottomNav onHome={() => setView("welcome")} />
+
+        {selected && (
+          <PickupSheet
+            influencer={influencer}
+            selected={selected}
+            step={step}
+            confirming={confirming}
+            error={error}
+            alreadyPickedUp={alreadyPickedUp}
+            cancelled={cancelled}
+            onClose={closeModal}
+            onStep={setStep}
+            onConfirm={confirmPickup}
+            onClearError={() => setError(null)}
+          />
+        )}
       </div>
     );
   }
@@ -633,12 +718,7 @@ export function InfAllocationList({
       </div>
 
       {/* 안내 문구 */}
-      {tab === "active" && currentTrip && !currentTrip.isToday && (
-        <div className="bg-[#fffbea] px-5 py-3 text-xs text-[#b08d3b]">
-          오늘 방문 예정인 지점의 상품만 수령 확인할 수 있습니다.
-        </div>
-      )}
-      {tab === "active" && currentTrip?.isToday && (
+      {tab === "active" && (
         <div className="bg-[#fafafa] px-5 py-3 text-xs text-[#aaa]">
           수령 확인 후에는 취소할 수 없습니다.
         </div>
@@ -661,7 +741,6 @@ export function InfAllocationList({
           <ul className="space-y-3">
             {tabItems.map((item) => {
               const done = isPickedUp(item);
-              const today = isVisitToday(item);
               const isCancelled = item.status === "cancelled";
 
               return (
@@ -680,12 +759,10 @@ export function InfAllocationList({
                               ? "bg-[#f5f5f5] text-[#ccc]"
                               : done
                                 ? "bg-[#f3eee3] text-[#8a7a5c]"
-                                : today
-                                  ? "bg-[#f3f0fe] text-[#7c6ef5]"
-                                  : "bg-[#f5f5f5] text-[#aaa]"
+                                : "bg-[#f3f0fe] text-[#7c6ef5]"
                           }`}
                         >
-                          {isCancelled ? "취소" : done ? "수령 완료" : today ? "수령 가능" : "방문 예정"}
+                          {isCancelled ? "취소" : done ? "수령 완료" : "수령 가능"}
                         </span>
                       </div>
                       <p className="mt-1 text-sm font-semibold text-[#1a1a2e]">
@@ -711,170 +788,20 @@ export function InfAllocationList({
       {/* 하단 네비 */}
       <BottomNav onHome={() => setView("welcome")} />
 
-      {/* ── 방문 예정 안내 바텀시트 ── */}
-      {selected && modalMode === "blocked" && (
-        <BottomSheet onClose={closeModal} label="방문 예정 안내">
-          <div className="flex flex-col items-center gap-4 py-2 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#fff3cd]">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <path d="M14 10v5M14 19h.01" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
-                <circle cx="14" cy="14" r="11" stroke="#f59e0b" strokeWidth="1.5" strokeOpacity=".5" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-[#1a1a2e]">오늘은 수령할 수 없습니다</h3>
-              <p className="mt-1 text-sm text-[#999]">{visitBlockedMessage(selected)}</p>
-            </div>
-            <div className="w-full rounded-2xl bg-[#f9f9f9] px-4 py-3 text-left text-sm text-[#444]">
-              <p className="font-medium">{selected.products?.name || "상품"}</p>
-              <p className="mt-0.5 text-xs text-[#aaa]">
-                {selected.stores?.name || "매장"} · {selected.quantity}개
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={closeModal}
-              className="w-full rounded-2xl bg-[#7c6ef5] py-4 text-sm font-semibold text-white"
-            >
-              확인
-            </button>
-          </div>
-        </BottomSheet>
-      )}
-
-      {/* ── 수령 확인 바텀시트 ── */}
-      {selected && modalMode === "pickup" && (
-        <BottomSheet
+      {selected && (
+        <PickupSheet
+          influencer={influencer}
+          selected={selected}
+          step={step}
+          confirming={confirming}
+          error={error}
+          alreadyPickedUp={alreadyPickedUp}
+          cancelled={cancelled}
           onClose={closeModal}
-          label={step === "confirm" ? "수령 최종 확인" : "수령 정보 확인"}
-        >
-          <div className="space-y-4">
-            <div>
-              <p className="text-xs font-medium tracking-widest text-[#7c6ef5] uppercase">
-                {step === "confirm" ? "Confirm" : "Review"}
-              </p>
-              <h3 className="mt-1 text-xl font-bold text-[#1a1a2e]">
-                {step === "confirm" ? "수령 최종 확인" : "수령 정보 확인"}
-              </h3>
-              <p className="mt-1 text-sm text-[#999]">
-                {step === "confirm"
-                  ? "아래 내용이 맞다면 최종 확인을 눌러 주세요."
-                  : "관계자에게 제시 후 상품을 수령하세요."}
-              </p>
-            </div>
-
-            {/* 요약 카드 */}
-            <div className="space-y-2.5 rounded-2xl bg-[#f9f9f9] px-4 py-4">
-              <InfoRow label="인플루언서">
-                {influencer.name}{" "}
-                <span className="text-[#7c6ef5]">{formatIgHandle(influencer)}</span>
-                {formatSnsUrl(influencer.sns_url) && (
-                  <a
-                    href={formatSnsUrl(influencer.sns_url)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-1 text-xs text-[#aaa] underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    프로필
-                  </a>
-                )}
-              </InfoRow>
-              <InfoRow label="상품">{selected.products?.name || "상품"}</InfoRow>
-              {selected.products?.description && (
-                <InfoRow label="설명">{selected.products.description}</InfoRow>
-              )}
-              <InfoRow label="수량">{selected.quantity}개</InfoRow>
-              <InfoRow label="매장">
-                {selected.stores?.name || "매장"}
-                {selected.stores?.address ? ` · ${selected.stores.address}` : ""}
-              </InfoRow>
-              {selected.visit_date && (
-                <InfoRow label="방문 예정일">{selected.visit_date}</InfoRow>
-              )}
-              {selected.visit_code && (
-                <InfoRow label="방문 코드">{selected.visit_code}</InfoRow>
-              )}
-              <InfoRow label="수령 여부">
-                <span
-                  className={
-                    alreadyPickedUp
-                      ? "text-[#8a7a5c]"
-                      : cancelled
-                        ? "text-[#aaa]"
-                        : "text-[#7c6ef5]"
-                  }
-                >
-                  {alreadyPickedUp
-                    ? "수령 완료"
-                    : cancelled
-                      ? ALLOCATION_STATUS_LABEL.cancelled
-                      : "수령 대기"}
-                </span>
-              </InfoRow>
-              {selected.picked_up_at && (
-                <InfoRow label="수령 시간">{formatKst(selected.picked_up_at)}</InfoRow>
-              )}
-            </div>
-
-            {error && (
-              <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-500">{error}</p>
-            )}
-
-            {/* 액션 버튼 */}
-            {alreadyPickedUp ? (
-              <div className="rounded-2xl bg-[#f3eee3] px-4 py-3 text-center text-sm font-semibold text-[#8a7a5c]">
-                ✓ 수령 확인 완료
-                {selected.picked_up_at ? ` · ${formatKst(selected.picked_up_at)}` : ""}
-              </div>
-            ) : cancelled ? (
-              <p className="text-center text-sm text-[#aaa]">
-                취소된 배정은 수령 확인할 수 없습니다.
-              </p>
-            ) : step === "review" ? (
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="flex-1 rounded-2xl border border-[#e8e8e8] py-4 text-sm font-semibold text-[#666]"
-                >
-                  닫기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep("confirm")}
-                  className="flex-1 rounded-2xl bg-[#7c6ef5] py-4 text-sm font-semibold text-white"
-                >
-                  수령 확인
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="rounded-2xl bg-[#f3f0fe] px-4 py-3 text-center text-sm text-[#7c6ef5]">
-                  수령 확정 후에는 취소할 수 없습니다.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    disabled={confirming}
-                    onClick={() => { setStep("review"); setError(null); }}
-                    className="flex-1 rounded-2xl border border-[#e8e8e8] py-4 text-sm font-semibold text-[#666] disabled:opacity-50"
-                  >
-                    이전
-                  </button>
-                  <button
-                    type="button"
-                    disabled={confirming}
-                    onClick={confirmPickup}
-                    className="flex-1 rounded-2xl bg-[#7c6ef5] py-4 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    {confirming ? "확인 중…" : "최종 수령 확인"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </BottomSheet>
+          onStep={setStep}
+          onConfirm={confirmPickup}
+          onClearError={() => setError(null)}
+        />
       )}
     </div>
   );
@@ -911,6 +838,199 @@ function BottomNav({ onHome }: { onHome: () => void }) {
   );
 }
 
+/* ─── 수령 정보 확인 시트 ───────────────────────────── */
+function PickupSheet({
+  influencer,
+  selected,
+  step,
+  confirming,
+  error,
+  alreadyPickedUp,
+  cancelled,
+  onClose,
+  onStep,
+  onConfirm,
+  onClearError,
+}: {
+  influencer: Influencer;
+  selected: AllocationWithRelations;
+  step: Step;
+  confirming: boolean;
+  error: string | null;
+  alreadyPickedUp: boolean;
+  cancelled: boolean;
+  onClose: () => void;
+  onStep: (step: Step) => void;
+  onConfirm: () => void;
+  onClearError: () => void;
+}) {
+  return (
+    <BottomSheet
+      onClose={onClose}
+      label={step === "confirm" ? "수령 최종 확인" : "수령 정보 확인"}
+      tall
+    >
+      <div className="inf-sheet-content flex min-h-[calc(82vh-5rem)] flex-col space-y-5">
+        <div>
+          <p className="text-xs font-medium tracking-widest text-[#7c6ef5] uppercase">
+            {step === "confirm" ? "Confirm" : "Review"}
+          </p>
+          <h3 className="mt-1 text-xl font-bold text-[#1a1a2e]">
+            {step === "confirm" ? "수령 최종 확인" : "수령 정보 확인"}
+          </h3>
+          <p className="mt-1 text-sm text-[#999]">
+            {step === "confirm"
+              ? "아래 내용이 맞다면 최종 확인을 눌러 주세요."
+              : "관계자에게 제시 후 상품을 수령하세요."}
+          </p>
+        </div>
+
+        <div className="flex flex-1 flex-col justify-center space-y-5 rounded-2xl bg-[#f9f9f9] px-5 py-8">
+          {/* 핵심 정보: 상품 / 매장 / 예정일 */}
+          <div className="space-y-6 text-center">
+            <div>
+              <p className="text-[11px] font-medium tracking-wide text-[#aaa]">상품</p>
+              <p className="mt-1.5 text-2xl font-bold leading-snug text-[#1a1a2e]">
+                {selected.products?.name || "상품"}
+              </p>
+              {selected.products?.description && (
+                <p className="mt-1 text-sm text-[#999]">{selected.products.description}</p>
+              )}
+            </div>
+
+            <div className="mx-auto h-px w-12 bg-[#e8e8e8]" />
+
+            <div>
+              <p className="text-[11px] font-medium tracking-wide text-[#aaa]">매장</p>
+              <p className="mt-1.5 text-xl font-bold text-[#1a1a2e]">
+                {formatStoreName(selected.stores)}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-medium tracking-wide text-[#aaa]">방문 예정일</p>
+              <p className="mt-1.5 text-xl font-bold tabular-nums text-[#7c6ef5]">
+                {selected.visit_date
+                  ? formatVisitDateKo(String(selected.visit_date).slice(0, 10))
+                  : "날짜 미정"}
+                {selected.visit_date ? (
+                  <span className="ml-1.5 text-base font-semibold text-[#999]">
+                    ({formatVisitDayOfWeek(String(selected.visit_date).slice(0, 10))}요일)
+                  </span>
+                ) : null}
+              </p>
+            </div>
+          </div>
+
+          {/* 보조 정보 */}
+          <div className="mt-2 space-y-2 border-t border-[#eee] pt-5 text-left">
+            <InfoRow label="인플루언서">
+              {influencer.name}{" "}
+              <span className="text-[#7c6ef5]">{formatIgHandle(influencer)}</span>
+              {formatSnsUrl(influencer.sns_url) && (
+                <a
+                  href={formatSnsUrl(influencer.sns_url)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 text-xs text-[#aaa] underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  프로필
+                </a>
+              )}
+            </InfoRow>
+            <InfoRow label="수량">{selected.quantity}개</InfoRow>
+            {selected.visit_code && (
+              <InfoRow label="방문 코드">{selected.visit_code}</InfoRow>
+            )}
+            <InfoRow label="수령 여부">
+              <span
+                className={
+                  alreadyPickedUp
+                    ? "text-[#8a7a5c]"
+                    : cancelled
+                      ? "text-[#aaa]"
+                      : "text-[#7c6ef5]"
+                }
+              >
+                {alreadyPickedUp
+                  ? "수령 완료"
+                  : cancelled
+                    ? ALLOCATION_STATUS_LABEL.cancelled
+                    : "수령 대기"}
+              </span>
+            </InfoRow>
+            {selected.picked_up_at && (
+              <InfoRow label="수령 시간">{formatKst(selected.picked_up_at)}</InfoRow>
+            )}
+          </div>
+        </div>
+
+        {error && (
+          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-500">{error}</p>
+        )}
+
+        <div className="mt-auto pt-2">
+        {alreadyPickedUp ? (
+          <div className="rounded-2xl bg-[#f3eee3] px-4 py-3 text-center text-sm font-semibold text-[#8a7a5c]">
+            ✓ 수령 확인 완료
+            {selected.picked_up_at ? ` · ${formatKst(selected.picked_up_at)}` : ""}
+          </div>
+        ) : cancelled ? (
+          <p className="text-center text-sm text-[#aaa]">
+            취소된 배정은 수령 확인할 수 없습니다.
+          </p>
+        ) : step === "review" ? (
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-2xl border border-[#e8e8e8] py-4 text-sm font-semibold text-[#666]"
+            >
+              닫기
+            </button>
+            <button
+              type="button"
+              onClick={() => onStep("confirm")}
+              className="flex-1 rounded-2xl bg-[#7c6ef5] py-4 text-sm font-semibold text-white"
+            >
+              수령 확인
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="rounded-2xl bg-[#f3f0fe] px-4 py-3 text-center text-sm text-[#7c6ef5]">
+              수령 확정 후에는 취소할 수 없습니다.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                disabled={confirming}
+                onClick={() => {
+                  onStep("review");
+                  onClearError();
+                }}
+                className="flex-1 rounded-2xl border border-[#e8e8e8] py-4 text-sm font-semibold text-[#666] disabled:opacity-50"
+              >
+                이전
+              </button>
+              <button
+                type="button"
+                disabled={confirming}
+                onClick={onConfirm}
+                className="flex-1 rounded-2xl bg-[#7c6ef5] py-4 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {confirming ? "확인 중…" : "최종 수령 확인"}
+              </button>
+            </div>
+          </div>
+        )}
+        </div>
+      </div>
+    </BottomSheet>
+  );
+}
+
 /* ─── InfoRow ────────────────────────────────────────── */
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -926,21 +1046,25 @@ function BottomSheet({
   onClose,
   label,
   children,
+  tall = false,
 }: {
   onClose: () => void;
   label: string;
   children: React.ReactNode;
+  tall?: boolean;
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end bg-black/40"
+      className="inf-sheet-backdrop fixed inset-0 z-50 flex items-end bg-black/40"
       role="dialog"
       aria-modal="true"
       aria-label={label}
       onClick={onClose}
     >
       <div
-        className="max-h-[88vh] w-full overflow-y-auto rounded-t-3xl bg-white px-5 pb-10 pt-5 shadow-2xl"
+        className={`inf-sheet-panel w-full overflow-y-auto rounded-t-3xl bg-white px-5 pb-10 pt-5 shadow-2xl ${
+          tall ? "min-h-[86vh] max-h-[96vh]" : "max-h-[88vh]"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-5 h-1 w-12 rounded-full bg-[#e8e8e8]" />

@@ -79,6 +79,14 @@ function MobileShell({
           <span className="text-sm font-bold tracking-wide text-[#7c6ef5]">
             OWM
           </span>
+          <form action="/api/inf/clear" method="post">
+            <button
+              type="submit"
+              className="rounded-full px-3 py-1.5 text-xs font-medium text-[#888] transition hover:bg-[#f5f5f5] hover:text-[#555] active:bg-[#eee]"
+            >
+              로그아웃
+            </button>
+          </form>
         </header>
       )}
       <main className="flex flex-1 flex-col">{children}</main>
@@ -96,7 +104,7 @@ function LoginScreen({ error }: { error?: string }) {
           Inf.
         </p>
         <h1 className="text-[1.75rem] font-bold leading-snug text-[#1a1a2e]">
-          인스타그램 아이디를<br />입력해주세요
+          소셜미디어 아이디를<br />입력해주세요
         </h1>
         <p className="mt-2 text-sm text-[#999]">
           입력한 계정으로 수령 가능한 상품을 확인합니다.
@@ -121,7 +129,7 @@ function LoginScreen({ error }: { error?: string }) {
             autoComplete="off"
             className="w-full rounded-2xl border border-[#e8e8e8] bg-[#f9f9f9] px-4 py-4 text-sm text-[#1a1a2e] outline-none transition placeholder:text-[#bbb] focus:border-[#7c6ef5] focus:bg-white focus:ring-2 focus:ring-[#7c6ef5]/20"
           />
-          <p className="mt-1.5 text-xs text-[#bbb]">%) @mina_beauty</p>
+          <p className="mt-1.5 text-xs text-[#bbb]"> @mina_beauty</p>
         </div>
 
         <button

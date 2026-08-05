@@ -40,3 +40,179 @@ textarea,
 button {
   font: inherit;
 }
+
+/* ── Inf 환영 애니메이션 ── */
+@keyframes inf-check-pop {
+  0% {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes inf-ring-draw {
+  from {
+    stroke-dashoffset: 110;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes inf-check-draw {
+  from {
+    stroke-dashoffset: 36;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes inf-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.inf-check-wrap {
+  animation: inf-check-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.inf-check-ring {
+  stroke-dasharray: 110;
+  stroke-dashoffset: 110;
+  animation: inf-ring-draw 0.55s ease-out 0.08s forwards;
+}
+
+.inf-check-mark {
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: inf-check-draw 0.4s ease-out 0.38s forwards;
+}
+
+.inf-greet-text {
+  animation: inf-fade-up 0.45s ease-out 0.45s both;
+}
+
+.inf-welcome-stack {
+  transition:
+    padding 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    gap 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.inf-schedule-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    grid-template-rows 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.55s ease 0.12s,
+    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.inf-schedule-panel.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.inf-schedule-panel > .inf-schedule-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.inf-footer-actions {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition:
+    opacity 0.45s ease 0.28s,
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.28s;
+}
+
+.inf-footer-actions.is-open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ── Inf 수령정보 바텀시트 ── */
+@keyframes inf-sheet-backdrop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes inf-sheet-up {
+  from {
+    opacity: 0.6;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes inf-sheet-content {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.inf-sheet-backdrop {
+  animation: inf-sheet-backdrop 0.28s ease-out both;
+}
+
+.inf-sheet-panel {
+  animation: inf-sheet-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform;
+}
+
+.inf-sheet-content {
+  animation: inf-sheet-content 0.4s ease-out 0.12s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inf-check-wrap,
+  .inf-greet-text,
+  .inf-check-ring,
+  .inf-check-mark,
+  .inf-sheet-backdrop,
+  .inf-sheet-panel,
+  .inf-sheet-content {
+    animation: none !important;
+  }
+
+  .inf-check-ring,
+  .inf-check-mark {
+    stroke-dashoffset: 0 !important;
+  }
+
+  .inf-welcome-stack,
+  .inf-schedule-panel,
+  .inf-footer-actions {
+    transition: none !important;
+  }
+}

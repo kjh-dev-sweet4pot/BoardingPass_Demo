@@ -3,21 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import { getInfluencerSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
-function todayYmdKst() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
-
-function formatVisitDateKo(ymd: string) {
-  const [y, m, d] = ymd.split("-").map(Number);
-  if (!y || !m || !d) return ymd;
-  return `${m}월 ${d}일`;
-}
-
 export async function POST(
   _request: Request,
   context: { params: Promise<{ id: string }> },
@@ -48,7 +33,7 @@ export async function POST(
 
   const { data: existing, error: fetchError } = await supabase
     .from("allocations")
-    .select("id, influencer_id, status, picked_up_at, visit_date")
+    .select("id, influencer_id, status, picked_up_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -88,18 +73,6 @@ export async function POST(
       allocation: allocation || existing,
       alreadyPickedUp: true,
     });
-  }
-
-  const today = todayYmdKst();
-  const visitDate = existing.visit_date
-    ? String(existing.visit_date).slice(0, 10)
-    : null;
-
-  if (!visitDate || visitDate !== today) {
-    const when = visitDate
-      ? `${formatVisitDateKo(visitDate)} 방문시 수령할 수 있습니다!`
-      : "방문 예정일이 등록되지 않아 수령할 수 없습니다.";
-    return NextResponse.json({ error: when }, { status: 400 });
   }
 
   const now = new Date().toISOString();
