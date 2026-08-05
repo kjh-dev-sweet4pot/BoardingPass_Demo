@@ -16,7 +16,7 @@ export default async function InfPage({
     return (
       <MobileShell showHeader={false}>
         <div className="flex flex-1 items-center justify-center px-6">
-          <p className="text-sm text-[#e55]">서버 설정 오류입니다. 잠시 후 다시 시도해 주세요.</p>
+          <p className="text-sm text-red-400">서버 설정 오류입니다. 잠시 후 다시 시도해 주세요.</p>
         </div>
       </MobileShell>
     );
@@ -64,6 +64,21 @@ export default async function InfPage({
   );
 }
 
+/* ─── OWM 로고 ─────────────────────────────────────────── */
+function OWMLogo({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="flex flex-col items-center">
+      {/* 실제 OWM 로고 이미지 사용 */}
+      <img
+        src="/owm-logo.webp"
+        alt="O.W.M 옵티마 웰니스 뮤지엄 약국"
+        className={compact ? "w-20" : "w-52"}
+        draggable={false}
+      />
+    </div>
+  );
+}
+
 /* ─── Shell ─────────────────────────────────────────── */
 function MobileShell({
   showHeader,
@@ -75,14 +90,12 @@ function MobileShell({
   return (
     <div className="flex min-h-screen flex-col bg-white">
       {showHeader && (
-        <header className="flex items-center justify-between px-5 pt-12 pb-4">
-          <span className="text-sm font-bold tracking-wide text-[#7c6ef5]">
-            OWM
-          </span>
+        <header className="flex items-center justify-between px-5 pt-10 pb-4">
+          <OWMLogo compact />
           <form action="/api/inf/clear" method="post">
             <button
               type="submit"
-              className="rounded-full px-3 py-1.5 text-xs font-medium text-[#888] transition hover:bg-[#f5f5f5] hover:text-[#555] active:bg-[#eee]"
+              className="rounded-full px-3 py-1.5 text-xs font-medium text-[#A07050] transition hover:bg-[#F0E6D8] active:bg-[#E8D8C8]"
             >
               로그아웃
             </button>
@@ -97,48 +110,62 @@ function MobileShell({
 /* ─── 로그인 화면 ──────────────────────────────────────── */
 function LoginScreen({ error }: { error?: string }) {
   return (
-    <div className="flex flex-1 flex-col px-6">
-      {/* 상단 헤더 영역 */}
-      <div className="pt-14 pb-10">
-        <p className="mb-2 text-xs font-semibold tracking-widest text-[#7c6ef5] uppercase">
-          Inf.
-        </p>
-        <h1 className="text-[1.75rem] font-bold leading-snug text-[#1a1a2e]">
-          소셜미디어 아이디를<br />입력해주세요
-        </h1>
-        <p className="mt-2 text-sm text-[#999]">
-          입력한 계정으로 수령 가능한 상품을 확인합니다.
-        </p>
-      </div>
-
-      {error && (
-        <div className="mb-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-500">
-          {error}
+    <div className="flex flex-1 flex-col">
+      {/* 중앙 콘텐츠 */}
+      <div className="flex flex-1 flex-col items-center justify-center px-8">
+        {/* OWM 로고 */}
+        <div className="owm-login-logo mb-10">
+          <OWMLogo />
         </div>
-      )}
 
-      <form action="/api/inf/verify" method="post" className="space-y-4">
-        <div>
-          <label className="mb-2 block text-sm font-medium text-[#333]">
-            Instagram ID
-          </label>
+        {/* 구분선 */}
+        <div className="owm-login-divider mb-10 h-px w-10 bg-[#C4956A]" />
+
+        {/* 안내 문구 */}
+        <div className="owm-login-title mb-8 text-center">
+          <h1 className="text-[1.15rem] font-semibold tracking-wide text-[#3D1F0A]">
+            SNS 아이디를 입력해주세요
+          </h1>
+          <p className="mt-2 text-sm tracking-wide text-[#B09070]">
+            샤오홍슈 · 인스타그램 · 틱톡
+          </p>
+        </div>
+
+        {/* 에러 메시지 */}
+        {error && (
+          <div className="mb-5 w-full max-w-[320px] rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
+        {/* 폼 */}
+        <form
+          action="/api/inf/verify"
+          method="post"
+          className="owm-login-form w-full max-w-[320px] space-y-3"
+        >
           <input
             name="instagram_handle"
-            placeholder="@mina_beauty"
+            placeholder="@your_id"
             required
             autoComplete="off"
-            className="w-full rounded-2xl border border-[#e8e8e8] bg-[#f9f9f9] px-4 py-4 text-sm text-[#1a1a2e] outline-none transition placeholder:text-[#bbb] focus:border-[#7c6ef5] focus:bg-white focus:ring-2 focus:ring-[#7c6ef5]/20"
+            className="w-full rounded-2xl border border-[#E8D5BE] bg-white px-5 py-4 text-sm text-[#3D1F0A] outline-none transition placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10"
           />
-          <p className="mt-1.5 text-xs text-[#bbb]"> @mina_beauty</p>
-        </div>
+          <button
+            type="submit"
+            className="w-full rounded-2xl bg-[#6B3B1F] py-4 text-sm font-semibold tracking-wide text-white transition hover:bg-[#7D4726] active:brightness-90"
+          >
+            확인
+          </button>
+        </form>
+      </div>
 
-        <button
-          type="submit"
-          className="w-full rounded-2xl bg-[#7c6ef5] py-4 text-sm font-semibold text-white transition active:brightness-90"
-        >
-          확인
-        </button>
-      </form>
+      {/* 하단 브랜드 워드마크 */}
+      <div className="pb-10 text-center">
+        <p className="text-[0.58rem] tracking-[0.2em] text-[#C4956A] uppercase">
+          Optima Wellness Museum Pharmacy
+        </p>
+      </div>
     </div>
   );
 }

@@ -41,6 +41,34 @@ button {
   font: inherit;
 }
 
+/* ── OWM 로그인 화면 애니메이션 ── */
+@keyframes owm-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.owm-login-logo {
+  animation: owm-fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+}
+
+.owm-login-divider {
+  animation: owm-fade-up 0.6s ease-out 0.3s both;
+}
+
+.owm-login-title {
+  animation: owm-fade-up 0.6s ease-out 0.42s both;
+}
+
+.owm-login-form {
+  animation: owm-fade-up 0.6s ease-out 0.54s both;
+}
+
 /* ── Inf 환영 애니메이션 ── */
 @keyframes inf-check-pop {
   0% {
