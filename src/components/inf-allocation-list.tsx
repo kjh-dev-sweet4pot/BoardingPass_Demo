@@ -375,12 +375,7 @@ export function InfAllocationList({
                     {selected.products?.name || "상품"}
                   </dd>
                 </div>
-                {selected.products?.sku && (
-                  <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
-                    <dt className="text-xs text-[var(--muted)]">SKU</dt>
-                    <dd className="text-sm">{selected.products.sku}</dd>
-                  </div>
-                )}
+                
                 {selected.products?.description && (
                   <div className="grid gap-1 sm:grid-cols-[7rem_1fr] sm:items-baseline">
                     <dt className="text-xs text-[var(--muted)]">설명</dt>
@@ -476,7 +471,7 @@ export function InfAllocationList({
             ) : (
               <div className="space-y-4">
                 <p className="border border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--accent)]">
-                  수령 확정 후에는 취소할 수 없습니다. 위 요약이 맞다면 최종
+                  수령 확정 후에는 취소할 수 없습니다. 위 내용이 맞다면 최종
                   확인을 눌러 주세요.
                 </p>
                 <div className="flex flex-wrap gap-3">
