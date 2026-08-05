@@ -6,6 +6,7 @@ import {
   ALLOCATION_STATUS_LABEL,
   type AllocationWithRelations,
   type Influencer,
+  type Store,
 } from "@/lib/types";
 
 /* ─── 유틸 ─────────────────────────────────────────── */
