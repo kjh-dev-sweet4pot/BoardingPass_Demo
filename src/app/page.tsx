@@ -39,7 +39,7 @@ const portals = [
     href: "/phar",
     label: "Pharmacist",
     title: "약사",
-    body: "날짜·지점별로 매장 배정 현황을 조회합니다.",
+    body: "지점 로그인 후 해당 매장 배정만 조회합니다.",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
         <rect

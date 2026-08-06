@@ -239,10 +239,13 @@ function AllocationRow({
 export function PharListWithModal({
   items,
   fillHeight = false,
+  lockedStoreId,
 }: {
   items: AllocationWithRelations[];
   /** 부모 높이에 맞춰 목록만 내부 스크롤 (운영 콘솔 등) */
   fillHeight?: boolean;
+  /** 지점 로그인 시 매장 필터 숨김 (서버에서 이미 해당 지점만 전달) */
+  lockedStoreId?: string;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
@@ -255,6 +258,7 @@ export function PharListWithModal({
   const [quantity, setQuantity] = useState("");
   const [visitDate, setVisitDate] = useState("");
   const [status, setStatus] = useState("");
+  const storeFilterId = lockedStoreId || storeId;
 
   const deferredInfluencerQ = useDeferredValue(
     influencerQ.trim().toLowerCase(),
@@ -294,7 +298,7 @@ export function PharListWithModal({
     const next = items.filter((item) => {
       if (!matchesInfluencerSearch(item, deferredInfluencerQ)) return false;
       if (!matchesProductSearch(item, deferredProductQ)) return false;
-      if (storeId && item.store_id !== storeId) return false;
+      if (storeFilterId && item.store_id !== storeFilterId) return false;
       if (quantity && String(item.quantity) !== quantity) return false;
       if (visitDate && (item.visit_date || "") !== visitDate) return false;
       if (status && item.status !== status) return false;
@@ -305,7 +309,7 @@ export function PharListWithModal({
     items,
     deferredInfluencerQ,
     deferredProductQ,
-    storeId,
+    storeFilterId,
     quantity,
     visitDate,
     status,
@@ -359,7 +363,7 @@ export function PharListWithModal({
   const hasFilters =
     Boolean(influencerQ.trim()) ||
     Boolean(productQ.trim()) ||
-    Boolean(storeId) ||
+    (!lockedStoreId && Boolean(storeId)) ||
     Boolean(quantity) ||
     Boolean(visitDate) ||
     Boolean(status);
@@ -505,20 +509,26 @@ export function PharListWithModal({
                   />
                 </th>
                 <th className="px-2 py-2 font-normal">
-                  <select
-                    className={filterSelectClass}
-                    style={{ backgroundImage: selectChevron }}
-                    value={storeId}
-                    onChange={(e) => setStoreId(e.target.value)}
-                    aria-label="매장 필터"
-                  >
-                    <option value="">매장 전체</option>
-                    {storeOptions.map((store) => (
-                      <option key={store.id} value={store.id}>
-                        {store.name}
-                      </option>
-                    ))}
-                  </select>
+                  {lockedStoreId ? (
+                    <span className="block px-1 text-xs text-[var(--muted)]">
+                      {storeOptions[0]?.name || "로그인 지점"}
+                    </span>
+                  ) : (
+                    <select
+                      className={filterSelectClass}
+                      style={{ backgroundImage: selectChevron }}
+                      value={storeId}
+                      onChange={(e) => setStoreId(e.target.value)}
+                      aria-label="매장 필터"
+                    >
+                      <option value="">매장 전체</option>
+                      {storeOptions.map((store) => (
+                        <option key={store.id} value={store.id}>
+                          {store.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </th>
                 <th className="px-2 py-2 font-normal">
                   <select
@@ -595,8 +605,7 @@ export function PharListWithModal({
                         colSpan={8}
                         className="px-4 py-6 text-center text-sm text-[var(--muted)]"
                       >
-                        오늘 방문 예정인 배정이 없습니다. 위로 과거 · 아래로 예정을
-                        확인하세요.
+                        오늘 방문인이 없습니다.
                       </td>
                     </tr>
                   ) : (
