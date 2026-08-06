@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createManualAllocation } from "@/app/actions/admin";
 import { AdminImportPanel } from "@/components/admin-import-panel";
+import { AdminStoreOverview } from "@/components/admin-store-overview";
 import { PharListWithModal } from "@/components/phar-list-with-modal";
 import {
   Field,
@@ -24,6 +25,17 @@ export function AdminConsoleLayout({
   message?: string;
 }) {
   const [manualOpen, setManualOpen] = useState(false);
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+
+  const filteredList = useMemo(() => {
+    if (!selectedStoreId) return list;
+    return list.filter((item) => item.store_id === selectedStoreId);
+  }, [list, selectedStoreId]);
+
+  const selectedStoreName =
+    storeList.find((s) => s.id === selectedStoreId)?.name ||
+    filteredList[0]?.stores?.name ||
+    null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -31,8 +43,15 @@ export function AdminConsoleLayout({
         <Notice error={error} message={message} />
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-6 overflow-hidden lg:grid-cols-[300px_minmax(0,1fr)] lg:items-stretch">
+      <div className="grid min-h-0 flex-1 gap-6 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
         <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto lg:max-h-full">
+          <AdminStoreOverview
+            storeList={storeList}
+            list={list}
+            selectedStoreId={selectedStoreId}
+            onSelectStore={setSelectedStoreId}
+          />
+
           <AdminImportPanel compact />
 
           <section className="border border-[var(--line)] bg-[var(--surface)]">
@@ -137,15 +156,26 @@ export function AdminConsoleLayout({
         </aside>
 
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-          <div className="mb-3 shrink-0">
-            <h2
-              className="text-lg"
-              style={{ fontFamily: "var(--font-display), serif" }}
-            >
-              배정 현황
-            </h2>
+          <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2
+                className="text-lg"
+                style={{ fontFamily: "var(--font-display), serif" }}
+              >
+                배정 현황
+              </h2>
+              {selectedStoreName ? (
+                <p className="mt-1 text-sm text-[var(--accent)]">
+                  {selectedStoreName}만 표시 중
+                </p>
+              ) : null}
+            </div>
           </div>
-          <PharListWithModal items={list} fillHeight />
+          <PharListWithModal
+            items={filteredList}
+            fillHeight
+            lockedStoreId={selectedStoreId || undefined}
+          />
         </section>
       </div>
     </div>

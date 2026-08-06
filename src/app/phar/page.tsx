@@ -69,8 +69,8 @@ export default async function PharPage({
       }
     >
       <Notice error={params.error || error?.message} message={params.message} />
-      <p className="mb-4 text-sm text-[var(--muted)]">
-        로그인한 지점의 배정만 표시됩니다.
+      <p className="mb-5 mt-1 text-m text-[var(--muted)]">
+        안녕하세요 약사님 방문 현황을 확인해주세요 ! 
       </p>
       <PharListWithModal items={list} lockedStoreId={storeRow.id} />
     </AppShell>

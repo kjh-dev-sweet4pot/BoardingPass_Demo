@@ -24,7 +24,7 @@ export default async function AdminLoginPage({
       <Notice error={params.error} message={params.message} />
       <div className="mx-auto max-w-md border border-[var(--line)] bg-[var(--surface)] p-6">
         <p className="mb-6 text-sm text-[var(--muted)]">
-          아이디 <code>admin</code> / 비밀번호 <code>admin</code>
+          관리자 로그인을 해주세요 ! 
         </p>
         <form action={signInAdmin} className="flex flex-col gap-4">
           <Field label="아이디">

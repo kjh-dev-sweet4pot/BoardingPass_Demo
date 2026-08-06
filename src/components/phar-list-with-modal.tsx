@@ -143,7 +143,7 @@ const SectionHeaderRow = forwardRef<
           : "border-y border-[var(--line)] bg-[#eef2f0]"
       }
     >
-      <td colSpan={8} className="px-4 py-2.5">
+      <td colSpan={7} className="px-4 py-2.5">
         <div className="flex items-center justify-between gap-3">
           <span
             className={`text-xs font-semibold tracking-[0.12em] uppercase ${
@@ -190,10 +190,7 @@ function AllocationRow({
           </span>
         ) : null}
       </td>
-      <td className="px-4 py-3.5 font-medium text-[var(--ink)]">
-        {item.influencers?.name || "인플루언서"}
-      </td>
-      <td className="px-4 py-3.5 text-[var(--accent)]">
+      <td className="px-4 py-3.5 font-medium text-[var(--accent)]">
         {formatSnsUrl(item.influencers?.sns_url) ? (
           <a
             href={formatSnsUrl(item.influencers?.sns_url)!}
@@ -466,11 +463,10 @@ export function PharListWithModal({
               : "max-h-[min(70vh,calc(100vh-14rem))]"
           }`}
         >
-          <table className="w-full min-w-[860px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[780px] border-collapse text-left text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs tracking-[0.08em] text-[var(--muted)] uppercase">
                 <th className="px-4 py-3 font-medium">방문일</th>
-                <th className="px-4 py-3 font-medium">이름</th>
                 <th className="px-4 py-3 font-medium">계정</th>
                 <th className="px-4 py-3 font-medium">상품</th>
                 <th className="px-4 py-3 font-medium">매장</th>
@@ -488,14 +484,14 @@ export function PharListWithModal({
                     aria-label="방문일 필터"
                   />
                 </th>
-                <th colSpan={2} className="px-2 py-2 font-normal">
+                <th className="px-2 py-2 font-normal">
                   <input
                     className={filterControlClass}
                     type="search"
                     value={influencerQ}
                     onChange={(e) => setInfluencerQ(e.target.value)}
-                    placeholder="이름 · 계정"
-                    aria-label="이름, 계정 통합 검색"
+                    placeholder="계정"
+                    aria-label="계정 검색"
                   />
                 </th>
                 <th className="px-2 py-2 font-normal">
@@ -569,7 +565,7 @@ export function PharListWithModal({
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     className="px-4 py-8 text-center text-sm text-[var(--muted)]"
                   >
                     조건에 맞는 배정이 없습니다.
@@ -602,7 +598,7 @@ export function PharListWithModal({
                   {todayItems.length === 0 ? (
                     <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
                       <td
-                        colSpan={8}
+                        colSpan={7}
                         className="px-4 py-6 text-center text-sm text-[var(--muted)]"
                       >
                         오늘 방문인이 없습니다.
@@ -662,13 +658,10 @@ export function PharListWithModal({
                   className="mt-1 text-2xl text-[var(--ink)]"
                   style={{ fontFamily: "var(--font-display), serif" }}
                 >
-                  {detail?.influencer.name || "불러오는 중…"}
+                  {detail
+                    ? formatIgHandle(detail.influencer) || "핸들 없음"
+                    : "불러오는 중…"}
                 </h2>
-                {detail && (
-                  <p className="mt-1 text-lg text-[var(--accent)]">
-                    {formatIgHandle(detail.influencer) || "핸들 없음"}
-                  </p>
-                )}
                 {detail && formatSnsUrl(detail.influencer.sns_url) && (
                   <a
                     href={formatSnsUrl(detail.influencer.sns_url)!}

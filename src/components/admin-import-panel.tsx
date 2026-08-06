@@ -12,6 +12,7 @@ import { primaryBtnClass, secondaryBtnClass } from "@/components/ui";
 
 export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
+  const [open, setOpen] = useState(!compact);
   const [rows, setRows] = useState<ParsedImportRow[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -137,20 +138,51 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="space-y-4">
-      <section className="border border-[var(--line)] bg-[var(--surface)] p-5">
-        <h2
-          className="text-lg"
-          style={{ fontFamily: "var(--font-display), serif" }}
-        >
-          Excel / CSV 업로드
-        </h2>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          업로드 → 내용 확인 → 확인 체크
-        </p>
+      <section className="border border-[var(--line)] bg-[var(--surface)]">
+        {compact ? (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+            aria-expanded={open}
+          >
+            <h2
+              className="text-lg text-[var(--ink)]"
+              style={{ fontFamily: "var(--font-display), serif" }}
+            >
+              Excel / CSV 업로드
+            </h2>
+            <span className="text-xs font-medium text-[var(--muted)]">
+              {open ? "접기 ▲" : "펼치기 ▼"}
+            </span>
+          </button>
+        ) : (
+          <div className="px-5 pt-5">
+            <h2
+              className="text-lg"
+              style={{ fontFamily: "var(--font-display), serif" }}
+            >
+              Excel / CSV 업로드
+            </h2>
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              업로드 → 내용 확인 → 확인 체크
+            </p>
+          </div>
+        )}
+
+        {open ? (
+          <div
+            className={`px-5 pb-5 ${compact ? "border-t border-[var(--line)] pt-4" : "pt-4"}`}
+          >
+            {compact ? (
+              <p className="mb-4 text-sm text-[var(--muted)]">
+                업로드 → 내용 확인 → 확인 체크
+              </p>
+            ) : null}
 
         <button
           type="button"
-          className={`${secondaryBtnClass} mt-4 w-full`}
+          className={`${secondaryBtnClass} w-full`}
           onClick={downloadTemplate}
         >
           템플릿 다운로드
@@ -221,6 +253,8 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
         {resultError && (
           <p className="mt-3 text-sm text-[var(--danger)]">{resultError}</p>
         )}
+          </div>
+        ) : null}
       </section>
 
       {reviewOpen && rows.length > 0 && (

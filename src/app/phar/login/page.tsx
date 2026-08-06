@@ -8,7 +8,7 @@ import {
   fieldClass,
   primaryBtnClass,
 } from "@/components/ui";
-import { getStoreSessionId, PHAR_DEFAULT_PASSWORD } from "@/lib/session";
+import { getStoreSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { type Store } from "@/lib/types";
@@ -66,7 +66,7 @@ export default async function PharLoginPage({
           </Field>
           {storeList.length === 0 && (
             <p className="text-xs text-[var(--danger)]">
-              등록된 지점이 없습니다. 관리자에서 지점을 먼저 추가해 주세요.
+              등록된 지점이 없습니다. 지점을 먼저 추가해 주세요.
             </p>
           )}
           <Field label="비밀번호">
