@@ -21,6 +21,17 @@ function monthLabel(ym: string) {
   return `${y}.${m}`;
 }
 
+function monthOnlyLabel(ym: string) {
+  const m = Number(ym.split("-")[1]);
+  return Number.isFinite(m) ? `${m}월` : "";
+}
+
+function todayShortLabel(ymd: string) {
+  const [, m, d] = ymd.split("-").map(Number);
+  if (!m || !d) return "";
+  return `(${m}월${d}일)`;
+}
+
 function currentMonthYm() {
   return todayYmdKst().slice(0, 7);
 }
@@ -51,12 +62,12 @@ function isCompleted(status: AllocationStatus) {
 type StoreMonthStats = {
   storeId: string;
   storeName: string;
-  /** 이달 방문 예정 인원 (pending, 중복 제거) */
-  scheduledPeople: number;
-  /** 이달 방문 완료 인원 (visited/ready/picked_up, 중복 제거) */
-  completedPeople: number;
-  /** 오늘 방문 예정·방문 인원 (중복 제거) */
-  todayPeople: number;
+  /** 이달 방문 예정 건수 (pending allocation) */
+  scheduledCount: number;
+  /** 이달 방문 완료 건수 (visited/ready/picked_up) */
+  completedCount: number;
+  /** 오늘 방문일 배정 건수 */
+  todayCount: number;
 };
 
 function buildStoreStats(
@@ -69,18 +80,18 @@ function buildStoreStats(
     string,
     {
       name: string;
-      scheduled: Set<string>;
-      completed: Set<string>;
-      todayPeople: Set<string>;
+      scheduled: number;
+      completed: number;
+      today: number;
     }
   >();
 
   for (const store of storeList) {
     byStore.set(store.id, {
       name: store.name,
-      scheduled: new Set(),
-      completed: new Set(),
-      todayPeople: new Set(),
+      scheduled: 0,
+      completed: 0,
+      today: 0,
     });
   }
 
@@ -91,21 +102,21 @@ function buildStoreStats(
       (() => {
         const next = {
           name: item.stores?.name || "매장",
-          scheduled: new Set<string>(),
-          completed: new Set<string>(),
-          todayPeople: new Set<string>(),
+          scheduled: 0,
+          completed: 0,
+          today: 0,
         };
         byStore.set(item.store_id, next);
         return next;
       })();
 
     const d = item.visit_date ? String(item.visit_date).slice(0, 10) : "";
-    if (visitYm(item) === ym && item.influencer_id) {
-      if (isScheduled(item.status)) bucket.scheduled.add(item.influencer_id);
-      if (isCompleted(item.status)) bucket.completed.add(item.influencer_id);
+    if (visitYm(item) === ym) {
+      if (isScheduled(item.status)) bucket.scheduled += 1;
+      if (isCompleted(item.status)) bucket.completed += 1;
     }
-    if (d === today && item.influencer_id) {
-      bucket.todayPeople.add(item.influencer_id);
+    if (d === today) {
+      bucket.today += 1;
     }
   }
 
@@ -113,14 +124,14 @@ function buildStoreStats(
     .map(([storeId, v]) => ({
       storeId,
       storeName: v.name,
-      scheduledPeople: v.scheduled.size,
-      completedPeople: v.completed.size,
-      todayPeople: v.todayPeople.size,
+      scheduledCount: v.scheduled,
+      completedCount: v.completed,
+      todayCount: v.today,
     }))
     .sort((a, b) => {
-      if (b.todayPeople !== a.todayPeople) return b.todayPeople - a.todayPeople;
-      if (b.scheduledPeople !== a.scheduledPeople) {
-        return b.scheduledPeople - a.scheduledPeople;
+      if (b.todayCount !== a.todayCount) return b.todayCount - a.todayCount;
+      if (b.scheduledCount !== a.scheduledCount) {
+        return b.scheduledCount - a.scheduledCount;
       }
       return a.storeName.localeCompare(b.storeName, "ko");
     });
@@ -148,14 +159,17 @@ export function AdminStoreOverview({
   const totals = useMemo(() => {
     return stats.reduce(
       (acc, s) => {
-        acc.scheduled += s.scheduledPeople;
-        acc.completed += s.completedPeople;
-        acc.todayPeople += s.todayPeople;
+        acc.scheduled += s.scheduledCount;
+        acc.completed += s.completedCount;
+        acc.today += s.todayCount;
         return acc;
       },
-      { scheduled: 0, completed: 0, todayPeople: 0 },
+      { scheduled: 0, completed: 0, today: 0 },
     );
   }, [stats]);
+
+  const monthKo = monthOnlyLabel(ym);
+  const todayMd = todayShortLabel(today);
 
   return (
     <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
@@ -190,38 +204,43 @@ export function AdminStoreOverview({
           </div>
         </div>
         <p className="mt-1 text-[11px] leading-4 text-[var(--muted)]">
-          월별 방문 예정 · 방문 완료 인원
+          월별 방문 예정 · 방문 완료 건수
         </p>
         <p className="mt-2 text-sm font-semibold text-[var(--ink)]">전체 지점 현황</p>
         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[var(--line)] pt-3 text-center">
           <div>
-            <p className="text-[10px] tracking-wide text-[var(--muted)] uppercase">
+            <p className="text-[10px] tracking-wide text-[var(--muted)]">
               오늘
+              {todayMd ? (
+                <span className="ml-1 tabular-nums text-[var(--accent)]">
+                  {todayMd}
+                </span>
+              ) : null}
             </p>
             <p className="mt-0.5 text-sm font-semibold tabular-nums text-[var(--accent)]">
-              {totals.todayPeople}
-              <span className="text-[10px] font-normal">명</span>
+              {totals.today}
+              <span className="text-[10px] font-normal">건</span>
             </p>
           </div>
           <div>
-            <p className="text-[10px] tracking-wide text-[var(--muted)] uppercase">
-              이달 예정
+            <p className="text-[10px] tracking-wide text-[var(--muted)]">
+              {monthKo} 방문예정
             </p>
             <p className="mt-0.5 text-sm font-semibold tabular-nums text-[var(--ink)]">
               {totals.scheduled}
               <span className="text-[10px] font-normal text-[var(--muted)]">
-                명
+                건
               </span>
             </p>
           </div>
           <div>
-            <p className="text-[10px] tracking-wide text-[var(--muted)] uppercase">
-              이달 방문 완료
+            <p className="text-[10px] tracking-wide text-[var(--muted)]">
+              {monthKo} 방문완료
             </p>
             <p className="mt-0.5 text-sm font-semibold tabular-nums text-[var(--ink)]">
               {totals.completed}
               <span className="text-[10px] font-normal text-[var(--muted)]">
-                명
+                건
               </span>
             </p>
           </div>
@@ -251,9 +270,9 @@ export function AdminStoreOverview({
                     <span className="truncate text-sm font-semibold text-[var(--ink)]">
                       {s.storeName}
                     </span>
-                    {s.todayPeople > 0 ? (
+                    {s.todayCount > 0 ? (
                       <span className="shrink-0 rounded-full border border-[var(--accent)] bg-white px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)]">
-                        오늘 {s.todayPeople}명
+                        오늘 {s.todayCount}건
                       </span>
                     ) : (
                       <span className="shrink-0 text-[10px] text-[var(--muted)]">
@@ -264,23 +283,23 @@ export function AdminStoreOverview({
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-xl border border-[var(--line)] bg-white/80 px-2.5 py-1.5">
                       <p className="text-[10px] text-[var(--muted)]">
-                        방문 예정
+                        {monthKo} 예정
                       </p>
                       <p className="mt-0.5 font-semibold tabular-nums text-[var(--ink)]">
-                        {s.scheduledPeople}
+                        {s.scheduledCount}
                         <span className="ml-0.5 text-[10px] font-normal text-[var(--muted)]">
-                          명
+                          건
                         </span>
                       </p>
                     </div>
                     <div className="rounded-xl border border-[var(--line)] bg-white/80 px-2.5 py-1.5">
                       <p className="text-[10px] text-[var(--muted)]">
-                        방문 완료
+                        {monthKo} 방문완료
                       </p>
                       <p className="mt-0.5 font-semibold tabular-nums text-[var(--accent)]">
-                        {s.completedPeople}
+                        {s.completedCount}
                         <span className="ml-0.5 text-[10px] font-normal text-[var(--muted)]">
-                          명
+                          건
                         </span>
                       </p>
                     </div>
