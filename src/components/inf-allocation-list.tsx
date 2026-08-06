@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   ALLOCATION_STATUS_LABEL,
   type AllocationWithRelations,
@@ -278,8 +277,8 @@ export function InfAllocationList({
   fromWelcome?: boolean;
 }) {
   const softEnter = skipIntro || fromWelcome;
-  const router = useRouter();
   const [allocations, setAllocations] = useState(() =>
+
     sortItems(USE_MOCK_DATA ? [...initialAllocations, ...buildMockAllocations()] : initialAllocations),
   );
   // fromWelcome: 마운트 직후 페이드인 되도록 처음엔 false
@@ -393,7 +392,6 @@ export function InfAllocationList({
         prev && prev.id === updated.id ? { ...prev, ...updated } : prev,
       );
       setStep("review");
-      router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "수령 확인 중 오류가 발생했습니다.");
     } finally {
