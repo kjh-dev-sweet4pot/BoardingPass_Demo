@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Sans_KR } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const display = Fraunces({
@@ -33,6 +34,7 @@ export default function RootLayout({
         style={{ fontFamily: "var(--font-sans-kr), var(--font-display), sans-serif" }}
       >
         {children}
+        <SpeedInsights />
       </body>
     </html>
   );
