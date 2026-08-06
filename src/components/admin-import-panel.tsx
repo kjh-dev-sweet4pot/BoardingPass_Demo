@@ -138,7 +138,7 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="space-y-4">
-      <section className="border border-[var(--line)] bg-[var(--surface)]">
+      <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
         {compact ? (
           <button
             type="button"

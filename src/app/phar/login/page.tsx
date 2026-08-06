@@ -26,7 +26,7 @@ export default async function PharLoginPage({
   if (!configured) {
     return (
       <AppShell eyebrow="Phar" title="지점 로그인">
-        <Notice error="Supabase 환경변수가 설정되지 않았습니다." />
+        <Notice error="환경변수가 설정되지 않았습니다." />
       </AppShell>
     );
   }

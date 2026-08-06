@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getStoreSessionId } from "@/lib/session";
+import { getStoreSessionId, isAdminSession } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const isAdmin = await isAdminSession();
   const storeId = await getStoreSessionId();
-  if (!storeId) {
+
+  if (!isAdmin && !storeId) {
     return NextResponse.json(
-      { error: "지점 로그인이 필요합니다." },
+      { error: "로그인이 필요합니다." },
       { status: 401 },
     );
   }
@@ -27,17 +29,23 @@ export async function GET(
 
   const supabase = createClient(url, key);
 
+  let allocQuery = supabase
+    .from("allocations")
+    .select("*, products(*), stores(*)")
+    .eq("influencer_id", id)
+    .order("created_at", { ascending: false });
+
+  // 지점 로그인: 해당 매장 배정만 / Admin: 전체
+  if (!isAdmin && storeId) {
+    allocQuery = allocQuery.eq("store_id", storeId);
+  }
+
   const [
     { data: influencer, error: infError },
     { data: allocations, error: allocError },
   ] = await Promise.all([
     supabase.from("influencers").select("*").eq("id", id).maybeSingle(),
-    supabase
-      .from("allocations")
-      .select("*, products(*), stores(*)")
-      .eq("influencer_id", id)
-      .eq("store_id", storeId)
-      .order("created_at", { ascending: false }),
+    allocQuery,
   ]);
 
   if (infError || !influencer) {
@@ -51,16 +59,20 @@ export async function GET(
     return NextResponse.json({ error: allocError.message }, { status: 500 });
   }
 
-  const storeAllocations = allocations || [];
-  if (storeAllocations.length === 0) {
+  const rows = allocations || [];
+  if (rows.length === 0) {
     return NextResponse.json(
-      { error: "이 지점에 해당 인플루언서 배정이 없습니다." },
+      {
+        error: isAdmin
+          ? "해당 인플루언서 배정이 없습니다."
+          : "이 지점에 해당 인플루언서 배정이 없습니다.",
+      },
       { status: 404 },
     );
   }
 
   return NextResponse.json({
     influencer,
-    allocations: storeAllocations,
+    allocations: rows,
   });
 }

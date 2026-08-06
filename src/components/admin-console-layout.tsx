@@ -32,10 +32,11 @@ export function AdminConsoleLayout({
     return list.filter((item) => item.store_id === selectedStoreId);
   }, [list, selectedStoreId]);
 
-  const selectedStoreName =
-    storeList.find((s) => s.id === selectedStoreId)?.name ||
-    filteredList[0]?.stores?.name ||
-    null;
+  const selectedStoreName = selectedStoreId
+    ? storeList.find((s) => s.id === selectedStoreId)?.name ||
+      filteredList[0]?.stores?.name ||
+      null
+    : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -54,7 +55,7 @@ export function AdminConsoleLayout({
 
           <AdminImportPanel compact />
 
-          <section className="border border-[var(--line)] bg-[var(--surface)]">
+          <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
             <button
               type="button"
               onClick={() => setManualOpen((v) => !v)}
@@ -164,11 +165,11 @@ export function AdminConsoleLayout({
               >
                 배정 현황
               </h2>
-              {selectedStoreName ? (
-                <p className="mt-1 text-sm text-[var(--accent)]">
-                  {selectedStoreName}만 표시 중
-                </p>
-              ) : null}
+              <p className="mt-1 text-sm text-[var(--accent)]">
+                {selectedStoreName
+                  ? `${selectedStoreName}만 표시 중`
+                  : "전체 지점 표시중"}
+              </p>
             </div>
           </div>
           <PharListWithModal

@@ -457,7 +457,7 @@ export function PharListWithModal({
       ) : (
         <div
           ref={listScrollRef}
-          className={`overflow-auto border border-[var(--line)] bg-[var(--surface)] ${
+          className={`overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm ${
             fillHeight
               ? "min-h-0 flex-1"
               : "max-h-[min(70vh,calc(100vh-14rem))]"

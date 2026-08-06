@@ -35,6 +35,7 @@ export default async function AdminPage({
     <AppShell
       full
       fitViewport
+      theme="owm"
       eyebrow="Admin"
       title="운영 콘솔"
       actions={

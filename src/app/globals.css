@@ -41,6 +41,56 @@ button {
   font: inherit;
 }
 
+/* ── OWM 운영 콘솔 / 관리자 (홈·Inf와 톤 통일) ── */
+.owm-theme {
+  --background: #f6efe6;
+  --foreground: #3d1f0a;
+  --surface: #fffdfb;
+  --surface-hover: #f0e6d8;
+  --line: #e8d5be;
+  --muted: #a07050;
+  --accent: #6b3b1f;
+  --accent-soft: #f5ede3;
+  --ink: #3d1f0a;
+  --danger: #9b2c2c;
+  color: var(--foreground);
+  background:
+    radial-gradient(circle at 88% 0%, rgba(232, 199, 154, 0.35) 0%, transparent 42%),
+    linear-gradient(165deg, #faf6f0 0%, #f3ebe0 52%, #efe4d6 100%);
+}
+
+.owm-theme input,
+.owm-theme select,
+.owm-theme textarea {
+  border-radius: 1rem;
+}
+
+.owm-theme .owm-panel {
+  border-radius: 1.25rem;
+  overflow: hidden;
+}
+
+.owm-theme .owm-btn-primary {
+  border-radius: 1rem;
+  background: #6b3b1f;
+}
+
+.owm-theme .owm-btn-primary:hover {
+  background: #7d4726;
+  filter: none;
+}
+
+.owm-theme .owm-btn-secondary {
+  border-radius: 9999px;
+  border-color: #e8d5be;
+  background: #fffdfb;
+  color: #6b3b1f;
+}
+
+.owm-theme .owm-btn-secondary:hover {
+  background: #f5ede3;
+}
+
 /* ── OWM 랜딩 페이지 (역할 선택) ── */
 .owm-landing {
   background: #1a0d05;

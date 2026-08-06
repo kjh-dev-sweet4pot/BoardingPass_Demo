@@ -158,14 +158,14 @@ export function AdminStoreOverview({
   }, [stats]);
 
   return (
-    <section className="border border-[var(--line)] bg-[var(--surface)]">
+    <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
       <div className="border-b border-[var(--line)] px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <h2
             className="text-base text-[var(--ink)]"
             style={{ fontFamily: "var(--font-display), serif" }}
           >
-            월간 요약 
+            월간 요약
           </h2>
           <div className="flex items-center gap-1">
             <button
@@ -262,7 +262,7 @@ export function AdminStoreOverview({
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="border border-[var(--line)] bg-white/70 px-2.5 py-1.5">
+                    <div className="rounded-xl border border-[var(--line)] bg-white/80 px-2.5 py-1.5">
                       <p className="text-[10px] text-[var(--muted)]">
                         방문 예정
                       </p>
@@ -273,7 +273,7 @@ export function AdminStoreOverview({
                         </span>
                       </p>
                     </div>
-                    <div className="border border-[var(--line)] bg-white/70 px-2.5 py-1.5">
+                    <div className="rounded-xl border border-[var(--line)] bg-white/80 px-2.5 py-1.5">
                       <p className="text-[10px] text-[var(--muted)]">
                         방문 완료
                       </p>
