@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
   const { url, key, configured } = getSupabaseEnv();
   if (!configured) {
-    const msg = "Supabase 환경변수가 설정되지 않았습니다.";
+    const msg = "env err : 환경변수가 설정되지 않았습니다.";
     return wantsJson ? jsonError(msg, 500) : redirectError(msg);
   }
 
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     if (!influencer?.id) {
-      const msg = "등록된 인스타그램 핸들과 일치하지 않습니다.";
+      const msg = "등록된 SNS 아이디와 일치하지 않습니다.";
       return wantsJson ? jsonError(msg, 404) : redirectError(msg);
     }
 
