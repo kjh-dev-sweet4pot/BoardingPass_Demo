@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   ALLOCATION_STATUS_LABEL,
   type AllocationStatus,
@@ -82,6 +82,40 @@ function matchesProductSearch(item: AllocationWithRelations, q: string) {
   return haystack.includes(q);
 }
 
+function todayYmdKst() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function visitDateKey(item: AllocationWithRelations) {
+  return item.visit_date ? String(item.visit_date).slice(0, 10) : "";
+}
+
+/** 미래(내림차순) → 오늘 → 과거(내림차순)
+ * 초기 스크롤은 오늘 위치에 맞춰, 위로 스크롤 시 오늘 이후가 보이게 함
+ */
+function sortByVisitRelativeToToday(items: AllocationWithRelations[]) {
+  const today = todayYmdKst();
+  return [...items].sort((a, b) => {
+    const da = visitDateKey(a);
+    const db = visitDateKey(b);
+    const rank = (d: string) => {
+      if (d && d > today) return 0;
+      if (d && d === today) return 1;
+      return 2;
+    };
+    const ra = rank(da);
+    const rb = rank(db);
+    if (ra !== rb) return ra - rb;
+    if (da !== db) return db.localeCompare(da);
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+}
+
 export function PharListWithModal({
   items,
 }: {
@@ -134,7 +168,7 @@ export function PharListWithModal({
   }, [items]);
 
   const filtered = useMemo(() => {
-    return items.filter((item) => {
+    const next = items.filter((item) => {
       if (!matchesInfluencerSearch(item, deferredInfluencerQ)) return false;
       if (!matchesProductSearch(item, deferredProductQ)) return false;
       if (storeId && item.store_id !== storeId) return false;
@@ -143,6 +177,7 @@ export function PharListWithModal({
       if (status && item.status !== status) return false;
       return true;
     });
+    return sortByVisitRelativeToToday(next);
   }, [
     items,
     deferredInfluencerQ,
@@ -152,6 +187,33 @@ export function PharListWithModal({
     visitDate,
     status,
   ]);
+
+  const today = todayYmdKst();
+  const anchorRowId = useMemo(() => {
+    const todayItem = filtered.find((item) => visitDateKey(item) === today);
+    if (todayItem) return todayItem.id;
+    const pastItem = filtered.find((item) => {
+      const d = visitDateKey(item);
+      return !d || d < today;
+    });
+    return pastItem?.id ?? null;
+  }, [filtered, today]);
+
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  const anchorRowRef = useRef<HTMLTableRowElement>(null);
+
+  useEffect(() => {
+    const container = listScrollRef.current;
+    const row = anchorRowRef.current;
+    if (!container || !row) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const thead = container.querySelector("thead");
+      const headerH = thead instanceof HTMLElement ? thead.offsetHeight : 0;
+      container.scrollTop = Math.max(0, row.offsetTop - headerH);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [filtered, anchorRowId]);
 
   const hasFilters =
     Boolean(influencerQ.trim()) ||
@@ -237,20 +299,32 @@ export function PharListWithModal({
       {items.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
       ) : (
-        <div className="overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
+        <div
+          ref={listScrollRef}
+          className="max-h-[min(70vh,calc(100vh-14rem))] overflow-auto border border-[var(--line)] bg-[var(--surface)]"
+        >
           <table className="w-full min-w-[860px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/50 text-xs tracking-[0.08em] text-[var(--muted)] uppercase">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs tracking-[0.08em] text-[var(--muted)] uppercase">
+                <th className="px-4 py-3 font-medium">방문일</th>
                 <th className="px-4 py-3 font-medium">이름</th>
                 <th className="px-4 py-3 font-medium">계정</th>
                 <th className="px-4 py-3 font-medium">상품</th>
                 <th className="px-4 py-3 font-medium">매장</th>
                 <th className="px-4 py-3 font-medium text-right">수량</th>
-                <th className="px-4 py-3 font-medium">방문일</th>
                 <th className="px-4 py-3 font-medium">상태</th>
                 <th className="px-4 py-3 font-medium text-right">상세</th>
               </tr>
               <tr className="border-b border-[var(--line)] bg-[var(--surface)]">
+                <th className="px-2 py-2 font-normal">
+                  <input
+                    className={filterControlClass}
+                    type="date"
+                    value={visitDate}
+                    onChange={(e) => setVisitDate(e.target.value)}
+                    aria-label="방문일 필터"
+                  />
+                </th>
                 <th colSpan={2} className="px-2 py-2 font-normal">
                   <input
                     className={filterControlClass}
@@ -304,15 +378,6 @@ export function PharListWithModal({
                   </select>
                 </th>
                 <th className="px-2 py-2 font-normal">
-                  <input
-                    className={filterControlClass}
-                    type="date"
-                    value={visitDate}
-                    onChange={(e) => setVisitDate(e.target.value)}
-                    aria-label="방문일 필터"
-                  />
-                </th>
-                <th className="px-2 py-2 font-normal">
                   <select
                     className={filterSelectClass}
                     style={{ backgroundImage: selectChevron }}
@@ -344,30 +409,44 @@ export function PharListWithModal({
               ) : (
                 filtered.map((item) => {
                   const handle = formatIgHandle(item.influencers);
+                  const dateKey = visitDateKey(item);
+                  const isToday = dateKey === today;
+                  const isAnchor = item.id === anchorRowId;
                   return (
                     <tr
                       key={item.id}
-                      className="cursor-pointer border-b border-[var(--line)] last:border-b-0 transition hover:bg-[var(--accent-soft)]/40"
+                      ref={isAnchor ? anchorRowRef : undefined}
+                      className={`cursor-pointer border-b border-[var(--line)] last:border-b-0 transition hover:bg-[var(--accent-soft)]/40 ${
+                        isToday ? "bg-[var(--accent-soft)]/35" : ""
+                      }`}
                       onClick={() => setOpenId(item.influencer_id)}
                     >
+                      <td className="px-4 py-3.5 tabular-nums font-medium text-[var(--ink)]">
+                        {item.visit_date || "—"}
+                        {isToday ? (
+                          <span className="ml-2 text-[10px] font-semibold tracking-wide text-[var(--accent)] uppercase">
+                            오늘
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3.5 font-medium text-[var(--ink)]">
                         {item.influencers?.name || "인플루언서"}
                       </td>
-                    <td className="px-4 py-3.5 text-[var(--accent)]">
-                      {formatSnsUrl(item.influencers?.sns_url) ? (
-                        <a
-                          href={formatSnsUrl(item.influencers?.sns_url)!}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline underline-offset-2"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {handle || "프로필"}
-                        </a>
-                      ) : (
-                        handle || "—"
-                      )}
-                    </td>
+                      <td className="px-4 py-3.5 text-[var(--accent)]">
+                        {formatSnsUrl(item.influencers?.sns_url) ? (
+                          <a
+                            href={formatSnsUrl(item.influencers?.sns_url)!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline underline-offset-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {handle || "프로필"}
+                          </a>
+                        ) : (
+                          handle || "—"
+                        )}
+                      </td>
                       <td className="px-4 py-3.5">
                         <span className="text-[var(--ink)]">
                           {item.products?.name || "상품"}
@@ -383,9 +462,6 @@ export function PharListWithModal({
                       </td>
                       <td className="px-4 py-3.5 text-right tabular-nums text-[var(--ink)]">
                         {item.quantity}
-                      </td>
-                      <td className="px-4 py-3.5 tabular-nums text-[var(--muted)]">
-                        {item.visit_date || "—"}
                       </td>
                       <td className="px-4 py-3.5">
                         <span
