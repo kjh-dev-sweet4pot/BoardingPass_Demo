@@ -341,17 +341,12 @@ export function InfAllocationList({
 
   useEffect(() => {
     if (!selected) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeModal();
-    };
-    window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   function closeModal() {
     setSelected(null);
@@ -802,26 +797,62 @@ function BottomSheet({
   children: React.ReactNode;
   tall?: boolean;
 }) {
+  const [closing, setClosing] = useState(false);
+
+  function requestClose() {
+    if (closing) return;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) {
+      onClose();
+      return;
+    }
+
+    setClosing(true);
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") requestClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // closing 변경 시 requestClose 동작이 달라지므로 재바인딩
+  }, [closing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handlePanelAnimationEnd(e: React.AnimationEvent<HTMLDivElement>) {
+    if (!closing) return;
+    // 패널 닫힘 애니만 처리 (자식 content 애니 무시)
+    if (e.target !== e.currentTarget) return;
+    onClose();
+  }
+
   return (
     <div
-      className="inf-sheet-backdrop fixed inset-0 z-50 flex items-end bg-black/40"
+      className={`inf-sheet-backdrop fixed inset-0 z-50 flex items-end bg-black/40${
+        closing ? " is-closing" : ""
+      }`}
       role="dialog"
       aria-modal="true"
       aria-label={label}
-      onClick={onClose}
+      onClick={requestClose}
     >
       <div
-        className={`inf-sheet-panel w-full overflow-y-auto rounded-t-3xl bg-white px-5 pb-10 pt-5 shadow-2xl ${
-          tall ? "min-h-[86vh] max-h-[96vh]" : "max-h-[88vh]"
-        }`}
+        className={`inf-sheet-panel w-full overflow-y-auto rounded-t-3xl bg-white px-5 pb-10 pt-5 shadow-2xl${
+          closing ? " is-closing" : ""
+        } ${tall ? "min-h-[86vh] max-h-[96vh]" : "max-h-[88vh]"}`}
         onClick={(e) => e.stopPropagation()}
+        onAnimationEnd={handlePanelAnimationEnd}
       >
         <div className="mx-auto mb-5 h-1 w-12 rounded-full bg-[#e8e8e8]" />
         <div className="mb-4 flex items-center justify-between">
           <span className="text-xs text-[#ccc]">{label}</span>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="text-xs text-[#aaa] hover:text-[#666]"
           >
             닫기
