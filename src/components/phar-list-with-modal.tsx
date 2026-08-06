@@ -1,6 +1,13 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ALLOCATION_STATUS_LABEL,
   type AllocationStatus,
@@ -122,6 +129,113 @@ function sortByVisitRelativeToToday(items: AllocationWithRelations[]) {
   });
 }
 
+const SectionHeaderRow = forwardRef<
+  HTMLTableRowElement,
+  { label: string; count: number; tone: "accent" | "muted" }
+>(function SectionHeaderRow({ label, count, tone }, ref) {
+  const accent = tone === "accent";
+  return (
+    <tr
+      ref={ref}
+      className={
+        accent
+          ? "border-y border-[var(--accent)] bg-[var(--accent-soft)]"
+          : "border-y border-[var(--line)] bg-[#eef2f0]"
+      }
+    >
+      <td colSpan={8} className="px-4 py-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <span
+            className={`text-xs font-semibold tracking-[0.12em] uppercase ${
+              accent ? "text-[var(--accent)]" : "text-[var(--muted)]"
+            }`}
+          >
+            {label}
+          </span>
+          <span
+            className={`text-xs tabular-nums ${
+              accent ? "font-semibold text-[var(--accent)]" : "text-[var(--muted)]"
+            }`}
+          >
+            {count}건
+          </span>
+        </div>
+      </td>
+    </tr>
+  );
+});
+
+function AllocationRow({
+  item,
+  isToday,
+  onOpen,
+}: {
+  item: AllocationWithRelations;
+  isToday: boolean;
+  onOpen: () => void;
+}) {
+  const handle = formatIgHandle(item.influencers);
+  return (
+    <tr
+      className={`cursor-pointer border-b border-[var(--line)] last:border-b-0 transition hover:bg-[var(--accent-soft)]/40 ${
+        isToday ? "bg-[var(--accent-soft)]/40" : ""
+      }`}
+      onClick={onOpen}
+    >
+      <td className="px-4 py-3.5 tabular-nums font-medium text-[var(--ink)]">
+        {item.visit_date || "—"}
+        {isToday ? (
+          <span className="ml-2 text-[10px] font-semibold tracking-wide text-[var(--accent)] uppercase">
+            오늘
+          </span>
+        ) : null}
+      </td>
+      <td className="px-4 py-3.5 font-medium text-[var(--ink)]">
+        {item.influencers?.name || "인플루언서"}
+      </td>
+      <td className="px-4 py-3.5 text-[var(--accent)]">
+        {formatSnsUrl(item.influencers?.sns_url) ? (
+          <a
+            href={formatSnsUrl(item.influencers?.sns_url)!}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {handle || "프로필"}
+          </a>
+        ) : (
+          handle || "—"
+        )}
+      </td>
+      <td className="px-4 py-3.5">
+        <span className="text-[var(--ink)]">{item.products?.name || "상품"}</span>
+        {item.products?.sku ? (
+          <span className="mt-0.5 block text-xs text-[var(--muted)]">
+            SKU {item.products.sku}
+          </span>
+        ) : null}
+      </td>
+      <td className="px-4 py-3.5 text-[var(--muted)]">
+        {item.stores?.name || "매장"}
+      </td>
+      <td className="px-4 py-3.5 text-right tabular-nums text-[var(--ink)]">
+        {item.quantity}
+      </td>
+      <td className="px-4 py-3.5">
+        <span
+          className={`inline-block border px-2.5 py-1 text-xs font-medium ${statusTone(item.status)}`}
+        >
+          {ALLOCATION_STATUS_LABEL[item.status]}
+        </span>
+      </td>
+      <td className="px-4 py-3.5 text-right text-xs text-[var(--accent)]">
+        보기 →
+      </td>
+    </tr>
+  );
+}
+
 export function PharListWithModal({
   items,
 }: {
@@ -195,31 +309,44 @@ export function PharListWithModal({
   ]);
 
   const today = todayYmdKst();
-  const anchorRowId = useMemo(() => {
-    const todayItem = filtered.find((item) => visitDateKey(item) === today);
-    if (todayItem) return todayItem.id;
-    const pastItem = filtered.find((item) => {
+
+  const { pastItems, todayItems, futureItems } = useMemo(() => {
+    const past: AllocationWithRelations[] = [];
+    const todayList: AllocationWithRelations[] = [];
+    const future: AllocationWithRelations[] = [];
+    for (const item of filtered) {
       const d = visitDateKey(item);
-      return !d || d < today;
-    });
-    return pastItem?.id ?? null;
+      if (d && d === today) todayList.push(item);
+      else if (d && d > today) future.push(item);
+      else past.push(item);
+    }
+    return { pastItems: past, todayItems: todayList, futureItems: future };
   }, [filtered, today]);
 
   const listScrollRef = useRef<HTMLDivElement>(null);
-  const anchorRowRef = useRef<HTMLTableRowElement>(null);
+  const todaySectionRef = useRef<HTMLTableRowElement>(null);
+
+  function scrollToTodaySection() {
+    const container = listScrollRef.current;
+    const row = todaySectionRef.current;
+    if (!container || !row) return;
+    const thead = container.querySelector("thead");
+    const headerH = thead instanceof HTMLElement ? thead.offsetHeight : 0;
+    container.scrollTop = Math.max(0, row.offsetTop - headerH);
+  }
 
   useEffect(() => {
-    const container = listScrollRef.current;
-    const row = anchorRowRef.current;
-    if (!container || !row) return;
-
+    let cancelled = false;
     const frame = window.requestAnimationFrame(() => {
-      const thead = container.querySelector("thead");
-      const headerH = thead instanceof HTMLElement ? thead.offsetHeight : 0;
-      container.scrollTop = Math.max(0, row.offsetTop - headerH);
+      window.requestAnimationFrame(() => {
+        if (!cancelled) scrollToTodaySection();
+      });
     });
-    return () => window.cancelAnimationFrame(frame);
-  }, [filtered, anchorRowId]);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [filtered, todayItems.length, pastItems.length, futureItems.length]);
 
   const hasFilters =
     Boolean(influencerQ.trim()) ||
@@ -286,20 +413,34 @@ export function PharListWithModal({
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--muted)]">
-        <p>
-          {hasFilters
-            ? `${filtered.length}건 / 전체 ${items.length}건`
-            : `${items.length}건`}
-        </p>
-        {hasFilters ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <p>
+            {hasFilters
+              ? `${filtered.length}건 / 전체 ${items.length}건`
+              : `${items.length}건`}
+          </p>
+          <p className="rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
+            오늘 {todayItems.length}건
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            className="text-xs text-[var(--accent)] hover:underline"
-            onClick={clearFilters}
+            className="text-xs font-medium text-[var(--accent)] hover:underline"
+            onClick={scrollToTodaySection}
           >
-            필터 초기화
+            오늘로 이동
           </button>
-        ) : null}
+          {hasFilters ? (
+            <button
+              type="button"
+              className="text-xs text-[var(--accent)] hover:underline"
+              onClick={clearFilters}
+            >
+              필터 초기화
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {items.length === 0 ? (
@@ -413,75 +554,66 @@ export function PharListWithModal({
                   </td>
                 </tr>
               ) : (
-                filtered.map((item) => {
-                  const handle = formatIgHandle(item.influencers);
-                  const dateKey = visitDateKey(item);
-                  const isToday = dateKey === today;
-                  const isAnchor = item.id === anchorRowId;
-                  return (
-                    <tr
+                <>
+                  {pastItems.length > 0 && (
+                    <SectionHeaderRow
+                      label="오늘 이전"
+                      count={pastItems.length}
+                      tone="muted"
+                    />
+                  )}
+                  {pastItems.map((item) => (
+                    <AllocationRow
                       key={item.id}
-                      ref={isAnchor ? anchorRowRef : undefined}
-                      className={`cursor-pointer border-b border-[var(--line)] last:border-b-0 transition hover:bg-[var(--accent-soft)]/40 ${
-                        isToday ? "bg-[var(--accent-soft)]/35" : ""
-                      }`}
-                      onClick={() => setOpenId(item.influencer_id)}
-                    >
-                      <td className="px-4 py-3.5 tabular-nums font-medium text-[var(--ink)]">
-                        {item.visit_date || "—"}
-                        {isToday ? (
-                          <span className="ml-2 text-[10px] font-semibold tracking-wide text-[var(--accent)] uppercase">
-                            오늘
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3.5 font-medium text-[var(--ink)]">
-                        {item.influencers?.name || "인플루언서"}
-                      </td>
-                      <td className="px-4 py-3.5 text-[var(--accent)]">
-                        {formatSnsUrl(item.influencers?.sns_url) ? (
-                          <a
-                            href={formatSnsUrl(item.influencers?.sns_url)!}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline underline-offset-2"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {handle || "프로필"}
-                          </a>
-                        ) : (
-                          handle || "—"
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span className="text-[var(--ink)]">
-                          {item.products?.name || "상품"}
-                        </span>
-                        {item.products?.sku ? (
-                          <span className="mt-0.5 block text-xs text-[var(--muted)]">
-                            SKU {item.products.sku}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3.5 text-[var(--muted)]">
-                        {item.stores?.name || "매장"}
-                      </td>
-                      <td className="px-4 py-3.5 text-right tabular-nums text-[var(--ink)]">
-                        {item.quantity}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span
-                          className={`inline-block border px-2.5 py-1 text-xs font-medium ${statusTone(item.status)}`}
-                        >
-                          {ALLOCATION_STATUS_LABEL[item.status]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-right text-xs text-[var(--accent)]">
-                        보기 →
+                      item={item}
+                      isToday={false}
+                      onOpen={() => setOpenId(item.influencer_id)}
+                    />
+                  ))}
+
+                  <SectionHeaderRow
+                    ref={todaySectionRef}
+                    label={`오늘 · ${today}`}
+                    count={todayItems.length}
+                    tone="accent"
+                  />
+                  {todayItems.length === 0 ? (
+                    <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
+                      <td
+                        colSpan={8}
+                        className="px-4 py-6 text-center text-sm text-[var(--muted)]"
+                      >
+                        오늘 방문 예정인 배정이 없습니다. 위로 과거 · 아래로 예정을
+                        확인하세요.
                       </td>
                     </tr>
-                  );
-                })
+                  ) : (
+                    todayItems.map((item) => (
+                      <AllocationRow
+                        key={item.id}
+                        item={item}
+                        isToday
+                        onOpen={() => setOpenId(item.influencer_id)}
+                      />
+                    ))
+                  )}
+
+                  {futureItems.length > 0 && (
+                    <SectionHeaderRow
+                      label="오늘 이후"
+                      count={futureItems.length}
+                      tone="muted"
+                    />
+                  )}
+                  {futureItems.map((item) => (
+                    <AllocationRow
+                      key={item.id}
+                      item={item}
+                      isToday={false}
+                      onOpen={() => setOpenId(item.influencer_id)}
+                    />
+                  ))}
+                </>
               )}
             </tbody>
           </table>
