@@ -238,8 +238,11 @@ function AllocationRow({
 
 export function PharListWithModal({
   items,
+  fillHeight = false,
 }: {
   items: AllocationWithRelations[];
+  /** 부모 높이에 맞춰 목록만 내부 스크롤 (운영 콘솔 등) */
+  fillHeight?: boolean;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
@@ -332,7 +335,12 @@ export function PharListWithModal({
     if (!container || !row) return;
     const thead = container.querySelector("thead");
     const headerH = thead instanceof HTMLElement ? thead.offsetHeight : 0;
-    container.scrollTop = Math.max(0, row.offsetTop - headerH);
+    const containerRect = container.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    container.scrollTop = Math.max(
+      0,
+      container.scrollTop + (rowRect.top - containerRect.top) - headerH,
+    );
   }
 
   useEffect(() => {
@@ -411,8 +419,8 @@ export function PharListWithModal({
   }
 
   return (
-    <>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--muted)]">
+    <div className={fillHeight ? "flex min-h-0 flex-1 flex-col" : ""}>
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 text-sm text-[var(--muted)]">
         <div className="flex flex-wrap items-center gap-3">
           <p>
             {hasFilters
@@ -448,7 +456,11 @@ export function PharListWithModal({
       ) : (
         <div
           ref={listScrollRef}
-          className="max-h-[min(70vh,calc(100vh-14rem))] overflow-auto border border-[var(--line)] bg-[var(--surface)]"
+          className={`overflow-auto border border-[var(--line)] bg-[var(--surface)] ${
+            fillHeight
+              ? "min-h-0 flex-1"
+              : "max-h-[min(70vh,calc(100vh-14rem))]"
+          }`}
         >
           <table className="w-full min-w-[860px] border-collapse text-left text-sm">
             <thead className="sticky top-0 z-10">
@@ -796,6 +808,6 @@ export function PharListWithModal({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

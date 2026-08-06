@@ -7,6 +7,7 @@ export function AppShell({
   actions,
   wide = false,
   full = false,
+  fitViewport = false,
 }: {
   eyebrow: string;
   title: string;
@@ -15,16 +16,26 @@ export function AppShell({
   wide?: boolean;
   /** 뷰포트 전체 폭 사용 (운영 콘솔 등) */
   full?: boolean;
+  /** 페이지 전체 스크롤 없이 뷰포트 높이에 맞춤 */
+  fitViewport?: boolean;
 }) {
   return (
     <main
-      className={`min-h-screen w-full py-10 ${
+      className={`w-full ${
+        fitViewport
+          ? "flex h-dvh flex-col overflow-hidden py-4"
+          : "min-h-screen py-10"
+      } ${
         full
           ? "mx-0 max-w-none px-4 sm:px-6 lg:px-8"
           : `mx-auto px-6 ${wide ? "max-w-6xl" : "max-w-5xl"}`
       }`}
     >
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--line)] pb-6">
+      <div
+        className={`flex flex-wrap items-end justify-between gap-4 border-b border-[var(--line)] pb-4 ${
+          fitViewport ? "mb-4 shrink-0" : "mb-8 pb-6"
+        }`}
+      >
         <div>
           <Link href="/" className="text-xs tracking-[0.22em] text-[var(--muted)] uppercase">
             Boarding Pass
@@ -33,7 +44,7 @@ export function AppShell({
             {eyebrow}
           </p>
           <h1
-            className="mt-2 text-4xl text-[var(--ink)]"
+            className={`mt-2 text-[var(--ink)] ${fitViewport ? "text-3xl" : "text-4xl"}`}
             style={{ fontFamily: "var(--font-display), serif" }}
           >
             {title}
@@ -41,7 +52,11 @@ export function AppShell({
         </div>
         {actions}
       </div>
-      {children}
+      {fitViewport ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+      ) : (
+        children
+      )}
     </main>
   );
 }
