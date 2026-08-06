@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   ALLOCATION_STATUS_LABEL,
+  allocationStatusDisplayLabel,
   type AllocationStatus,
   type AllocationWithRelations,
   type Influencer,
@@ -223,7 +224,7 @@ function AllocationRow({
         <span
           className={`inline-block border px-2.5 py-1 text-xs font-medium ${statusTone(item.status)}`}
         >
-          {ALLOCATION_STATUS_LABEL[item.status]}
+          {allocationStatusDisplayLabel(item)}
         </span>
       </td>
       <td className="px-4 py-3.5 text-right text-xs text-[var(--accent)]">
@@ -790,7 +791,7 @@ export function PharListWithModal({
                                 <span
                                   className={`inline-block border px-2 py-0.5 text-xs font-medium ${statusTone(item.status)}`}
                                 >
-                                  {ALLOCATION_STATUS_LABEL[item.status]}
+                                  {allocationStatusDisplayLabel(item)}
                                 </span>
                               </td>
                               <td className="px-3 py-2.5 text-xs text-[var(--muted)]">

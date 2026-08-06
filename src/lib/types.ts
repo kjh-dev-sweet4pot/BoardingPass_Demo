@@ -61,3 +61,39 @@ export const ALLOCATION_STATUS_LABEL: Record<AllocationStatus, string> = {
   picked_up: "반출 완료",
   cancelled: "취소",
 };
+
+/** ISO / Date → YYYY-MM-DD (KST) */
+export function ymdKst(input: string | Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(typeof input === "string" ? new Date(input) : input);
+}
+
+function formatVisitCompleteLabel(ymd: string) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return ALLOCATION_STATUS_LABEL.visited;
+  return `${m}월 ${d}일 방문 완료`;
+}
+
+/**
+ * 운영 콘솔 상태 표시.
+ * visited 이고 실제 확인일(verified_at)이 예정일(visit_date)과 다르면
+ * "M월 D일 방문 완료"로 표시.
+ */
+export function allocationStatusDisplayLabel(
+  item: Pick<Allocation, "status" | "visit_date" | "verified_at">,
+) {
+  if (item.status === "visited" && item.verified_at) {
+    const verifiedDay = ymdKst(item.verified_at);
+    const visitDay = item.visit_date
+      ? String(item.visit_date).slice(0, 10)
+      : "";
+    if (verifiedDay && visitDay && verifiedDay !== visitDay) {
+      return formatVisitCompleteLabel(verifiedDay);
+    }
+  }
+  return ALLOCATION_STATUS_LABEL[item.status];
+}
