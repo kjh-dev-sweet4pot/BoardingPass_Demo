@@ -55,9 +55,7 @@ export async function POST(request: Request) {
 
     const { data: influencer, error } = await supabase
       .from("influencers")
-      .select(
-        "id, name, instagram_handle, instagram_handle_normalized, sns_url, notes, created_at, updated_at",
-      )
+      .select("id, name, instagram_handle, instagram_handle_normalized, sns_url")
       .eq("instagram_handle_normalized", normalized)
       .maybeSingle();
 

@@ -1,11 +1,25 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { InfAllocationList } from "@/components/inf-allocation-list";
 import {
   type AllocationWithRelations,
   type Influencer,
 } from "@/lib/types";
+
+/** 로그인 화면에서는 목록 번들을 미리 안 받아 첫 페인트 빠르게 */
+const InfAllocationList = dynamic(
+  () =>
+    import("@/components/inf-allocation-list").then((m) => m.InfAllocationList),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex flex-1 items-center justify-center py-16">
+        <p className="text-sm text-[#B09070]">목록 준비 중…</p>
+      </div>
+    ),
+  },
+);
 
 type Phase = "form" | "welcome" | "ready";
 
@@ -101,6 +115,12 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
       if (exitTimer.current) window.clearTimeout(exitTimer.current);
     };
   }, []);
+
+  /** 환영 화면 동안 목록 청크를 미리 받아 전환 지연 제거 */
+  useEffect(() => {
+    if (phase !== "welcome") return;
+    void import("@/components/inf-allocation-list");
+  }, [phase]);
 
   useEffect(() => {
     if (
@@ -261,19 +281,23 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <div className="flex flex-1 flex-col items-center justify-center px-8">
-        <div className="owm-login-logo mb-10">
+        <div className="inf-entry-logo mb-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/owm-logo.webp"
             alt="O.W.M 옵티마 웰니스 뮤지엄 약국"
             className="w-52"
+            width={208}
+            height={208}
+            decoding="async"
+            fetchPriority="high"
             draggable={false}
           />
         </div>
 
-        <div className="owm-login-divider mb-10 h-px w-10 bg-[#C4956A]" />
+        <div className="inf-entry-reveal mb-10 h-px w-10 bg-[#C4956A]" />
 
-        <div className="owm-login-title mb-8 text-center">
+        <div className="inf-entry-reveal mb-8 text-center">
           <h1 className="text-[1.15rem] font-semibold tracking-wide text-[#3D1F0A]">
             SNS 아이디를 입력해주세요
           </h1>
@@ -283,14 +307,14 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
         </div>
 
         {error ? (
-          <div className="mb-5 w-full max-w-[320px] rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-sm text-red-400">
+          <div className="inf-entry-reveal mb-5 w-full max-w-[320px] rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-sm text-red-400">
             {error}
           </div>
         ) : null}
 
         <form
           onSubmit={onSubmit}
-          className="owm-login-form w-full max-w-[320px] space-y-3"
+          className="inf-entry-reveal-late w-full max-w-[320px] space-y-3"
         >
           <input
             name="instagram_handle"
@@ -312,7 +336,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
         </form>
       </div>
 
-      <div className="pb-10 text-center">
+      <div className="inf-entry-reveal-late pb-10 text-center">
         <p className="text-[0.58rem] tracking-[0.2em] text-[#C4956A] uppercase">
           Optima Wellness Museum Pharmacy
         </p>

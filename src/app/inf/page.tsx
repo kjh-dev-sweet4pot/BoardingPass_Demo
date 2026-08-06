@@ -33,10 +33,18 @@ export default async function InfPage({
   const supabase = await createClient();
   const [{ data: inf, error: infError }, { data: rows, error: allocError }] =
     await Promise.all([
-      supabase.from("influencers").select("*").eq("id", influencerId).maybeSingle(),
+      supabase
+        .from("influencers")
+        .select(
+          "id, name, instagram_handle, instagram_handle_normalized, sns_url, notes, created_at, updated_at",
+        )
+        .eq("id", influencerId)
+        .maybeSingle(),
       supabase
         .from("allocations")
-        .select("*, products(*), stores(*)")
+        .select(
+          "id, influencer_id, product_id, store_id, quantity, status, visit_code, visit_date, verified_at, picked_up_at, created_at, updated_at, products(id, name, sku, description), stores(id, name, address)",
+        )
         .eq("influencer_id", influencerId)
         .order("created_at", { ascending: false }),
     ]);
