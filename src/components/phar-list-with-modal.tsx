@@ -346,7 +346,7 @@ export function PharListWithModal({
       cancelled = true;
       window.cancelAnimationFrame(frame);
     };
-  }, [filtered, todayItems.length, pastItems.length, futureItems.length]);
+  }, [filtered, today, todayItems.length, pastItems.length, futureItems.length]);
 
   const hasFilters =
     Boolean(influencerQ.trim()) ||
