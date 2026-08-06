@@ -23,8 +23,8 @@ export default async function PharPage({
 
   if (!configured) {
     return (
-      <AppShell wide eyebrow="Phar" title="매장 배정 현황">
-        <Notice error="ERR ENV..." />
+      <AppShell wide theme="owm" eyebrow="Phar" title="매장 배정 현황">
+        <Notice error="환경변수가 설정되지 않았습니다." />
       </AppShell>
     );
   }
@@ -57,6 +57,7 @@ export default async function PharPage({
   return (
     <AppShell
       wide
+      theme="owm"
       eyebrow="Phar"
       title={storeRow.name}
       actions={
@@ -69,8 +70,8 @@ export default async function PharPage({
       }
     >
       <Notice error={params.error || error?.message} message={params.message} />
-      <p className="mb-5 mt-1 text-m text-[var(--muted)]">
-        안녕하세요 약사님 방문 현황을 확인해주세요 ! 
+      <p className="mb-5 mt-1 text-sm tracking-wide text-[var(--muted)]">
+        안녕하세요 약사님, 방문 현황을 확인해 주세요.
       </p>
       <PharListWithModal items={list} lockedStoreId={storeRow.id} />
     </AppShell>

@@ -24,9 +24,9 @@ export function AppShell({
 }) {
   const owm = theme === "owm";
 
-  return (
+  const shell = (
     <main
-      className={`${owm ? "owm-theme" : ""} w-full ${
+      className={`w-full ${
         fitViewport
           ? "flex h-dvh flex-col overflow-hidden py-4"
           : "min-h-screen py-10"
@@ -56,9 +56,7 @@ export function AppShell({
           <div>
             <Link
               href="/"
-              className={`text-xs tracking-[0.22em] uppercase ${
-                owm ? "text-[var(--muted)]" : "text-[var(--muted)]"
-              }`}
+              className="text-xs tracking-[0.22em] uppercase text-[var(--muted)]"
             >
               Boarding Pass
             </Link>
@@ -86,6 +84,21 @@ export function AppShell({
       )}
     </main>
   );
+
+  // OWM: 콘텐츠 max-width 밖 좌우에도 cream 배경이 보이도록 full-bleed 래퍼
+  if (owm) {
+    return (
+      <div
+        className={`owm-theme w-full ${
+          fitViewport ? "h-dvh overflow-hidden" : "min-h-screen"
+        }`}
+      >
+        {shell}
+      </div>
+    );
+  }
+
+  return shell;
 }
 
 export function Notice({
