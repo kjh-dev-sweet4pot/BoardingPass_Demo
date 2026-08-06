@@ -95,8 +95,9 @@ function visitDateKey(item: AllocationWithRelations) {
   return item.visit_date ? String(item.visit_date).slice(0, 10) : "";
 }
 
-/** 미래(내림차순) → 오늘 → 과거(내림차순)
- * 초기 스크롤은 오늘 위치에 맞춰, 위로 스크롤 시 오늘 이후가 보이게 함
+/** 과거 → 오늘 → 미래
+ * 초기 스크롤은 오늘. 위로=오늘 이전, 아래로=오늘 이후
+ * 오늘과 맞닿는 쪽이 가까운 날짜가 되도록 과거·미래 모두 오늘 쪽으로 정렬
  */
 function sortByVisitRelativeToToday(items: AllocationWithRelations[]) {
   const today = todayYmdKst();
@@ -104,14 +105,19 @@ function sortByVisitRelativeToToday(items: AllocationWithRelations[]) {
     const da = visitDateKey(a);
     const db = visitDateKey(b);
     const rank = (d: string) => {
-      if (d && d > today) return 0;
-      if (d && d === today) return 1;
-      return 2;
+      if (!d || d < today) return 0; // past / missing
+      if (d === today) return 1; // today
+      return 2; // future
     };
     const ra = rank(da);
     const rb = rank(db);
     if (ra !== rb) return ra - rb;
-    if (da !== db) return db.localeCompare(da);
+    if (da !== db) {
+      // past: ascending (old → recent, yesterday just above today)
+      // future: ascending (tomorrow just below today → far)
+      // today: tie-break by created_at only
+      return da.localeCompare(db);
+    }
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 }
