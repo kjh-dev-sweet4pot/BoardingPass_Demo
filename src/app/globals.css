@@ -380,6 +380,53 @@ button {
   animation: inf-sheet-content 0.4s ease-out 0.12s both;
 }
 
+/* ── Inf 환영 → 목록 전환 ── */
+@keyframes inf-welcome-exit {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97) translateY(-12px);
+  }
+}
+
+@keyframes inf-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes inf-card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.inf-welcome-exit {
+  animation: inf-welcome-exit 0.48s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.inf-content-enter {
+  animation: inf-content-enter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.inf-card-rise {
+  opacity: 0;
+  animation: inf-card-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .inf-check-wrap,
   .inf-greet-text,
@@ -387,13 +434,20 @@ button {
   .inf-check-mark,
   .inf-sheet-backdrop,
   .inf-sheet-panel,
-  .inf-sheet-content {
+  .inf-sheet-content,
+  .inf-welcome-exit,
+  .inf-content-enter,
+  .inf-card-rise {
     animation: none !important;
   }
 
   .inf-check-ring,
   .inf-check-mark {
     stroke-dashoffset: 0 !important;
+  }
+
+  .inf-card-rise {
+    opacity: 1 !important;
   }
 
   .inf-welcome-stack,

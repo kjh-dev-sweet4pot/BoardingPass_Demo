@@ -268,18 +268,23 @@ export function InfAllocationList({
   influencer,
   initialAllocations,
   skipIntro = false,
+  fromWelcome = false,
 }: {
   influencer: Influencer;
   initialAllocations: AllocationWithRelations[];
-  /** 로그인 환영 화면을 이미 본 경우 인트로 스킵 */
+  /** 로그인 환영 화면을 이미 본 경우 인트로 스킵 (하위 호환) */
   skipIntro?: boolean;
+  /** 환영 화면 직후 진입 — 카드 스태거 + 컴팩트 헤더 */
+  fromWelcome?: boolean;
 }) {
+  const softEnter = skipIntro || fromWelcome;
   const router = useRouter();
   const [allocations, setAllocations] = useState(() =>
     sortItems(USE_MOCK_DATA ? [...initialAllocations, ...buildMockAllocations()] : initialAllocations),
   );
-  const [cardsReady, setCardsReady] = useState(skipIntro);
-  const [introPlayed, setIntroPlayed] = useState(skipIntro);
+  // fromWelcome: 마운트 직후 페이드인 되도록 처음엔 false
+  const [cardsReady, setCardsReady] = useState(false);
+  const [introPlayed, setIntroPlayed] = useState(softEnter);
 
   const [selected, setSelected] = useState<AllocationWithRelations | null>(null);
   const [step, setStep] = useState<Step>("review");
@@ -298,14 +303,26 @@ export function InfAllocationList({
 
   /* 카드 피드 진입 타이밍 */
   useEffect(() => {
-    if (skipIntro || introPlayed) {
-      setCardsReady(true);
-      return;
-    }
-
     const reduceMotion =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (softEnter) {
+      if (reduceMotion) {
+        setCardsReady(true);
+        return;
+      }
+      // 레이아웃 커밋 후 전환 시작 → 끊김 없이 페이드업
+      const id = window.requestAnimationFrame(() => {
+        window.setTimeout(() => setCardsReady(true), 40);
+      });
+      return () => window.cancelAnimationFrame(id);
+    }
+
+    if (introPlayed) {
+      setCardsReady(true);
+      return;
+    }
 
     if (reduceMotion) {
       setCardsReady(true);
@@ -320,7 +337,7 @@ export function InfAllocationList({
     }, 1100);
 
     return () => window.clearTimeout(timer);
-  }, [skipIntro]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [softEnter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selected) return;
@@ -400,44 +417,70 @@ export function InfAllocationList({
   return (
     <div className="flex flex-1 flex-col">
       {/* ── 그리팅 섹션 ── */}
-      <div className="flex flex-col items-center px-6 pb-4 pt-8 text-center">
-        <div className={introPlayed ? undefined : "inf-check-wrap"}>
-          <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center">
-            <div className="absolute inset-0 rounded-full bg-[#6B3B1F]/10" />
-            <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
-              <circle
-                className={introPlayed ? undefined : "inf-check-ring"}
-                cx="20"
-                cy="20"
-                r="16"
-                stroke="#6B3B1F"
-                strokeWidth="2"
-                strokeOpacity=".45"
-                fill="none"
-              />
-              <path
-                className={introPlayed ? undefined : "inf-check-mark"}
-                d="M13 20l5.5 5.5 9.5-10"
-                stroke="#6B3B1F"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-            </svg>
+      <div
+        className={`flex flex-col items-center px-6 text-center ${
+          fromWelcome ? "pb-3 pt-4" : "pb-4 pt-8"
+        }`}
+        style={
+          fromWelcome
+            ? {
+                opacity: cardsReady ? 1 : 0,
+                transform: cardsReady ? "translateY(0)" : "translateY(10px)",
+                transition:
+                  "opacity 0.45s ease, transform 0.5s cubic-bezier(0.22,1,0.36,1)",
+              }
+            : undefined
+        }
+      >
+        {fromWelcome ? null : (
+          <div className={introPlayed ? undefined : "inf-check-wrap"}>
+            <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-[#6B3B1F]/10" />
+              <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+                <circle
+                  className={introPlayed ? undefined : "inf-check-ring"}
+                  cx="20"
+                  cy="20"
+                  r="16"
+                  stroke="#6B3B1F"
+                  strokeWidth="2"
+                  strokeOpacity=".45"
+                  fill="none"
+                />
+                <path
+                  className={introPlayed ? undefined : "inf-check-mark"}
+                  d="M13 20l5.5 5.5 9.5-10"
+                  stroke="#6B3B1F"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className={introPlayed ? undefined : "inf-greet-text"}>
-          <h1 className="text-xl font-bold text-[#1a1a2e]">
-            안녕하세요, {influencer.name}님!
+        <div className={introPlayed && !fromWelcome ? undefined : fromWelcome ? undefined : "inf-greet-text"}>
+          <h1
+            className={`font-bold text-[#1a1a2e] ${
+              fromWelcome ? "text-lg" : "text-xl"
+            }`}
+          >
+            {fromWelcome
+              ? `${influencer.name || "고객"}님의 배정 목록`
+              : `안녕하세요, ${influencer.name}님!`}
           </h1>
           {todayActive.length > 0 ? (
-            <p className="mt-1.5 text-sm text-[#6B3B1F] font-medium">
+            <p className="mt-1.5 text-sm font-medium text-[#6B3B1F]">
               오늘 수령 가능한 상품이 {todayActive.length}건 있습니다
             </p>
           ) : (
-            <p className="mt-1.5 text-sm text-[#999]">본인 확인이 완료되었습니다.</p>
+            <p className="mt-1.5 text-sm text-[#999]">
+              {fromWelcome
+                ? "아래에서 상품을 확인해 주세요"
+                : "본인 확인이 완료되었습니다."}
+            </p>
           )}
           {influencer.sns_url && (
             <a
@@ -453,16 +496,31 @@ export function InfAllocationList({
       </div>
 
       {/* ── 구분선 ── */}
-      <div className="mx-5 h-px bg-[#f0f0f0]" />
+      <div
+        className="mx-5 h-px bg-[#f0f0f0]"
+        style={
+          fromWelcome
+            ? {
+                opacity: cardsReady ? 1 : 0,
+                transition: "opacity 0.4s ease 0.08s",
+              }
+            : undefined
+        }
+      />
 
       {/* ── 카드 피드 ── */}
       <div
         className="flex-1 overflow-y-auto px-5 py-5"
-        style={{
-          opacity: cardsReady ? 1 : 0,
-          transform: cardsReady ? "translateY(0)" : "translateY(14px)",
-          transition: "opacity 0.5s ease 0.1s, transform 0.5s cubic-bezier(0.22,1,0.36,1) 0.1s",
-        }}
+        style={
+          fromWelcome
+            ? undefined
+            : {
+                opacity: cardsReady ? 1 : 0,
+                transform: cardsReady ? "translateY(0)" : "translateY(14px)",
+                transition:
+                  "opacity 0.5s ease 0.1s, transform 0.5s cubic-bezier(0.22,1,0.36,1) 0.1s",
+              }
+        }
       >
         {allocations.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-20 text-center">
@@ -480,8 +538,18 @@ export function InfAllocationList({
           </div>
         ) : (
           <ul className="space-y-4 pb-10">
-            {allocations.map((item) => (
-              <li key={item.id}>
+            {allocations.map((item, index) => (
+              <li
+                key={item.id}
+                className={fromWelcome && cardsReady ? "inf-card-rise" : undefined}
+                style={
+                  fromWelcome && cardsReady
+                    ? { animationDelay: `${60 + index * 75}ms` }
+                    : fromWelcome
+                      ? { opacity: 0 }
+                      : undefined
+                }
+              >
                 <AllocationCard item={item} onOpen={openItem} />
               </li>
             ))}

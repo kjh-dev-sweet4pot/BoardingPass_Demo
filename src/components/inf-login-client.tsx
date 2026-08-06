@@ -10,6 +10,7 @@ import {
 type Phase = "form" | "welcome" | "ready";
 
 const WELCOME_MIN_MS = 1600;
+const WELCOME_EXIT_MS = 480;
 
 function displayName(inf: Pick<Influencer, "name" | "instagram_handle">) {
   const name = (inf.name || "").trim();
@@ -21,12 +22,18 @@ function displayName(inf: Pick<Influencer, "name" | "instagram_handle">) {
 function WelcomeScreen({
   name,
   loading,
+  exiting,
 }: {
   name: string;
   loading: boolean;
+  exiting?: boolean;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+    <div
+      className={`flex flex-1 flex-col items-center justify-center px-8 text-center ${
+        exiting ? "inf-welcome-exit" : ""
+      }`}
+    >
       <div className="inf-check-wrap relative mb-6 flex h-20 w-20 items-center justify-center">
         <div className="absolute inset-0 rounded-full bg-[#6B3B1F]/10" />
         <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
@@ -60,7 +67,11 @@ function WelcomeScreen({
           {name}님 환영합니다
         </h1>
         <p className="mt-2 text-sm tracking-wide text-[#B09070]">
-          {loading ? "방문 정보를 불러오는 중…" : "준비되었습니다"}
+          {exiting
+            ? "상품 목록으로 이동 중…"
+            : loading
+              ? "방문 정보를 불러오는 중…"
+              : "준비되었습니다"}
         </p>
       </div>
     </div>
@@ -80,19 +91,43 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [welcomeDone, setWelcomeDone] = useState(false);
   const [dataReady, setDataReady] = useState(false);
+  const [welcomeExiting, setWelcomeExiting] = useState(false);
   const welcomeTimer = useRef<number | null>(null);
+  const exitTimer = useRef<number | null>(null);
 
   useEffect(() => {
     return () => {
       if (welcomeTimer.current) window.clearTimeout(welcomeTimer.current);
+      if (exitTimer.current) window.clearTimeout(exitTimer.current);
     };
   }, []);
 
   useEffect(() => {
-    if (phase === "welcome" && welcomeDone && dataReady && influencer) {
-      setPhase("ready");
+    if (
+      phase !== "welcome" ||
+      !welcomeDone ||
+      !dataReady ||
+      !influencer ||
+      welcomeExiting
+    ) {
+      return;
     }
-  }, [phase, welcomeDone, dataReady, influencer]);
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) {
+      setPhase("ready");
+      return;
+    }
+
+    setWelcomeExiting(true);
+    exitTimer.current = window.setTimeout(() => {
+      setPhase("ready");
+      setWelcomeExiting(false);
+    }, WELCOME_EXIT_MS);
+  }, [phase, welcomeDone, dataReady, influencer, welcomeExiting]);
 
   async function runBootstrap() {
     setBootstrapLoading(true);
@@ -148,6 +183,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
       setPhase("welcome");
       setWelcomeDone(false);
       setDataReady(false);
+      setWelcomeExiting(false);
 
       const reduceMotion =
         typeof window !== "undefined" &&
@@ -158,10 +194,11 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
         reduceMotion ? 0 : WELCOME_MIN_MS,
       );
 
-      // 환영 애니메이션과 동시에 배정·상태 갱신
       void runBootstrap();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "본인확인 중 오류가 발생했습니다.");
+      setError(
+        err instanceof Error ? err.message : "본인확인 중 오류가 발생했습니다.",
+      );
       setPhase("form");
     } finally {
       setPending(false);
@@ -170,7 +207,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
 
   if (phase === "ready" && influencer) {
     return (
-      <div className="flex min-h-screen flex-col bg-white">
+      <div className="inf-content-enter flex min-h-screen flex-col bg-white">
         <header className="flex items-center justify-between px-5 pt-10 pb-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -197,7 +234,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
           <InfAllocationList
             influencer={influencer}
             initialAllocations={allocations}
-            skipIntro
+            fromWelcome
           />
         </main>
       </div>
@@ -210,6 +247,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
         <WelcomeScreen
           name={displayName(influencer)}
           loading={bootstrapLoading || !dataReady}
+          exiting={welcomeExiting}
         />
         <div className="pb-10 text-center">
           <p className="text-[0.58rem] tracking-[0.2em] text-[#C4956A] uppercase">
