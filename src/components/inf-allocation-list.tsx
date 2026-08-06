@@ -267,16 +267,19 @@ function buildMockAllocations(): AllocationWithRelations[] {
 export function InfAllocationList({
   influencer,
   initialAllocations,
+  skipIntro = false,
 }: {
   influencer: Influencer;
   initialAllocations: AllocationWithRelations[];
+  /** 로그인 환영 화면을 이미 본 경우 인트로 스킵 */
+  skipIntro?: boolean;
 }) {
   const router = useRouter();
   const [allocations, setAllocations] = useState(() =>
     sortItems(USE_MOCK_DATA ? [...initialAllocations, ...buildMockAllocations()] : initialAllocations),
   );
-  const [cardsReady, setCardsReady] = useState(false);
-  const [introPlayed, setIntroPlayed] = useState(false);
+  const [cardsReady, setCardsReady] = useState(skipIntro);
+  const [introPlayed, setIntroPlayed] = useState(skipIntro);
 
   const [selected, setSelected] = useState<AllocationWithRelations | null>(null);
   const [step, setStep] = useState<Step>("review");
@@ -295,7 +298,7 @@ export function InfAllocationList({
 
   /* 카드 피드 진입 타이밍 */
   useEffect(() => {
-    if (introPlayed) {
+    if (skipIntro || introPlayed) {
       setCardsReady(true);
       return;
     }
@@ -317,7 +320,7 @@ export function InfAllocationList({
     }, 1100);
 
     return () => window.clearTimeout(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [skipIntro]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selected) return;
