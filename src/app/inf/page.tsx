@@ -63,7 +63,7 @@ export default async function InfPage({
   }
 
   const influencer = inf as Influencer;
-  const allocations = (rows as AllocationWithRelations[]) || [];
+  const allocations = (rows as unknown as AllocationWithRelations[]) || [];
 
   return (
     <div className="flex min-h-screen flex-col bg-white">

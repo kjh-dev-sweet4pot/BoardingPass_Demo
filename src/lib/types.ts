@@ -51,7 +51,8 @@ export type Allocation = {
 export type AllocationWithRelations = Allocation & {
   products: Product | null;
   stores: Store | null;
-  influencers: Influencer | null;
+  /** 조인 시만 존재 (Inf 목록 등에서는 생략 가능) */
+  influencers?: Influencer | null;
 };
 
 export const ALLOCATION_STATUS_LABEL: Record<AllocationStatus, string> = {
