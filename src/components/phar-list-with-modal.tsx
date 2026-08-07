@@ -931,115 +931,140 @@ export function PharListWithModal({
   if (simpleFilters) {
     return (
       <div className={fillHeight ? "flex min-h-0 flex-1 flex-col" : ""}>
-        <div className="mb-5 flex shrink-0 flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
-              Counter · 오늘
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-3.5">
-                <p className="text-sm font-medium text-[var(--muted)]">오늘</p>
-                <p className="mt-1 text-4xl font-semibold tabular-nums tracking-wide text-[var(--accent)]">
-                  {todayStats.total}
-                  <span className="ml-1 text-base font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--muted)]">오늘 방문 합계</p>
+        <div className="mb-5 shrink-0 space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
+                Counter
+              </p>
+              <p className="mt-1 text-lg font-semibold tracking-wide text-[var(--ink)]">
+                오늘 현황
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div
+                className="flex rounded-full border border-[var(--line)] bg-white p-1"
+                role="group"
+                aria-label="목록 범위"
+              >
+                <button
+                  type="button"
+                  aria-pressed={todayOnly}
+                  onClick={() => {
+                    setTodayOnly(true);
+                    setVisitDate("");
+                  }}
+                  className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                    todayOnly
+                      ? "bg-[var(--accent)] text-white"
+                      : "text-[var(--muted)] hover:text-[var(--ink)]"
+                  }`}
+                >
+                  오늘만
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={!todayOnly}
+                  onClick={() => setTodayOnly(false)}
+                  className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                    !todayOnly
+                      ? "bg-[var(--accent)] text-white"
+                      : "text-[var(--muted)] hover:text-[var(--ink)]"
+                  }`}
+                >
+                  전체 날짜
+                </button>
               </div>
-              <div className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3.5">
-                <p className="text-sm font-medium text-[var(--muted)]">
-                  방문예정
-                </p>
-                <p className="mt-1 text-4xl font-semibold tabular-nums tracking-wide text-[var(--ink)]">
-                  {todayStats.scheduled}
-                  <span className="ml-1 text-base font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--muted)]">아직 미방문</p>
-              </div>
-              <div className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3.5">
-                <p className="text-sm font-medium text-[var(--muted)]">
-                  방문완료
-                </p>
-                <p className="mt-1 text-4xl font-semibold tabular-nums tracking-wide text-[var(--ink)]">
-                  {todayStats.visited}
-                  <span className="ml-1 text-base font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--muted)]">
-                  매장 방문 완료
-                </p>
-              </div>
-              <div className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3.5">
-                <p className="text-sm font-medium text-[var(--muted)]">
-                  반출완료
-                </p>
-                <p className="mt-1 text-4xl font-semibold tabular-nums tracking-wide text-[var(--accent)]">
-                  {todayStats.pickedUp}
-                  <span className="ml-1 text-base font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--muted)]">수령 완료</p>
-              </div>
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)]">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-[var(--accent)]"
+                  checked={hidePickedUp}
+                  onChange={(e) => setHidePickedUp(e.target.checked)}
+                />
+                미수령만
+              </label>
+              {!todayOnly ? (
+                <button
+                  type="button"
+                  className="rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                  onClick={scrollToTodaySection}
+                >
+                  오늘로 이동
+                </button>
+              ) : null}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div
-              className="flex rounded-full border border-[var(--line)] bg-white p-1"
-              role="group"
-              aria-label="목록 범위"
-            >
-              <button
-                type="button"
-                aria-pressed={todayOnly}
-                onClick={() => {
-                  setTodayOnly(true);
-                  setVisitDate("");
-                }}
-                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                  todayOnly
-                    ? "bg-[var(--accent)] text-white"
-                    : "text-[var(--muted)] hover:text-[var(--ink)]"
-                }`}
-              >
-                오늘만
-              </button>
-              <button
-                type="button"
-                aria-pressed={!todayOnly}
-                onClick={() => setTodayOnly(false)}
-                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                  !todayOnly
-                    ? "bg-[var(--accent)] text-white"
-                    : "text-[var(--muted)] hover:text-[var(--ink)]"
-                }`}
-              >
-                전체 날짜
-              </button>
+          <div
+            className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
+            role="group"
+            aria-label="오늘 방문 현황"
+          >
+            <div className="grid grid-cols-2 divide-x divide-y divide-[var(--line)] sm:grid-cols-4 sm:divide-y-0">
+              <div className="relative bg-[var(--accent-soft)]/55 px-5 py-4 sm:px-6 sm:py-5">
+                <div className="absolute inset-y-3 left-0 w-1 rounded-full bg-[var(--accent)]" />
+                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
+                  오늘
+                </p>
+                <p className="mt-2 flex items-baseline gap-1.5">
+                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--accent)]">
+                    {todayStats.total}
+                  </span>
+                  <span className="text-lg font-medium text-[var(--muted)]">
+                    건
+                  </span>
+                </p>
+                <p className="mt-1.5 text-xs text-[var(--muted)]">방문 합계</p>
+              </div>
+
+              <div className="px-5 py-4 sm:px-6 sm:py-5">
+                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
+                  방문예정
+                </p>
+                <p className="mt-2 flex items-baseline gap-1.5">
+                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
+                    {todayStats.scheduled}
+                  </span>
+                  <span className="text-lg font-medium text-[var(--muted)]">
+                    건
+                  </span>
+                </p>
+                <p className="mt-1.5 text-xs text-[var(--muted)]">아직 미방문</p>
+              </div>
+
+              <div className="px-5 py-4 sm:px-6 sm:py-5">
+                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
+                  방문완료
+                </p>
+                <p className="mt-2 flex items-baseline gap-1.5">
+                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
+                    {todayStats.visited}
+                  </span>
+                  <span className="text-lg font-medium text-[var(--muted)]">
+                    건
+                  </span>
+                </p>
+                <p className="mt-1.5 text-xs text-[var(--muted)]">
+                  매장 방문 완료
+                </p>
+              </div>
+
+              <div className="px-5 py-4 sm:px-6 sm:py-5">
+                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
+                  반출완료
+                </p>
+                <p className="mt-2 flex items-baseline gap-1.5">
+                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--accent)]">
+                    {todayStats.pickedUp}
+                  </span>
+                  <span className="text-lg font-medium text-[var(--muted)]">
+                    건
+                  </span>
+                </p>
+                <p className="mt-1.5 text-xs text-[var(--muted)]">수령 완료</p>
+              </div>
             </div>
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)]">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-[var(--accent)]"
-                checked={hidePickedUp}
-                onChange={(e) => setHidePickedUp(e.target.checked)}
-              />
-              미수령만
-            </label>
-            {!todayOnly ? (
-              <button
-                type="button"
-                className="rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
-                onClick={scrollToTodaySection}
-              >
-                오늘로 이동
-              </button>
-            ) : null}
           </div>
         </div>
 
