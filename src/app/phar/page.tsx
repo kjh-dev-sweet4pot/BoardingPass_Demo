@@ -56,7 +56,8 @@ export default async function PharPage({
 
   return (
     <AppShell
-      wide
+      full
+      fitViewport
       theme="owm"
       eyebrow="Phar"
       title={storeRow.name}
@@ -70,10 +71,11 @@ export default async function PharPage({
       }
     >
       <Notice error={params.error || error?.message} message={params.message} />
-      <p className="mb-5 mt-1 text-sm tracking-wide text-[var(--muted)]">
-        안녕하세요 약사님, 방문 현황을 확인해 주세요.
-      </p>
-      <PharListWithModal items={list} lockedStoreId={storeRow.id} />
+      <PharListWithModal
+        items={list}
+        lockedStoreId={storeRow.id}
+        fillHeight
+      />
     </AppShell>
   );
 }
