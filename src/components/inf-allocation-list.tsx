@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useInfLocale } from "@/components/inf-locale-provider";
 import {
@@ -875,20 +875,45 @@ function BottomSheet({
   const { t } = useInfLocale();
   const [closing, setClosing] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [settled, setSettled] = useState(false);
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [swipeClosing, setSwipeClosing] = useState(false);
+  const dragYRef = useRef(0);
+  const dragStartY = useRef(0);
+  const dragStartOffset = useRef(0);
+  const lastMoveY = useRef(0);
+  const lastMoveAt = useRef(0);
+  const velocityY = useRef(0);
+  const closedRef = useRef(false);
+
+  const DISMISS_DISTANCE = 120;
+  const DISMISS_VELOCITY = 0.55; // px/ms
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  function finishClose() {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    onClose();
+  }
+
+  function updateDragY(next: number) {
+    dragYRef.current = next;
+    setDragY(next);
+  }
+
   function requestClose() {
-    if (closing) return;
+    if (closing || swipeClosing || closedRef.current) return;
 
     const reduceMotion =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (reduceMotion) {
-      onClose();
+      finishClose();
       return;
     }
 
@@ -901,21 +926,117 @@ function BottomSheet({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closing]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [closing, swipeClosing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handlePanelAnimationEnd(e: React.AnimationEvent<HTMLDivElement>) {
-    if (!closing) return;
     if (e.target !== e.currentTarget) return;
-    onClose();
+    if (closing && !swipeClosing) {
+      finishClose();
+      return;
+    }
+    // 입장 애니메이션 종료 → 이후 재실행 방지
+    if (!settled) setSettled(true);
+  }
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (closing || swipeClosing) return;
+    const tag = (e.target as HTMLElement | null)?.closest(
+      "button, a, input, select, textarea",
+    );
+    if (tag) return;
+
+    dragStartY.current = e.clientY;
+    dragStartOffset.current = dragYRef.current;
+    lastMoveY.current = e.clientY;
+    lastMoveAt.current = performance.now();
+    velocityY.current = 0;
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragging || closing || swipeClosing) return;
+    const now = performance.now();
+    const dy = e.clientY - lastMoveY.current;
+    const dt = Math.max(now - lastMoveAt.current, 1);
+    velocityY.current = dy / dt;
+    lastMoveY.current = e.clientY;
+    lastMoveAt.current = now;
+
+    const next = Math.max(
+      0,
+      dragStartOffset.current + (e.clientY - dragStartY.current),
+    );
+    updateDragY(next);
+  }
+
+  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragging) return;
+    setDragging(false);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+
+    const current = dragYRef.current;
+    const shouldDismiss =
+      current > DISMISS_DISTANCE || velocityY.current > DISMISS_VELOCITY;
+
+    if (shouldDismiss) {
+      setSettled(true);
+      setSwipeClosing(true);
+      // 현재 위치에서 화면 밖으로만 이어서 이동 (입장 애니 재실행 없음)
+      updateDragY(
+        typeof window !== "undefined" ? window.innerHeight : Math.max(current, 800),
+      );
+      // transitionend 미발생 대비
+      window.setTimeout(() => finishClose(), 320);
+      return;
+    }
+    updateDragY(0);
+  }
+
+  function onPanelTransitionEnd(e: React.TransitionEvent<HTMLDivElement>) {
+    if (e.propertyName !== "transform") return;
+    if (!swipeClosing) return;
+    finishClose();
   }
 
   if (!mounted) return null;
 
+  const backdropOpacity = swipeClosing
+    ? 0
+    : Math.max(0.08, 0.4 * (1 - dragY / 420));
+
+  const panelStyle: React.CSSProperties = {
+    height: "min(96dvh, 98vh)",
+    maxHeight: "min(96dvh, 98vh)",
+    transform:
+      dragging || dragY > 0 || swipeClosing
+        ? `translateY(${dragY}px)`
+        : undefined,
+    transition: dragging
+      ? "none"
+      : swipeClosing
+        ? "transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.28s ease"
+        : closing
+          ? undefined
+          : "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
+    opacity: swipeClosing ? 0.92 : 1,
+    touchAction: "none",
+  };
+
   return createPortal(
     <div
-      className={`inf-sheet-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-black/40${
-        closing ? " is-closing" : ""
+      className={`inf-sheet-backdrop fixed inset-0 z-[100] flex items-end justify-center${
+        closing && !swipeClosing ? " is-closing" : ""
       }`}
+      style={{
+        backgroundColor: `rgba(0,0,0,${backdropOpacity})`,
+        transition: dragging ? "none" : "background-color 0.28s ease",
+        pointerEvents: swipeClosing ? "none" : undefined,
+      }}
       role="dialog"
       aria-modal="true"
       aria-label={label}
@@ -923,17 +1044,25 @@ function BottomSheet({
     >
       <div
         className={`inf-sheet-panel flex w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white px-5 pb-[max(1.75rem,calc(env(safe-area-inset-bottom)+0.75rem))] pt-3 shadow-2xl${
-          closing ? " is-closing" : ""
-        }`}
-        style={{
-          // 화면 거의 전체 · 스크롤 없이 맞춤
-          height: "min(96dvh, 98vh)",
-          maxHeight: "min(96dvh, 98vh)",
-        }}
+          settled ? " is-settled" : ""
+        }${closing && !swipeClosing ? " is-closing" : ""}${
+          dragging ? " is-dragging" : ""
+        }${swipeClosing ? " is-swipe-closing" : ""}`}
+        style={panelStyle}
         onClick={(e) => e.stopPropagation()}
         onAnimationEnd={handlePanelAnimationEnd}
+        onTransitionEnd={onPanelTransitionEnd}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
       >
-        <div className="mx-auto mb-3 h-1 w-12 shrink-0 rounded-full bg-[#e8e8e8]" />
+        <div
+          className="mx-auto mb-3 flex h-6 w-full shrink-0 cursor-grab items-start justify-center active:cursor-grabbing"
+          aria-hidden
+        >
+          <div className="mt-1 h-1 w-12 rounded-full bg-[#e8e8e8]" />
+        </div>
         <div className="mb-3 flex shrink-0 items-center justify-between">
           <span className="text-xs text-[#ccc]">{label}</span>
           <button
