@@ -126,6 +126,8 @@ function AllocationCard({
   const done = isPickedUp(item);
   const isCancelled = item.status === "cancelled";
   const today = isVisitToday(item);
+  /** 오늘 수령 가능 — 브랜드 웜톤 / 그 외는 스톤 톤으로 구분 */
+  const isTodayPickup = today && !done && !isCancelled;
   const visitYmd = visitDateYmd(item);
   const storeName = formatStoreName(item.stores, t.storeFallback);
 
@@ -135,10 +137,12 @@ function AllocationCard({
       ? t.pickupDone
       : t.pickupAvailable;
   const statusChipClass = isCancelled
-    ? "bg-[#f0f0f0] text-[#aaa]"
+    ? "bg-[#ebe8e3] text-[#a39e96]"
     : done
-      ? "bg-[#f3eee3] text-[#8a7a5c]"
-      : "bg-[#F5EDE3] text-[#6B3B1F]";
+      ? "bg-[#ebe8e3] text-[#8a7a5c]"
+      : isTodayPickup
+        ? "bg-[#F5EDE3] text-[#6B3B1F]"
+        : "bg-[#e8e6e2] text-[#6b6862]";
 
   const weekday = formatVisitWeekdayLocalized(visitYmd, locale);
 
@@ -146,14 +150,18 @@ function AllocationCard({
     <button
       type="button"
       onClick={() => onOpen(item)}
-      className="relative w-full overflow-hidden rounded-3xl border border-[#e8e8e8] bg-white text-left shadow-sm transition active:brightness-95"
+      className={`relative w-full overflow-hidden rounded-3xl border text-left shadow-sm transition active:brightness-95 ${
+        isTodayPickup
+          ? "border-[#e8e8e8] bg-white"
+          : "border-[#ddd9d3] bg-[#F6F5F3]"
+      }`}
     >
       <div className="absolute right-4 top-4 flex items-center gap-1.5">
-        {today && !done && !isCancelled && (
+        {isTodayPickup ? (
           <span className="rounded-full bg-[#6B3B1F] px-2 py-0.5 text-[10px] font-bold text-white">
             {t.today}
           </span>
-        )}
+        ) : null}
         <span
           className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusChipClass}`}
         >
@@ -163,31 +171,47 @@ function AllocationCard({
 
       <div className="space-y-4 px-5 pb-5 pt-5">
         <div className="pr-24">
-          <p className="text-[0.6rem] font-bold tracking-[0.18em] text-[#bbb] uppercase">
+          <p
+            className={`text-[0.6rem] font-bold tracking-[0.18em] uppercase ${
+              isTodayPickup ? "text-[#bbb]" : "text-[#b0aaa2]"
+            }`}
+          >
             {t.visitStore}
           </p>
-          <p className="mt-1 text-[1.55rem] font-bold leading-tight text-[#1a1a2e]">
+          <p
+            className={`mt-1 text-[1.55rem] font-bold leading-tight ${
+              isTodayPickup ? "text-[#1a1a2e]" : "text-[#5c5a56]"
+            }`}
+          >
             {storeName}
           </p>
         </div>
 
-        <div className="h-px bg-[#f2f2f2]" />
+        <div
+          className={`h-px ${isTodayPickup ? "bg-[#f2f2f2]" : "bg-[#e8e4de]"}`}
+        />
 
         <dl className="grid grid-cols-2 gap-x-4 gap-y-4">
           <div>
-            <dt className="text-[0.62rem] font-semibold tracking-wide text-[#bbb] uppercase">
+            <dt
+              className={`text-[0.62rem] font-semibold tracking-wide uppercase ${
+                isTodayPickup ? "text-[#bbb]" : "text-[#b0aaa2]"
+              }`}
+            >
               {t.visitSchedule}
             </dt>
             <dd
               className={`mt-1 text-base font-bold ${
-                today && !done && !isCancelled
-                  ? "text-[#6B3B1F]"
-                  : "text-[#333]"
+                isTodayPickup ? "text-[#6B3B1F]" : "text-[#6b6862]"
               }`}
             >
               {formatVisitDateLocalized(visitYmd, locale, t.dateUndecided)}
               {visitYmd && weekday ? (
-                <span className="ml-1 text-sm font-normal text-[#999]">
+                <span
+                  className={`ml-1 text-sm font-normal ${
+                    isTodayPickup ? "text-[#999]" : "text-[#a39e96]"
+                  }`}
+                >
                   ({weekday})
                 </span>
               ) : null}
@@ -195,19 +219,35 @@ function AllocationCard({
           </div>
 
           <div>
-            <dt className="text-[0.62rem] font-semibold tracking-wide text-[#bbb] uppercase">
+            <dt
+              className={`text-[0.62rem] font-semibold tracking-wide uppercase ${
+                isTodayPickup ? "text-[#bbb]" : "text-[#b0aaa2]"
+              }`}
+            >
               {t.quantity}
             </dt>
-            <dd className="mt-1 text-base font-bold text-[#333]">
+            <dd
+              className={`mt-1 text-base font-bold ${
+                isTodayPickup ? "text-[#333]" : "text-[#6b6862]"
+              }`}
+            >
               {t.quantityUnit(item.quantity)}
             </dd>
           </div>
 
           <div className="col-span-2">
-            <dt className="text-[0.62rem] font-semibold tracking-wide text-[#bbb] uppercase">
+            <dt
+              className={`text-[0.62rem] font-semibold tracking-wide uppercase ${
+                isTodayPickup ? "text-[#bbb]" : "text-[#b0aaa2]"
+              }`}
+            >
               {t.product}
             </dt>
-            <dd className="mt-1 text-base font-semibold text-[#333]">
+            <dd
+              className={`mt-1 text-base font-semibold ${
+                isTodayPickup ? "text-[#333]" : "text-[#6b6862]"
+              }`}
+            >
               {item.products?.name || t.productFallback}
             </dd>
           </div>
