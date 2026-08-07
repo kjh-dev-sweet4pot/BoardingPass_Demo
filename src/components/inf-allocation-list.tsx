@@ -673,61 +673,65 @@ function PickupSheet({
 
   return (
     <BottomSheet onClose={onClose} label={title}>
-      <div className="inf-sheet-content flex min-h-0 flex-1 flex-col space-y-5">
+      <div className="inf-sheet-content flex h-full min-h-0 flex-1 flex-col gap-[clamp(0.5rem,1.6vh,1.25rem)] overflow-hidden">
         <div className="shrink-0">
-          <p className="text-xs font-medium tracking-widest text-[#6B3B1F] uppercase">
+          <p className="[font-size:clamp(0.65rem,1.4vh,0.75rem)] font-medium tracking-widest text-[#6B3B1F] uppercase">
             {step === "confirm" ? "Confirm" : "Review"}
           </p>
-          <h3 className="mt-1 text-xl font-bold text-[#1a1a2e]">{title}</h3>
-          <p className="mt-1 text-sm text-[#999]">
+          <h3 className="mt-[clamp(0.15rem,0.6vh,0.35rem)] [font-size:clamp(1.05rem,2.8vh,1.25rem)] font-bold text-[#1a1a2e]">
+            {title}
+          </h3>
+          <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(0.75rem,1.8vh,0.875rem)] text-[#999]">
             {step === "confirm" ? t.pickupConfirmHint : t.pickupReviewHint}
           </p>
         </div>
 
         {/* 약사님 안내 — 사용자 언어 */}
-        <div className="shrink-0 rounded-2xl border border-[#6B3B1F]/25 bg-[#F5EDE3] px-4 py-3 text-center">
-          <p className="text-sm font-bold tracking-wide text-[#6B3B1F]">
+        <div className="shrink-0 rounded-2xl border border-[#6B3B1F]/25 bg-[#F5EDE3] px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] text-center">
+          <p className="[font-size:clamp(0.8rem,2vh,0.875rem)] font-bold tracking-wide text-[#6B3B1F]">
             {t.showToPharmacist}
           </p>
-          <p className="mt-1 text-[11px] text-[#8a6a4a]">약사님께 보여주세요</p>
+          <p className="mt-0.5 [font-size:clamp(0.625rem,1.4vh,0.7rem)] text-[#8a6a4a]">
+            약사님께 보여주세요
+          </p>
         </div>
 
-        {/* 약사용 본문 — 한국어 고정 */}
-        <div className="flex min-h-0 flex-1 flex-col justify-center space-y-5 overflow-y-auto rounded-2xl bg-[#f9f9f9] px-5 py-6">
-          <div className="space-y-5 text-center">
-            <div>
-              <p className="text-[11px] font-medium tracking-wide text-[#aaa]">
+        {/* 약사용 본문 — 공간 부족 시 이 박스만 줄어듦 (스크롤 없음) */}
+        <div className="flex min-h-0 flex-1 flex-col justify-evenly gap-[clamp(0.35rem,1.5vh,1.25rem)] overflow-hidden rounded-2xl bg-[#f9f9f9] px-5 py-[clamp(0.75rem,2vh,1.5rem)]">
+          <div className="flex min-h-0 flex-col justify-evenly gap-[clamp(0.35rem,1.4vh,1.25rem)] text-center">
+            <div className="min-h-0 shrink">
+              <p className="[font-size:clamp(0.625rem,1.3vh,0.7rem)] font-medium tracking-wide text-[#aaa]">
                 {ko.product}
               </p>
-              <p className="mt-1.5 text-2xl font-bold leading-snug text-[#1a1a2e]">
+              <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1.1rem,3.2vh,1.5rem)] font-bold leading-snug text-[#1a1a2e]">
                 {selected.products?.name || ko.product}
               </p>
               {selected.products?.description ? (
-                <p className="mt-1 text-sm text-[#999]">
+                <p className="mt-[clamp(0.1rem,0.4vh,0.25rem)] line-clamp-2 [font-size:clamp(0.7rem,1.6vh,0.875rem)] text-[#999]">
                   {selected.products.description}
                 </p>
               ) : null}
             </div>
 
-            <div className="mx-auto h-px w-12 bg-[#e8e8e8]" />
+            <div className="mx-auto h-px w-12 shrink-0 bg-[#e8e8e8]" />
 
-            <div>
-              <p className="text-[11px] font-medium tracking-wide text-[#aaa]">
+            <div className="min-h-0 shrink">
+              <p className="[font-size:clamp(0.625rem,1.3vh,0.7rem)] font-medium tracking-wide text-[#aaa]">
                 {ko.store}
               </p>
-              <p className="mt-1.5 text-xl font-bold text-[#1a1a2e]">
+              <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1rem,2.8vh,1.25rem)] font-bold text-[#1a1a2e]">
                 {formatStoreName(selected.stores, ko.store)}
               </p>
             </div>
 
-            <div>
-              <p className="text-[11px] font-medium tracking-wide text-[#aaa]">
+            <div className="min-h-0 shrink">
+              <p className="[font-size:clamp(0.625rem,1.3vh,0.7rem)] font-medium tracking-wide text-[#aaa]">
                 {ko.visitDate}
               </p>
-              <p className="mt-1.5 text-xl font-bold tabular-nums text-[#6B3B1F]">
+              <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1rem,2.8vh,1.25rem)] font-bold tabular-nums text-[#6B3B1F]">
                 {visitYmd ? formatVisitDateKo(visitYmd) : ko.dateUndecided}
                 {visitYmd ? (
-                  <span className="ml-1.5 text-base font-semibold text-[#999]">
+                  <span className="ml-1.5 [font-size:clamp(0.75rem,2vh,1rem)] font-semibold text-[#999]">
                     ({formatVisitDayOfWeekKo(visitYmd)}요일)
                   </span>
                 ) : null}
@@ -735,7 +739,7 @@ function PickupSheet({
             </div>
           </div>
 
-          <div className="mt-1 space-y-2 border-t border-[#eee] pt-4 text-left">
+          <div className="shrink-0 space-y-[clamp(0.2rem,0.8vh,0.5rem)] border-t border-[#eee] pt-[clamp(0.5rem,1.4vh,1rem)] text-left">
             <InfoRow label={ko.influencer}>
               {influencer.name}{" "}
               <span className="text-[#6B3B1F]">
@@ -774,14 +778,14 @@ function PickupSheet({
         </div>
 
         {error ? (
-          <p className="shrink-0 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-500">
+          <p className="shrink-0 rounded-2xl bg-red-50 px-4 py-2 text-sm text-red-500">
             {error}
           </p>
         ) : null}
 
-        <div className="shrink-0 pt-1">
+        <div className="shrink-0 pb-1">
           {alreadyPickedUp ? (
-            <div className="rounded-2xl bg-[#f3eee3] px-4 py-3 text-center text-sm font-semibold text-[#8a7a5c]">
+            <div className="rounded-2xl bg-[#f3eee3] px-4 py-[clamp(0.6rem,1.6vh,0.75rem)] text-center text-sm font-semibold text-[#8a7a5c]">
               {t.pickupDoneBanner}
               {selected.picked_up_at
                 ? ` · ${formatKst(selected.picked_up_at)}`
@@ -796,21 +800,21 @@ function PickupSheet({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 rounded-2xl border border-[#e8e8e8] py-4 text-sm font-semibold text-[#666]"
+                className="flex-1 rounded-2xl border border-[#e8e8e8] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[#666]"
               >
                 {t.close}
               </button>
               <button
                 type="button"
                 onClick={() => onStep("confirm")}
-                className="flex-1 rounded-2xl bg-[#6B3B1F] py-4 text-sm font-semibold text-white"
+                className="flex-1 rounded-2xl bg-[#6B3B1F] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-white"
               >
                 {t.pickupConfirmBtn}
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
-              <p className="rounded-2xl bg-[#F5EDE3] px-4 py-3 text-center text-sm text-[#6B3B1F]">
+            <div className="space-y-2">
+              <p className="rounded-2xl bg-[#F5EDE3] px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] text-center text-sm text-[#6B3B1F]">
                 {t.pickupIrreversible}
               </p>
               <div className="flex gap-3">
@@ -821,7 +825,7 @@ function PickupSheet({
                     onStep("review");
                     onClearError();
                   }}
-                  className="flex-1 rounded-2xl border border-[#e8e8e8] py-4 text-sm font-semibold text-[#666] disabled:opacity-50"
+                  className="flex-1 rounded-2xl border border-[#e8e8e8] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[#666] disabled:opacity-50"
                 >
                   {t.previous}
                 </button>
@@ -829,7 +833,7 @@ function PickupSheet({
                   type="button"
                   disabled={confirming}
                   onClick={onConfirm}
-                  className="flex-1 rounded-2xl bg-[#6B3B1F] py-4 text-sm font-semibold text-white disabled:opacity-50"
+                  className="flex-1 rounded-2xl bg-[#6B3B1F] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-white disabled:opacity-50"
                 >
                   {confirming ? t.confirming : t.finalPickupConfirm}
                 </button>
@@ -918,19 +922,19 @@ function BottomSheet({
       onClick={requestClose}
     >
       <div
-        className={`inf-sheet-panel flex w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5 shadow-2xl${
+        className={`inf-sheet-panel flex w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white px-5 pb-[max(1.75rem,calc(env(safe-area-inset-bottom)+0.75rem))] pt-3 shadow-2xl${
           closing ? " is-closing" : ""
         }`}
         style={{
-          // 휴대폰 화면 높이에 맞춰 시트 크기 변동 (브라우저 UI 포함 dvh)
-          maxHeight: "min(92dvh, 96vh)",
-          height: "min(86dvh, 90vh)",
+          // 화면 거의 전체 · 스크롤 없이 맞춤
+          height: "min(96dvh, 98vh)",
+          maxHeight: "min(96dvh, 98vh)",
         }}
         onClick={(e) => e.stopPropagation()}
         onAnimationEnd={handlePanelAnimationEnd}
       >
-        <div className="mx-auto mb-5 h-1 w-12 shrink-0 rounded-full bg-[#e8e8e8]" />
-        <div className="mb-4 flex shrink-0 items-center justify-between">
+        <div className="mx-auto mb-3 h-1 w-12 shrink-0 rounded-full bg-[#e8e8e8]" />
+        <div className="mb-3 flex shrink-0 items-center justify-between">
           <span className="text-xs text-[#ccc]">{label}</span>
           <button
             type="button"
@@ -940,7 +944,9 @@ function BottomSheet({
             {t.close}
           </button>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {children}
+        </div>
       </div>
     </div>,
     document.body,
