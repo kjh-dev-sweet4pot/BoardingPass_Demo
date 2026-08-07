@@ -90,6 +90,23 @@ function matchesProductSearch(item: AllocationWithRelations, q: string) {
   return haystack.includes(q);
 }
 
+/** 이름 · 핸들 · 상품 통합 검색 (지점 카운터용) */
+function matchesUnifiedSearch(item: AllocationWithRelations, q: string) {
+  if (!q) return true;
+  const handle = formatIgHandle(item.influencers) || "";
+  const haystack = [
+    item.influencers?.name || "",
+    handle,
+    item.influencers?.instagram_handle || "",
+    item.influencers?.instagram_handle_normalized || "",
+    item.products?.name || "",
+    item.products?.sku || "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
 function todayYmdKst() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -252,16 +269,22 @@ export function PharListWithModal({
 
   const [influencerQ, setInfluencerQ] = useState("");
   const [productQ, setProductQ] = useState("");
+  const [searchQ, setSearchQ] = useState("");
   const [storeId, setStoreId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [visitDate, setVisitDate] = useState("");
   const [status, setStatus] = useState("");
+  /** 지점(phar)은 기본 오늘만, Admin 전체 목록은 기본 전체 */
+  const [todayOnly, setTodayOnly] = useState(() => Boolean(lockedStoreId));
   const storeFilterId = lockedStoreId || storeId;
+  /** 지점 로그인: 통합 검색 + 상태만 */
+  const simpleFilters = Boolean(lockedStoreId);
 
   const deferredInfluencerQ = useDeferredValue(
     influencerQ.trim().toLowerCase(),
   );
   const deferredProductQ = useDeferredValue(productQ.trim().toLowerCase());
+  const deferredSearchQ = useDeferredValue(searchQ.trim().toLowerCase());
 
   const storeOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -294,17 +317,25 @@ export function PharListWithModal({
 
   const filtered = useMemo(() => {
     const next = items.filter((item) => {
+      if (storeFilterId && item.store_id !== storeFilterId) return false;
+      if (status && item.status !== status) return false;
+
+      if (simpleFilters) {
+        if (!matchesUnifiedSearch(item, deferredSearchQ)) return false;
+        return true;
+      }
+
       if (!matchesInfluencerSearch(item, deferredInfluencerQ)) return false;
       if (!matchesProductSearch(item, deferredProductQ)) return false;
-      if (storeFilterId && item.store_id !== storeFilterId) return false;
       if (quantity && String(item.quantity) !== quantity) return false;
       if (visitDate && (item.visit_date || "") !== visitDate) return false;
-      if (status && item.status !== status) return false;
       return true;
     });
     return sortByVisitRelativeToToday(next);
   }, [
     items,
+    simpleFilters,
+    deferredSearchQ,
     deferredInfluencerQ,
     deferredProductQ,
     storeFilterId,
@@ -346,6 +377,7 @@ export function PharListWithModal({
   }
 
   useEffect(() => {
+    if (todayOnly) return;
     let cancelled = false;
     const frame = window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
@@ -356,15 +388,23 @@ export function PharListWithModal({
       cancelled = true;
       window.cancelAnimationFrame(frame);
     };
-  }, [filtered, today, todayItems.length, pastItems.length, futureItems.length]);
+  }, [
+    filtered,
+    today,
+    todayOnly,
+    todayItems.length,
+    pastItems.length,
+    futureItems.length,
+  ]);
 
-  const hasFilters =
-    Boolean(influencerQ.trim()) ||
-    Boolean(productQ.trim()) ||
-    (!lockedStoreId && Boolean(storeId)) ||
-    Boolean(quantity) ||
-    Boolean(visitDate) ||
-    Boolean(status);
+  const hasFilters = simpleFilters
+    ? Boolean(searchQ.trim()) || Boolean(status)
+    : Boolean(influencerQ.trim()) ||
+      Boolean(productQ.trim()) ||
+      (!lockedStoreId && Boolean(storeId)) ||
+      Boolean(quantity) ||
+      Boolean(visitDate) ||
+      Boolean(status);
 
   useEffect(() => {
     if (!openId) {
@@ -414,6 +454,7 @@ export function PharListWithModal({
   function clearFilters() {
     setInfluencerQ("");
     setProductQ("");
+    setSearchQ("");
     setStoreId("");
     setQuantity("");
     setVisitDate("");
@@ -422,25 +463,69 @@ export function PharListWithModal({
 
   return (
     <div className={fillHeight ? "flex min-h-0 flex-1 flex-col" : ""}>
-      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 text-sm text-[var(--muted)]">
-        <div className="flex flex-wrap items-center gap-3">
-          <p>
-            {hasFilters
-              ? `${filtered.length}건 / 전체 ${items.length}건`
-              : `${items.length}건`}
+      <div className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] tracking-[0.18em] text-[var(--muted)] uppercase">
+            {todayOnly ? "Today" : "All visits"}
           </p>
-          <p className="rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
-            오늘 {todayItems.length}건
+          <p className="mt-1 text-2xl font-semibold tabular-nums tracking-wide text-[var(--accent)] sm:text-3xl">
+            오늘 {todayItems.length}
+            <span className="ml-1 text-base font-medium text-[var(--muted)]">
+              건
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            {hasFilters
+              ? `필터 적용 ${todayOnly ? todayItems.length : filtered.length}건 / 전체 ${items.length}건`
+              : todayOnly
+                ? `전체 ${items.length}건 중 오늘만 표시`
+                : `전체 ${filtered.length}건`}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="text-xs font-medium text-[var(--accent)] hover:underline"
-            onClick={scrollToTodaySection}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
+            role="group"
+            aria-label="목록 범위"
           >
-            오늘로 이동
-          </button>
+            <button
+              type="button"
+              aria-pressed={todayOnly}
+              onClick={() => {
+                setTodayOnly(true);
+                setVisitDate("");
+              }}
+              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+                todayOnly
+                  ? "bg-[var(--accent)] text-white"
+                  : "text-[var(--muted)] hover:text-[var(--ink)]"
+              }`}
+            >
+              오늘만 보기
+            </button>
+            <button
+              type="button"
+              aria-pressed={!todayOnly}
+              onClick={() => setTodayOnly(false)}
+              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+                !todayOnly
+                  ? "bg-[var(--accent)] text-white"
+                  : "text-[var(--muted)] hover:text-[var(--ink)]"
+              }`}
+            >
+              전체
+            </button>
+          </div>
+          {!todayOnly ? (
+            <button
+              type="button"
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              onClick={scrollToTodaySection}
+            >
+              오늘로 이동
+            </button>
+          ) : null}
           {hasFilters ? (
             <button
               type="button"
@@ -456,113 +541,142 @@ export function PharListWithModal({
       {items.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
       ) : (
-        <div
-          ref={listScrollRef}
-          className={`overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm ${
-            fillHeight
-              ? "min-h-0 flex-1"
-              : "max-h-[min(70vh,calc(100vh-14rem))]"
-          }`}
-        >
-          <table className="w-full min-w-[780px] border-collapse text-left text-sm">
-            <thead className="sticky top-0 z-10">
-              <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs tracking-[0.08em] text-[var(--muted)] uppercase">
-                <th className="px-4 py-3 font-medium">방문일</th>
-                <th className="px-4 py-3 font-medium">계정</th>
-                <th className="px-4 py-3 font-medium">상품</th>
-                <th className="px-4 py-3 font-medium">매장</th>
-                <th className="px-4 py-3 font-medium text-right">수량</th>
-                <th className="px-4 py-3 font-medium">상태</th>
-                <th className="px-4 py-3 font-medium text-right">상세</th>
-              </tr>
-              <tr className="border-b border-[var(--line)] bg-[var(--surface)]">
-                <th className="px-2 py-2 font-normal">
-                  <input
-                    className={filterControlClass}
-                    type="date"
-                    value={visitDate}
-                    onChange={(e) => setVisitDate(e.target.value)}
-                    aria-label="방문일 필터"
-                  />
-                </th>
-                <th className="px-2 py-2 font-normal">
-                  <input
-                    className={filterControlClass}
-                    type="search"
-                    value={influencerQ}
-                    onChange={(e) => setInfluencerQ(e.target.value)}
-                    placeholder="계정"
-                    aria-label="계정 검색"
-                  />
-                </th>
-                <th className="px-2 py-2 font-normal">
-                  <input
-                    className={filterControlClass}
-                    type="search"
-                    value={productQ}
-                    onChange={(e) => setProductQ(e.target.value)}
-                    placeholder="상품"
-                    aria-label="상품 검색"
-                  />
-                </th>
-                <th className="px-2 py-2 font-normal">
-                  {lockedStoreId ? (
-                    <span className="block px-1 text-xs text-[var(--muted)]">
-                      {storeOptions[0]?.name || "로그인 지점"}
-                    </span>
-                  ) : (
-                    <select
-                      className={filterSelectClass}
-                      style={{ backgroundImage: selectChevron }}
-                      value={storeId}
-                      onChange={(e) => setStoreId(e.target.value)}
-                      aria-label="매장 필터"
-                    >
-                      <option value="">매장 전체</option>
-                      {storeOptions.map((store) => (
-                        <option key={store.id} value={store.id}>
-                          {store.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </th>
-                <th className="px-2 py-2 font-normal">
-                  <select
-                    className={filterSelectClass}
-                    style={{ backgroundImage: selectChevron }}
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    aria-label="수량 필터"
-                  >
-                    <option value="">수량 전체</option>
-                    {quantityOptions.map((qty) => (
-                      <option key={qty} value={qty}>
-                        {qty}
-                      </option>
-                    ))}
-                  </select>
-                </th>
-                <th className="px-2 py-2 font-normal">
-                  <select
-                    className={filterSelectClass}
-                    style={{ backgroundImage: selectChevron }}
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    aria-label="상태 필터"
-                  >
-                    <option value="">상태 전체</option>
-                    {statusOptions.map((value) => (
-                      <option key={value} value={value}>
-                        {ALLOCATION_STATUS_LABEL[value]}
-                      </option>
-                    ))}
-                  </select>
-                </th>
-                <th className="px-2 py-2" />
-              </tr>
-            </thead>
-            <tbody>
+        <>
+          {simpleFilters ? (
+            <div className="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+              <label className="sr-only" htmlFor="phar-unified-search">
+                이름, 핸들, 상품 검색
+              </label>
+              <input
+                id="phar-unified-search"
+                className={`${filterControlClass} h-11 flex-1 rounded-xl px-3.5 text-sm`}
+                type="search"
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder="이름 · @핸들 · 상품 검색"
+                aria-label="이름, 핸들, 상품 검색"
+              />
+              <select
+                className={`${filterSelectClass} h-11 w-full rounded-xl sm:w-44`}
+                style={{ backgroundImage: selectChevron }}
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                aria-label="상태 필터"
+              >
+                <option value="">상태 전체</option>
+                {statusOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {ALLOCATION_STATUS_LABEL[value]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
+          <div
+            ref={listScrollRef}
+            className={`overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm ${
+              fillHeight
+                ? "min-h-0 flex-1"
+                : "max-h-[min(70vh,calc(100vh-14rem))]"
+            }`}
+          >
+            <table className="w-full min-w-[780px] border-collapse text-left text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs tracking-[0.08em] text-[var(--muted)] uppercase">
+                  <th className="px-4 py-3 font-medium">방문일</th>
+                  <th className="px-4 py-3 font-medium">계정</th>
+                  <th className="px-4 py-3 font-medium">상품</th>
+                  <th className="px-4 py-3 font-medium">매장</th>
+                  <th className="px-4 py-3 font-medium text-right">수량</th>
+                  <th className="px-4 py-3 font-medium">상태</th>
+                  <th className="px-4 py-3 font-medium text-right">상세</th>
+                </tr>
+                {!simpleFilters ? (
+                  <tr className="border-b border-[var(--line)] bg-[var(--surface)]">
+                    <th className="px-2 py-2 font-normal">
+                      <input
+                        className={filterControlClass}
+                        type="date"
+                        value={visitDate}
+                        onChange={(e) => setVisitDate(e.target.value)}
+                        aria-label="방문일 필터"
+                        disabled={todayOnly}
+                      />
+                    </th>
+                    <th className="px-2 py-2 font-normal">
+                      <input
+                        className={filterControlClass}
+                        type="search"
+                        value={influencerQ}
+                        onChange={(e) => setInfluencerQ(e.target.value)}
+                        placeholder="계정"
+                        aria-label="계정 검색"
+                      />
+                    </th>
+                    <th className="px-2 py-2 font-normal">
+                      <input
+                        className={filterControlClass}
+                        type="search"
+                        value={productQ}
+                        onChange={(e) => setProductQ(e.target.value)}
+                        placeholder="상품"
+                        aria-label="상품 검색"
+                      />
+                    </th>
+                    <th className="px-2 py-2 font-normal">
+                      <select
+                        className={filterSelectClass}
+                        style={{ backgroundImage: selectChevron }}
+                        value={storeId}
+                        onChange={(e) => setStoreId(e.target.value)}
+                        aria-label="매장 필터"
+                      >
+                        <option value="">매장 전체</option>
+                        {storeOptions.map((store) => (
+                          <option key={store.id} value={store.id}>
+                            {store.name}
+                          </option>
+                        ))}
+                      </select>
+                    </th>
+                    <th className="px-2 py-2 font-normal">
+                      <select
+                        className={filterSelectClass}
+                        style={{ backgroundImage: selectChevron }}
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        aria-label="수량 필터"
+                      >
+                        <option value="">수량 전체</option>
+                        {quantityOptions.map((qty) => (
+                          <option key={qty} value={qty}>
+                            {qty}
+                          </option>
+                        ))}
+                      </select>
+                    </th>
+                    <th className="px-2 py-2 font-normal">
+                      <select
+                        className={filterSelectClass}
+                        style={{ backgroundImage: selectChevron }}
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        aria-label="상태 필터"
+                      >
+                        <option value="">상태 전체</option>
+                        {statusOptions.map((value) => (
+                          <option key={value} value={value}>
+                            {ALLOCATION_STATUS_LABEL[value]}
+                          </option>
+                        ))}
+                      </select>
+                    </th>
+                    <th className="px-2 py-2" />
+                  </tr>
+                ) : null}
+              </thead>
+              <tbody>
               {filtered.length === 0 ? (
                 <tr>
                   <td
@@ -572,6 +686,41 @@ export function PharListWithModal({
                     조건에 맞는 배정이 없습니다.
                   </td>
                 </tr>
+              ) : todayOnly ? (
+                <>
+                  <SectionHeaderRow
+                    ref={todaySectionRef}
+                    label={`오늘 · ${today}`}
+                    count={todayItems.length}
+                    tone="accent"
+                  />
+                  {todayItems.length === 0 ? (
+                    <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
+                      <td
+                        colSpan={7}
+                        className="px-4 py-6 text-center text-sm text-[var(--muted)]"
+                      >
+                        오늘 방문인이 없습니다.
+                        <button
+                          type="button"
+                          className="mt-2 block w-full text-xs font-medium text-[var(--accent)] hover:underline"
+                          onClick={() => setTodayOnly(false)}
+                        >
+                          전체 목록 보기
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    todayItems.map((item) => (
+                      <AllocationRow
+                        key={item.id}
+                        item={item}
+                        isToday
+                        onOpen={() => setOpenId(item.influencer_id)}
+                      />
+                    ))
+                  )}
+                </>
               ) : (
                 <>
                   {pastItems.length > 0 && (
@@ -636,6 +785,7 @@ export function PharListWithModal({
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {openId && (
