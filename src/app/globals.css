@@ -382,7 +382,7 @@ button {
   pointer-events: auto;
 }
 
-/* ── Inf 수령정보 바텀시트 ── */
+/* ── Inf 수령정보 바텀시트 (뷰포트 하단 고정) ── */
 @keyframes inf-sheet-backdrop {
   from {
     opacity: 0;

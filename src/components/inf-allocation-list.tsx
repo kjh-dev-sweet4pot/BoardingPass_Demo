@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useInfLocale } from "@/components/inf-locale-provider";
 import {
   formatVisitDateKo,
@@ -857,7 +858,7 @@ function InfoRow({
   );
 }
 
-/* ─── BottomSheet ────────────────────────────────────── */
+/* ─── 수령정보 바텀시트 (현재 뷰포트 하단 · body 포탈) ─ */
 function BottomSheet({
   onClose,
   label,
@@ -871,6 +872,11 @@ function BottomSheet({
 }) {
   const { t } = useInfLocale();
   const [closing, setClosing] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function requestClose() {
     if (closing) return;
@@ -901,9 +907,11 @@ function BottomSheet({
     onClose();
   }
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className={`inf-sheet-backdrop fixed inset-0 z-50 flex items-end bg-black/40${
+      className={`inf-sheet-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-black/40${
         closing ? " is-closing" : ""
       }`}
       role="dialog"
@@ -912,7 +920,7 @@ function BottomSheet({
       onClick={requestClose}
     >
       <div
-        className={`inf-sheet-panel w-full overflow-y-auto rounded-t-3xl bg-white px-5 pb-10 pt-5 shadow-2xl${
+        className={`inf-sheet-panel w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-5 pb-10 pt-5 shadow-2xl${
           closing ? " is-closing" : ""
         } ${tall ? "min-h-[86vh] max-h-[96vh]" : "max-h-[88vh]"}`}
         onClick={(e) => e.stopPropagation()}
@@ -931,6 +939,7 @@ function BottomSheet({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
