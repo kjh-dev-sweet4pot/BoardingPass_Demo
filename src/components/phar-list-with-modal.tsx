@@ -54,61 +54,65 @@ function CounterDetailPanel({
   const picked = item.status === "picked_up" || Boolean(item.picked_up_at);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] tracking-[0.18em] text-[var(--muted)] uppercase">
+          <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
             Detail
           </p>
-          <h3 className="mt-1 text-xl font-bold tracking-wide text-[var(--ink)]">
+          <h3 className="mt-1.5 text-2xl font-bold tracking-wide text-[var(--ink)]">
             {name || handle || "인플루언서"}
           </h3>
           {name && handle ? (
-            <p className="mt-0.5 font-medium text-[var(--accent)]">{handle}</p>
+            <p className="mt-1 text-base font-medium text-[var(--accent)]">
+              {handle}
+            </p>
           ) : null}
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 rounded-full px-2.5 py-1 text-xs text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]"
+          className="shrink-0 rounded-full px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]"
         >
           닫기
         </button>
       </div>
 
-      <div className="space-y-3 rounded-2xl bg-[var(--accent-soft)]/50 px-4 py-4">
+      <div className="space-y-4 rounded-2xl bg-[var(--accent-soft)]/50 px-5 py-5">
         <div>
-          <p className="text-[11px] tracking-wide text-[var(--muted)]">줄 상품</p>
-          <p className="mt-1 text-xl font-bold text-[var(--ink)]">
+          <p className="text-xs tracking-wide text-[var(--muted)]">줄 상품</p>
+          <p className="mt-1.5 text-2xl font-bold text-[var(--ink)]">
             {item.products?.name || "상품"}
           </p>
           {item.products?.sku ? (
-            <p className="mt-0.5 text-xs text-[var(--muted)]">
+            <p className="mt-1 text-sm text-[var(--muted)]">
               SKU {item.products.sku}
             </p>
           ) : null}
         </div>
-        <p className="text-2xl font-semibold tabular-nums text-[var(--accent)]">
+        <p className="text-4xl font-semibold tabular-nums text-[var(--accent)]">
           {item.quantity}
-          <span className="ml-1 text-sm font-medium text-[var(--muted)]">개</span>
+          <span className="ml-1.5 text-lg font-medium text-[var(--muted)]">
+            개
+          </span>
         </p>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] pt-3">
-          <p className="text-sm tabular-nums text-[var(--ink)]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] pt-4">
+          <p className="text-base tabular-nums text-[var(--ink)]">
             {d || "날짜 미정"}
             {d === today ? (
-              <span className="ml-1.5 text-xs font-semibold text-[var(--accent)]">
+              <span className="ml-2 text-sm font-semibold text-[var(--accent)]">
                 오늘
               </span>
             ) : null}
           </p>
           <span
-            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone(item.status)}`}
+            className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${statusTone(item.status)}`}
           >
             {allocationStatusDisplayLabel(item)}
           </span>
         </div>
         <p
-          className={`text-sm font-medium ${
+          className={`text-base font-medium ${
             picked ? "text-[#8a7a5c]" : "text-[var(--accent)]"
           }`}
         >
@@ -125,18 +129,18 @@ function CounterDetailPanel({
           href={sns}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-12 items-center justify-center rounded-xl bg-[var(--accent)] text-sm font-semibold text-white transition hover:brightness-110"
+          className="flex h-14 items-center justify-center rounded-xl bg-[var(--accent)] text-base font-semibold text-white transition hover:brightness-110"
         >
           SNS 프로필 확인
         </a>
       ) : (
-        <p className="rounded-xl border border-[var(--line)] px-4 py-3 text-center text-sm text-[var(--muted)]">
+        <p className="rounded-xl border border-[var(--line)] px-4 py-3.5 text-center text-base text-[var(--muted)]">
           등록된 SNS 링크가 없습니다
         </p>
       )}
 
       {item.visit_code ? (
-        <p className="text-sm text-[var(--muted)]">
+        <p className="text-base text-[var(--muted)]">
           방문 코드{" "}
           <span className="font-semibold tabular-nums text-[var(--ink)]">
             {item.visit_code}
@@ -145,17 +149,17 @@ function CounterDetailPanel({
       ) : null}
 
       {item.influencers?.notes ? (
-        <p className="text-sm leading-6 text-[var(--muted)]">
+        <p className="text-base leading-7 text-[var(--muted)]">
           {item.influencers.notes}
         </p>
       ) : null}
 
       {related.length > 1 ? (
         <div>
-          <p className="mb-2 text-xs font-medium tracking-wide text-[var(--muted)]">
+          <p className="mb-2.5 text-sm font-medium tracking-wide text-[var(--muted)]">
             이 지점 배정 {related.length}건
           </p>
-          <ul className="space-y-2">
+          <ul className="space-y-2.5">
             {related.map((row) => {
               const active = row.id === item.id;
               const rd = visitDateKey(row);
@@ -164,7 +168,7 @@ function CounterDetailPanel({
                   <button
                     type="button"
                     onClick={() => onSelectRelated(row.id)}
-                    className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
+                    className={`w-full rounded-xl border px-4 py-3 text-left transition ${
                       active
                         ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                         : "border-[var(--line)] bg-white hover:bg-[var(--accent-soft)]/40"
@@ -172,15 +176,15 @@ function CounterDetailPanel({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[var(--ink)]">
+                        <p className="truncate text-base font-semibold text-[var(--ink)]">
                           {row.products?.name || "상품"}
                         </p>
-                        <p className="mt-0.5 text-xs tabular-nums text-[var(--muted)]">
+                        <p className="mt-0.5 text-sm tabular-nums text-[var(--muted)]">
                           {rd || "미정"} · {row.quantity}개
                         </p>
                       </div>
                       <span
-                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusTone(row.status)}`}
+                        className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone(row.status)}`}
                       >
                         {ALLOCATION_STATUS_LABEL[row.status]}
                       </span>
@@ -374,16 +378,20 @@ function AllocationRow({
   isToday,
   selected,
   hideStore,
+  counter,
   onOpen,
 }: {
   item: AllocationWithRelations;
   isToday: boolean;
   selected?: boolean;
   hideStore?: boolean;
+  /** 지점 카운터: 글자·행 높이 확대 */
+  counter?: boolean;
   onOpen: () => void;
 }) {
   const handle = formatIgHandle(item.influencers);
   const name = (item.influencers?.name || "").trim();
+  const cell = counter ? "px-4 py-4" : "px-4 py-3.5";
   return (
     <tr
       data-alloc-id={item.id}
@@ -397,50 +405,90 @@ function AllocationRow({
       onClick={onOpen}
       aria-selected={selected}
     >
-      <td className="px-4 py-3.5 tabular-nums font-medium text-[var(--ink)]">
+      <td
+        className={`${cell} tabular-nums font-medium text-[var(--ink)] ${
+          counter ? "text-base" : ""
+        }`}
+      >
         {item.visit_date || "—"}
         {isToday ? (
-          <span className="ml-2 text-[10px] font-semibold tracking-wide text-[var(--accent)] uppercase">
+          <span
+            className={`ml-2 font-semibold tracking-wide text-[var(--accent)] uppercase ${
+              counter ? "text-xs" : "text-[10px]"
+            }`}
+          >
             오늘
           </span>
         ) : null}
       </td>
-      <td className="px-4 py-3.5">
+      <td className={cell}>
         {name ? (
-          <span className="block font-semibold text-[var(--ink)]">{name}</span>
+          <span
+            className={`block font-semibold text-[var(--ink)] ${
+              counter ? "text-base" : ""
+            }`}
+          >
+            {name}
+          </span>
         ) : null}
-        <span className="font-medium text-[var(--accent)]">
+        <span
+          className={`font-medium text-[var(--accent)] ${
+            counter ? "text-base" : ""
+          }`}
+        >
           {handle || "—"}
         </span>
       </td>
-      <td className="px-4 py-3.5">
-        <span className="text-base font-semibold text-[var(--ink)]">
+      <td className={cell}>
+        <span
+          className={`font-semibold text-[var(--ink)] ${
+            counter ? "text-lg" : "text-base"
+          }`}
+        >
           {item.products?.name || "상품"}
         </span>
         {item.products?.sku ? (
-          <span className="mt-0.5 block text-xs text-[var(--muted)]">
+          <span
+            className={`mt-0.5 block text-[var(--muted)] ${
+              counter ? "text-sm" : "text-xs"
+            }`}
+          >
             SKU {item.products.sku}
           </span>
         ) : null}
       </td>
       {!hideStore ? (
-        <td className="px-4 py-3.5 text-[var(--muted)]">
+        <td className={`${cell} text-[var(--muted)]`}>
           {item.stores?.name || "매장"}
         </td>
       ) : null}
-      <td className="px-4 py-3.5 text-right text-base font-semibold tabular-nums text-[var(--accent)]">
+      <td
+        className={`${cell} text-right font-semibold tabular-nums text-[var(--accent)] ${
+          counter ? "text-lg" : "text-base"
+        }`}
+      >
         {item.quantity}
-        <span className="ml-0.5 text-xs font-medium text-[var(--muted)]">개</span>
-      </td>
-      <td className="px-4 py-3.5">
         <span
-          className={`inline-block border px-2.5 py-1 text-xs font-medium ${statusTone(item.status)}`}
+          className={`ml-0.5 font-medium text-[var(--muted)] ${
+            counter ? "text-sm" : "text-xs"
+          }`}
+        >
+          개
+        </span>
+      </td>
+      <td className={cell}>
+        <span
+          className={`inline-block border font-medium ${statusTone(item.status)} ${
+            counter
+              ? "px-3 py-1.5 text-sm"
+              : "px-2.5 py-1 text-xs"
+          }`}
         >
           {allocationStatusDisplayLabel(item)}
         </span>
       </td>
       {!hideStore ? (
-        <td className="px-4 py-3.5 text-right text-xs text-[var(--accent)]">
+        <td className={`${cell} text-right text-xs text-[var(--accent)]`}>
           보기 →
         </td>
       ) : null}
@@ -477,10 +525,56 @@ export function PharListWithModal({
   const [hidePickedUp, setHidePickedUp] = useState(() => Boolean(lockedStoreId));
   /** 지점 PC: 우측 패널용 선택 (allocation id) */
   const [selectedAllocId, setSelectedAllocId] = useState<string | null>(null);
+  /** 지점 카운터: INF 수령 등 원격 변경을 반영하기 위한 목록 */
+  const [liveItems, setLiveItems] = useState(items);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const storeFilterId = lockedStoreId || storeId;
   /** 지점 로그인: 통합 검색 + 상태만 */
   const simpleFilters = Boolean(lockedStoreId);
+
+  useEffect(() => {
+    setLiveItems(items);
+  }, [items]);
+
+  /** 약사 카운터: 수령/방문 상태 변경을 수 초 내 반영 */
+  useEffect(() => {
+    if (!lockedStoreId) return;
+
+    let cancelled = false;
+
+    async function refresh() {
+      try {
+        const res = await fetch("/api/phar/allocations", {
+          cache: "no-store",
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          allocations?: AllocationWithRelations[];
+        };
+        if (!cancelled && Array.isArray(data.allocations)) {
+          setLiveItems(data.allocations);
+        }
+      } catch {
+        // 네트워크 오류 시 다음 주기에 재시도
+      }
+    }
+
+    void refresh();
+    const timer = window.setInterval(refresh, 2500);
+
+    function onVisible() {
+      if (document.visibilityState === "visible") void refresh();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [lockedStoreId]);
 
   const deferredInfluencerQ = useDeferredValue(
     influencerQ.trim().toLowerCase(),
@@ -490,7 +584,7 @@ export function PharListWithModal({
 
   const storeOptions = useMemo(() => {
     const map = new Map<string, string>();
-    for (const item of items) {
+    for (const item of liveItems) {
       if (item.store_id && item.stores?.name) {
         map.set(item.store_id, item.stores.name);
       }
@@ -498,27 +592,27 @@ export function PharListWithModal({
     return [...map.entries()]
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, "ko"));
-  }, [items]);
+  }, [liveItems]);
 
   const quantityOptions = useMemo(() => {
     const set = new Set<number>();
-    for (const item of items) set.add(item.quantity);
+    for (const item of liveItems) set.add(item.quantity);
     return [...set].sort((a, b) => a - b);
-  }, [items]);
+  }, [liveItems]);
 
   const statusOptions = useMemo(() => {
     const set = new Set<AllocationStatus>();
-    for (const item of items) set.add(item.status);
+    for (const item of liveItems) set.add(item.status);
     return [...set].sort((a, b) =>
       ALLOCATION_STATUS_LABEL[a].localeCompare(
         ALLOCATION_STATUS_LABEL[b],
         "ko",
       ),
     );
-  }, [items]);
+  }, [liveItems]);
 
   const filtered = useMemo(() => {
-    const next = items.filter((item) => {
+    const next = liveItems.filter((item) => {
       if (storeFilterId && item.store_id !== storeFilterId) return false;
       if (status && item.status !== status) return false;
 
@@ -537,7 +631,7 @@ export function PharListWithModal({
 
     return sortByVisitRelativeToToday(next);
   }, [
-    items,
+    liveItems,
     simpleFilters,
     deferredSearchQ,
     deferredInfluencerQ,
@@ -554,18 +648,21 @@ export function PharListWithModal({
 
   const todayStats = useMemo(() => {
     let total = 0;
-    let waiting = 0;
-    let done = 0;
-    for (const item of items) {
+    let scheduled = 0; // 방문예정
+    let visited = 0; // 방문완료 (매장 방문 완료)
+    let pickedUp = 0; // 반출완료 (수령 완료)
+    for (const item of liveItems) {
       if (storeFilterId && item.store_id !== storeFilterId) continue;
       const d = visitDateKey(item);
       if (d !== today) continue;
+      if (item.status === "cancelled") continue;
       total += 1;
-      if (item.status === "picked_up") done += 1;
-      else if (item.status !== "cancelled") waiting += 1;
+      if (item.status === "picked_up") pickedUp += 1;
+      else if (item.status === "visited") visited += 1;
+      else scheduled += 1; // pending, ready 등
     }
-    return { total, waiting, done };
-  }, [items, storeFilterId, today]);
+    return { total, scheduled, visited, pickedUp };
+  }, [liveItems, storeFilterId, today]);
 
   const { pastItems, todayItems, futureItems } = useMemo(() => {
     const past: AllocationWithRelations[] = [];
@@ -628,13 +725,13 @@ export function PharListWithModal({
       Boolean(status);
 
   const selectedItem = useMemo(
-    () => items.find((i) => i.id === selectedAllocId) || null,
-    [items, selectedAllocId],
+    () => liveItems.find((i) => i.id === selectedAllocId) || null,
+    [liveItems, selectedAllocId],
   );
 
   const relatedItems = useMemo(() => {
     if (!selectedItem?.influencer_id) return [];
-    return items
+    return liveItems
       .filter((i) => i.influencer_id === selectedItem.influencer_id)
       .sort((a, b) => {
         const da = visitDateKey(a);
@@ -644,7 +741,7 @@ export function PharListWithModal({
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
       });
-  }, [items, selectedItem]);
+  }, [liveItems, selectedItem]);
 
   const visibleRows = useMemo(() => {
     // 검색 중에는 오늘만 보기를 무시하고 전체 섹션(과거·오늘·미래) 노출
@@ -834,35 +931,66 @@ export function PharListWithModal({
   if (simpleFilters) {
     return (
       <div className={fillHeight ? "flex min-h-0 flex-1 flex-col" : ""}>
-        <div className="mb-4 flex shrink-0 flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-[11px] tracking-[0.18em] text-[var(--muted)] uppercase">
-              Counter
+        <div className="mb-5 flex shrink-0 flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
+              Counter · 오늘
             </p>
-            <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <p className="text-3xl font-semibold tabular-nums tracking-wide text-[var(--accent)]">
-                오늘 {todayStats.total}
-                <span className="ml-1 text-base font-medium text-[var(--muted)]">
-                  건
-                </span>
-              </p>
-              <p className="text-sm text-[var(--ink)]">
-                대기{" "}
-                <span className="font-semibold tabular-nums text-[var(--accent)]">
-                  {todayStats.waiting}
-                </span>
-                <span className="mx-2 text-[var(--line)]">·</span>
-                완료{" "}
-                <span className="font-semibold tabular-nums text-[var(--muted)]">
-                  {todayStats.done}
-                </span>
-              </p>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-3.5">
+                <p className="text-sm font-medium text-[var(--muted)]">오늘</p>
+                <p className="mt-1 text-4xl font-semibold tabular-nums tracking-wide text-[var(--accent)]">
+                  {todayStats.total}
+                  <span className="ml-1 text-base font-medium text-[var(--muted)]">
+                    건
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-[var(--muted)]">오늘 방문 합계</p>
+              </div>
+              <div className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3.5">
+                <p className="text-sm font-medium text-[var(--muted)]">
+                  방문예정
+                </p>
+                <p className="mt-1 text-4xl font-semibold tabular-nums tracking-wide text-[var(--ink)]">
+                  {todayStats.scheduled}
+                  <span className="ml-1 text-base font-medium text-[var(--muted)]">
+                    건
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-[var(--muted)]">아직 미방문</p>
+              </div>
+              <div className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3.5">
+                <p className="text-sm font-medium text-[var(--muted)]">
+                  방문완료
+                </p>
+                <p className="mt-1 text-4xl font-semibold tabular-nums tracking-wide text-[var(--ink)]">
+                  {todayStats.visited}
+                  <span className="ml-1 text-base font-medium text-[var(--muted)]">
+                    건
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-[var(--muted)]">
+                  매장 방문 완료
+                </p>
+              </div>
+              <div className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3.5">
+                <p className="text-sm font-medium text-[var(--muted)]">
+                  반출완료
+                </p>
+                <p className="mt-1 text-4xl font-semibold tabular-nums tracking-wide text-[var(--accent)]">
+                  {todayStats.pickedUp}
+                  <span className="ml-1 text-base font-medium text-[var(--muted)]">
+                    건
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-[var(--muted)]">수령 완료</p>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <div
-              className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
+              className="flex rounded-full border border-[var(--line)] bg-white p-1"
               role="group"
               aria-label="목록 범위"
             >
@@ -873,7 +1001,7 @@ export function PharListWithModal({
                   setTodayOnly(true);
                   setVisitDate("");
                 }}
-                className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                   todayOnly
                     ? "bg-[var(--accent)] text-white"
                     : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -885,7 +1013,7 @@ export function PharListWithModal({
                 type="button"
                 aria-pressed={!todayOnly}
                 onClick={() => setTodayOnly(false)}
-                className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                   !todayOnly
                     ? "bg-[var(--accent)] text-white"
                     : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -894,10 +1022,10 @@ export function PharListWithModal({
                 전체 날짜
               </button>
             </div>
-            <label className="flex cursor-pointer items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold text-[var(--ink)]">
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)]">
               <input
                 type="checkbox"
-                className="accent-[var(--accent)]"
+                className="h-4 w-4 accent-[var(--accent)]"
                 checked={hidePickedUp}
                 onChange={(e) => setHidePickedUp(e.target.checked)}
               />
@@ -906,7 +1034,7 @@ export function PharListWithModal({
             {!todayOnly ? (
               <button
                 type="button"
-                className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                className="rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
                 onClick={scrollToTodaySection}
               >
                 오늘로 이동
@@ -915,11 +1043,11 @@ export function PharListWithModal({
           </div>
         </div>
 
-        <div className="mb-3 flex w-full shrink-0 items-stretch gap-2">
+        <div className="mb-4 flex w-full shrink-0 items-stretch gap-2.5">
           <input
             ref={searchInputRef}
             id="phar-unified-search"
-            className="h-14 min-w-0 flex-1 basis-0 rounded-2xl border border-[var(--line)] bg-white px-5 text-lg text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+            className="h-16 min-w-0 flex-1 basis-0 rounded-2xl border border-[var(--line)] bg-white px-5 text-xl text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
             type="search"
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
@@ -928,7 +1056,7 @@ export function PharListWithModal({
             autoComplete="off"
           />
           <select
-            className="h-14 w-44 shrink-0 appearance-none rounded-2xl border border-[var(--line)] bg-white bg-[length:12px] bg-[right_12px_center] bg-no-repeat px-4 pr-9 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+            className="h-16 w-48 shrink-0 appearance-none rounded-2xl border border-[var(--line)] bg-white bg-[length:12px] bg-[right_14px_center] bg-no-repeat px-4 pr-10 text-base text-[var(--ink)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
             style={{ backgroundImage: selectChevron }}
             value={status}
             onChange={(e) => setStatus(e.target.value)}
@@ -944,7 +1072,7 @@ export function PharListWithModal({
           {hasFilters ? (
             <button
               type="button"
-              className="shrink-0 self-center px-2 text-xs text-[var(--accent)] hover:underline"
+              className="shrink-0 self-center px-2 text-sm text-[var(--accent)] hover:underline"
               onClick={clearFilters}
             >
               초기화
@@ -952,11 +1080,11 @@ export function PharListWithModal({
           ) : null}
         </div>
 
-        {items.length === 0 ? (
+        {liveItems.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
         ) : (
           <div
-            className={`grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)] ${
+            className={`grid min-h-0 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.95fr)] ${
               fillHeight ? "flex-1" : ""
             }`}
           >
@@ -968,14 +1096,14 @@ export function PharListWithModal({
                   : "max-h-[min(70vh,calc(100vh-14rem))]"
               }`}
             >
-              <table className="w-full border-collapse text-left text-sm">
+              <table className="w-full border-collapse text-left text-base">
                 <thead className="sticky top-0 z-10">
-                  <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs tracking-[0.08em] text-[var(--muted)] uppercase">
-                    <th className="px-4 py-3 font-medium">방문일</th>
-                    <th className="px-4 py-3 font-medium">계정</th>
-                    <th className="px-4 py-3 font-medium">상품</th>
-                    <th className="px-4 py-3 font-medium text-right">수량</th>
-                    <th className="px-4 py-3 font-medium">상태</th>
+                  <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-sm tracking-[0.08em] text-[var(--muted)] uppercase">
+                    <th className="px-4 py-3.5 font-medium">방문일</th>
+                    <th className="px-4 py-3.5 font-medium">계정</th>
+                    <th className="px-4 py-3.5 font-medium">상품</th>
+                    <th className="px-4 py-3.5 font-medium text-right">수량</th>
+                    <th className="px-4 py-3.5 font-medium">상태</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1027,6 +1155,7 @@ export function PharListWithModal({
                             item={item}
                             isToday
                             hideStore
+                            counter
                             selected={item.id === selectedAllocId}
                             onOpen={() => selectRow(item)}
                           />
@@ -1050,6 +1179,7 @@ export function PharListWithModal({
                           isToday={false}
                           hideStore
                           selected={item.id === selectedAllocId}
+                          counter
                           onOpen={() => selectRow(item)}
                         />
                       ))}
@@ -1076,6 +1206,7 @@ export function PharListWithModal({
                             item={item}
                             isToday
                             hideStore
+                            counter
                             selected={item.id === selectedAllocId}
                             onOpen={() => selectRow(item)}
                           />
@@ -1096,6 +1227,7 @@ export function PharListWithModal({
                           isToday={false}
                           hideStore
                           selected={item.id === selectedAllocId}
+                          counter
                           onOpen={() => selectRow(item)}
                         />
                       ))}
@@ -1106,7 +1238,7 @@ export function PharListWithModal({
             </div>
 
             <aside
-              className={`overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm ${
+              className={`overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm ${
                 fillHeight ? "min-h-0" : "max-h-[min(70vh,calc(100vh-14rem))]"
               }`}
             >
@@ -1120,10 +1252,10 @@ export function PharListWithModal({
                 />
               ) : (
                 <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
-                  <p className="text-sm font-medium text-[var(--ink)]">
+                  <p className="text-base font-medium text-[var(--ink)]">
                     행을 선택하면 상세가 여기에 표시됩니다
                   </p>
-                  <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+                  <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
                     검색 후 Enter · ↑/↓ 이동 · Esc 선택 해제
                   </p>
                 </div>
@@ -1150,9 +1282,9 @@ export function PharListWithModal({
           </p>
           <p className="mt-1 text-xs text-[var(--muted)]">
             {hasFilters
-              ? `필터 적용 ${todayOnly ? todayItems.length : filtered.length}건 / 전체 ${items.length}건`
+              ? `필터 적용 ${todayOnly ? todayItems.length : filtered.length}건 / 전체 ${liveItems.length}건`
               : todayOnly
-                ? `전체 ${items.length}건 중 오늘만 표시`
+                ? `전체 ${liveItems.length}건 중 오늘만 표시`
                 : `전체 ${filtered.length}건`}
           </p>
         </div>
@@ -1212,7 +1344,7 @@ export function PharListWithModal({
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {liveItems.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
       ) : (
         <div
