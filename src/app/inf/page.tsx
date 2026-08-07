@@ -1,5 +1,7 @@
 import { InfAllocationList } from "@/components/inf-allocation-list";
+import { InfAppHeader } from "@/components/inf-app-header";
 import { InfLoginClient } from "@/components/inf-login-client";
+import { InfServerMessage } from "@/components/inf-server-message";
 import { type AllocationWithRelations, type Influencer } from "@/lib/types";
 import { getInfluencerSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -16,9 +18,7 @@ export default async function InfPage({
   if (!configured) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6">
-        <p className="text-sm text-red-400">
-          서버 설정 오류입니다. 잠시 후 다시 시도해 주세요.
-        </p>
+        <InfServerMessage kind="serverConfigError" />
       </div>
     );
   }
@@ -67,23 +67,7 @@ export default async function InfPage({
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      <header className="flex items-center justify-between px-5 pt-10 pb-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/owm-logo.webp"
-          alt="O.W.M 옵티마 웰니스 뮤지엄 약국"
-          className="w-20"
-          draggable={false}
-        />
-        <form action="/api/inf/clear" method="post">
-          <button
-            type="submit"
-            className="rounded-full px-3 py-1.5 text-xs font-medium text-[#A07050] transition hover:bg-[#F0E6D8] active:bg-[#E8D8C8]"
-          >
-            로그아웃
-          </button>
-        </form>
-      </header>
+      <InfAppHeader />
       <main className="flex flex-1 flex-col">
         <InfAllocationList
           influencer={influencer}

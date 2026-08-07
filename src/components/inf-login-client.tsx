@@ -2,6 +2,12 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
+import { InfAppHeader } from "@/components/inf-app-header";
+import {
+  InfLanguageToggle,
+  useInfLocale,
+} from "@/components/inf-locale-provider";
+import { translateInfApiError } from "@/lib/inf-i18n";
 import {
   type AllocationWithRelations,
   type Influencer,
@@ -13,24 +19,32 @@ const InfAllocationList = dynamic(
     import("@/components/inf-allocation-list").then((m) => m.InfAllocationList),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex flex-1 items-center justify-center py-16">
-        <p className="text-sm text-[#B09070]">목록 준비 중…</p>
-      </div>
-    ),
+    loading: () => <ListPreparing />,
   },
 );
+
+function ListPreparing() {
+  const { t } = useInfLocale();
+  return (
+    <div className="flex flex-1 items-center justify-center py-16">
+      <p className="text-sm text-[#B09070]">{t.listPreparing}</p>
+    </div>
+  );
+}
 
 type Phase = "form" | "welcome" | "ready";
 
 const WELCOME_MIN_MS = 1600;
 const WELCOME_EXIT_MS = 480;
 
-function displayName(inf: Pick<Influencer, "name" | "instagram_handle">) {
+function displayName(
+  inf: Pick<Influencer, "name" | "instagram_handle">,
+  guest: string,
+) {
   const name = (inf.name || "").trim();
   if (name) return name;
   const handle = (inf.instagram_handle || "").replace(/^@+/, "").trim();
-  return handle || "게스트";
+  return handle || guest;
 }
 
 function WelcomeScreen({
@@ -42,6 +56,8 @@ function WelcomeScreen({
   loading: boolean;
   exiting?: boolean;
 }) {
+  const { t } = useInfLocale();
+
   return (
     <div
       className={`flex flex-1 flex-col items-center justify-center px-8 text-center ${
@@ -78,14 +94,14 @@ function WelcomeScreen({
           Welcome
         </p>
         <h1 className="mt-3 text-[1.35rem] font-semibold tracking-wide text-[#3D1F0A]">
-          {name}님 환영합니다
+          {t.welcomeName(name)}
         </h1>
         <p className="mt-2 text-sm tracking-wide text-[#B09070]">
           {exiting
-            ? "상품 목록으로 이동 중…"
+            ? t.movingToList
             : loading
-              ? "방문 정보를 불러오는 중…"
-              : "열심히 불러오고 있어요!"}
+              ? t.loadingVisitInfo
+              : t.loadingHard}
         </p>
       </div>
     </div>
@@ -93,10 +109,11 @@ function WelcomeScreen({
 }
 
 export function InfLoginClient({ initialError }: { initialError?: string }) {
+  const { t } = useInfLocale();
   const [phase, setPhase] = useState<Phase>("form");
   const [handle, setHandle] = useState("");
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | undefined>(initialError);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [influencer, setInfluencer] = useState<Influencer | null>(null);
   const [allocations, setAllocations] = useState<AllocationWithRelations[]>(
     [],
@@ -108,6 +125,14 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
   const [welcomeExiting, setWelcomeExiting] = useState(false);
   const welcomeTimer = useRef<number | null>(null);
   const exitTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!initialError) {
+      setError(undefined);
+      return;
+    }
+    setError(translateInfApiError(initialError, t));
+  }, [initialError, t]);
 
   useEffect(() => {
     return () => {
@@ -159,7 +184,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.error || "배정 정보를 불러오지 못했습니다.");
+        throw new Error(body.error || t.bootstrapFailed);
       }
       if (body.influencer) {
         setInfluencer(body.influencer as Influencer);
@@ -168,7 +193,10 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
       setDataReady(true);
     } catch (err) {
       setBootstrapError(
-        err instanceof Error ? err.message : "배정 정보를 불러오지 못했습니다.",
+        translateInfApiError(
+          err instanceof Error ? err.message : t.bootstrapFailed,
+          t,
+        ),
       );
       setDataReady(true);
     } finally {
@@ -195,7 +223,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(body.error || "본인확인에 실패했습니다.");
+        throw new Error(body.error || t.verifyFailed);
       }
 
       const inf = body.influencer as Influencer;
@@ -217,7 +245,10 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
       void runBootstrap();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "본인확인 중 오류가 발생했습니다.",
+        translateInfApiError(
+          err instanceof Error ? err.message : t.verifyError,
+          t,
+        ),
       );
       setPhase("form");
     } finally {
@@ -228,23 +259,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
   if (phase === "ready" && influencer) {
     return (
       <div className="inf-content-enter flex min-h-screen flex-col bg-white">
-        <header className="flex items-center justify-between px-5 pt-10 pb-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/owm-logo.webp"
-            alt="O.W.M"
-            className="w-20"
-            draggable={false}
-          />
-          <form action="/api/inf/clear" method="post">
-            <button
-              type="submit"
-              className="rounded-full px-3 py-1.5 text-xs font-medium text-[#A07050] transition hover:bg-[#F0E6D8] active:bg-[#E8D8C8]"
-            >
-              로그아웃
-            </button>
-          </form>
-        </header>
+        <InfAppHeader />
         <main className="flex flex-1 flex-col">
           {bootstrapError ? (
             <p className="mx-6 mb-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-sm text-red-400">
@@ -263,9 +278,12 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
 
   if (phase === "welcome" && influencer) {
     return (
-      <div className="flex min-h-screen flex-col bg-white">
+      <div className="relative flex min-h-screen flex-col bg-white">
+        <div className="absolute top-5 right-4 z-10">
+          <InfLanguageToggle compact />
+        </div>
         <WelcomeScreen
-          name={displayName(influencer)}
+          name={displayName(influencer, t.guest)}
           loading={bootstrapLoading || !dataReady}
           exiting={welcomeExiting}
         />
@@ -279,13 +297,17 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="relative flex min-h-screen flex-col bg-white">
+      <div className="absolute top-5 right-4 z-10">
+        <InfLanguageToggle />
+      </div>
+
       <div className="flex flex-1 flex-col items-center justify-center px-8">
         <div className="inf-entry-logo mb-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/owm-logo.webp"
-            alt="O.W.M 옵티마 웰니스 뮤지엄 약국"
+            alt="O.W.M"
             className="w-52"
             width={208}
             height={208}
@@ -299,10 +321,10 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
 
         <div className="inf-entry-reveal mb-8 text-center">
           <h1 className="text-[1.15rem] font-semibold tracking-wide text-[#3D1F0A]">
-            SNS 아이디를 입력해주세요
+            {t.enterSnsId}
           </h1>
           <p className="mt-2 text-sm tracking-wide text-[#B09070]">
-            샤오홍슈 · 인스타그램 · 틱톡
+            {t.snsPlatforms}
           </p>
         </div>
 
@@ -331,7 +353,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
             disabled={pending}
             className="w-full rounded-2xl bg-[#6B3B1F] py-4 text-sm font-semibold tracking-wide text-white transition hover:bg-[#7D4726] active:brightness-90 disabled:cursor-wait disabled:opacity-70"
           >
-            {pending ? "확인 중…" : "확인"}
+            {pending ? t.confirming : t.confirm}
           </button>
         </form>
       </div>
