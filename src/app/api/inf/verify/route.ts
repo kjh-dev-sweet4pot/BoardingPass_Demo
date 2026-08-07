@@ -18,7 +18,7 @@ async function readHandle(request: Request) {
 
 /**
  * 본인확인만 빠르게 수행 (influencers 조회 + 세션 쿠키).
- * pending → visited / 배정 조회는 /api/inf/bootstrap 에서 병렬 처리.
+ * pending → visited(오늘 예정만) / 미수령 재방문일 갱신은 /api/inf/bootstrap 에서 처리.
  */
 export async function POST(request: Request) {
   const handle = await readHandle(request);

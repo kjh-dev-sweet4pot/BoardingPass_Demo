@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { getInfluencerSessionId } from "@/lib/session";
+import { applyInfluencerStoreVisit } from "@/lib/inf-visit";
 
 /**
- * 세션 확인 후 pending→visited 반영 + 배정/인플루언서 상세 로드.
+ * 세션 확인 후 방문 반영(pending→visited / 미수령 재방문일 갱신) + 배정 로드.
  * 로그인 UI에서 환영 애니메이션과 병렬로 호출.
  */
 export async function POST() {
@@ -23,18 +24,8 @@ export async function POST() {
 
   try {
     const supabase = createClient(url, key);
-    const now = new Date().toISOString();
 
-    // 상태 갱신 후 상세 조회 (환영 애니와는 클라이언트가 병렬)
-    await supabase
-      .from("allocations")
-      .update({
-        status: "visited",
-        verified_at: now,
-        updated_at: now,
-      })
-      .eq("influencer_id", influencerId)
-      .eq("status", "pending");
+    await applyInfluencerStoreVisit(supabase, influencerId);
 
     const [infResult, allocResult] = await Promise.all([
       supabase

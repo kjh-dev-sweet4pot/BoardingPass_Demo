@@ -2,6 +2,7 @@ import { InfAllocationList } from "@/components/inf-allocation-list";
 import { InfAppHeader } from "@/components/inf-app-header";
 import { InfLoginClient } from "@/components/inf-login-client";
 import { InfServerMessage } from "@/components/inf-server-message";
+import { applyInfluencerStoreVisit } from "@/lib/inf-visit";
 import { type AllocationWithRelations, type Influencer } from "@/lib/types";
 import { getInfluencerSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -31,6 +32,10 @@ export default async function InfPage({
   }
 
   const supabase = await createClient();
+
+  // 세션으로 재진입해도 오늘 방문 / 미수령 재방문일 반영
+  await applyInfluencerStoreVisit(supabase, influencerId);
+
   const [{ data: inf, error: infError }, { data: rows, error: allocError }] =
     await Promise.all([
       supabase
