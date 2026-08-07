@@ -19,7 +19,7 @@ export function InfAppHeader({
         draggable={false}
       />
       <div className="flex items-center gap-2">
-        {showLanguage ? <InfLanguageToggle compact /> : null}
+        {showLanguage ? <InfLanguageToggle size="mini" /> : null}
         <form action="/api/inf/clear" method="post">
           <button
             type="submit"

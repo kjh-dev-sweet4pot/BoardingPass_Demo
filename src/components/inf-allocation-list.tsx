@@ -672,9 +672,9 @@ function PickupSheet({
     : null;
 
   return (
-    <BottomSheet onClose={onClose} label={title} tall>
-      <div className="inf-sheet-content flex min-h-[calc(82vh-5rem)] flex-col space-y-5">
-        <div>
+    <BottomSheet onClose={onClose} label={title}>
+      <div className="inf-sheet-content flex min-h-0 flex-1 flex-col space-y-5">
+        <div className="shrink-0">
           <p className="text-xs font-medium tracking-widest text-[#6B3B1F] uppercase">
             {step === "confirm" ? "Confirm" : "Review"}
           </p>
@@ -685,7 +685,7 @@ function PickupSheet({
         </div>
 
         {/* 약사님 안내 — 사용자 언어 */}
-        <div className="rounded-2xl border border-[#6B3B1F]/25 bg-[#F5EDE3] px-4 py-3 text-center">
+        <div className="shrink-0 rounded-2xl border border-[#6B3B1F]/25 bg-[#F5EDE3] px-4 py-3 text-center">
           <p className="text-sm font-bold tracking-wide text-[#6B3B1F]">
             {t.showToPharmacist}
           </p>
@@ -693,8 +693,8 @@ function PickupSheet({
         </div>
 
         {/* 약사용 본문 — 한국어 고정 */}
-        <div className="flex flex-1 flex-col justify-center space-y-5 rounded-2xl bg-[#f9f9f9] px-5 py-8">
-          <div className="space-y-6 text-center">
+        <div className="flex min-h-0 flex-1 flex-col justify-center space-y-5 overflow-y-auto rounded-2xl bg-[#f9f9f9] px-5 py-6">
+          <div className="space-y-5 text-center">
             <div>
               <p className="text-[11px] font-medium tracking-wide text-[#aaa]">
                 {ko.product}
@@ -702,11 +702,11 @@ function PickupSheet({
               <p className="mt-1.5 text-2xl font-bold leading-snug text-[#1a1a2e]">
                 {selected.products?.name || ko.product}
               </p>
-              {selected.products?.description && (
+              {selected.products?.description ? (
                 <p className="mt-1 text-sm text-[#999]">
                   {selected.products.description}
                 </p>
-              )}
+              ) : null}
             </div>
 
             <div className="mx-auto h-px w-12 bg-[#e8e8e8]" />
@@ -735,7 +735,7 @@ function PickupSheet({
             </div>
           </div>
 
-          <div className="mt-2 space-y-2 border-t border-[#eee] pt-5 text-left">
+          <div className="mt-1 space-y-2 border-t border-[#eee] pt-4 text-left">
             <InfoRow label={ko.influencer}>
               {influencer.name}{" "}
               <span className="text-[#6B3B1F]">
@@ -745,9 +745,9 @@ function PickupSheet({
             <InfoRow label={ko.quantity}>
               {ko.quantityUnit(selected.quantity)}
             </InfoRow>
-            {selected.visit_code && (
+            {selected.visit_code ? (
               <InfoRow label={ko.visitCode}>{selected.visit_code}</InfoRow>
-            )}
+            ) : null}
             <InfoRow label={ko.pickupStatus}>
               <span
                 className={
@@ -765,21 +765,21 @@ function PickupSheet({
                     : ko.pickupWaiting}
               </span>
             </InfoRow>
-            {selected.picked_up_at && (
+            {selected.picked_up_at ? (
               <InfoRow label={ko.pickupTime}>
                 {formatKst(selected.picked_up_at)}
               </InfoRow>
-            )}
+            ) : null}
           </div>
         </div>
 
-        {error && (
-          <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-500">
+        {error ? (
+          <p className="shrink-0 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-500">
             {error}
           </p>
-        )}
+        ) : null}
 
-        <div className="mt-auto pt-2">
+        <div className="shrink-0 pt-1">
           {alreadyPickedUp ? (
             <div className="rounded-2xl bg-[#f3eee3] px-4 py-3 text-center text-sm font-semibold text-[#8a7a5c]">
               {t.pickupDoneBanner}
@@ -858,17 +858,15 @@ function InfoRow({
   );
 }
 
-/* ─── 수령정보 바텀시트 (현재 뷰포트 하단 · body 포탈) ─ */
+/* ─── 수령정보 바텀시트 (현재 뷰포트 하단 · 화면 높이 맞춤) ─ */
 function BottomSheet({
   onClose,
   label,
   children,
-  tall = false,
 }: {
   onClose: () => void;
   label: string;
   children: React.ReactNode;
-  tall?: boolean;
 }) {
   const { t } = useInfLocale();
   const [closing, setClosing] = useState(false);
@@ -920,14 +918,19 @@ function BottomSheet({
       onClick={requestClose}
     >
       <div
-        className={`inf-sheet-panel w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-5 pb-10 pt-5 shadow-2xl${
+        className={`inf-sheet-panel flex w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-5 shadow-2xl${
           closing ? " is-closing" : ""
-        } ${tall ? "min-h-[86vh] max-h-[96vh]" : "max-h-[88vh]"}`}
+        }`}
+        style={{
+          // 휴대폰 화면 높이에 맞춰 시트 크기 변동 (브라우저 UI 포함 dvh)
+          maxHeight: "min(92dvh, 96vh)",
+          height: "min(86dvh, 90vh)",
+        }}
         onClick={(e) => e.stopPropagation()}
         onAnimationEnd={handlePanelAnimationEnd}
       >
-        <div className="mx-auto mb-5 h-1 w-12 rounded-full bg-[#e8e8e8]" />
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mx-auto mb-5 h-1 w-12 shrink-0 rounded-full bg-[#e8e8e8]" />
+        <div className="mb-4 flex shrink-0 items-center justify-between">
           <span className="text-xs text-[#ccc]">{label}</span>
           <button
             type="button"
@@ -937,7 +940,7 @@ function BottomSheet({
             {t.close}
           </button>
         </div>
-        {children}
+        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>
     </div>,
     document.body,

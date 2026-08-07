@@ -280,7 +280,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
     return (
       <div className="relative flex min-h-screen flex-col bg-white">
         <div className="absolute top-5 right-4 z-10">
-          <InfLanguageToggle compact />
+          <InfLanguageToggle size="mini" />
         </div>
         <WelcomeScreen
           name={displayName(influencer, t.guest)}
@@ -299,7 +299,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
   return (
     <div className="relative flex min-h-screen flex-col bg-white">
       <div className="absolute top-5 right-4 z-10">
-        <InfLanguageToggle />
+        <InfLanguageToggle size="full" />
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center px-8">
