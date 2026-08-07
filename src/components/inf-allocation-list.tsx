@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { useInfLocale } from "@/components/inf-locale-provider";
 import {
@@ -16,6 +22,16 @@ import {
   type Influencer,
   type Store,
 } from "@/lib/types";
+
+const SheetCloseContext = createContext<(() => void) | null>(null);
+
+function useSheetClose() {
+  const close = useContext(SheetCloseContext);
+  if (!close) {
+    throw new Error("useSheetClose must be used within BottomSheet");
+  }
+  return close;
+}
 
 /* ─── 유틸 ─────────────────────────────────────────── */
 function formatKst(iso: string | null) {
@@ -664,6 +680,52 @@ function PickupSheet({
   onClearError: () => void;
 }) {
   const { t } = useInfLocale();
+  const title =
+    step === "confirm" ? t.pickupConfirmTitle : t.pickupReviewTitle;
+
+  return (
+    <BottomSheet onClose={onClose} label={title}>
+      <PickupSheetBody
+        influencer={influencer}
+        selected={selected}
+        step={step}
+        confirming={confirming}
+        error={error}
+        alreadyPickedUp={alreadyPickedUp}
+        cancelled={cancelled}
+        onStep={onStep}
+        onConfirm={onConfirm}
+        onClearError={onClearError}
+      />
+    </BottomSheet>
+  );
+}
+
+function PickupSheetBody({
+  influencer,
+  selected,
+  step,
+  confirming,
+  error,
+  alreadyPickedUp,
+  cancelled,
+  onStep,
+  onConfirm,
+  onClearError,
+}: {
+  influencer: Influencer;
+  selected: AllocationWithRelations;
+  step: Step;
+  confirming: boolean;
+  error: string | null;
+  alreadyPickedUp: boolean;
+  cancelled: boolean;
+  onStep: (step: Step) => void;
+  onConfirm: () => void;
+  onClearError: () => void;
+}) {
+  const { t } = useInfLocale();
+  const requestClose = useSheetClose();
   const ko = t.koSheet;
   const title =
     step === "confirm" ? t.pickupConfirmTitle : t.pickupReviewTitle;
@@ -672,7 +734,6 @@ function PickupSheet({
     : null;
 
   return (
-    <BottomSheet onClose={onClose} label={title}>
       <div className="inf-sheet-content flex h-full min-h-0 flex-1 flex-col gap-[clamp(0.5rem,1.6vh,1.25rem)] overflow-hidden">
         <div className="shrink-0">
           <p className="[font-size:clamp(0.65rem,1.4vh,0.75rem)] font-medium tracking-widest text-[#6B3B1F] uppercase">
@@ -799,7 +860,7 @@ function PickupSheet({
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={requestClose}
                 className="flex-1 rounded-2xl border border-[#e8e8e8] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[#666]"
               >
                 {t.close}
@@ -842,7 +903,6 @@ function PickupSheet({
           )}
         </div>
       </div>
-    </BottomSheet>
   );
 }
 
@@ -872,7 +932,6 @@ function BottomSheet({
   label: string;
   children: React.ReactNode;
 }) {
-  const { t } = useInfLocale();
   const [closing, setClosing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [settled, setSettled] = useState(false);
@@ -1058,23 +1117,15 @@ function BottomSheet({
         onPointerCancel={onPointerUp}
       >
         <div
-          className="mx-auto mb-3 flex h-6 w-full shrink-0 cursor-grab items-start justify-center active:cursor-grabbing"
+          className="mx-auto mb-2 flex h-6 w-full shrink-0 cursor-grab items-start justify-center active:cursor-grabbing"
           aria-hidden
         >
           <div className="mt-1 h-1 w-12 rounded-full bg-[#e8e8e8]" />
         </div>
-        <div className="mb-3 flex shrink-0 items-center justify-between">
-          <span className="text-xs text-[#ccc]">{label}</span>
-          <button
-            type="button"
-            onClick={requestClose}
-            className="text-xs text-[#aaa] hover:text-[#666]"
-          >
-            {t.close}
-          </button>
-        </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {children}
+          <SheetCloseContext.Provider value={requestClose}>
+            {children}
+          </SheetCloseContext.Provider>
         </div>
       </div>
     </div>,
