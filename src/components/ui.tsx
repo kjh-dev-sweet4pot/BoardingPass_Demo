@@ -8,6 +8,7 @@ export function AppShell({
   wide = false,
   full = false,
   fitViewport = false,
+  compactHeader = false,
   theme = "default",
 }: {
   eyebrow: string;
@@ -19,17 +20,22 @@ export function AppShell({
   full?: boolean;
   /** 페이지 전체 스크롤 없이 뷰포트 높이에 맞춤 */
   fitViewport?: boolean;
+  /** 약사 카운터와 같은 컴팩트 헤더 (스크롤은 유지) */
+  compactHeader?: boolean;
   /** 홈·인플루언서와 맞춘 OWM 톤 */
   theme?: "default" | "owm";
 }) {
   const owm = theme === "owm";
+  const denseHeader = compactHeader || fitViewport;
 
   const shell = (
     <main
       className={`w-full ${
         fitViewport
           ? "flex h-dvh flex-col overflow-hidden py-2.5"
-          : "min-h-screen py-10"
+          : denseHeader
+            ? "min-h-screen py-4"
+            : "min-h-screen py-10"
       } ${
         full
           ? "mx-0 max-w-none px-4 sm:px-6 lg:px-8"
@@ -40,31 +46,31 @@ export function AppShell({
         className={`flex flex-wrap items-end justify-between gap-3 border-b ${
           owm ? "border-[var(--line)]/80" : "border-[var(--line)]"
         } ${
-          fitViewport
+          denseHeader
             ? "mb-2.5 shrink-0 pb-2.5"
             : "mb-8 pb-6"
         }`}
       >
         <div
           className={`flex ${
-            fitViewport ? "items-center gap-3" : "items-start gap-4"
+            denseHeader ? "items-center gap-3" : "items-start gap-4"
           }`}
         >
           {owm ? (
             <Link
               href="/"
-              className={`shrink-0 ${fitViewport ? "" : "mt-1"}`}
+              className={`shrink-0 ${denseHeader ? "" : "mt-1"}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/owm-logo.webp"
                 alt="O.W.M"
-                className={`drop-shadow-sm ${fitViewport ? "w-10" : "w-14"}`}
+                className={`drop-shadow-sm ${denseHeader ? "w-10" : "w-14"}`}
                 draggable={false}
               />
             </Link>
           ) : null}
-          {fitViewport ? (
+          {denseHeader ? (
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <Link
