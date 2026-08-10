@@ -104,37 +104,88 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
+/** 방문일을 YYYY-MM-DD 로 정규화. `-` `.` `/` 구분, 2자리 연도(YY→20YY) 허용 */
 export function normalizeVisitDate(raw: string): string | null {
   const value = raw.trim();
   if (!value) return null;
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-
-  const slash = value.match(/^(\d{4})[/.](\d{1,2})[/.](\d{1,2})$/);
-  if (slash) {
-    const [, y, m, d] = slash;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-  }
-
-  const mdY = value.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
-  if (mdY) {
-    const [, m, d, y] = mdY;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-  }
 
   // Excel serial date (rough)
   if (/^\d+(\.\d+)?$/.test(value)) {
     const serial = Number(value);
     if (serial > 20000 && serial < 80000) {
       const utc = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
-      const y = utc.getUTCFullYear();
-      const m = String(utc.getUTCMonth() + 1).padStart(2, "0");
-      const d = String(utc.getUTCDate()).padStart(2, "0");
-      return `${y}-${m}-${d}`;
+      return toYmd(
+        utc.getUTCFullYear(),
+        utc.getUTCMonth() + 1,
+        utc.getUTCDate(),
+      );
     }
   }
 
+  // 시간 포함 값: "2026-08-11 00:00:00" / ISO
+  const dateOnly = value.split(/[T\s]/)[0]!.trim();
+  const sep = "[./-]";
+
+  // YYYY-M-D / YYYY.M.D / YYYY/M/D
+  let match = dateOnly.match(
+    new RegExp(`^(\\d{4})${sep}(\\d{1,2})${sep}(\\d{1,2})$`),
+  );
+  if (match) {
+    return toYmd(Number(match[1]), Number(match[2]), Number(match[3]));
+  }
+
+  // YY-M-D / YY.M.D / YY/M/D  (예: 26.08.11, 26-08-11)
+  match = dateOnly.match(
+    new RegExp(`^(\\d{2})${sep}(\\d{1,2})${sep}(\\d{1,2})$`),
+  );
+  if (match) {
+    return toYmd(2000 + Number(match[1]), Number(match[2]), Number(match[3]));
+  }
+
+  // M-D-YYYY / M.D.YYYY / M/D/YYYY
+  match = dateOnly.match(
+    new RegExp(`^(\\d{1,2})${sep}(\\d{1,2})${sep}(\\d{4})$`),
+  );
+  if (match) {
+    return toYmd(Number(match[3]), Number(match[1]), Number(match[2]));
+  }
+
+  // M-D-YY
+  match = dateOnly.match(
+    new RegExp(`^(\\d{1,2})${sep}(\\d{1,2})${sep}(\\d{2})$`),
+  );
+  if (match) {
+    return toYmd(
+      2000 + Number(match[3]),
+      Number(match[1]),
+      Number(match[2]),
+    );
+  }
+
   return null;
+}
+
+function toYmd(year: number, month: number, day: number): string | null {
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    return null;
+  }
+  if (year < 2000 || year > 2099) return null;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (
+    utc.getUTCFullYear() !== year ||
+    utc.getUTCMonth() !== month - 1 ||
+    utc.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 /** "텔로액트 두피 스케일러 2개" → { name, quantity } */
@@ -242,7 +293,8 @@ export function validateImportRow(
     String(raw.name || "").trim() || (snsid ? snsid : "");
 
   if (!snsid) errors.push("snsid(핸들) 필요");
-  if (!visit_date) errors.push("visit_date 형식 오류 (YYYY-MM-DD)");
+  if (!visit_date)
+    errors.push("visit_date 형식 오류 (예: 2026-08-11, 2026.08.11, 26-08-11)");
   if (!store) errors.push("방문지점(store) 필요");
   if (!product) errors.push("상품(product) 필요");
   if (!Number.isFinite(quantity) || quantity < 1) errors.push("수량 오류");

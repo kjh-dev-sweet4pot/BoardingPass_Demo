@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { PHAR_COUNTER_ROOT_ID } from "@/components/phar-header-actions";
 import {
   ALLOCATION_STATUS_LABEL,
   allocationStatusDisplayLabel,
@@ -52,6 +53,11 @@ function CounterDetailPanel({
   const sns = formatSnsUrl(item.influencers?.sns_url);
   const d = visitDateKey(item);
   const picked = item.status === "picked_up" || Boolean(item.picked_up_at);
+  const [relatedOpen, setRelatedOpen] = useState(false);
+
+  useEffect(() => {
+    setRelatedOpen(false);
+  }, [item.influencer_id]);
 
   return (
     <div className="space-y-6">
@@ -80,7 +86,7 @@ function CounterDetailPanel({
 
       <div className="space-y-4 rounded-2xl bg-[var(--accent-soft)]/50 px-5 py-5">
         <div>
-          <p className="text-xs tracking-wide text-[var(--muted)]">줄 상품</p>
+          <p className="text-xs tracking-wide text-[var(--muted)]">배정 상품</p>
           <p className="mt-1.5 text-2xl font-bold text-[var(--ink)]">
             {item.products?.name || "상품"}
           </p>
@@ -120,7 +126,7 @@ function CounterDetailPanel({
             ? `수령 완료${item.picked_up_at ? ` · ${formatKst(item.picked_up_at)}` : ""}`
             : item.status === "cancelled"
               ? "취소된 배정"
-              : "아직 수령 확인 전 — 손님 폰에서 수령 확인"}
+              : "아직 수령 확인 전 — 손님 휴대폰 에서 수령 확인 버튼을 눌러주세요 ! "}
         </p>
       </div>
 
@@ -129,7 +135,7 @@ function CounterDetailPanel({
           href={sns}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-14 items-center justify-center rounded-xl bg-[var(--accent)] text-base font-semibold text-white transition hover:brightness-110"
+          className="flex h-14 items-center justify-center rounded-xl bg-[var(--accent)] text-base font-bold !text-white transition hover:brightness-110"
         >
           SNS 프로필 확인
         </a>
@@ -156,44 +162,61 @@ function CounterDetailPanel({
 
       {related.length > 1 ? (
         <div>
-          <p className="mb-2.5 text-sm font-medium tracking-wide text-[var(--muted)]">
-            이 지점 배정 {related.length}건
-          </p>
-          <ul className="space-y-2.5">
-            {related.map((row) => {
-              const active = row.id === item.id;
-              const rd = visitDateKey(row);
-              return (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelectRelated(row.id)}
-                    className={`w-full rounded-xl border px-4 py-3 text-left transition ${
-                      active
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                        : "border-[var(--line)] bg-white hover:bg-[var(--accent-soft)]/40"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-[var(--ink)]">
-                          {row.products?.name || "상품"}
-                        </p>
-                        <p className="mt-0.5 text-sm tabular-nums text-[var(--muted)]">
-                          {rd || "미정"} · {row.quantity}개
-                        </p>
+          <button
+            type="button"
+            aria-expanded={relatedOpen}
+            onClick={() => setRelatedOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-left transition hover:bg-[var(--accent-soft)]/40"
+          >
+            <span className="text-sm font-medium tracking-wide text-[var(--muted)]">
+              이 지점 배정 {related.length}건
+            </span>
+            <span
+              className={`text-xs font-semibold text-[var(--accent)] transition ${
+                relatedOpen ? "rotate-180" : ""
+              }`}
+              aria-hidden
+            >
+              ▾
+            </span>
+          </button>
+          {relatedOpen ? (
+            <ul className="mt-2.5 space-y-2.5">
+              {related.map((row) => {
+                const active = row.id === item.id;
+                const rd = visitDateKey(row);
+                return (
+                  <li key={row.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectRelated(row.id)}
+                      className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                        active
+                          ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                          : "border-[var(--line)] bg-white hover:bg-[var(--accent-soft)]/40"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-[var(--ink)]">
+                            {row.products?.name || "상품"}
+                          </p>
+                          <p className="mt-0.5 text-sm tabular-nums text-[var(--muted)]">
+                            {rd || "미정"} · {row.quantity}개
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone(row.status)}`}
+                        >
+                          {ALLOCATION_STATUS_LABEL[row.status]}
+                        </span>
                       </div>
-                      <span
-                        className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone(row.status)}`}
-                      >
-                        {ALLOCATION_STATUS_LABEL[row.status]}
-                      </span>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -527,10 +550,30 @@ export function PharListWithModal({
   const [selectedAllocId, setSelectedAllocId] = useState<string | null>(null);
   /** 지점 카운터: INF 수령 등 원격 변경을 반영하기 위한 목록 */
   const [liveItems, setLiveItems] = useState(items);
+  /** 카운터 상단 현황: 오늘 / 이번달 / 전체 */
+  const [statsPeriod, setStatsPeriod] = useState<"today" | "month" | "all">(
+    "today",
+  );
+  /** 현황 카드 클릭 필터: 합계 / 방문예정 / 방문완료 / 반출완료 */
+  const [statsBucket, setStatsBucket] = useState<
+    "total" | "scheduled" | "visited" | "picked_up" | null
+  >(null);
+  /** 카운터 영역만 브라우저 전체화면 (AppShell 헤더 제외) */
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const counterRootRef = useRef<HTMLDivElement>(null);
   const storeFilterId = lockedStoreId || storeId;
   /** 지점 로그인: 통합 검색 + 상태만 */
   const simpleFilters = Boolean(lockedStoreId);
+
+  useEffect(() => {
+    if (!simpleFilters) return;
+    function onFsChange() {
+      setIsFullscreen(document.fullscreenElement === counterRootRef.current);
+    }
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, [simpleFilters]);
 
   useEffect(() => {
     setLiveItems(items);
@@ -552,7 +595,26 @@ export function PharListWithModal({
           allocations?: AllocationWithRelations[];
         };
         if (!cancelled && Array.isArray(data.allocations)) {
-          setLiveItems(data.allocations);
+          setLiveItems((prev) => {
+            // 내용이 같으면 참조 유지 → 스크롤/선택 상태 보존
+            if (
+              prev.length === data.allocations!.length &&
+              prev.every((row, i) => {
+                const next = data.allocations![i];
+                return (
+                  row.id === next.id &&
+                  row.status === next.status &&
+                  row.updated_at === next.updated_at &&
+                  row.picked_up_at === next.picked_up_at &&
+                  row.verified_at === next.verified_at &&
+                  row.last_visited_at === next.last_visited_at
+                );
+              })
+            ) {
+              return prev;
+            }
+            return data.allocations!;
+          });
         }
       } catch {
         // 네트워크 오류 시 다음 주기에 재시도
@@ -611,6 +673,9 @@ export function PharListWithModal({
     );
   }, [liveItems]);
 
+  const today = todayYmdKst();
+  const monthKey = today.slice(0, 7); // YYYY-MM
+
   const filtered = useMemo(() => {
     const next = liveItems.filter((item) => {
       if (storeFilterId && item.store_id !== storeFilterId) return false;
@@ -618,6 +683,28 @@ export function PharListWithModal({
 
       if (simpleFilters) {
         if (!matchesUnifiedSearch(item, deferredSearchQ)) return false;
+
+        const d = visitDateKey(item);
+        if (statsPeriod === "today") {
+          if (d !== today) return false;
+        } else if (statsPeriod === "month") {
+          if (!d || !d.startsWith(monthKey)) return false;
+        }
+
+        if (statsBucket) {
+          if (item.status === "cancelled") return false;
+          if (statsBucket === "scheduled") {
+            if (item.status === "picked_up" || item.status === "visited") {
+              return false;
+            }
+          } else if (statsBucket === "visited") {
+            if (item.status !== "visited") return false;
+          } else if (statsBucket === "picked_up") {
+            if (item.status !== "picked_up") return false;
+          }
+          return true;
+        }
+
         if (hidePickedUp && item.status === "picked_up") return false;
         return true;
       }
@@ -641,12 +728,15 @@ export function PharListWithModal({
     visitDate,
     status,
     hidePickedUp,
+    statsBucket,
+    statsPeriod,
+    today,
+    monthKey,
   ]);
 
-  const today = todayYmdKst();
   const isSearching = Boolean(deferredSearchQ);
 
-  const todayStats = useMemo(() => {
+  const periodStats = useMemo(() => {
     let total = 0;
     let scheduled = 0; // 방문예정
     let visited = 0; // 방문완료 (매장 방문 완료)
@@ -654,7 +744,12 @@ export function PharListWithModal({
     for (const item of liveItems) {
       if (storeFilterId && item.store_id !== storeFilterId) continue;
       const d = visitDateKey(item);
-      if (d !== today) continue;
+      if (statsPeriod === "today") {
+        if (d !== today) continue;
+      } else if (statsPeriod === "month") {
+        if (!d || !d.startsWith(monthKey)) continue;
+      }
+      // all: 날짜 제한 없음
       if (item.status === "cancelled") continue;
       total += 1;
       if (item.status === "picked_up") pickedUp += 1;
@@ -662,7 +757,21 @@ export function PharListWithModal({
       else scheduled += 1; // pending, ready 등
     }
     return { total, scheduled, visited, pickedUp };
-  }, [liveItems, storeFilterId, today]);
+  }, [liveItems, storeFilterId, today, monthKey, statsPeriod]);
+
+  const statsPeriodLabel =
+    statsPeriod === "today"
+      ? "오늘 현황"
+      : statsPeriod === "month"
+        ? "이번달 현황"
+        : "전체 현황";
+
+  const statsTotalHint =
+    statsPeriod === "today"
+      ? "오늘 방문 합계"
+      : statsPeriod === "month"
+        ? `${Number(monthKey.slice(5))}월 방문 합계`
+        : "전체 방문 합계";
 
   const { pastItems, todayItems, futureItems } = useMemo(() => {
     const past: AllocationWithRelations[] = [];
@@ -679,6 +788,8 @@ export function PharListWithModal({
 
   const listScrollRef = useRef<HTMLDivElement>(null);
   const todaySectionRef = useRef<HTMLTableRowElement>(null);
+  /** 폴링 갱신마다 오늘로 튕기지 않도록, '전체 날짜' 진입 시 1회만 자동 스크롤 */
+  const didAutoScrollToTodayRef = useRef(false);
 
   function scrollToTodaySection() {
     const container = listScrollRef.current;
@@ -695,28 +806,29 @@ export function PharListWithModal({
   }
 
   useEffect(() => {
-    if (todayOnly) return;
+    if (todayOnly) {
+      didAutoScrollToTodayRef.current = false;
+      return;
+    }
+    if (didAutoScrollToTodayRef.current) return;
+    if (todayItems.length === 0) return;
+
     let cancelled = false;
     const frame = window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        if (!cancelled) scrollToTodaySection();
+        if (cancelled) return;
+        scrollToTodaySection();
+        didAutoScrollToTodayRef.current = true;
       });
     });
     return () => {
       cancelled = true;
       window.cancelAnimationFrame(frame);
     };
-  }, [
-    filtered,
-    today,
-    todayOnly,
-    todayItems.length,
-    pastItems.length,
-    futureItems.length,
-  ]);
+  }, [todayOnly, todayItems.length]);
 
   const hasFilters = simpleFilters
-    ? Boolean(searchQ.trim()) || Boolean(status)
+    ? Boolean(searchQ.trim()) || Boolean(status) || Boolean(statsBucket)
     : Boolean(influencerQ.trim()) ||
       Boolean(productQ.trim()) ||
       (!lockedStoreId && Boolean(storeId)) ||
@@ -914,7 +1026,35 @@ export function PharListWithModal({
     setQuantity("");
     setVisitDate("");
     setStatus("");
+    setStatsBucket(null);
     if (simpleFilters) setHidePickedUp(true);
+  }
+
+  function syncListDateToStatsPeriod(period: "today" | "month" | "all") {
+    if (period === "today") {
+      setTodayOnly(true);
+      setVisitDate("");
+    } else {
+      setTodayOnly(false);
+    }
+  }
+
+  function onStatsPeriodChange(period: "today" | "month" | "all") {
+    setStatsPeriod(period);
+    syncListDateToStatsPeriod(period);
+  }
+
+  function onStatsCellClick(
+    bucket: "total" | "scheduled" | "visited" | "picked_up",
+  ) {
+    if (statsBucket === bucket) {
+      setStatsBucket(null);
+      setHidePickedUp(true);
+      return;
+    }
+    setStatsBucket(bucket);
+    setStatus("");
+    syncListDateToStatsPeriod(statsPeriod);
   }
 
   function selectRow(item: AllocationWithRelations) {
@@ -927,365 +1067,423 @@ export function PharListWithModal({
 
   const colSpan = simpleFilters ? 5 : 7;
 
-  /* ── 지점 PC 카운터: 검색 + 좌목록 + 우상세 ── */
+  /* ── 지점 PC 카운터: 좌 Counter+목록 / 우 검색+상세 ── */
   if (simpleFilters) {
+    const counterTall = fillHeight || isFullscreen;
+    const counterGridClass =
+      "grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(240px,0.55fr)]";
+
     return (
-      <div className={fillHeight ? "flex min-h-0 flex-1 flex-col" : ""}>
-        <div className="mb-5 shrink-0 space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
-                Counter
-              </p>
-              <p className="mt-1 text-lg font-semibold tracking-wide text-[var(--ink)]">
-                오늘 현황
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div
-                className="flex rounded-full border border-[var(--line)] bg-white p-1"
-                role="group"
-                aria-label="목록 범위"
-              >
-                <button
-                  type="button"
-                  aria-pressed={todayOnly}
-                  onClick={() => {
-                    setTodayOnly(true);
-                    setVisitDate("");
-                  }}
-                  className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                    todayOnly
-                      ? "bg-[var(--accent)] text-white"
-                      : "text-[var(--muted)] hover:text-[var(--ink)]"
-                  }`}
-                >
-                  오늘만
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={!todayOnly}
-                  onClick={() => setTodayOnly(false)}
-                  className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                    !todayOnly
-                      ? "bg-[var(--accent)] text-white"
-                      : "text-[var(--muted)] hover:text-[var(--ink)]"
-                  }`}
-                >
-                  전체 날짜
-                </button>
-              </div>
-              <label className="flex cursor-pointer items-center gap-2.5 rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)]">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-[var(--accent)]"
-                  checked={hidePickedUp}
-                  onChange={(e) => setHidePickedUp(e.target.checked)}
-                />
-                미수령만
-              </label>
-              {!todayOnly ? (
-                <button
-                  type="button"
-                  className="rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
-                  onClick={scrollToTodaySection}
-                >
-                  오늘로 이동
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          <div
-            className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
-            role="group"
-            aria-label="오늘 방문 현황"
-          >
-            <div className="grid grid-cols-2 divide-x divide-y divide-[var(--line)] sm:grid-cols-4 sm:divide-y-0">
-              <div className="relative bg-[var(--accent-soft)]/55 px-5 py-4 sm:px-6 sm:py-5">
-                <div className="absolute inset-y-3 left-0 w-1 rounded-full bg-[var(--accent)]" />
-                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
-                  오늘
-                </p>
-                <p className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--accent)]">
-                    {todayStats.total}
-                  </span>
-                  <span className="text-lg font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="mt-1.5 text-xs text-[var(--muted)]">방문 합계</p>
-              </div>
-
-              <div className="px-5 py-4 sm:px-6 sm:py-5">
-                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
-                  방문예정
-                </p>
-                <p className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
-                    {todayStats.scheduled}
-                  </span>
-                  <span className="text-lg font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="mt-1.5 text-xs text-[var(--muted)]">아직 미방문</p>
-              </div>
-
-              <div className="px-5 py-4 sm:px-6 sm:py-5">
-                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
-                  방문완료
-                </p>
-                <p className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
-                    {todayStats.visited}
-                  </span>
-                  <span className="text-lg font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="mt-1.5 text-xs text-[var(--muted)]">
-                  매장 방문 완료
-                </p>
-              </div>
-
-              <div className="px-5 py-4 sm:px-6 sm:py-5">
-                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
-                  반출완료
-                </p>
-                <p className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--accent)]">
-                    {todayStats.pickedUp}
-                  </span>
-                  <span className="text-lg font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="mt-1.5 text-xs text-[var(--muted)]">수령 완료</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-4 flex w-full shrink-0 items-stretch gap-2.5">
-          <input
-            ref={searchInputRef}
-            id="phar-unified-search"
-            className="h-16 min-w-0 flex-1 basis-0 rounded-2xl border border-[var(--line)] bg-white px-5 text-xl text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
-            type="search"
-            value={searchQ}
-            onChange={(e) => setSearchQ(e.target.value)}
-            placeholder="이름 · @핸들 · 상품 검색"
-            aria-label="이름, 핸들, 상품 검색"
-            autoComplete="off"
-          />
-          <select
-            className="h-16 w-48 shrink-0 appearance-none rounded-2xl border border-[var(--line)] bg-white bg-[length:12px] bg-[right_14px_center] bg-no-repeat px-4 pr-10 text-base text-[var(--ink)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
-            style={{ backgroundImage: selectChevron }}
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            aria-label="상태 필터"
-          >
-            <option value="">상태 전체</option>
-            {statusOptions.map((value) => (
-              <option key={value} value={value}>
-                {ALLOCATION_STATUS_LABEL[value]}
-              </option>
-            ))}
-          </select>
-          {hasFilters ? (
+      <div
+        id={PHAR_COUNTER_ROOT_ID}
+        ref={counterRootRef}
+        className={`${
+          counterTall ? "flex min-h-0 flex-1 flex-col" : ""
+        } ${
+          isFullscreen
+            ? "h-dvh bg-[var(--background)] px-4 py-3 sm:px-6"
+            : ""
+        }`}
+      >
+        {isFullscreen ? (
+          <div className="mb-2 flex shrink-0 justify-end">
             <button
               type="button"
-              className="shrink-0 self-center px-2 text-sm text-[var(--accent)] hover:underline"
-              onClick={clearFilters}
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:bg-[var(--accent-soft)]"
+              onClick={() => void document.exitFullscreen().catch(() => {})}
             >
-              초기화
+              전체화면 종료
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         {liveItems.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
         ) : (
           <div
-            className={`grid min-h-0 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.95fr)] ${
-              fillHeight ? "flex-1" : ""
-            }`}
+            className={`${counterGridClass} ${counterTall ? "flex-1" : ""}`}
           >
-            <div
-              ref={listScrollRef}
-              className={`overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm ${
-                fillHeight
-                  ? "min-h-0"
-                  : "max-h-[min(70vh,calc(100vh-14rem))]"
-              }`}
-            >
-              <table className="w-full border-collapse text-left text-base">
-                <thead className="sticky top-0 z-10">
-                  <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-sm tracking-[0.08em] text-[var(--muted)] uppercase">
-                    <th className="px-4 py-3.5 font-medium">방문일</th>
-                    <th className="px-4 py-3.5 font-medium">계정</th>
-                    <th className="px-4 py-3.5 font-medium">상품</th>
-                    <th className="px-4 py-3.5 font-medium text-right">수량</th>
-                    <th className="px-4 py-3.5 font-medium">상태</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={colSpan}
-                        className="px-4 py-8 text-center text-sm text-[var(--muted)]"
+            <div className="flex min-h-0 min-w-0 flex-col gap-3">
+              <div className="shrink-0 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/70 p-3 shadow-sm sm:p-3.5">
+                <div className="mb-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
+                      Counter
+                    </p>
+                    <p className="text-base font-semibold tracking-wide text-[var(--ink)]">
+                      {statsPeriodLabel}
+                    </p>
+                  </div>
+                  <div
+                    className="flex rounded-full border border-[var(--line)] bg-white/90 p-0.5"
+                    role="group"
+                    aria-label="조회 기간"
+                  >
+                    {(
+                      [
+                        ["today", "오늘만"],
+                        ["month", "이번달"],
+                        ["all", "전체 날짜"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={statsPeriod === value}
+                        onClick={() => onStatsPeriodChange(value)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                          statsPeriod === value
+                            ? "bg-[var(--accent)] text-white"
+                            : "text-[var(--muted)] hover:text-[var(--ink)]"
+                        }`}
                       >
-                        조건에 맞는 배정이 없습니다.
-                      </td>
-                    </tr>
-                  ) : todayOnly && !isSearching ? (
-                    <>
-                      <SectionHeaderRow
-                        ref={todaySectionRef}
-                        label={`오늘 · ${today}`}
-                        count={todayItems.length}
-                        tone="accent"
-                        colSpan={colSpan}
-                      />
-                      {todayItems.length === 0 ? (
-                        <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
-                          <td
-                            colSpan={colSpan}
-                            className="px-4 py-6 text-center text-sm text-[var(--muted)]"
-                          >
-                            {hidePickedUp
-                              ? "오늘 미수령 방문이 없습니다."
-                              : "오늘 방문인이 없습니다."}
-                            <button
-                              type="button"
-                              className="mt-2 block w-full text-xs font-medium text-[var(--accent)] hover:underline"
-                              onClick={() => {
-                                if (hidePickedUp) setHidePickedUp(false);
-                                else setTodayOnly(false);
-                              }}
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div
+                  className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]"
+                  role="group"
+                  aria-label={statsPeriodLabel}
+                >
+                  <div className="grid grid-cols-2 divide-x divide-y divide-[var(--line)] sm:grid-cols-4 sm:divide-y-0">
+                    {(
+                      [
+                        {
+                          bucket: "total" as const,
+                          label:
+                            statsPeriod === "today"
+                              ? "오늘"
+                              : statsPeriod === "month"
+                                ? "이번달"
+                                : "전체",
+                          count: periodStats.total,
+                          hint: statsTotalHint,
+                          accent: true,
+                        },
+                        {
+                          bucket: "scheduled" as const,
+                          label: "방문예정",
+                          count: periodStats.scheduled,
+                          hint: "아직 미방문",
+                          accent: false,
+                        },
+                        {
+                          bucket: "visited" as const,
+                          label: "방문완료",
+                          count: periodStats.visited,
+                          hint: "매장 방문 완료",
+                          accent: false,
+                        },
+                        {
+                          bucket: "picked_up" as const,
+                          label: "반출완료",
+                          count: periodStats.pickedUp,
+                          hint: "수령 완료",
+                          accent: true,
+                        },
+                      ] as const
+                    ).map((cell) => {
+                      const active = statsBucket === cell.bucket;
+                      return (
+                        <button
+                          key={cell.bucket}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => onStatsCellClick(cell.bucket)}
+                          className={`relative px-4 py-2.5 text-left transition sm:px-5 sm:py-3 ${
+                            cell.bucket === "total"
+                              ? "bg-[var(--accent-soft)]/55"
+                              : "bg-transparent"
+                          } ${
+                            active
+                              ? "bg-[var(--accent-soft)] ring-2 ring-inset ring-[var(--accent)]"
+                              : "hover:bg-[var(--accent-soft)]/40"
+                          }`}
+                        >
+                          {cell.bucket === "total" ? (
+                            <div className="absolute inset-y-2 left-0 w-1 rounded-full bg-[var(--accent)]" />
+                          ) : null}
+                          <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
+                            {cell.label}
+                          </p>
+                          <p className="mt-0.5 flex items-baseline gap-1">
+                            <span
+                              className={`text-3xl font-semibold tabular-nums tracking-tight ${
+                                cell.accent
+                                  ? "text-[var(--accent)]"
+                                  : "text-[var(--ink)]"
+                              }`}
                             >
-                              {hidePickedUp
-                                ? "완료 포함해 보기"
-                                : "전체 날짜 보기"}
-                            </button>
-                          </td>
-                        </tr>
-                      ) : (
-                        todayItems.map((item) => (
-                          <AllocationRow
-                            key={item.id}
-                            item={item}
-                            isToday
-                            hideStore
-                            counter
-                            selected={item.id === selectedAllocId}
-                            onOpen={() => selectRow(item)}
-                          />
-                        ))
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {pastItems.length > 0 && (
-                        <SectionHeaderRow
-                          label="오늘 이전"
-                          count={pastItems.length}
-                          tone="muted"
-                          colSpan={colSpan}
-                        />
-                      )}
-                      {pastItems.map((item) => (
-                        <AllocationRow
-                          key={item.id}
-                          item={item}
-                          isToday={false}
-                          hideStore
-                          selected={item.id === selectedAllocId}
-                          counter
-                          onOpen={() => selectRow(item)}
-                        />
-                      ))}
-                      <SectionHeaderRow
-                        ref={todaySectionRef}
-                        label={`오늘 · ${today}`}
-                        count={todayItems.length}
-                        tone="accent"
-                        colSpan={colSpan}
-                      />
-                      {todayItems.length === 0 ? (
-                        <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
+                              {cell.count}
+                            </span>
+                            <span className="text-sm font-medium text-[var(--muted)]">
+                              건
+                            </span>
+                          </p>
+                          <p className="text-[11px] leading-tight text-[var(--muted)]">
+                            {active ? "클릭해서 필터 해제" : cell.hint}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`relative min-h-0 ${
+                  counterTall
+                    ? "flex-1"
+                    : "max-h-[min(70vh,calc(100vh-14rem))]"
+                }`}
+              >
+                {statsPeriod !== "today" ? (
+                  <button
+                    type="button"
+                    className="absolute right-14 top-6 z-20 -translate-y-1/2 rounded-full border border-[var(--line)] bg-white/95 px-3 py-1.5 text-xs font-medium text-[var(--accent)] shadow-sm backdrop-blur-sm hover:bg-[var(--accent-soft)]"
+                    onClick={scrollToTodaySection}
+                  >
+                    오늘로 이동
+                  </button>
+                ) : null}
+                <div
+                  ref={listScrollRef}
+                  className="h-full overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
+                >
+                  <table className="w-full border-collapse text-left text-base">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-sm tracking-[0.08em] text-[var(--muted)] uppercase">
+                        <th className="px-4 py-3.5 font-medium">방문일</th>
+                        <th className="px-4 py-3.5 font-medium">계정</th>
+                        <th className="px-4 py-3.5 font-medium">상품</th>
+                        <th className="px-4 py-3.5 font-medium text-right">
+                          수량
+                        </th>
+                        <th className="px-4 py-3.5 font-medium">상태</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.length === 0 ? (
+                        <tr>
                           <td
                             colSpan={colSpan}
-                            className="px-4 py-6 text-center text-sm text-[var(--muted)]"
+                            className="px-4 py-8 text-center text-sm text-[var(--muted)]"
                           >
-                            오늘 방문인이 없습니다.
+                            조건에 맞는 배정이 없습니다.
                           </td>
                         </tr>
-                      ) : (
-                        todayItems.map((item) => (
-                          <AllocationRow
-                            key={item.id}
-                            item={item}
-                            isToday
-                            hideStore
-                            counter
-                            selected={item.id === selectedAllocId}
-                            onOpen={() => selectRow(item)}
+                      ) : todayOnly && !isSearching ? (
+                        <>
+                          <SectionHeaderRow
+                            ref={todaySectionRef}
+                            label={`오늘 · ${today}`}
+                            count={todayItems.length}
+                            tone="accent"
+                            colSpan={colSpan}
                           />
-                        ))
+                          {todayItems.length === 0 ? (
+                            <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
+                              <td
+                                colSpan={colSpan}
+                                className="px-4 py-6 text-center text-sm text-[var(--muted)]"
+                              >
+                                {hidePickedUp
+                                  ? "오늘 미수령 방문이 없습니다."
+                                  : "오늘 방문인이 없습니다."}
+                                <button
+                                  type="button"
+                                  className="mt-2 block w-full text-xs font-medium text-[var(--accent)] hover:underline"
+                                  onClick={() => {
+                                    if (hidePickedUp) setHidePickedUp(false);
+                                    else onStatsPeriodChange("all");
+                                  }}
+                                >
+                                  {hidePickedUp
+                                    ? "완료 포함해 보기"
+                                    : "전체 날짜 보기"}
+                                </button>
+                              </td>
+                            </tr>
+                          ) : (
+                            todayItems.map((item) => (
+                              <AllocationRow
+                                key={item.id}
+                                item={item}
+                                isToday
+                                hideStore
+                                counter
+                                selected={item.id === selectedAllocId}
+                                onOpen={() => selectRow(item)}
+                              />
+                            ))
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {pastItems.length > 0 && (
+                            <SectionHeaderRow
+                              label="오늘 이전"
+                              count={pastItems.length}
+                              tone="muted"
+                              colSpan={colSpan}
+                            />
+                          )}
+                          {pastItems.map((item) => (
+                            <AllocationRow
+                              key={item.id}
+                              item={item}
+                              isToday={false}
+                              hideStore
+                              selected={item.id === selectedAllocId}
+                              counter
+                              onOpen={() => selectRow(item)}
+                            />
+                          ))}
+                          <SectionHeaderRow
+                            ref={todaySectionRef}
+                            label={`오늘 · ${today}`}
+                            count={todayItems.length}
+                            tone="accent"
+                            colSpan={colSpan}
+                          />
+                          {todayItems.length === 0 ? (
+                            <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
+                              <td
+                                colSpan={colSpan}
+                                className="px-4 py-6 text-center text-sm text-[var(--muted)]"
+                              >
+                                오늘 방문인이 없습니다.
+                              </td>
+                            </tr>
+                          ) : (
+                            todayItems.map((item) => (
+                              <AllocationRow
+                                key={item.id}
+                                item={item}
+                                isToday
+                                hideStore
+                                counter
+                                selected={item.id === selectedAllocId}
+                                onOpen={() => selectRow(item)}
+                              />
+                            ))
+                          )}
+                          {futureItems.length > 0 && (
+                            <SectionHeaderRow
+                              label="오늘 이후"
+                              count={futureItems.length}
+                              tone="muted"
+                              colSpan={colSpan}
+                            />
+                          )}
+                          {futureItems.map((item) => (
+                            <AllocationRow
+                              key={item.id}
+                              item={item}
+                              isToday={false}
+                              hideStore
+                              selected={item.id === selectedAllocId}
+                              counter
+                              onOpen={() => selectRow(item)}
+                            />
+                          ))}
+                        </>
                       )}
-                      {futureItems.length > 0 && (
-                        <SectionHeaderRow
-                          label="오늘 이후"
-                          count={futureItems.length}
-                          tone="muted"
-                          colSpan={colSpan}
-                        />
-                      )}
-                      {futureItems.map((item) => (
-                        <AllocationRow
-                          key={item.id}
-                          item={item}
-                          isToday={false}
-                          hideStore
-                          selected={item.id === selectedAllocId}
-                          counter
-                          onOpen={() => selectRow(item)}
-                        />
-                      ))}
-                    </>
-                  )}
-                </tbody>
-              </table>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
-            <aside
-              className={`overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm ${
-                fillHeight ? "min-h-0" : "max-h-[min(70vh,calc(100vh-14rem))]"
-              }`}
-            >
-              {selectedItem ? (
-                <CounterDetailPanel
-                  item={selectedItem}
-                  related={relatedItems}
-                  today={today}
-                  onClose={() => setSelectedAllocId(null)}
-                  onSelectRelated={(id) => setSelectedAllocId(id)}
+            <div className="flex min-h-0 min-w-0 flex-col gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <label className="flex cursor-pointer items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink)]">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-[var(--accent)]"
+                    checked={hidePickedUp && !statsBucket}
+                    onChange={(e) => {
+                      setHidePickedUp(e.target.checked);
+                      if (statsBucket) setStatsBucket(null);
+                    }}
+                  />
+                  미수령만
+                </label>
+                {hasFilters ? (
+                  <button
+                    type="button"
+                    className="px-1 text-xs text-[var(--accent)] hover:underline"
+                    onClick={clearFilters}
+                  >
+                    초기화
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="flex shrink-0 items-stretch gap-2">
+                <input
+                  ref={searchInputRef}
+                  id="phar-unified-search"
+                  className="h-10 min-w-0 flex-1 basis-0 rounded-xl border border-[var(--line)] bg-white px-3.5 text-sm text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+                  type="search"
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  placeholder="이름 · @핸들 · 상품 검색"
+                  aria-label="이름, 핸들, 상품 검색"
+                  autoComplete="off"
                 />
-              ) : (
-                <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
-                  <p className="text-base font-medium text-[var(--ink)]">
-                    행을 선택하면 상세가 여기에 표시됩니다
-                  </p>
-                  <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
-                    검색 후 Enter · ↑/↓ 이동 · Esc 선택 해제
-                  </p>
-                </div>
-              )}
-            </aside>
+                <select
+                  className="h-10 w-32 shrink-0 appearance-none rounded-xl border border-[var(--line)] bg-white bg-[length:12px] bg-[right_10px_center] bg-no-repeat px-3 pr-8 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+                  style={{ backgroundImage: selectChevron }}
+                  value={status}
+                  onChange={(e) => {
+                    setStatus(e.target.value);
+                    if (e.target.value) {
+                      setStatsBucket(null);
+                      setHidePickedUp(true);
+                    }
+                  }}
+                  aria-label="상태 필터"
+                >
+                  <option value="">상태 전체</option>
+                  {statusOptions.map((value) => (
+                    <option key={value} value={value}>
+                      {ALLOCATION_STATUS_LABEL[value]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <aside
+                className={`min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm ${
+                  counterTall
+                    ? ""
+                    : "max-h-[min(70vh,calc(100vh-14rem))]"
+                }`}
+              >
+                {selectedItem ? (
+                  <CounterDetailPanel
+                    item={selectedItem}
+                    related={relatedItems}
+                    today={today}
+                    onClose={() => setSelectedAllocId(null)}
+                    onSelectRelated={(id) => setSelectedAllocId(id)}
+                  />
+                ) : (
+                  <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
+                    <p className="text-base font-medium text-[var(--ink)]">
+                      행을 선택하면 상세가 여기에 표시됩니다
+                    </p>
+                    <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
+                      검색 후 Enter · ↑/↓ 이동 · Esc 선택 해제
+                    </p>
+                  </div>
+                )}
+              </aside>
+            </div>
           </div>
         )}
       </div>

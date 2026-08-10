@@ -42,7 +42,10 @@ export type Allocation = {
   visit_code: string | null;
   /** 방문 예정일 (YYYY-MM-DD) */
   visit_date: string | null;
+  /** 첫 매장 방문 확인 시각 (한 번 찍히면 변경하지 않음) */
   verified_at: string | null;
+  /** 가장 최근 매장 방문 확인 시각 (재방문 시 갱신, 화면 표시용) */
+  last_visited_at: string | null;
   picked_up_at: string | null;
   created_at: string;
   updated_at: string;
@@ -80,24 +83,22 @@ function formatVisitCompleteLabel(ymd: string) {
 }
 
 /**
- * 운영 콘솔 상태 표시.
- * 방문했지만 아직 수령 전(visited/ready)이고, 실제 확인일(verified_at)이
- * 예정일(visit_date)과 다르면 "M월 D일 방문 완료"로 표시.
- * 수령 완료(picked_up)는 상태 라벨만 유지(과거 기록 보존).
+ * 운영 콘솔·약사 카운터 상태 표시.
+ * 방문했지만 아직 수령 전(visited/ready)이면 최근 방문일(last_visited_at,
+ * 없으면 verified_at) 기준으로 "M월 D일 방문 완료"로 표시.
+ * 첫 방문일(verified_at)은 이력으로 유지되며 덮어쓰지 않음.
  */
 export function allocationStatusDisplayLabel(
-  item: Pick<Allocation, "status" | "visit_date" | "verified_at">,
+  item: Pick<
+    Allocation,
+    "status" | "visit_date" | "verified_at" | "last_visited_at"
+  >,
 ) {
-  if (
-    (item.status === "visited" || item.status === "ready") &&
-    item.verified_at
-  ) {
-    const verifiedDay = ymdKst(item.verified_at);
-    const visitDay = item.visit_date
-      ? String(item.visit_date).slice(0, 10)
-      : "";
-    if (verifiedDay && visitDay && verifiedDay !== visitDay) {
-      return formatVisitCompleteLabel(verifiedDay);
+  if (item.status === "visited" || item.status === "ready") {
+    const stamp = item.last_visited_at || item.verified_at;
+    if (stamp) {
+      const day = ymdKst(stamp);
+      if (day) return formatVisitCompleteLabel(day);
     }
   }
   return ALLOCATION_STATUS_LABEL[item.status];

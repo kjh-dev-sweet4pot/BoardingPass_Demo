@@ -39,13 +39,11 @@ export function AdminConsoleLayout({
     : null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="shrink-0">
-        <Notice error={error} message={message} />
-      </div>
+    <div className="flex flex-col gap-6">
+      <Notice error={error} message={message} />
 
-      <div className="grid min-h-0 flex-1 gap-6 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)] lg:items-stretch">
-        <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto lg:max-h-full">
+      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
+        <aside className="flex flex-col gap-4">
           <AdminStoreOverview
             storeList={storeList}
             list={list}
@@ -156,7 +154,7 @@ export function AdminConsoleLayout({
           </section>
         </aside>
 
-        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+        <section className="flex min-h-[min(70vh,calc(100dvh-12rem))] min-w-0 flex-col lg:sticky lg:top-4 lg:h-[calc(100dvh-6.5rem)] lg:min-h-0">
           <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-2">
             <div>
               <h2
@@ -172,11 +170,13 @@ export function AdminConsoleLayout({
               </p>
             </div>
           </div>
-          <PharListWithModal
-            items={filteredList}
-            fillHeight
-            lockedStoreId={selectedStoreId || undefined}
-          />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <PharListWithModal
+              items={filteredList}
+              fillHeight
+              lockedStoreId={selectedStoreId || undefined}
+            />
+          </div>
         </section>
       </div>
     </div>

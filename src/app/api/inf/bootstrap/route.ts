@@ -38,7 +38,7 @@ export async function POST() {
       supabase
         .from("allocations")
         .select(
-          "id, influencer_id, product_id, store_id, quantity, status, visit_code, visit_date, verified_at, picked_up_at, created_at, updated_at, products(id, name, sku, description), stores(id, name, address)",
+          "id, influencer_id, product_id, store_id, quantity, status, visit_code, visit_date, verified_at, last_visited_at, picked_up_at, created_at, updated_at, products(id, name, sku, description), stores(id, name, address)",
         )
         .eq("influencer_id", influencerId)
         .order("created_at", { ascending: false }),
