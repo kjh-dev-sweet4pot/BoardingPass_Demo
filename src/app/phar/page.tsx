@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { signOut } from "@/app/actions/auth";
+import { PharHeaderActions } from "@/components/phar-header-actions";
 import { PharListWithModal } from "@/components/phar-list-with-modal";
-import { AppShell, Notice, secondaryBtnClass } from "@/components/ui";
+import { AppShell, Notice } from "@/components/ui";
 import { getStoreSessionId, clearStoreSession } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -61,14 +61,7 @@ export default async function PharPage({
       theme="owm"
       eyebrow="Phar"
       title={storeRow.name}
-      actions={
-        <form action={signOut}>
-          <input type="hidden" name="next" value="/phar/login" />
-          <button className={secondaryBtnClass} type="submit">
-            로그아웃
-          </button>
-        </form>
-      }
+      actions={<PharHeaderActions />}
     >
       <Notice error={params.error || error?.message} message={params.message} />
       <PharListWithModal

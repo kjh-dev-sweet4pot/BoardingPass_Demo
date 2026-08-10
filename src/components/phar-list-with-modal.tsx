@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { PHAR_COUNTER_ROOT_ID } from "@/components/phar-header-actions";
 import {
   ALLOCATION_STATUS_LABEL,
   allocationStatusDisplayLabel,
@@ -574,20 +575,6 @@ export function PharListWithModal({
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, [simpleFilters]);
 
-  async function toggleCounterFullscreen() {
-    const el = counterRootRef.current;
-    if (!el) return;
-    try {
-      if (document.fullscreenElement === el) {
-        await document.exitFullscreen();
-      } else {
-        await el.requestFullscreen();
-      }
-    } catch {
-      // 브라우저 정책·미지원 시 무시
-    }
-  }
-
   useEffect(() => {
     setLiveItems(items);
   }, [items]);
@@ -1079,414 +1066,423 @@ export function PharListWithModal({
 
   const colSpan = simpleFilters ? 5 : 7;
 
-  /* ── 지점 PC 카운터: 검색 + 좌목록 + 우상세 ── */
+  /* ── 지점 PC 카운터: 좌 Counter+목록 / 우 검색+상세 ── */
   if (simpleFilters) {
+    const counterTall = fillHeight || isFullscreen;
+    const counterGridClass =
+      "grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.8fr)]";
+
     return (
       <div
+        id={PHAR_COUNTER_ROOT_ID}
         ref={counterRootRef}
         className={`${
-          fillHeight || isFullscreen ? "flex min-h-0 flex-1 flex-col" : ""
+          counterTall ? "flex min-h-0 flex-1 flex-col" : ""
         } ${
           isFullscreen
             ? "h-dvh bg-[var(--background)] px-4 py-3 sm:px-6"
             : ""
         }`}
       >
-        <div className="mb-3 grid shrink-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-stretch">
-          <div className="rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/70 p-3 shadow-sm sm:p-3.5">
-            <div className="mb-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-              <div className="flex items-baseline gap-2">
-                <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
-                  Counter
-                </p>
-                <p className="text-base font-semibold tracking-wide text-[var(--ink)]">
-                  {statsPeriodLabel}
-                </p>
-              </div>
-              <div
-                className="flex rounded-full border border-[var(--line)] bg-white/90 p-0.5"
-                role="group"
-                aria-label="조회 기간"
-              >
-                {(
-                  [
-                    ["today", "오늘만"],
-                    ["month", "이번달"],
-                    ["all", "전체 날짜"],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={statsPeriod === value}
-                    onClick={() => onStatsPeriodChange(value)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                      statsPeriod === value
-                        ? "bg-[var(--accent)] text-white"
-                        : "text-[var(--muted)] hover:text-[var(--ink)]"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div
-              className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]"
-              role="group"
-              aria-label={statsPeriodLabel}
+        {isFullscreen ? (
+          <div className="mb-2 flex shrink-0 justify-end">
+            <button
+              type="button"
+              className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:bg-[var(--accent-soft)]"
+              onClick={() => void document.exitFullscreen().catch(() => {})}
             >
-              <div className="grid grid-cols-2 divide-x divide-y divide-[var(--line)] sm:grid-cols-4 sm:divide-y-0">
-                {(
-                  [
-                    {
-                      bucket: "total" as const,
-                      label:
-                        statsPeriod === "today"
-                          ? "오늘"
-                          : statsPeriod === "month"
-                            ? "이번달"
-                            : "전체",
-                      count: periodStats.total,
-                      hint: statsTotalHint,
-                      accent: true,
-                    },
-                    {
-                      bucket: "scheduled" as const,
-                      label: "방문예정",
-                      count: periodStats.scheduled,
-                      hint: "아직 미방문",
-                      accent: false,
-                    },
-                    {
-                      bucket: "visited" as const,
-                      label: "방문완료",
-                      count: periodStats.visited,
-                      hint: "매장 방문 완료",
-                      accent: false,
-                    },
-                    {
-                      bucket: "picked_up" as const,
-                      label: "반출완료",
-                      count: periodStats.pickedUp,
-                      hint: "수령 완료",
-                      accent: true,
-                    },
-                  ] as const
-                ).map((cell) => {
-                  const active = statsBucket === cell.bucket;
-                  return (
-                    <button
-                      key={cell.bucket}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => onStatsCellClick(cell.bucket)}
-                      className={`relative px-4 py-2.5 text-left transition sm:px-5 sm:py-3 ${
-                        cell.bucket === "total"
-                          ? "bg-[var(--accent-soft)]/55"
-                          : "bg-transparent"
-                      } ${
-                        active
-                          ? "bg-[var(--accent-soft)] ring-2 ring-inset ring-[var(--accent)]"
-                          : "hover:bg-[var(--accent-soft)]/40"
-                      }`}
-                    >
-                      {cell.bucket === "total" ? (
-                        <div className="absolute inset-y-2 left-0 w-1 rounded-full bg-[var(--accent)]" />
-                      ) : null}
-                      <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
-                        {cell.label}
-                      </p>
-                      <p className="mt-0.5 flex items-baseline gap-1">
-                        <span
-                          className={`text-3xl font-semibold tabular-nums tracking-tight ${
-                            cell.accent
-                              ? "text-[var(--accent)]"
-                              : "text-[var(--ink)]"
-                          }`}
-                        >
-                          {cell.count}
-                        </span>
-                        <span className="text-sm font-medium text-[var(--muted)]">
-                          건
-                        </span>
-                      </p>
-                      <p className="text-[11px] leading-tight text-[var(--muted)]">
-                        {active ? "클릭해서 필터 해제" : cell.hint}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+              전체화면 종료
+            </button>
           </div>
-
-          <div className="flex min-h-0 min-w-0 flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="flex cursor-pointer items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink)]">
-                <input
-                  type="checkbox"
-                  className="h-3.5 w-3.5 accent-[var(--accent)]"
-                  checked={hidePickedUp && !statsBucket}
-                  onChange={(e) => {
-                    setHidePickedUp(e.target.checked);
-                    if (statsBucket) setStatsBucket(null);
-                  }}
-                />
-                미수령만
-              </label>
-              <button
-                type="button"
-                aria-pressed={isFullscreen}
-                className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:bg-[var(--accent-soft)]"
-                onClick={() => void toggleCounterFullscreen()}
-              >
-                {isFullscreen ? "전체화면 종료" : "전체화면"}
-              </button>
-              {hasFilters ? (
-                <button
-                  type="button"
-                  className="px-1 text-xs text-[var(--accent)] hover:underline"
-                  onClick={clearFilters}
-                >
-                  초기화
-                </button>
-              ) : null}
-            </div>
-
-            <div className="flex items-stretch gap-2">
-              <input
-                ref={searchInputRef}
-                id="phar-unified-search"
-                className="h-10 min-w-0 flex-1 basis-0 rounded-xl border border-[var(--line)] bg-white px-3.5 text-sm text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
-                type="search"
-                value={searchQ}
-                onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="이름 · @핸들 · 상품 검색"
-                aria-label="이름, 핸들, 상품 검색"
-                autoComplete="off"
-              />
-              <select
-                className="h-10 w-32 shrink-0 appearance-none rounded-xl border border-[var(--line)] bg-white bg-[length:12px] bg-[right_10px_center] bg-no-repeat px-3 pr-8 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
-                style={{ backgroundImage: selectChevron }}
-                value={status}
-                onChange={(e) => {
-                  setStatus(e.target.value);
-                  if (e.target.value) {
-                    setStatsBucket(null);
-                    setHidePickedUp(true);
-                  }
-                }}
-                aria-label="상태 필터"
-              >
-                <option value="">상태 전체</option>
-                {statusOptions.map((value) => (
-                  <option key={value} value={value}>
-                    {ALLOCATION_STATUS_LABEL[value]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
+        ) : null}
 
         {liveItems.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
         ) : (
           <div
-            className={`grid min-h-0 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.95fr)] ${
-              fillHeight || isFullscreen ? "flex-1" : ""
-            }`}
+            className={`${counterGridClass} ${counterTall ? "flex-1" : ""}`}
           >
-            <div
-              className={`relative min-h-0 ${
-                fillHeight || isFullscreen
-                  ? "h-full min-h-0"
-                  : "max-h-[min(70vh,calc(100vh-14rem))]"
-              }`}
-            >
-              {statsPeriod !== "today" ? (
-                <button
-                  type="button"
-                  className="absolute right-14 top-6 z-20 -translate-y-1/2 rounded-full border border-[var(--line)] bg-white/95 px-3 py-1.5 text-xs font-medium text-[var(--accent)] shadow-sm backdrop-blur-sm hover:bg-[var(--accent-soft)]"
-                  onClick={scrollToTodaySection}
-                >
-                  오늘로 이동
-                </button>
-              ) : null}
-              <div
-                ref={listScrollRef}
-                className="h-full overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
-              >
-              <table className="w-full border-collapse text-left text-base">
-                <thead className="sticky top-0 z-10">
-                  <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-sm tracking-[0.08em] text-[var(--muted)] uppercase">
-                    <th className="px-4 py-3.5 font-medium">방문일</th>
-                    <th className="px-4 py-3.5 font-medium">계정</th>
-                    <th className="px-4 py-3.5 font-medium">상품</th>
-                    <th className="px-4 py-3.5 font-medium text-right">수량</th>
-                    <th className="px-4 py-3.5 font-medium">상태</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={colSpan}
-                        className="px-4 py-8 text-center text-sm text-[var(--muted)]"
+            <div className="flex min-h-0 min-w-0 flex-col gap-3">
+              <div className="shrink-0 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/70 p-3 shadow-sm sm:p-3.5">
+                <div className="mb-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
+                      Counter
+                    </p>
+                    <p className="text-base font-semibold tracking-wide text-[var(--ink)]">
+                      {statsPeriodLabel}
+                    </p>
+                  </div>
+                  <div
+                    className="flex rounded-full border border-[var(--line)] bg-white/90 p-0.5"
+                    role="group"
+                    aria-label="조회 기간"
+                  >
+                    {(
+                      [
+                        ["today", "오늘만"],
+                        ["month", "이번달"],
+                        ["all", "전체 날짜"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={statsPeriod === value}
+                        onClick={() => onStatsPeriodChange(value)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                          statsPeriod === value
+                            ? "bg-[var(--accent)] text-white"
+                            : "text-[var(--muted)] hover:text-[var(--ink)]"
+                        }`}
                       >
-                        조건에 맞는 배정이 없습니다.
-                      </td>
-                    </tr>
-                  ) : todayOnly && !isSearching ? (
-                    <>
-                      <SectionHeaderRow
-                        ref={todaySectionRef}
-                        label={`오늘 · ${today}`}
-                        count={todayItems.length}
-                        tone="accent"
-                        colSpan={colSpan}
-                      />
-                      {todayItems.length === 0 ? (
-                        <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
-                          <td
-                            colSpan={colSpan}
-                            className="px-4 py-6 text-center text-sm text-[var(--muted)]"
-                          >
-                            {hidePickedUp
-                              ? "오늘 미수령 방문이 없습니다."
-                              : "오늘 방문인이 없습니다."}
-                            <button
-                              type="button"
-                              className="mt-2 block w-full text-xs font-medium text-[var(--accent)] hover:underline"
-                              onClick={() => {
-                                if (hidePickedUp) setHidePickedUp(false);
-                                else onStatsPeriodChange("all");
-                              }}
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div
+                  className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]"
+                  role="group"
+                  aria-label={statsPeriodLabel}
+                >
+                  <div className="grid grid-cols-2 divide-x divide-y divide-[var(--line)] sm:grid-cols-4 sm:divide-y-0">
+                    {(
+                      [
+                        {
+                          bucket: "total" as const,
+                          label:
+                            statsPeriod === "today"
+                              ? "오늘"
+                              : statsPeriod === "month"
+                                ? "이번달"
+                                : "전체",
+                          count: periodStats.total,
+                          hint: statsTotalHint,
+                          accent: true,
+                        },
+                        {
+                          bucket: "scheduled" as const,
+                          label: "방문예정",
+                          count: periodStats.scheduled,
+                          hint: "아직 미방문",
+                          accent: false,
+                        },
+                        {
+                          bucket: "visited" as const,
+                          label: "방문완료",
+                          count: periodStats.visited,
+                          hint: "매장 방문 완료",
+                          accent: false,
+                        },
+                        {
+                          bucket: "picked_up" as const,
+                          label: "반출완료",
+                          count: periodStats.pickedUp,
+                          hint: "수령 완료",
+                          accent: true,
+                        },
+                      ] as const
+                    ).map((cell) => {
+                      const active = statsBucket === cell.bucket;
+                      return (
+                        <button
+                          key={cell.bucket}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => onStatsCellClick(cell.bucket)}
+                          className={`relative px-4 py-2.5 text-left transition sm:px-5 sm:py-3 ${
+                            cell.bucket === "total"
+                              ? "bg-[var(--accent-soft)]/55"
+                              : "bg-transparent"
+                          } ${
+                            active
+                              ? "bg-[var(--accent-soft)] ring-2 ring-inset ring-[var(--accent)]"
+                              : "hover:bg-[var(--accent-soft)]/40"
+                          }`}
+                        >
+                          {cell.bucket === "total" ? (
+                            <div className="absolute inset-y-2 left-0 w-1 rounded-full bg-[var(--accent)]" />
+                          ) : null}
+                          <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
+                            {cell.label}
+                          </p>
+                          <p className="mt-0.5 flex items-baseline gap-1">
+                            <span
+                              className={`text-3xl font-semibold tabular-nums tracking-tight ${
+                                cell.accent
+                                  ? "text-[var(--accent)]"
+                                  : "text-[var(--ink)]"
+                              }`}
                             >
-                              {hidePickedUp
-                                ? "완료 포함해 보기"
-                                : "전체 날짜 보기"}
-                            </button>
-                          </td>
-                        </tr>
-                      ) : (
-                        todayItems.map((item) => (
-                          <AllocationRow
-                            key={item.id}
-                            item={item}
-                            isToday
-                            hideStore
-                            counter
-                            selected={item.id === selectedAllocId}
-                            onOpen={() => selectRow(item)}
-                          />
-                        ))
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {pastItems.length > 0 && (
-                        <SectionHeaderRow
-                          label="오늘 이전"
-                          count={pastItems.length}
-                          tone="muted"
-                          colSpan={colSpan}
-                        />
-                      )}
-                      {pastItems.map((item) => (
-                        <AllocationRow
-                          key={item.id}
-                          item={item}
-                          isToday={false}
-                          hideStore
-                          selected={item.id === selectedAllocId}
-                          counter
-                          onOpen={() => selectRow(item)}
-                        />
-                      ))}
-                      <SectionHeaderRow
-                        ref={todaySectionRef}
-                        label={`오늘 · ${today}`}
-                        count={todayItems.length}
-                        tone="accent"
-                        colSpan={colSpan}
-                      />
-                      {todayItems.length === 0 ? (
-                        <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
+                              {cell.count}
+                            </span>
+                            <span className="text-sm font-medium text-[var(--muted)]">
+                              건
+                            </span>
+                          </p>
+                          <p className="text-[11px] leading-tight text-[var(--muted)]">
+                            {active ? "클릭해서 필터 해제" : cell.hint}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className={`relative min-h-0 ${
+                  counterTall
+                    ? "flex-1"
+                    : "max-h-[min(70vh,calc(100vh-14rem))]"
+                }`}
+              >
+                {statsPeriod !== "today" ? (
+                  <button
+                    type="button"
+                    className="absolute right-14 top-6 z-20 -translate-y-1/2 rounded-full border border-[var(--line)] bg-white/95 px-3 py-1.5 text-xs font-medium text-[var(--accent)] shadow-sm backdrop-blur-sm hover:bg-[var(--accent-soft)]"
+                    onClick={scrollToTodaySection}
+                  >
+                    오늘로 이동
+                  </button>
+                ) : null}
+                <div
+                  ref={listScrollRef}
+                  className="h-full overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
+                >
+                  <table className="w-full border-collapse text-left text-base">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-sm tracking-[0.08em] text-[var(--muted)] uppercase">
+                        <th className="px-4 py-3.5 font-medium">방문일</th>
+                        <th className="px-4 py-3.5 font-medium">계정</th>
+                        <th className="px-4 py-3.5 font-medium">상품</th>
+                        <th className="px-4 py-3.5 font-medium text-right">
+                          수량
+                        </th>
+                        <th className="px-4 py-3.5 font-medium">상태</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.length === 0 ? (
+                        <tr>
                           <td
                             colSpan={colSpan}
-                            className="px-4 py-6 text-center text-sm text-[var(--muted)]"
+                            className="px-4 py-8 text-center text-sm text-[var(--muted)]"
                           >
-                            오늘 방문인이 없습니다.
+                            조건에 맞는 배정이 없습니다.
                           </td>
                         </tr>
-                      ) : (
-                        todayItems.map((item) => (
-                          <AllocationRow
-                            key={item.id}
-                            item={item}
-                            isToday
-                            hideStore
-                            counter
-                            selected={item.id === selectedAllocId}
-                            onOpen={() => selectRow(item)}
+                      ) : todayOnly && !isSearching ? (
+                        <>
+                          <SectionHeaderRow
+                            ref={todaySectionRef}
+                            label={`오늘 · ${today}`}
+                            count={todayItems.length}
+                            tone="accent"
+                            colSpan={colSpan}
                           />
-                        ))
+                          {todayItems.length === 0 ? (
+                            <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
+                              <td
+                                colSpan={colSpan}
+                                className="px-4 py-6 text-center text-sm text-[var(--muted)]"
+                              >
+                                {hidePickedUp
+                                  ? "오늘 미수령 방문이 없습니다."
+                                  : "오늘 방문인이 없습니다."}
+                                <button
+                                  type="button"
+                                  className="mt-2 block w-full text-xs font-medium text-[var(--accent)] hover:underline"
+                                  onClick={() => {
+                                    if (hidePickedUp) setHidePickedUp(false);
+                                    else onStatsPeriodChange("all");
+                                  }}
+                                >
+                                  {hidePickedUp
+                                    ? "완료 포함해 보기"
+                                    : "전체 날짜 보기"}
+                                </button>
+                              </td>
+                            </tr>
+                          ) : (
+                            todayItems.map((item) => (
+                              <AllocationRow
+                                key={item.id}
+                                item={item}
+                                isToday
+                                hideStore
+                                counter
+                                selected={item.id === selectedAllocId}
+                                onOpen={() => selectRow(item)}
+                              />
+                            ))
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {pastItems.length > 0 && (
+                            <SectionHeaderRow
+                              label="오늘 이전"
+                              count={pastItems.length}
+                              tone="muted"
+                              colSpan={colSpan}
+                            />
+                          )}
+                          {pastItems.map((item) => (
+                            <AllocationRow
+                              key={item.id}
+                              item={item}
+                              isToday={false}
+                              hideStore
+                              selected={item.id === selectedAllocId}
+                              counter
+                              onOpen={() => selectRow(item)}
+                            />
+                          ))}
+                          <SectionHeaderRow
+                            ref={todaySectionRef}
+                            label={`오늘 · ${today}`}
+                            count={todayItems.length}
+                            tone="accent"
+                            colSpan={colSpan}
+                          />
+                          {todayItems.length === 0 ? (
+                            <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/20">
+                              <td
+                                colSpan={colSpan}
+                                className="px-4 py-6 text-center text-sm text-[var(--muted)]"
+                              >
+                                오늘 방문인이 없습니다.
+                              </td>
+                            </tr>
+                          ) : (
+                            todayItems.map((item) => (
+                              <AllocationRow
+                                key={item.id}
+                                item={item}
+                                isToday
+                                hideStore
+                                counter
+                                selected={item.id === selectedAllocId}
+                                onOpen={() => selectRow(item)}
+                              />
+                            ))
+                          )}
+                          {futureItems.length > 0 && (
+                            <SectionHeaderRow
+                              label="오늘 이후"
+                              count={futureItems.length}
+                              tone="muted"
+                              colSpan={colSpan}
+                            />
+                          )}
+                          {futureItems.map((item) => (
+                            <AllocationRow
+                              key={item.id}
+                              item={item}
+                              isToday={false}
+                              hideStore
+                              selected={item.id === selectedAllocId}
+                              counter
+                              onOpen={() => selectRow(item)}
+                            />
+                          ))}
+                        </>
                       )}
-                      {futureItems.length > 0 && (
-                        <SectionHeaderRow
-                          label="오늘 이후"
-                          count={futureItems.length}
-                          tone="muted"
-                          colSpan={colSpan}
-                        />
-                      )}
-                      {futureItems.map((item) => (
-                        <AllocationRow
-                          key={item.id}
-                          item={item}
-                          isToday={false}
-                          hideStore
-                          selected={item.id === selectedAllocId}
-                          counter
-                          onOpen={() => selectRow(item)}
-                        />
-                      ))}
-                    </>
-                  )}
-                </tbody>
-              </table>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
-            <aside
-              className={`overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm ${
-                fillHeight || isFullscreen
-                  ? "min-h-0"
-                  : "max-h-[min(70vh,calc(100vh-14rem))]"
-              }`}
-            >
-              {selectedItem ? (
-                <CounterDetailPanel
-                  item={selectedItem}
-                  related={relatedItems}
-                  today={today}
-                  onClose={() => setSelectedAllocId(null)}
-                  onSelectRelated={(id) => setSelectedAllocId(id)}
+            <div className="flex min-h-0 min-w-0 flex-col gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <label className="flex cursor-pointer items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink)]">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-[var(--accent)]"
+                    checked={hidePickedUp && !statsBucket}
+                    onChange={(e) => {
+                      setHidePickedUp(e.target.checked);
+                      if (statsBucket) setStatsBucket(null);
+                    }}
+                  />
+                  미수령만
+                </label>
+                {hasFilters ? (
+                  <button
+                    type="button"
+                    className="px-1 text-xs text-[var(--accent)] hover:underline"
+                    onClick={clearFilters}
+                  >
+                    초기화
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="flex shrink-0 items-stretch gap-2">
+                <input
+                  ref={searchInputRef}
+                  id="phar-unified-search"
+                  className="h-10 min-w-0 flex-1 basis-0 rounded-xl border border-[var(--line)] bg-white px-3.5 text-sm text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+                  type="search"
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  placeholder="이름 · @핸들 · 상품 검색"
+                  aria-label="이름, 핸들, 상품 검색"
+                  autoComplete="off"
                 />
-              ) : (
-                <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
-                  <p className="text-base font-medium text-[var(--ink)]">
-                    행을 선택하면 상세가 여기에 표시됩니다
-                  </p>
-                  <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
-                    검색 후 Enter · ↑/↓ 이동 · Esc 선택 해제
-                  </p>
-                </div>
-              )}
-            </aside>
+                <select
+                  className="h-10 w-32 shrink-0 appearance-none rounded-xl border border-[var(--line)] bg-white bg-[length:12px] bg-[right_10px_center] bg-no-repeat px-3 pr-8 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+                  style={{ backgroundImage: selectChevron }}
+                  value={status}
+                  onChange={(e) => {
+                    setStatus(e.target.value);
+                    if (e.target.value) {
+                      setStatsBucket(null);
+                      setHidePickedUp(true);
+                    }
+                  }}
+                  aria-label="상태 필터"
+                >
+                  <option value="">상태 전체</option>
+                  {statusOptions.map((value) => (
+                    <option key={value} value={value}>
+                      {ALLOCATION_STATUS_LABEL[value]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <aside
+                className={`min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm ${
+                  counterTall
+                    ? ""
+                    : "max-h-[min(70vh,calc(100vh-14rem))]"
+                }`}
+              >
+                {selectedItem ? (
+                  <CounterDetailPanel
+                    item={selectedItem}
+                    related={relatedItems}
+                    today={today}
+                    onClose={() => setSelectedAllocId(null)}
+                    onSelectRelated={(id) => setSelectedAllocId(id)}
+                  />
+                ) : (
+                  <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
+                    <p className="text-base font-medium text-[var(--ink)]">
+                      행을 선택하면 상세가 여기에 표시됩니다
+                    </p>
+                    <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
+                      검색 후 Enter · ↑/↓ 이동 · Esc 선택 해제
+                    </p>
+                  </div>
+                )}
+              </aside>
+            </div>
           </div>
         )}
       </div>
