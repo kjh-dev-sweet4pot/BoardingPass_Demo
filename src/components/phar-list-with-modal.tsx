@@ -552,7 +552,25 @@ export function PharListWithModal({
           allocations?: AllocationWithRelations[];
         };
         if (!cancelled && Array.isArray(data.allocations)) {
-          setLiveItems(data.allocations);
+          setLiveItems((prev) => {
+            // 내용이 같으면 참조 유지 → 스크롤/선택 상태 보존
+            if (
+              prev.length === data.allocations!.length &&
+              prev.every((row, i) => {
+                const next = data.allocations![i];
+                return (
+                  row.id === next.id &&
+                  row.status === next.status &&
+                  row.updated_at === next.updated_at &&
+                  row.picked_up_at === next.picked_up_at &&
+                  row.verified_at === next.verified_at
+                );
+              })
+            ) {
+              return prev;
+            }
+            return data.allocations!;
+          });
         }
       } catch {
         // 네트워크 오류 시 다음 주기에 재시도
@@ -679,6 +697,8 @@ export function PharListWithModal({
 
   const listScrollRef = useRef<HTMLDivElement>(null);
   const todaySectionRef = useRef<HTMLTableRowElement>(null);
+  /** 폴링 갱신마다 오늘로 튕기지 않도록, '전체 날짜' 진입 시 1회만 자동 스크롤 */
+  const didAutoScrollToTodayRef = useRef(false);
 
   function scrollToTodaySection() {
     const container = listScrollRef.current;
@@ -695,25 +715,26 @@ export function PharListWithModal({
   }
 
   useEffect(() => {
-    if (todayOnly) return;
+    if (todayOnly) {
+      didAutoScrollToTodayRef.current = false;
+      return;
+    }
+    if (didAutoScrollToTodayRef.current) return;
+    if (todayItems.length === 0) return;
+
     let cancelled = false;
     const frame = window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        if (!cancelled) scrollToTodaySection();
+        if (cancelled) return;
+        scrollToTodaySection();
+        didAutoScrollToTodayRef.current = true;
       });
     });
     return () => {
       cancelled = true;
       window.cancelAnimationFrame(frame);
     };
-  }, [
-    filtered,
-    today,
-    todayOnly,
-    todayItems.length,
-    pastItems.length,
-    futureItems.length,
-  ]);
+  }, [todayOnly, todayItems.length]);
 
   const hasFilters = simpleFilters
     ? Boolean(searchQ.trim()) || Boolean(status)
