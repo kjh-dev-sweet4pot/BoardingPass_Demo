@@ -29,6 +29,7 @@ export type InfMessages = {
   bootstrapFailed: string;
   handleRequired: string;
   handleNotFound: string;
+  nameAmbiguous: string;
   helloName: (name: string) => string;
   allocationListTitle: (name: string) => string;
   todayPickupCount: (n: number) => string;
@@ -117,7 +118,7 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     serverConfigError: "서버 설정 오류입니다. 잠시 후 다시 시도해 주세요.",
     sessionExpired: "세션이 만료되었습니다. 다시 로그인해 주세요.",
     listPreparing: "목록 준비 중…",
-    enterSnsId: "SNS 아이디를 입력해주세요",
+    enterSnsId: "SNS 아이디 또는 이름을 입력해주세요",
     snsPlatforms: "샤오홍슈 · 인스타그램 · 틱톡",
     confirm: "확인",
     confirming: "확인 중…",
@@ -130,8 +131,10 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     verifyFailed: "본인확인에 실패했습니다.",
     verifyError: "본인확인 중 오류가 발생했습니다.",
     bootstrapFailed: "배정 정보를 불러오지 못했습니다.",
-    handleRequired: "인스타그램 핸들을 입력하세요.",
-    handleNotFound: "등록된 SNS 아이디와 일치하지 않습니다.",
+    handleRequired: "SNS 아이디 또는 이름을 입력하세요.",
+    handleNotFound: "등록된 SNS 아이디 또는 이름과 일치하지 않습니다.",
+    nameAmbiguous:
+      "같은 이름이 여러 명 등록되어 있습니다. SNS 아이디로 로그인해 주세요.",
     helloName: (name) => `안녕하세요, ${name}님!`,
     allocationListTitle: (name) => `${name}님의 배정 목록`,
     todayPickupCount: (n) => `오늘 수령 가능한 상품이 ${n}건 있습니다`,
@@ -174,7 +177,7 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     serverConfigError: "Server configuration error. Please try again later.",
     sessionExpired: "Your session has expired. Please sign in again.",
     listPreparing: "Preparing list…",
-    enterSnsId: "Enter your SNS ID",
+    enterSnsId: "Enter your SNS ID or name",
     snsPlatforms: "Xiaohongshu · Instagram · TikTok",
     confirm: "Confirm",
     confirming: "Checking…",
@@ -187,8 +190,10 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     verifyFailed: "Verification failed.",
     verifyError: "An error occurred during verification.",
     bootstrapFailed: "Could not load your allocations.",
-    handleRequired: "Please enter your Instagram handle.",
-    handleNotFound: "This SNS ID is not registered.",
+    handleRequired: "Please enter your SNS ID or name.",
+    handleNotFound: "No matching SNS ID or name found.",
+    nameAmbiguous:
+      "Multiple people share this name. Please sign in with your SNS ID.",
     helloName: (name) => `Hello, ${name}!`,
     allocationListTitle: (name) => `${name}'s allocations`,
     todayPickupCount: (n) =>
@@ -249,7 +254,7 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
       "サーバー設定エラーです。しばらくしてから再度お試しください。",
     sessionExpired: "セッションの有効期限が切れました。再度ログインしてください。",
     listPreparing: "リストを準備中…",
-    enterSnsId: "SNS IDを入力してください",
+    enterSnsId: "SNS IDまたはお名前を入力してください",
     snsPlatforms: "小紅書 · Instagram · TikTok",
     confirm: "確認",
     confirming: "確認中…",
@@ -262,8 +267,10 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     verifyFailed: "本人確認に失敗しました。",
     verifyError: "本人確認中にエラーが発生しました。",
     bootstrapFailed: "割り当て情報を読み込めませんでした。",
-    handleRequired: "Instagramのハンドルを入力してください。",
-    handleNotFound: "登録されたSNS IDと一致しません。",
+    handleRequired: "SNS IDまたはお名前を入力してください。",
+    handleNotFound: "登録されたSNS IDまたは名前と一致しません。",
+    nameAmbiguous:
+      "同じ名前が複数登録されています。SNS IDでログインしてください。",
     helloName: (name) => `こんにちは、${name}様！`,
     allocationListTitle: (name) => `${name}様の割り当て一覧`,
     todayPickupCount: (n) => `本日受け取り可能な商品が${n}件あります`,
@@ -320,7 +327,7 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     serverConfigError: "服务器配置错误，请稍后再试。",
     sessionExpired: "登录已过期，请重新登录。",
     listPreparing: "正在准备列表…",
-    enterSnsId: "请输入您的 SNS 账号",
+    enterSnsId: "请输入 SNS 账号或姓名",
     snsPlatforms: "小红书 · Instagram · TikTok",
     confirm: "确认",
     confirming: "确认中…",
@@ -333,8 +340,9 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     verifyFailed: "身份验证失败。",
     verifyError: "身份验证时发生错误。",
     bootstrapFailed: "无法加载分配信息。",
-    handleRequired: "请输入 Instagram 账号。",
-    handleNotFound: "与已登记的 SNS 账号不符。",
+    handleRequired: "请输入 SNS 账号或姓名。",
+    handleNotFound: "与已登记的 SNS 账号或姓名不符。",
+    nameAmbiguous: "存在同名的多人，请使用 SNS 账号登录。",
     helloName: (name) => `您好，${name}！`,
     allocationListTitle: (name) => `${name} 的分配列表`,
     todayPickupCount: (n) => `今天有 ${n} 件商品可领取`,
@@ -399,7 +407,11 @@ export function translateInfApiError(
 
   const map: Record<string, string> = {
     "인스타그램 핸들을 입력하세요.": t.handleRequired,
+    "SNS 아이디 또는 이름을 입력하세요.": t.handleRequired,
     "등록된 SNS 아이디와 일치하지 않습니다.": t.handleNotFound,
+    "등록된 SNS 아이디 또는 이름과 일치하지 않습니다.": t.handleNotFound,
+    "같은 이름이 여러 명 등록되어 있습니다. SNS 아이디로 로그인해 주세요.":
+      t.nameAmbiguous,
     "본인확인에 실패했습니다.": t.verifyFailed,
     "본인확인 중 오류가 발생했습니다.": t.verifyError,
     "배정 정보를 불러오지 못했습니다.": t.bootstrapFailed,

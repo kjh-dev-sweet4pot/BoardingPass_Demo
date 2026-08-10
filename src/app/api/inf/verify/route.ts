@@ -1,27 +1,73 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { INF_COOKIE } from "@/lib/session";
 import { normalizeHandle } from "@/lib/auth";
 
-async function readHandle(request: Request) {
+const INF_SELECT =
+  "id, name, instagram_handle, instagram_handle_normalized, sns_url";
+
+async function readQuery(request: Request) {
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     const body = (await request.json().catch(() => null)) as {
       instagram_handle?: string;
+      query?: string;
+      name?: string;
     } | null;
-    return String(body?.instagram_handle || "").trim();
+    return String(
+      body?.instagram_handle || body?.query || body?.name || "",
+    ).trim();
   }
   const formData = await request.formData();
-  return String(formData.get("instagram_handle") || "").trim();
+  return String(
+    formData.get("instagram_handle") ||
+      formData.get("query") ||
+      formData.get("name") ||
+      "",
+  ).trim();
+}
+
+/** ilike 정확 일치용: % _ 이스케이프 */
+function escapeIlikeExact(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+async function findInfluencer(supabase: SupabaseClient, query: string) {
+  const normalized = normalizeHandle(query);
+
+  if (normalized) {
+    const { data, error } = await supabase
+      .from("influencers")
+      .select(INF_SELECT)
+      .eq("instagram_handle_normalized", normalized)
+      .maybeSingle();
+    if (error) return { error };
+    if (data?.id) return { influencer: data };
+  }
+
+  const nameKey = query.trim();
+  if (!nameKey) return { influencer: null };
+
+  const { data: byName, error: nameError } = await supabase
+    .from("influencers")
+    .select(INF_SELECT)
+    .ilike("name", escapeIlikeExact(nameKey))
+    .limit(2);
+
+  if (nameError) return { error: nameError };
+  if (!byName || byName.length === 0) return { influencer: null };
+  if (byName.length > 1) return { ambiguous: true as const };
+  return { influencer: byName[0] };
 }
 
 /**
  * 본인확인만 빠르게 수행 (influencers 조회 + 세션 쿠키).
+ * SNS 핸들 또는 등록된 이름으로 매칭.
  * pending → visited(오늘 예정만) / 미수령 재방문일 갱신은 /api/inf/bootstrap 에서 처리.
  */
 export async function POST(request: Request) {
-  const handle = await readHandle(request);
+  const query = await readQuery(request);
   const wantsJson =
     request.headers.get("accept")?.includes("application/json") ||
     (request.headers.get("content-type") || "").includes("application/json");
@@ -38,8 +84,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status });
   }
 
-  if (!handle) {
-    const msg = "인스타그램 핸들을 입력하세요.";
+  if (!query) {
+    const msg = "SNS 아이디 또는 이름을 입력하세요.";
     return wantsJson ? jsonError(msg) : redirectError(msg);
   }
 
@@ -51,20 +97,23 @@ export async function POST(request: Request) {
 
   try {
     const supabase = createClient(url, key);
-    const normalized = normalizeHandle(handle);
+    const result = await findInfluencer(supabase, query);
 
-    const { data: influencer, error } = await supabase
-      .from("influencers")
-      .select("id, name, instagram_handle, instagram_handle_normalized, sns_url")
-      .eq("instagram_handle_normalized", normalized)
-      .maybeSingle();
-
-    if (error) {
-      return wantsJson ? jsonError(error.message, 500) : redirectError(error.message);
+    if (result.error) {
+      return wantsJson
+        ? jsonError(result.error.message, 500)
+        : redirectError(result.error.message);
     }
 
+    if (result.ambiguous) {
+      const msg =
+        "같은 이름이 여러 명 등록되어 있습니다. SNS 아이디로 로그인해 주세요.";
+      return wantsJson ? jsonError(msg, 409) : redirectError(msg);
+    }
+
+    const influencer = result.influencer;
     if (!influencer?.id) {
-      const msg = "등록된 SNS 아이디와 일치하지 않습니다.";
+      const msg = "등록된 SNS 아이디 또는 이름과 일치하지 않습니다.";
       return wantsJson ? jsonError(msg, 404) : redirectError(msg);
     }
 

@@ -342,7 +342,7 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
             name="instagram_handle"
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
-            placeholder="@your_id"
+            placeholder="@id / name"
             required
             autoComplete="off"
             disabled={pending}
