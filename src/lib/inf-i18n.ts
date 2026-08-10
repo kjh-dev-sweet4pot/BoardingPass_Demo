@@ -64,25 +64,29 @@ export type InfMessages = {
   cancelledCannotPickup: string;
   pickupFailed: string;
   pickupError: string;
+  /** 시트 본문 라벨 (사용자 언어) */
+  sheet: InfSheetLabels;
   /** 약사님께 보이는 한국어 고정 라벨 (시트 본문) */
-  koSheet: {
-    product: string;
-    store: string;
-    visitDate: string;
-    dateUndecided: string;
-    influencer: string;
-    quantity: string;
-    quantityUnit: (n: number) => string;
-    visitCode: string;
-    pickupStatus: string;
-    pickupDone: string;
-    pickupWaiting: string;
-    pickupTime: string;
-    cancelled: string;
-  };
+  koSheet: InfSheetLabels;
 };
 
-const koSheet: InfMessages["koSheet"] = {
+export type InfSheetLabels = {
+  product: string;
+  store: string;
+  visitDate: string;
+  dateUndecided: string;
+  influencer: string;
+  quantity: string;
+  quantityUnit: (n: number) => string;
+  visitCode: string;
+  pickupStatus: string;
+  pickupDone: string;
+  pickupWaiting: string;
+  pickupTime: string;
+  cancelled: string;
+};
+
+const koSheet: InfSheetLabels = {
   product: "상품",
   store: "매장",
   visitDate: "방문 예정일",
@@ -97,6 +101,16 @@ const koSheet: InfMessages["koSheet"] = {
   pickupTime: "수령 시간",
   cancelled: "취소",
 };
+
+/** 사용자 언어 + 한국어 병기 (한국어 UI는 한국어만) */
+export function bilingualSheetText(
+  locale: InfLocale,
+  localized: string,
+  korean: string,
+): string {
+  if (locale === "ko" || localized === korean) return korean;
+  return `${localized} / ${korean}`;
+}
 
 export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
   ko: {
@@ -153,6 +167,7 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     cancelledCannotPickup: "취소된 배정은 수령 확인할 수 없습니다.",
     pickupFailed: "수령 확인 실패",
     pickupError: "수령 확인 중 오류가 발생했습니다.",
+    sheet: koSheet,
     koSheet,
   },
   en: {
@@ -212,6 +227,21 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     cancelledCannotPickup: "Cancelled allocations cannot be picked up.",
     pickupFailed: "Pickup confirmation failed",
     pickupError: "An error occurred while confirming pickup.",
+    sheet: {
+      product: "Product",
+      store: "Store",
+      visitDate: "Visit date",
+      dateUndecided: "Date TBD",
+      influencer: "Influencer",
+      quantity: "Qty",
+      quantityUnit: (n) => `${n}`,
+      visitCode: "Visit code",
+      pickupStatus: "Pickup status",
+      pickupDone: "Picked up",
+      pickupWaiting: "Waiting for pickup",
+      pickupTime: "Pickup time",
+      cancelled: "Cancelled",
+    },
     koSheet,
   },
   ja: {
@@ -269,6 +299,21 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     cancelledCannotPickup: "キャンセルされた割り当ては受け取れません。",
     pickupFailed: "受取確認に失敗しました",
     pickupError: "受取確認中にエラーが発生しました。",
+    sheet: {
+      product: "商品",
+      store: "店舗",
+      visitDate: "来店予定日",
+      dateUndecided: "日付未定",
+      influencer: "インフルエンサー",
+      quantity: "数量",
+      quantityUnit: (n) => `${n}個`,
+      visitCode: "来店コード",
+      pickupStatus: "受取状況",
+      pickupDone: "受取済",
+      pickupWaiting: "受取待ち",
+      pickupTime: "受取時間",
+      cancelled: "キャンセル",
+    },
     koSheet,
   },
   zh: {
@@ -325,6 +370,21 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     cancelledCannotPickup: "已取消的分配无法领取。",
     pickupFailed: "领取确认失败",
     pickupError: "领取确认时发生错误。",
+    sheet: {
+      product: "商品",
+      store: "门店",
+      visitDate: "到访日期",
+      dateUndecided: "日期待定",
+      influencer: "达人",
+      quantity: "数量",
+      quantityUnit: (n) => `${n}个`,
+      visitCode: "到访码",
+      pickupStatus: "领取状态",
+      pickupDone: "已领取",
+      pickupWaiting: "待领取",
+      pickupTime: "领取时间",
+      cancelled: "已取消",
+    },
     koSheet,
   },
 };

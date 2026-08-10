@@ -10,10 +10,12 @@ import {
 import { createPortal } from "react-dom";
 import { useInfLocale } from "@/components/inf-locale-provider";
 import {
+  bilingualSheetText,
   formatVisitDateKo,
   formatVisitDateLocalized,
   formatVisitDayOfWeekKo,
   formatVisitWeekdayLocalized,
+  INF_MESSAGES,
   translateInfApiError,
   type InfMessages,
 } from "@/lib/inf-i18n";
@@ -764,51 +766,80 @@ function PickupSheetBody({
   onConfirm: () => void;
   onClearError: () => void;
 }) {
-  const { t } = useInfLocale();
+  const { t, locale } = useInfLocale();
   const requestClose = useSheetClose();
+  const sheet = t.sheet;
   const ko = t.koSheet;
+  const bl = (local: string, korean: string) =>
+    bilingualSheetText(locale, local, korean);
   const title =
     step === "confirm" ? t.pickupConfirmTitle : t.pickupReviewTitle;
   const visitYmd = selected.visit_date
     ? String(selected.visit_date).slice(0, 10)
     : null;
 
+  const visitDateLocal = visitYmd
+    ? formatVisitDateLocalized(visitYmd, locale, sheet.dateUndecided)
+    : sheet.dateUndecided;
+  const visitWeekLocal = visitYmd
+    ? formatVisitWeekdayLocalized(visitYmd, locale)
+    : "";
+  const visitDateKo = visitYmd
+    ? formatVisitDateKo(visitYmd)
+    : ko.dateUndecided;
+  const visitWeekKo = visitYmd ? formatVisitDayOfWeekKo(visitYmd) : "";
+
+  const statusLocal = alreadyPickedUp
+    ? sheet.pickupDone
+    : cancelled
+      ? sheet.cancelled
+      : sheet.pickupWaiting;
+  const statusKo = alreadyPickedUp
+    ? ko.pickupDone
+    : cancelled
+      ? ko.cancelled
+      : ko.pickupWaiting;
+
   return (
       <div className="inf-sheet-content flex h-full min-h-0 flex-1 flex-col gap-[clamp(0.5rem,1.6vh,1.25rem)] overflow-hidden">
-        <div className="shrink-0">
-          <p className="[font-size:clamp(0.65rem,1.4vh,0.75rem)] font-medium tracking-widest text-[#6B3B1F] uppercase">
-            {step === "confirm" ? "Confirm" : "Review"}
-          </p>
-          <h3 className="mt-[clamp(0.15rem,0.6vh,0.35rem)] [font-size:clamp(1.05rem,2.8vh,1.25rem)] font-bold text-[#1a1a2e]">
-            {title}
-          </h3>
-          <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(0.75rem,1.8vh,0.875rem)] text-[#999]">
-            {step === "confirm" ? t.pickupConfirmHint : t.pickupReviewHint}
-          </p>
-        </div>
+        <div className="flex shrink-0 items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="[font-size:clamp(0.65rem,1.4vh,0.75rem)] font-medium tracking-widest text-[#6B3B1F] uppercase">
+              {step === "confirm" ? "Confirm" : "Review"}
+            </p>
+            <h3 className="mt-[clamp(0.15rem,0.6vh,0.35rem)] [font-size:clamp(1.05rem,2.8vh,1.25rem)] font-bold text-[#1a1a2e]">
+              {title}
+            </h3>
+            <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(0.75rem,1.8vh,0.875rem)] text-[#999]">
+              {step === "confirm" ? t.pickupConfirmHint : t.pickupReviewHint}
+            </p>
+          </div>
 
-        {/* 약사님 안내 — 사용자 언어 */}
-        <div className="shrink-0 rounded-2xl border border-[#6B3B1F]/25 bg-[#F5EDE3] px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] text-center">
-          <p className="[font-size:clamp(0.8rem,2vh,0.875rem)] font-bold tracking-wide text-[#6B3B1F]">
-            {t.showToPharmacist}
-          </p>
-          <p className="mt-0.5 [font-size:clamp(0.625rem,1.4vh,0.7rem)] text-[#8a6a4a]">
-            약사님께 보여주세요
-          </p>
+          {/* 약사님 안내 — Pickup info 오른쪽 */}
+          <div className="w-[min(42%,11.5rem)] shrink-0 rounded-2xl border border-[#6B3B1F]/25 bg-[#F5EDE3] px-2.5 py-[clamp(0.45rem,1.2vh,0.7rem)] text-center">
+            <p className="[font-size:clamp(0.7rem,1.7vh,0.8rem)] font-bold leading-snug tracking-wide text-[#6B3B1F]">
+              {t.showToPharmacist}
+            </p>
+            {locale !== "ko" ? (
+              <p className="mt-0.5 [font-size:clamp(0.6rem,1.3vh,0.68rem)] leading-snug text-[#8a6a4a]">
+                약사님께 보여주세요
+              </p>
+            ) : null}
+          </div>
         </div>
 
         {/* 약사용 본문 — 공간 부족 시 이 박스만 줄어듦 (스크롤 없음) */}
-        <div className="flex min-h-0 flex-1 flex-col justify-evenly gap-[clamp(0.35rem,1.5vh,1.25rem)] overflow-hidden rounded-2xl bg-[#f9f9f9] px-5 py-[clamp(0.75rem,2vh,1.5rem)]">
-          <div className="flex min-h-0 flex-col justify-evenly gap-[clamp(0.35rem,1.4vh,1.25rem)] text-center">
-            <div className="min-h-0 shrink">
-              <p className="[font-size:clamp(0.625rem,1.3vh,0.7rem)] font-medium tracking-wide text-[#aaa]">
-                {ko.product}
+        <div className="flex min-h-0 flex-1 flex-col justify-evenly gap-[clamp(0.4rem,1.5vh,1.25rem)] overflow-hidden rounded-2xl bg-[#f9f9f9] px-5 py-[clamp(0.75rem,2vh,1.5rem)]">
+          <div className="flex min-h-0 flex-col justify-evenly gap-[clamp(0.4rem,1.5vh,1.25rem)] text-center">
+            <div className="min-h-0 shrink-0 grow basis-[38%]">
+              <p className="[font-size:clamp(0.75rem,1.7vh,0.85rem)] font-medium tracking-wide text-[#aaa]">
+                {bl(sheet.product, ko.product)}
               </p>
-              <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1.1rem,3.2vh,1.5rem)] font-bold leading-snug text-[#1a1a2e]">
-                {selected.products?.name || ko.product}
+              <p className="mt-[clamp(0.25rem,0.7vh,0.45rem)] [font-size:clamp(1.45rem,4.2vh,2rem)] font-bold leading-snug text-[#1a1a2e]">
+                {selected.products?.name || bl(sheet.product, ko.product)}
               </p>
               {selected.products?.description ? (
-                <p className="mt-[clamp(0.1rem,0.4vh,0.25rem)] line-clamp-2 [font-size:clamp(0.7rem,1.6vh,0.875rem)] text-[#999]">
+                <p className="mt-[clamp(0.2rem,0.5vh,0.35rem)] line-clamp-3 [font-size:clamp(0.85rem,2vh,1.05rem)] leading-snug text-[#777]">
                   {selected.products.description}
                 </p>
               ) : null}
@@ -817,43 +848,65 @@ function PickupSheetBody({
             <div className="mx-auto h-px w-12 shrink-0 bg-[#e8e8e8]" />
 
             <div className="min-h-0 shrink">
-              <p className="[font-size:clamp(0.625rem,1.3vh,0.7rem)] font-medium tracking-wide text-[#aaa]">
-                {ko.store}
+              <p className="[font-size:clamp(0.72rem,1.5vh,0.8rem)] font-medium tracking-wide text-[#aaa]">
+                {bl(sheet.store, ko.store)}
               </p>
-              <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1rem,2.8vh,1.25rem)] font-bold text-[#1a1a2e]">
-                {formatStoreName(selected.stores, ko.store)}
+              <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold text-[#1a1a2e]">
+                {formatStoreName(selected.stores, bl(sheet.store, ko.store))}
               </p>
             </div>
 
             <div className="min-h-0 shrink">
-              <p className="[font-size:clamp(0.625rem,1.3vh,0.7rem)] font-medium tracking-wide text-[#aaa]">
-                {ko.visitDate}
+              <p className="[font-size:clamp(0.72rem,1.5vh,0.8rem)] font-medium tracking-wide text-[#aaa]">
+                {bl(sheet.visitDate, ko.visitDate)}
               </p>
-              <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1rem,2.8vh,1.25rem)] font-bold tabular-nums text-[#6B3B1F]">
-                {visitYmd ? formatVisitDateKo(visitYmd) : ko.dateUndecided}
-                {visitYmd ? (
-                  <span className="ml-1.5 [font-size:clamp(0.75rem,2vh,1rem)] font-semibold text-[#999]">
-                    ({formatVisitDayOfWeekKo(visitYmd)}요일)
-                  </span>
-                ) : null}
-              </p>
+              {locale === "ko" ? (
+                <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold tabular-nums text-[#6B3B1F]">
+                  {visitDateKo}
+                  {visitWeekKo ? (
+                    <span className="ml-1.5 [font-size:clamp(0.85rem,2.2vh,1.05rem)] font-semibold text-[#999]">
+                      ({visitWeekKo}요일)
+                    </span>
+                  ) : null}
+                </p>
+              ) : (
+                <div className="mt-[clamp(0.15rem,0.5vh,0.35rem)] space-y-0.5">
+                  <p className="[font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold tabular-nums text-[#6B3B1F]">
+                    {visitDateLocal}
+                    {visitWeekLocal ? (
+                      <span className="ml-1.5 [font-size:clamp(0.85rem,2.2vh,1.05rem)] font-semibold text-[#999]">
+                        ({visitWeekLocal})
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="[font-size:clamp(0.85rem,2vh,1rem)] font-semibold tabular-nums text-[#8a6a4a]">
+                    {visitDateKo}
+                    {visitWeekKo ? ` (${visitWeekKo}요일)` : ""}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="shrink-0 space-y-[clamp(0.2rem,0.8vh,0.5rem)] border-t border-[#eee] pt-[clamp(0.5rem,1.4vh,1rem)] text-left">
-            <InfoRow label={ko.influencer}>
+          <div className="shrink-0 space-y-[clamp(0.25rem,0.9vh,0.55rem)] border-t border-[#eee] pt-[clamp(0.5rem,1.4vh,1rem)] text-left">
+            <InfoRow label={bl(sheet.influencer, ko.influencer)}>
               {influencer.name}{" "}
               <span className="text-[#6B3B1F]">
                 {formatIgHandle(influencer)}
               </span>
             </InfoRow>
-            <InfoRow label={ko.quantity}>
-              {ko.quantityUnit(selected.quantity)}
+            <InfoRow label={bl(sheet.quantity, ko.quantity)}>
+              {bl(
+                sheet.quantityUnit(selected.quantity),
+                ko.quantityUnit(selected.quantity),
+              )}
             </InfoRow>
             {selected.visit_code ? (
-              <InfoRow label={ko.visitCode}>{selected.visit_code}</InfoRow>
+              <InfoRow label={bl(sheet.visitCode, ko.visitCode)}>
+                {selected.visit_code}
+              </InfoRow>
             ) : null}
-            <InfoRow label={ko.pickupStatus}>
+            <InfoRow label={bl(sheet.pickupStatus, ko.pickupStatus)}>
               <span
                 className={
                   alreadyPickedUp
@@ -863,15 +916,11 @@ function PickupSheetBody({
                       : "text-[#6B3B1F]"
                 }
               >
-                {alreadyPickedUp
-                  ? ko.pickupDone
-                  : cancelled
-                    ? ko.cancelled
-                    : ko.pickupWaiting}
+                {bl(statusLocal, statusKo)}
               </span>
             </InfoRow>
             {selected.picked_up_at ? (
-              <InfoRow label={ko.pickupTime}>
+              <InfoRow label={bl(sheet.pickupTime, ko.pickupTime)}>
                 {formatKst(selected.picked_up_at)}
               </InfoRow>
             ) : null}
@@ -908,15 +957,15 @@ function PickupSheetBody({
               <button
                 type="button"
                 onClick={() => onStep("confirm")}
-                className="flex-1 rounded-2xl bg-[#6B3B1F] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-white"
+                className="flex-1 rounded-2xl bg-[#6B3B1F] py-[clamp(0.65rem,1.8vh,0.9rem)] text-sm font-semibold leading-snug text-white"
               >
-                {t.pickupConfirmBtn}
+                {bl(t.pickupConfirmBtn, INF_MESSAGES.ko.pickupConfirmBtn)}
               </button>
             </div>
           ) : (
             <div className="space-y-2">
-              <p className="rounded-2xl bg-[#F5EDE3] px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] text-center text-sm text-[#6B3B1F]">
-                {t.pickupIrreversible}
+              <p className="rounded-2xl bg-[#F5EDE3] px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] text-center text-sm leading-snug text-[#6B3B1F]">
+                {bl(t.pickupIrreversible, INF_MESSAGES.ko.pickupIrreversible)}
               </p>
               <div className="flex gap-3">
                 <button
@@ -934,9 +983,14 @@ function PickupSheetBody({
                   type="button"
                   disabled={confirming}
                   onClick={onConfirm}
-                  className="flex-1 rounded-2xl bg-[#6B3B1F] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-white disabled:opacity-50"
+                  className="flex-1 rounded-2xl bg-[#6B3B1F] py-[clamp(0.65rem,1.8vh,0.9rem)] text-sm font-semibold leading-snug text-white disabled:opacity-50"
                 >
-                  {confirming ? t.confirming : t.finalPickupConfirm}
+                  {confirming
+                    ? bl(t.confirming, INF_MESSAGES.ko.confirming)
+                    : bl(
+                        t.finalPickupConfirm,
+                        INF_MESSAGES.ko.finalPickupConfirm,
+                      )}
                 </button>
               </div>
             </div>
@@ -955,9 +1009,13 @@ function InfoRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-baseline gap-2">
-      <dt className="w-20 shrink-0 text-xs text-[#aaa]">{label}</dt>
-      <dd className="text-sm text-[#1a1a2e]">{children}</dd>
+    <div className="flex items-baseline gap-2.5">
+      <dt className="w-[min(42%,9.5rem)] shrink-0 [font-size:clamp(0.72rem,1.55vh,0.82rem)] leading-snug text-[#aaa]">
+        {label}
+      </dt>
+      <dd className="min-w-0 flex-1 [font-size:clamp(0.95rem,2.1vh,1.1rem)] leading-snug text-[#1a1a2e]">
+        {children}
+      </dd>
     </div>
   );
 }
