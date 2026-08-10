@@ -553,6 +553,10 @@ export function PharListWithModal({
   const [statsPeriod, setStatsPeriod] = useState<"today" | "month" | "all">(
     "today",
   );
+  /** 현황 카드 클릭 필터: 합계 / 방문예정 / 방문완료 / 반출완료 */
+  const [statsBucket, setStatsBucket] = useState<
+    "total" | "scheduled" | "visited" | "picked_up" | null
+  >(null);
   /** 카운터 영역만 브라우저 전체화면 (AppShell 헤더 제외) */
   const [isFullscreen, setIsFullscreen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -681,6 +685,9 @@ export function PharListWithModal({
     );
   }, [liveItems]);
 
+  const today = todayYmdKst();
+  const monthKey = today.slice(0, 7); // YYYY-MM
+
   const filtered = useMemo(() => {
     const next = liveItems.filter((item) => {
       if (storeFilterId && item.store_id !== storeFilterId) return false;
@@ -688,6 +695,28 @@ export function PharListWithModal({
 
       if (simpleFilters) {
         if (!matchesUnifiedSearch(item, deferredSearchQ)) return false;
+
+        const d = visitDateKey(item);
+        if (statsPeriod === "today") {
+          if (d !== today) return false;
+        } else if (statsPeriod === "month") {
+          if (!d || !d.startsWith(monthKey)) return false;
+        }
+
+        if (statsBucket) {
+          if (item.status === "cancelled") return false;
+          if (statsBucket === "scheduled") {
+            if (item.status === "picked_up" || item.status === "visited") {
+              return false;
+            }
+          } else if (statsBucket === "visited") {
+            if (item.status !== "visited") return false;
+          } else if (statsBucket === "picked_up") {
+            if (item.status !== "picked_up") return false;
+          }
+          return true;
+        }
+
         if (hidePickedUp && item.status === "picked_up") return false;
         return true;
       }
@@ -711,10 +740,12 @@ export function PharListWithModal({
     visitDate,
     status,
     hidePickedUp,
+    statsBucket,
+    statsPeriod,
+    today,
+    monthKey,
   ]);
 
-  const today = todayYmdKst();
-  const monthKey = today.slice(0, 7); // YYYY-MM
   const isSearching = Boolean(deferredSearchQ);
 
   const periodStats = useMemo(() => {
@@ -809,7 +840,7 @@ export function PharListWithModal({
   }, [todayOnly, todayItems.length]);
 
   const hasFilters = simpleFilters
-    ? Boolean(searchQ.trim()) || Boolean(status)
+    ? Boolean(searchQ.trim()) || Boolean(status) || Boolean(statsBucket)
     : Boolean(influencerQ.trim()) ||
       Boolean(productQ.trim()) ||
       (!lockedStoreId && Boolean(storeId)) ||
@@ -1007,7 +1038,35 @@ export function PharListWithModal({
     setQuantity("");
     setVisitDate("");
     setStatus("");
+    setStatsBucket(null);
     if (simpleFilters) setHidePickedUp(true);
+  }
+
+  function syncListDateToStatsPeriod(period: "today" | "month" | "all") {
+    if (period === "today") {
+      setTodayOnly(true);
+      setVisitDate("");
+    } else {
+      setTodayOnly(false);
+    }
+  }
+
+  function onStatsPeriodChange(period: "today" | "month" | "all") {
+    setStatsPeriod(period);
+    syncListDateToStatsPeriod(period);
+  }
+
+  function onStatsCellClick(
+    bucket: "total" | "scheduled" | "visited" | "picked_up",
+  ) {
+    if (statsBucket === bucket) {
+      setStatsBucket(null);
+      setHidePickedUp(true);
+      return;
+    }
+    setStatsBucket(bucket);
+    setStatus("");
+    syncListDateToStatsPeriod(statsPeriod);
   }
 
   function selectRow(item: AllocationWithRelations) {
@@ -1033,9 +1092,9 @@ export function PharListWithModal({
             : ""
         }`}
       >
-        <div className="mb-3 shrink-0 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="mb-3 grid shrink-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-stretch">
+          <div className="rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/70 p-3 shadow-sm sm:p-3.5">
+            <div className="mb-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
               <div className="flex items-baseline gap-2">
                 <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
                   Counter
@@ -1045,22 +1104,22 @@ export function PharListWithModal({
                 </p>
               </div>
               <div
-                className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
+                className="flex rounded-full border border-[var(--line)] bg-white/90 p-0.5"
                 role="group"
-                aria-label="현황 기간"
+                aria-label="조회 기간"
               >
                 {(
                   [
-                    ["today", "오늘"],
+                    ["today", "오늘만"],
                     ["month", "이번달"],
-                    ["all", "전체"],
+                    ["all", "전체 날짜"],
                   ] as const
                 ).map(([value, label]) => (
                   <button
                     key={value}
                     type="button"
                     aria-pressed={statsPeriod === value}
-                    onClick={() => setStatsPeriod(value)}
+                    onClick={() => onStatsPeriodChange(value)}
                     className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                       statsPeriod === value
                         ? "bg-[var(--accent)] text-white"
@@ -1072,58 +1131,111 @@ export function PharListWithModal({
                 ))}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div
-                className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
-                role="group"
-                aria-label="목록 범위"
-              >
-                <button
-                  type="button"
-                  aria-pressed={todayOnly}
-                  onClick={() => {
-                    setTodayOnly(true);
-                    setVisitDate("");
-                  }}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    todayOnly
-                      ? "bg-[var(--accent)] text-white"
-                      : "text-[var(--muted)] hover:text-[var(--ink)]"
-                  }`}
-                >
-                  오늘만
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={!todayOnly}
-                  onClick={() => setTodayOnly(false)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    !todayOnly
-                      ? "bg-[var(--accent)] text-white"
-                      : "text-[var(--muted)] hover:text-[var(--ink)]"
-                  }`}
-                >
-                  전체 날짜
-                </button>
+
+            <div
+              className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]"
+              role="group"
+              aria-label={statsPeriodLabel}
+            >
+              <div className="grid grid-cols-2 divide-x divide-y divide-[var(--line)] sm:grid-cols-4 sm:divide-y-0">
+                {(
+                  [
+                    {
+                      bucket: "total" as const,
+                      label:
+                        statsPeriod === "today"
+                          ? "오늘"
+                          : statsPeriod === "month"
+                            ? "이번달"
+                            : "전체",
+                      count: periodStats.total,
+                      hint: statsTotalHint,
+                      accent: true,
+                    },
+                    {
+                      bucket: "scheduled" as const,
+                      label: "방문예정",
+                      count: periodStats.scheduled,
+                      hint: "아직 미방문",
+                      accent: false,
+                    },
+                    {
+                      bucket: "visited" as const,
+                      label: "방문완료",
+                      count: periodStats.visited,
+                      hint: "매장 방문 완료",
+                      accent: false,
+                    },
+                    {
+                      bucket: "picked_up" as const,
+                      label: "반출완료",
+                      count: periodStats.pickedUp,
+                      hint: "수령 완료",
+                      accent: true,
+                    },
+                  ] as const
+                ).map((cell) => {
+                  const active = statsBucket === cell.bucket;
+                  return (
+                    <button
+                      key={cell.bucket}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => onStatsCellClick(cell.bucket)}
+                      className={`relative px-4 py-2.5 text-left transition sm:px-5 sm:py-3 ${
+                        cell.bucket === "total"
+                          ? "bg-[var(--accent-soft)]/55"
+                          : "bg-transparent"
+                      } ${
+                        active
+                          ? "bg-[var(--accent-soft)] ring-2 ring-inset ring-[var(--accent)]"
+                          : "hover:bg-[var(--accent-soft)]/40"
+                      }`}
+                    >
+                      {cell.bucket === "total" ? (
+                        <div className="absolute inset-y-2 left-0 w-1 rounded-full bg-[var(--accent)]" />
+                      ) : null}
+                      <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
+                        {cell.label}
+                      </p>
+                      <p className="mt-0.5 flex items-baseline gap-1">
+                        <span
+                          className={`text-3xl font-semibold tabular-nums tracking-tight ${
+                            cell.accent
+                              ? "text-[var(--accent)]"
+                              : "text-[var(--ink)]"
+                          }`}
+                        >
+                          {cell.count}
+                        </span>
+                        <span className="text-sm font-medium text-[var(--muted)]">
+                          건
+                        </span>
+                      </p>
+                      <p className="text-[11px] leading-tight text-[var(--muted)]">
+                        {active ? "클릭해서 필터 해제" : cell.hint}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
+          </div>
+
+          <div className="flex min-h-0 min-w-0 flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <label className="flex cursor-pointer items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink)]">
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5 accent-[var(--accent)]"
-                  checked={hidePickedUp}
-                  onChange={(e) => setHidePickedUp(e.target.checked)}
+                  checked={hidePickedUp && !statsBucket}
+                  onChange={(e) => {
+                    setHidePickedUp(e.target.checked);
+                    if (statsBucket) setStatsBucket(null);
+                  }}
                 />
                 미수령만
               </label>
-              {!todayOnly ? (
-                <button
-                  type="button"
-                  className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
-                  onClick={scrollToTodaySection}
-                >
-                  오늘로 이동
-                </button>
-              ) : null}
               <button
                 type="button"
                 aria-pressed={isFullscreen}
@@ -1132,126 +1244,51 @@ export function PharListWithModal({
               >
                 {isFullscreen ? "전체화면 종료" : "전체화면"}
               </button>
+              {hasFilters ? (
+                <button
+                  type="button"
+                  className="px-1 text-xs text-[var(--accent)] hover:underline"
+                  onClick={clearFilters}
+                >
+                  초기화
+                </button>
+              ) : null}
+            </div>
+
+            <div className="flex items-stretch gap-2">
+              <input
+                ref={searchInputRef}
+                id="phar-unified-search"
+                className="h-10 min-w-0 flex-1 basis-0 rounded-xl border border-[var(--line)] bg-white px-3.5 text-sm text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+                type="search"
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder="이름 · @핸들 · 상품 검색"
+                aria-label="이름, 핸들, 상품 검색"
+                autoComplete="off"
+              />
+              <select
+                className="h-10 w-32 shrink-0 appearance-none rounded-xl border border-[var(--line)] bg-white bg-[length:12px] bg-[right_10px_center] bg-no-repeat px-3 pr-8 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+                style={{ backgroundImage: selectChevron }}
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  if (e.target.value) {
+                    setStatsBucket(null);
+                    setHidePickedUp(true);
+                  }
+                }}
+                aria-label="상태 필터"
+              >
+                <option value="">상태 전체</option>
+                {statusOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {ALLOCATION_STATUS_LABEL[value]}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-
-          <div
-            className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
-            role="group"
-            aria-label={statsPeriodLabel}
-          >
-            <div className="grid grid-cols-2 divide-x divide-y divide-[var(--line)] sm:grid-cols-4 sm:divide-y-0">
-              <div className="relative bg-[var(--accent-soft)]/55 px-4 py-2.5 sm:px-5 sm:py-3">
-                <div className="absolute inset-y-2 left-0 w-1 rounded-full bg-[var(--accent)]" />
-                <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
-                  {statsPeriod === "today"
-                    ? "오늘"
-                    : statsPeriod === "month"
-                      ? "이번달"
-                      : "전체"}
-                </p>
-                <p className="mt-0.5 flex items-baseline gap-1">
-                  <span className="text-3xl font-semibold tabular-nums tracking-tight text-[var(--accent)]">
-                    {periodStats.total}
-                  </span>
-                  <span className="text-sm font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="text-[11px] leading-tight text-[var(--muted)]">
-                  {statsTotalHint}
-                </p>
-              </div>
-
-              <div className="px-4 py-2.5 sm:px-5 sm:py-3">
-                <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
-                  방문예정
-                </p>
-                <p className="mt-0.5 flex items-baseline gap-1">
-                  <span className="text-3xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
-                    {periodStats.scheduled}
-                  </span>
-                  <span className="text-sm font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="text-[11px] leading-tight text-[var(--muted)]">
-                  아직 미방문
-                </p>
-              </div>
-
-              <div className="px-4 py-2.5 sm:px-5 sm:py-3">
-                <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
-                  방문완료
-                </p>
-                <p className="mt-0.5 flex items-baseline gap-1">
-                  <span className="text-3xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
-                    {periodStats.visited}
-                  </span>
-                  <span className="text-sm font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="text-[11px] leading-tight text-[var(--muted)]">
-                  매장 방문 완료
-                </p>
-              </div>
-
-              <div className="px-4 py-2.5 sm:px-5 sm:py-3">
-                <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
-                  반출완료
-                </p>
-                <p className="mt-0.5 flex items-baseline gap-1">
-                  <span className="text-3xl font-semibold tabular-nums tracking-tight text-[var(--accent)]">
-                    {periodStats.pickedUp}
-                  </span>
-                  <span className="text-sm font-medium text-[var(--muted)]">
-                    건
-                  </span>
-                </p>
-                <p className="text-[11px] leading-tight text-[var(--muted)]">
-                  수령 완료
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-4 flex w-full shrink-0 items-stretch gap-2.5">
-          <input
-            ref={searchInputRef}
-            id="phar-unified-search"
-            className="h-16 min-w-0 flex-1 basis-0 rounded-2xl border border-[var(--line)] bg-white px-5 text-xl text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
-            type="search"
-            value={searchQ}
-            onChange={(e) => setSearchQ(e.target.value)}
-            placeholder="이름 · @핸들 · 상품 검색"
-            aria-label="이름, 핸들, 상품 검색"
-            autoComplete="off"
-          />
-          <select
-            className="h-16 w-48 shrink-0 appearance-none rounded-2xl border border-[var(--line)] bg-white bg-[length:12px] bg-[right_14px_center] bg-no-repeat px-4 pr-10 text-base text-[var(--ink)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
-            style={{ backgroundImage: selectChevron }}
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            aria-label="상태 필터"
-          >
-            <option value="">상태 전체</option>
-            {statusOptions.map((value) => (
-              <option key={value} value={value}>
-                {ALLOCATION_STATUS_LABEL[value]}
-              </option>
-            ))}
-          </select>
-          {hasFilters ? (
-            <button
-              type="button"
-              className="shrink-0 self-center px-2 text-sm text-[var(--accent)] hover:underline"
-              onClick={clearFilters}
-            >
-              초기화
-            </button>
-          ) : null}
         </div>
 
         {liveItems.length === 0 ? (
@@ -1259,17 +1296,29 @@ export function PharListWithModal({
         ) : (
           <div
             className={`grid min-h-0 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.95fr)] ${
-              fillHeight ? "flex-1" : ""
+              fillHeight || isFullscreen ? "flex-1" : ""
             }`}
           >
             <div
-              ref={listScrollRef}
-              className={`overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm ${
-                fillHeight
-                  ? "min-h-0"
+              className={`relative min-h-0 ${
+                fillHeight || isFullscreen
+                  ? "h-full min-h-0"
                   : "max-h-[min(70vh,calc(100vh-14rem))]"
               }`}
             >
+              {statsPeriod !== "today" ? (
+                <button
+                  type="button"
+                  className="absolute right-14 top-6 z-20 -translate-y-1/2 rounded-full border border-[var(--line)] bg-white/95 px-3 py-1.5 text-xs font-medium text-[var(--accent)] shadow-sm backdrop-blur-sm hover:bg-[var(--accent-soft)]"
+                  onClick={scrollToTodaySection}
+                >
+                  오늘로 이동
+                </button>
+              ) : null}
+              <div
+                ref={listScrollRef}
+                className="h-full overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
+              >
               <table className="w-full border-collapse text-left text-base">
                 <thead className="sticky top-0 z-10">
                   <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-sm tracking-[0.08em] text-[var(--muted)] uppercase">
@@ -1313,7 +1362,7 @@ export function PharListWithModal({
                               className="mt-2 block w-full text-xs font-medium text-[var(--accent)] hover:underline"
                               onClick={() => {
                                 if (hidePickedUp) setHidePickedUp(false);
-                                else setTodayOnly(false);
+                                else onStatsPeriodChange("all");
                               }}
                             >
                               {hidePickedUp
@@ -1409,11 +1458,14 @@ export function PharListWithModal({
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
 
             <aside
               className={`overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm ${
-                fillHeight ? "min-h-0" : "max-h-[min(70vh,calc(100vh-14rem))]"
+                fillHeight || isFullscreen
+                  ? "min-h-0"
+                  : "max-h-[min(70vh,calc(100vh-14rem))]"
               }`}
             >
               {selectedItem ? (
