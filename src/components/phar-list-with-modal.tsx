@@ -80,7 +80,7 @@ function CounterDetailPanel({
 
       <div className="space-y-4 rounded-2xl bg-[var(--accent-soft)]/50 px-5 py-5">
         <div>
-          <p className="text-xs tracking-wide text-[var(--muted)]">줄 상품</p>
+          <p className="text-xs tracking-wide text-[var(--muted)]">배정 상품</p>
           <p className="mt-1.5 text-2xl font-bold text-[var(--ink)]">
             {item.products?.name || "상품"}
           </p>
@@ -120,7 +120,7 @@ function CounterDetailPanel({
             ? `수령 완료${item.picked_up_at ? ` · ${formatKst(item.picked_up_at)}` : ""}`
             : item.status === "cancelled"
               ? "취소된 배정"
-              : "아직 수령 확인 전 — 손님 폰에서 수령 확인"}
+              : "아직 수령 확인 전 — 손님 휴대폰 에서 수령 확인 버튼을 눌러주세요 ! "}
         </p>
       </div>
 
@@ -527,6 +527,10 @@ export function PharListWithModal({
   const [selectedAllocId, setSelectedAllocId] = useState<string | null>(null);
   /** 지점 카운터: INF 수령 등 원격 변경을 반영하기 위한 목록 */
   const [liveItems, setLiveItems] = useState(items);
+  /** 카운터 상단 현황: 오늘 / 이번달 / 전체 */
+  const [statsPeriod, setStatsPeriod] = useState<"today" | "month" | "all">(
+    "today",
+  );
   const searchInputRef = useRef<HTMLInputElement>(null);
   const storeFilterId = lockedStoreId || storeId;
   /** 지점 로그인: 통합 검색 + 상태만 */
@@ -662,9 +666,10 @@ export function PharListWithModal({
   ]);
 
   const today = todayYmdKst();
+  const monthKey = today.slice(0, 7); // YYYY-MM
   const isSearching = Boolean(deferredSearchQ);
 
-  const todayStats = useMemo(() => {
+  const periodStats = useMemo(() => {
     let total = 0;
     let scheduled = 0; // 방문예정
     let visited = 0; // 방문완료 (매장 방문 완료)
@@ -672,7 +677,12 @@ export function PharListWithModal({
     for (const item of liveItems) {
       if (storeFilterId && item.store_id !== storeFilterId) continue;
       const d = visitDateKey(item);
-      if (d !== today) continue;
+      if (statsPeriod === "today") {
+        if (d !== today) continue;
+      } else if (statsPeriod === "month") {
+        if (!d || !d.startsWith(monthKey)) continue;
+      }
+      // all: 날짜 제한 없음
       if (item.status === "cancelled") continue;
       total += 1;
       if (item.status === "picked_up") pickedUp += 1;
@@ -680,7 +690,21 @@ export function PharListWithModal({
       else scheduled += 1; // pending, ready 등
     }
     return { total, scheduled, visited, pickedUp };
-  }, [liveItems, storeFilterId, today]);
+  }, [liveItems, storeFilterId, today, monthKey, statsPeriod]);
+
+  const statsPeriodLabel =
+    statsPeriod === "today"
+      ? "오늘 현황"
+      : statsPeriod === "month"
+        ? "이번달 현황"
+        : "전체 현황";
+
+  const statsTotalHint =
+    statsPeriod === "today"
+      ? "오늘 방문 합계"
+      : statsPeriod === "month"
+        ? `${Number(monthKey.slice(5))}월 방문 합계`
+        : "전체 방문 합계";
 
   const { pastItems, todayItems, futureItems } = useMemo(() => {
     const past: AllocationWithRelations[] = [];
@@ -952,19 +976,48 @@ export function PharListWithModal({
   if (simpleFilters) {
     return (
       <div className={fillHeight ? "flex min-h-0 flex-1 flex-col" : ""}>
-        <div className="mb-5 shrink-0 space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
-                Counter
-              </p>
-              <p className="mt-1 text-lg font-semibold tracking-wide text-[var(--ink)]">
-                오늘 현황
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2.5">
+        <div className="mb-3 shrink-0 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="flex items-baseline gap-2">
+                <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
+                  Counter
+                </p>
+                <p className="text-base font-semibold tracking-wide text-[var(--ink)]">
+                  {statsPeriodLabel}
+                </p>
+              </div>
               <div
-                className="flex rounded-full border border-[var(--line)] bg-white p-1"
+                className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
+                role="group"
+                aria-label="현황 기간"
+              >
+                {(
+                  [
+                    ["today", "오늘"],
+                    ["month", "이번달"],
+                    ["all", "전체"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={statsPeriod === value}
+                    onClick={() => setStatsPeriod(value)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      statsPeriod === value
+                        ? "bg-[var(--accent)] text-white"
+                        : "text-[var(--muted)] hover:text-[var(--ink)]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
                 role="group"
                 aria-label="목록 범위"
               >
@@ -975,7 +1028,7 @@ export function PharListWithModal({
                     setTodayOnly(true);
                     setVisitDate("");
                   }}
-                  className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                     todayOnly
                       ? "bg-[var(--accent)] text-white"
                       : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -987,7 +1040,7 @@ export function PharListWithModal({
                   type="button"
                   aria-pressed={!todayOnly}
                   onClick={() => setTodayOnly(false)}
-                  className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                     !todayOnly
                       ? "bg-[var(--accent)] text-white"
                       : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -996,10 +1049,10 @@ export function PharListWithModal({
                   전체 날짜
                 </button>
               </div>
-              <label className="flex cursor-pointer items-center gap-2.5 rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--ink)]">
+              <label className="flex cursor-pointer items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink)]">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 accent-[var(--accent)]"
+                  className="h-3.5 w-3.5 accent-[var(--accent)]"
                   checked={hidePickedUp}
                   onChange={(e) => setHidePickedUp(e.target.checked)}
                 />
@@ -1008,7 +1061,7 @@ export function PharListWithModal({
               {!todayOnly ? (
                 <button
                   type="button"
-                  className="rounded-full border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                  className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
                   onClick={scrollToTodaySection}
                 >
                   오늘로 이동
@@ -1018,72 +1071,82 @@ export function PharListWithModal({
           </div>
 
           <div
-            className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
+            className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
             role="group"
-            aria-label="오늘 방문 현황"
+            aria-label={statsPeriodLabel}
           >
             <div className="grid grid-cols-2 divide-x divide-y divide-[var(--line)] sm:grid-cols-4 sm:divide-y-0">
-              <div className="relative bg-[var(--accent-soft)]/55 px-5 py-4 sm:px-6 sm:py-5">
-                <div className="absolute inset-y-3 left-0 w-1 rounded-full bg-[var(--accent)]" />
-                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
-                  오늘
+              <div className="relative bg-[var(--accent-soft)]/55 px-4 py-2.5 sm:px-5 sm:py-3">
+                <div className="absolute inset-y-2 left-0 w-1 rounded-full bg-[var(--accent)]" />
+                <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
+                  {statsPeriod === "today"
+                    ? "오늘"
+                    : statsPeriod === "month"
+                      ? "이번달"
+                      : "전체"}
                 </p>
-                <p className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--accent)]">
-                    {todayStats.total}
+                <p className="mt-0.5 flex items-baseline gap-1">
+                  <span className="text-3xl font-semibold tabular-nums tracking-tight text-[var(--accent)]">
+                    {periodStats.total}
                   </span>
-                  <span className="text-lg font-medium text-[var(--muted)]">
+                  <span className="text-sm font-medium text-[var(--muted)]">
                     건
                   </span>
                 </p>
-                <p className="mt-1.5 text-xs text-[var(--muted)]">방문 합계</p>
+                <p className="text-[11px] leading-tight text-[var(--muted)]">
+                  {statsTotalHint}
+                </p>
               </div>
 
-              <div className="px-5 py-4 sm:px-6 sm:py-5">
-                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
+              <div className="px-4 py-2.5 sm:px-5 sm:py-3">
+                <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
                   방문예정
                 </p>
-                <p className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
-                    {todayStats.scheduled}
+                <p className="mt-0.5 flex items-baseline gap-1">
+                  <span className="text-3xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
+                    {periodStats.scheduled}
                   </span>
-                  <span className="text-lg font-medium text-[var(--muted)]">
+                  <span className="text-sm font-medium text-[var(--muted)]">
                     건
                   </span>
                 </p>
-                <p className="mt-1.5 text-xs text-[var(--muted)]">아직 미방문</p>
+                <p className="text-[11px] leading-tight text-[var(--muted)]">
+                  아직 미방문
+                </p>
               </div>
 
-              <div className="px-5 py-4 sm:px-6 sm:py-5">
-                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
+              <div className="px-4 py-2.5 sm:px-5 sm:py-3">
+                <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
                   방문완료
                 </p>
-                <p className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
-                    {todayStats.visited}
+                <p className="mt-0.5 flex items-baseline gap-1">
+                  <span className="text-3xl font-semibold tabular-nums tracking-tight text-[var(--ink)]">
+                    {periodStats.visited}
                   </span>
-                  <span className="text-lg font-medium text-[var(--muted)]">
+                  <span className="text-sm font-medium text-[var(--muted)]">
                     건
                   </span>
                 </p>
-                <p className="mt-1.5 text-xs text-[var(--muted)]">
+                <p className="text-[11px] leading-tight text-[var(--muted)]">
                   매장 방문 완료
                 </p>
               </div>
 
-              <div className="px-5 py-4 sm:px-6 sm:py-5">
-                <p className="text-sm font-medium tracking-wide text-[var(--muted)]">
+              <div className="px-4 py-2.5 sm:px-5 sm:py-3">
+                <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
                   반출완료
                 </p>
-                <p className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-5xl font-semibold tabular-nums tracking-tight text-[var(--accent)]">
-                    {todayStats.pickedUp}
+                <p className="mt-0.5 flex items-baseline gap-1">
+                  <span className="text-3xl font-semibold tabular-nums tracking-tight text-[var(--accent)]">
+                    {periodStats.pickedUp}
                   </span>
-                  <span className="text-lg font-medium text-[var(--muted)]">
+                  <span className="text-sm font-medium text-[var(--muted)]">
                     건
                   </span>
                 </p>
-                <p className="mt-1.5 text-xs text-[var(--muted)]">수령 완료</p>
+                <p className="text-[11px] leading-tight text-[var(--muted)]">
+                  수령 완료
+                </p>
               </div>
             </div>
           </div>

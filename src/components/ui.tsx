@@ -28,7 +28,7 @@ export function AppShell({
     <main
       className={`w-full ${
         fitViewport
-          ? "flex h-dvh flex-col overflow-hidden py-4"
+          ? "flex h-dvh flex-col overflow-hidden py-2.5"
           : "min-h-screen py-10"
       } ${
         full
@@ -37,43 +37,83 @@ export function AppShell({
       }`}
     >
       <div
-        className={`flex flex-wrap items-end justify-between gap-4 border-b pb-4 ${
+        className={`flex flex-wrap items-end justify-between gap-3 border-b ${
           owm ? "border-[var(--line)]/80" : "border-[var(--line)]"
-        } ${fitViewport ? "mb-4 shrink-0" : "mb-8 pb-6"}`}
+        } ${
+          fitViewport
+            ? "mb-2.5 shrink-0 pb-2.5"
+            : "mb-8 pb-6"
+        }`}
       >
-        <div className="flex items-start gap-4">
+        <div
+          className={`flex ${
+            fitViewport ? "items-center gap-3" : "items-start gap-4"
+          }`}
+        >
           {owm ? (
-            <Link href="/" className="mt-1 shrink-0">
+            <Link
+              href="/"
+              className={`shrink-0 ${fitViewport ? "" : "mt-1"}`}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/owm-logo.webp"
                 alt="O.W.M"
-                className="w-14 drop-shadow-sm"
+                className={`drop-shadow-sm ${fitViewport ? "w-10" : "w-14"}`}
                 draggable={false}
               />
             </Link>
           ) : null}
-          <div>
-            <Link
-              href="/"
-              className="text-xs tracking-[0.22em] uppercase text-[var(--muted)]"
-            >
-              Boarding Pass
-            </Link>
-            <p
-              className={`mt-3 text-xs tracking-[0.2em] uppercase ${
-                owm ? "text-[#C4956A]" : "text-[var(--accent)]"
-              }`}
-            >
-              {eyebrow}
-            </p>
-            <h1
-              className={`mt-2 text-[var(--ink)] ${fitViewport ? "text-3xl" : "text-4xl"}`}
-              style={{ fontFamily: "var(--font-display), serif" }}
-            >
-              {title}
-            </h1>
-          </div>
+          {fitViewport ? (
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <Link
+                  href="/"
+                  className="text-xs tracking-[0.22em] uppercase text-[var(--muted)]"
+                >
+                  Boarding Pass
+                </Link>
+                <span className="text-[var(--line)]" aria-hidden>
+                  ·
+                </span>
+                <p
+                  className={`text-xs tracking-[0.2em] uppercase ${
+                    owm ? "text-[#C4956A]" : "text-[var(--accent)]"
+                  }`}
+                >
+                  {eyebrow}
+                </p>
+              </div>
+              <h1
+                className="mt-0.5 text-3xl leading-tight text-[var(--ink)]"
+                style={{ fontFamily: "var(--font-display), serif" }}
+              >
+                {title}
+              </h1>
+            </div>
+          ) : (
+            <div>
+              <Link
+                href="/"
+                className="text-xs tracking-[0.22em] uppercase text-[var(--muted)]"
+              >
+                Boarding Pass
+              </Link>
+              <p
+                className={`mt-3 text-xs tracking-[0.2em] uppercase ${
+                  owm ? "text-[#C4956A]" : "text-[var(--accent)]"
+                }`}
+              >
+                {eyebrow}
+              </p>
+              <h1
+                className="mt-2 text-4xl text-[var(--ink)]"
+                style={{ fontFamily: "var(--font-display), serif" }}
+              >
+                {title}
+              </h1>
+            </div>
+          )}
         </div>
         {actions}
       </div>
