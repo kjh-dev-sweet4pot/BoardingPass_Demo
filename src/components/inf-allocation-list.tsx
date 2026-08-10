@@ -386,7 +386,15 @@ export function InfAllocationList({
   }, [initialAllocations]);
 
   useEffect(() => {
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     if (softEnter) {
+      if (reduceMotion) {
+        setCardsReady(true);
+        return;
+      }
       const id = window.requestAnimationFrame(() => {
         window.setTimeout(() => setCardsReady(true), 40);
       });
@@ -395,6 +403,12 @@ export function InfAllocationList({
 
     if (introPlayed) {
       setCardsReady(true);
+      return;
+    }
+
+    if (reduceMotion) {
+      setCardsReady(true);
+      setIntroPlayed(true);
       return;
     }
 
@@ -1105,6 +1119,16 @@ function BottomSheet({
 
   function requestClose() {
     if (closing || swipeClosing || closedRef.current) return;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) {
+      finishClose();
+      return;
+    }
+
     setClosing(true);
   }
 

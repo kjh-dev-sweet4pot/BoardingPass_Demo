@@ -158,6 +158,15 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
       return;
     }
 
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) {
+      setPhase("ready");
+      return;
+    }
+
     setWelcomeExiting(true);
     exitTimer.current = window.setTimeout(() => {
       setPhase("ready");
@@ -224,9 +233,13 @@ export function InfLoginClient({ initialError }: { initialError?: string }) {
       setDataReady(false);
       setWelcomeExiting(false);
 
+      const reduceMotion =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
       welcomeTimer.current = window.setTimeout(
         () => setWelcomeDone(true),
-        WELCOME_MIN_MS,
+        reduceMotion ? 0 : WELCOME_MIN_MS,
       );
 
       void runBootstrap();

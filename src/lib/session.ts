@@ -97,6 +97,9 @@ export const PHAR_STORE_PASSWORDS: Record<string, string> = {
   분당서현점: "bdshowm2608",
 };
 
+/** 맵에 없는 지점용 기본 비밀번호 */
+export const PHAR_DEFAULT_PASSWORD = "phar";
+
 export function expectedStorePassword(store: { id: string; name: string }) {
   const name = store.name.trim();
   if (PHAR_STORE_PASSWORDS[name]) return PHAR_STORE_PASSWORDS[name];
@@ -109,13 +112,12 @@ export function expectedStorePassword(store: { id: string; name: string }) {
     if (name.includes(key)) return PHAR_STORE_PASSWORDS[key];
   }
 
-  return null;
+  return PHAR_DEFAULT_PASSWORD;
 }
 
 export function isValidStorePassword(
   store: { id: string; name: string },
   password: string,
 ) {
-  const expected = expectedStorePassword(store);
-  return Boolean(expected) && password === expected;
+  return password === expectedStorePassword(store);
 }
