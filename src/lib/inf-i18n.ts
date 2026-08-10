@@ -113,6 +113,69 @@ export function bilingualSheetText(
   return `${localized} / ${korean}`;
 }
 
+/** 지점명에 자주 쓰는 지역·접미 번역 (미매칭 한글은 그대로 둠) */
+const STORE_PLACE_I18N: Record<
+  string,
+  Partial<Record<Exclude<InfLocale, "ko">, string>>
+> = {
+  강남: { en: "Gangnam", ja: "江南", zh: "江南" },
+  성수: { en: "Seongsu", ja: "聖水", zh: "圣水" },
+  신사: { en: "Sinsa", ja: "新沙", zh: "新沙" },
+  명동: { en: "Myeongdong", ja: "明洞", zh: "明洞" },
+  홍대: { en: "Hongdae", ja: "弘大", zh: "弘大" },
+  잠실: { en: "Jamsil", ja: "蚕室", zh: "蚕室" },
+  여의도: { en: "Yeouido", ja: "汝矣島", zh: "汝矣岛" },
+  판교: { en: "Pangyo", ja: "板橋", zh: "板桥" },
+  송파: { en: "Songpa", ja: "松坡", zh: "松坡" },
+  마포: { en: "Mapo", ja: "麻浦", zh: "麻浦" },
+  용산: { en: "Yongsan", ja: "龍山", zh: "龙山" },
+  종로: { en: "Jongno", ja: "鐘路", zh: "钟路" },
+  이태원: { en: "Itaewon", ja: "梨泰院", zh: "梨泰院" },
+  압구정: { en: "Apgujeong", ja: "狎鴎亭", zh: "狎鸥亭" },
+  청담: { en: "Cheongdam", ja: "清潭", zh: "清潭" },
+  한남: { en: "Hannam", ja: "漢南", zh: "汉南" },
+  건대: { en: "Konkuk", ja: "建大", zh: "建大" },
+  신촌: { en: "Sinchon", ja: "新村", zh: "新村" },
+  영등포: { en: "Yeongdeungpo", ja: "永登浦", zh: "永登浦" },
+  부산: { en: "Busan", ja: "釜山", zh: "釜山" },
+  대구: { en: "Daegu", ja: "大邱", zh: "大邱" },
+  대전: { en: "Daejeon", ja: "大田", zh: "大田" },
+  광주: { en: "Gwangju", ja: "光州", zh: "光州" },
+  인천: { en: "Incheon", ja: "仁川", zh: "仁川" },
+  제주: { en: "Jeju", ja: "済州", zh: "济州" },
+};
+
+/**
+ * 한국어 지점명을 로케일 표기로 변환.
+ * 예: "OWM 강남점" → en "OWM Gangnam" / ja "OWM 江南店"
+ */
+export function localizeStoreName(
+  koreanName: string,
+  locale: InfLocale,
+): string {
+  const name = koreanName.trim();
+  if (!name || locale === "ko") return name;
+
+  let out = name;
+  const places = Object.keys(STORE_PLACE_I18N).sort(
+    (a, b) => b.length - a.length,
+  );
+  for (const place of places) {
+    const localized = STORE_PLACE_I18N[place]?.[locale];
+    if (localized && out.includes(place)) {
+      out = out.split(place).join(localized);
+    }
+  }
+
+  if (locale === "en") {
+    out = out.replace(/점/g, "").replace(/\s+/g, " ").trim();
+  } else {
+    out = out.replace(/점/g, "店");
+  }
+
+  return out || name;
+}
+
 export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
   ko: {
     serverConfigError: "서버 설정 오류입니다. 잠시 후 다시 시도해 주세요.",

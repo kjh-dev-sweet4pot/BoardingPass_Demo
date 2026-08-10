@@ -16,6 +16,7 @@ import {
   formatVisitDayOfWeekKo,
   formatVisitWeekdayLocalized,
   INF_MESSAGES,
+  localizeStoreName,
   translateInfApiError,
   type InfMessages,
 } from "@/lib/inf-i18n";
@@ -131,7 +132,10 @@ function AllocationCard({
   /** 오늘 수령 가능 — 브랜드 웜톤 / 그 외는 스톤 톤으로 구분 */
   const isTodayPickup = today && !done && !isCancelled;
   const visitYmd = visitDateYmd(item);
-  const storeName = formatStoreName(item.stores, t.storeFallback);
+  const storeNameKo = formatStoreName(item.stores, INF_MESSAGES.ko.storeFallback);
+  const storeNameLocal = localizeStoreName(storeNameKo, locale);
+  const showStoreBilingual =
+    locale !== "ko" && storeNameLocal !== storeNameKo;
 
   const statusLabel = isCancelled
     ? t.cancelled
@@ -185,8 +189,17 @@ function AllocationCard({
               isTodayPickup ? "text-[#1a1a2e]" : "text-[#5c5a56]"
             }`}
           >
-            {storeName}
+            {showStoreBilingual ? storeNameLocal : storeNameKo}
           </p>
+          {showStoreBilingual ? (
+            <p
+              className={`mt-0.5 text-sm font-semibold ${
+                isTodayPickup ? "text-[#8a6a4a]" : "text-[#a39e96]"
+              }`}
+            >
+              {storeNameKo}
+            </p>
+          ) : null}
         </div>
 
         <div
@@ -789,6 +802,9 @@ function PickupSheetBody({
     : ko.dateUndecided;
   const visitWeekKo = visitYmd ? formatVisitDayOfWeekKo(visitYmd) : "";
 
+  const storeNameKo = formatStoreName(selected.stores, ko.store);
+  const storeNameLocal = localizeStoreName(storeNameKo, locale);
+
   const statusLocal = alreadyPickedUp
     ? sheet.pickupDone
     : cancelled
@@ -851,9 +867,20 @@ function PickupSheetBody({
               <p className="[font-size:clamp(0.72rem,1.5vh,0.8rem)] font-medium tracking-wide text-[#aaa]">
                 {bl(sheet.store, ko.store)}
               </p>
-              <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold text-[#1a1a2e]">
-                {formatStoreName(selected.stores, bl(sheet.store, ko.store))}
-              </p>
+              {locale === "ko" || storeNameLocal === storeNameKo ? (
+                <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold text-[#1a1a2e]">
+                  {storeNameKo}
+                </p>
+              ) : (
+                <div className="mt-[clamp(0.15rem,0.5vh,0.35rem)] space-y-0.5">
+                  <p className="[font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold text-[#1a1a2e]">
+                    {storeNameLocal}
+                  </p>
+                  <p className="[font-size:clamp(0.85rem,2vh,1rem)] font-semibold text-[#8a6a4a]">
+                    {storeNameKo}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="min-h-0 shrink">
