@@ -54,7 +54,6 @@ export default async function AdminLoginPage({
             className={`${fieldClass} h-auto w-full rounded-2xl border-[#E8D5BE] px-5 py-4 text-sm text-[#3D1F0A] placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10`}
             name="username"
             type="text"
-            defaultValue="admin"
             autoComplete="username"
             placeholder="아이디"
             required
@@ -63,7 +62,6 @@ export default async function AdminLoginPage({
             className={`${fieldClass} h-auto w-full rounded-2xl border-[#E8D5BE] px-5 py-4 text-sm text-[#3D1F0A] placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10`}
             name="password"
             type="password"
-            defaultValue="admin"
             autoComplete="current-password"
             placeholder="비밀번호"
             required

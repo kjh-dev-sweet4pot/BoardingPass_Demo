@@ -64,51 +64,58 @@ export async function clearStoreSession() {
   jar.delete(STORE_COOKIE);
 }
 
-/** Plain username/password — no email. Case-insensitive. */
-export const ADMIN_USERNAME = "admin";
-export const ADMIN_PASSWORD = "admin";
+/** Plain username/password — no email. Case-insensitive username. */
+export const ADMIN_USERNAME = "manager01";
+export const ADMIN_PASSWORD = "slamglobal260801";
 
 export function isValidAdminCredentials(username: string, password: string) {
   return (
-    username.trim().toLowerCase() === ADMIN_USERNAME &&
+    username.trim().toLowerCase() === ADMIN_USERNAME.toLowerCase() &&
     password === ADMIN_PASSWORD
   );
 }
 
-/** Alpha default when PHAR_DEFAULT_PASSWORD / PHAR_STORE_PASSWORDS unset. */
-export const PHAR_DEFAULT_PASSWORD = "phar";
-
-function parseStorePasswordMap(): Record<string, string> {
-  const raw = process.env.PHAR_STORE_PASSWORDS?.trim();
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-    const out: Record<string, string> = {};
-    for (const [key, value] of Object.entries(parsed)) {
-      if (typeof value === "string") out[key] = value;
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
+/** 지점명 → 비밀번호 (DB stores.name 기준, "점" 유무 모두 매칭) */
+export const PHAR_STORE_PASSWORDS: Record<string, string> = {
+  강남: "gnowm26",
+  강남점: "gnowm26",
+  남포: "pusanowm2608",
+  남포점: "pusanowm2608",
+  명동: "mdongowm26",
+  명동점: "mdongowm26",
+  신사: "ssaowm2626",
+  신사점: "ssaowm2626",
+  종각: "jgakowm26",
+  종각점: "jgakowm26",
+  성수: "ssuowm2626",
+  성수점: "ssuowm2626",
+  북촌: "bchonowm26",
+  북촌점: "bchonowm26",
+  이태원: "itaeowm26",
+  이태원점: "itaeowm26",
+  분당서현: "bdshowm2608",
+  분당서현점: "bdshowm2608",
+};
 
 export function expectedStorePassword(store: { id: string; name: string }) {
-  const map = parseStorePasswordMap();
-  return (
-    map[store.id] ||
-    map[store.name] ||
-    process.env.PHAR_DEFAULT_PASSWORD?.trim() ||
-    PHAR_DEFAULT_PASSWORD
+  const name = store.name.trim();
+  if (PHAR_STORE_PASSWORDS[name]) return PHAR_STORE_PASSWORDS[name];
+
+  // "OWM 강남점" 등 접두가 있어도 키 매칭
+  const keys = Object.keys(PHAR_STORE_PASSWORDS).sort(
+    (a, b) => b.length - a.length,
   );
+  for (const key of keys) {
+    if (name.includes(key)) return PHAR_STORE_PASSWORDS[key];
+  }
+
+  return null;
 }
 
 export function isValidStorePassword(
   store: { id: string; name: string },
   password: string,
 ) {
-  return password === expectedStorePassword(store);
+  const expected = expectedStorePassword(store);
+  return Boolean(expected) && password === expected;
 }
