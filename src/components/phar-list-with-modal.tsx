@@ -309,9 +309,17 @@ function visitDateKey(item: AllocationWithRelations) {
   return item.visit_date ? String(item.visit_date).slice(0, 10) : "";
 }
 
+/** 같은 일자 내: 반출완료 → 방문완료 → 대기 → 취소 */
+function statusSortRank(item: AllocationWithRelations) {
+  if (item.status === "picked_up" || item.picked_up_at) return 0;
+  if (item.status === "visited" || item.status === "ready") return 1;
+  if (item.status === "cancelled") return 3;
+  return 2; // pending 등 대기
+}
+
 /** 과거 → 오늘 → 미래
  * 초기 스크롤은 오늘. 위로=오늘 이전, 아래로=오늘 이후
- * 오늘과 맞닿는 쪽이 가까운 날짜가 되도록 과거·미래 모두 오늘 쪽으로 정렬
+ * 같은 일자 안에서는 반출완료 → 방문완료 → 대기
  */
 function sortByVisitRelativeToToday(items: AllocationWithRelations[]) {
   const today = todayYmdKst();
@@ -329,14 +337,16 @@ function sortByVisitRelativeToToday(items: AllocationWithRelations[]) {
     if (da !== db) {
       // past: ascending (old → recent, yesterday just above today)
       // future: ascending (tomorrow just below today → far)
-      // today: tie-break by created_at only
       return da.localeCompare(db);
     }
+    const sa = statusSortRank(a);
+    const sb = statusSortRank(b);
+    if (sa !== sb) return sa - sb;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 }
 
-/** 검색 결과: 오늘과 날짜 거리가 가까운 순 (동일 거리면 미래 우선) */
+/** 검색 결과: 오늘과 날짜 거리가 가까운 순 (동일 거리면 미래 우선, 같은 날은 상태순) */
 function sortByClosestToToday(items: AllocationWithRelations[]) {
   const today = todayYmdKst();
   const signedDays = (ymd: string) => {
@@ -356,6 +366,9 @@ function sortByClosestToToday(items: AllocationWithRelations[]) {
     if (sa >= 0 && sb < 0) return -1;
     if (sb >= 0 && sa < 0) return 1;
     if (sa !== sb) return sa - sb;
+    const statusA = statusSortRank(a);
+    const statusB = statusSortRank(b);
+    if (statusA !== statusB) return statusA - statusB;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 }
@@ -849,6 +862,9 @@ export function PharListWithModal({
         const da = visitDateKey(a);
         const db = visitDateKey(b);
         if (da !== db) return db.localeCompare(da);
+        const sa = statusSortRank(a);
+        const sb = statusSortRank(b);
+        if (sa !== sb) return sa - sb;
         return (
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );

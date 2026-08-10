@@ -100,10 +100,10 @@ function isPickedUp(item: AllocationWithRelations) {
 function sortItems(items: AllocationWithRelations[]) {
   return [...items].sort((a, b) => {
     const rank = (i: AllocationWithRelations) => {
-      if (isPickedUp(i)) return 2;
+      if (isPickedUp(i)) return 0; // 반출완료 최상단
+      if (i.status === "visited" || i.status === "ready") return 1; // 방문완료
       if (i.status === "cancelled") return 3;
-      if (isVisitToday(i)) return 0;
-      return 1;
+      return 2; // 대기(pending 등)
     };
     const d = rank(a) - rank(b);
     return d !== 0
