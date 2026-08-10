@@ -530,43 +530,4 @@ button {
   animation: inf-card-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .inf-check-wrap,
-  .inf-greet-text,
-  .inf-check-ring,
-  .inf-check-mark,
-  .inf-sheet-backdrop,
-  .inf-sheet-panel,
-  .inf-sheet-content,
-  .inf-welcome-exit,
-  .inf-content-enter,
-  .inf-card-rise,
-  .inf-entry-logo,
-  .inf-entry-reveal,
-  .inf-entry-reveal-late {
-    animation: none !important;
-  }
-
-  /* 애니메이션 없이 opacity:0 에 갇히지 않도록 최종 상태 강제 */
-  .inf-entry-logo,
-  .inf-entry-reveal,
-  .inf-entry-reveal-late,
-  .inf-check-wrap,
-  .inf-greet-text,
-  .inf-content-enter,
-  .inf-card-rise {
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
-  .inf-check-ring,
-  .inf-check-mark {
-    stroke-dashoffset: 0 !important;
-  }
-
-  .inf-welcome-stack,
-  .inf-schedule-panel,
-  .inf-footer-actions {
-    transition: none !important;
-  }
-}
+/* INF: prefers-reduced-motion 무시 — 브랜딩 인트로/시트 애니메이션 유지 */
