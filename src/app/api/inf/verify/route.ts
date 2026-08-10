@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { INF_COOKIE } from "@/lib/session";
 import { normalizeHandle } from "@/lib/auth";
+import { applyInfluencerStoreVisit } from "@/lib/inf-visit";
 
 const INF_SELECT =
   "id, name, instagram_handle, instagram_handle_normalized, sns_url";
@@ -62,9 +63,9 @@ async function findInfluencer(supabase: SupabaseClient, query: string) {
 }
 
 /**
- * 본인확인만 빠르게 수행 (influencers 조회 + 세션 쿠키).
+ * 본인확인 + 방문 반영(pending→visited) + 세션 쿠키.
  * SNS 핸들 또는 등록된 이름으로 매칭.
- * pending → visited(오늘 예정만) / 미수령 재방문일 갱신은 /api/inf/bootstrap 에서 처리.
+ * 배정 목록 로드는 /api/inf/bootstrap 에서 처리.
  */
 export async function POST(request: Request) {
   const query = await readQuery(request);
@@ -116,6 +117,9 @@ export async function POST(request: Request) {
       const msg = "등록된 SNS 아이디 또는 이름과 일치하지 않습니다.";
       return wantsJson ? jsonError(msg, 404) : redirectError(msg);
     }
+
+    // 로그인 직후 방문 반영 (bootstrap 과 중복되어도 안전)
+    await applyInfluencerStoreVisit(supabase, influencer.id);
 
     if (!wantsJson) {
       const origin = new URL(request.url).origin;

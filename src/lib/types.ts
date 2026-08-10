@@ -80,10 +80,9 @@ function formatVisitCompleteLabel(ymd: string) {
 }
 
 /**
- * 운영 콘솔 상태 표시.
- * 방문했지만 아직 수령 전(visited/ready)이고, 실제 확인일(verified_at)이
- * 예정일(visit_date)과 다르면 "M월 D일 방문 완료"로 표시.
- * 수령 완료(picked_up)는 상태 라벨만 유지(과거 기록 보존).
+ * 운영 콘솔·약사 카운터 상태 표시.
+ * 방문했지만 아직 수령 전(visited/ready)이면 실제 확인일(verified_at) 기준으로
+ * "M월 D일 방문 완료"로 표시. 수령 완료(picked_up)는 상태 라벨만 유지.
  */
 export function allocationStatusDisplayLabel(
   item: Pick<Allocation, "status" | "visit_date" | "verified_at">,
@@ -93,10 +92,7 @@ export function allocationStatusDisplayLabel(
     item.verified_at
   ) {
     const verifiedDay = ymdKst(item.verified_at);
-    const visitDay = item.visit_date
-      ? String(item.visit_date).slice(0, 10)
-      : "";
-    if (verifiedDay && visitDay && verifiedDay !== visitDay) {
+    if (verifiedDay) {
       return formatVisitCompleteLabel(verifiedDay);
     }
   }
