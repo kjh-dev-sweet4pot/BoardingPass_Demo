@@ -531,10 +531,36 @@ export function PharListWithModal({
   const [statsPeriod, setStatsPeriod] = useState<"today" | "month" | "all">(
     "today",
   );
+  /** 카운터 영역만 브라우저 전체화면 (AppShell 헤더 제외) */
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const counterRootRef = useRef<HTMLDivElement>(null);
   const storeFilterId = lockedStoreId || storeId;
   /** 지점 로그인: 통합 검색 + 상태만 */
   const simpleFilters = Boolean(lockedStoreId);
+
+  useEffect(() => {
+    if (!simpleFilters) return;
+    function onFsChange() {
+      setIsFullscreen(document.fullscreenElement === counterRootRef.current);
+    }
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, [simpleFilters]);
+
+  async function toggleCounterFullscreen() {
+    const el = counterRootRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement === el) {
+        await document.exitFullscreen();
+      } else {
+        await el.requestFullscreen();
+      }
+    } catch {
+      // 브라우저 정책·미지원 시 무시
+    }
+  }
 
   useEffect(() => {
     setLiveItems(items);
@@ -975,7 +1001,16 @@ export function PharListWithModal({
   /* ── 지점 PC 카운터: 검색 + 좌목록 + 우상세 ── */
   if (simpleFilters) {
     return (
-      <div className={fillHeight ? "flex min-h-0 flex-1 flex-col" : ""}>
+      <div
+        ref={counterRootRef}
+        className={`${
+          fillHeight || isFullscreen ? "flex min-h-0 flex-1 flex-col" : ""
+        } ${
+          isFullscreen
+            ? "h-dvh bg-[var(--background)] px-4 py-3 sm:px-6"
+            : ""
+        }`}
+      >
         <div className="mb-3 shrink-0 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
@@ -1067,6 +1102,14 @@ export function PharListWithModal({
                   오늘로 이동
                 </button>
               ) : null}
+              <button
+                type="button"
+                aria-pressed={isFullscreen}
+                className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:bg-[var(--accent-soft)]"
+                onClick={() => void toggleCounterFullscreen()}
+              >
+                {isFullscreen ? "전체화면 종료" : "전체화면"}
+              </button>
             </div>
           </div>
 
