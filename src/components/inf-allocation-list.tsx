@@ -829,23 +829,23 @@ function PickupSheetBody({
         </div>
 
         {/* 약사용 본문 — 공간 부족 시 이 박스만 줄어듦 (스크롤 없음) */}
-        <div className="flex min-h-0 flex-1 flex-col justify-evenly gap-[clamp(0.4rem,1.5vh,1.25rem)] overflow-hidden rounded-2xl bg-[#f9f9f9] px-5 py-[clamp(0.75rem,2vh,1.5rem)]">
-          <div className="flex min-h-0 flex-col justify-evenly gap-[clamp(0.4rem,1.5vh,1.25rem)] text-center">
-            <div className="min-h-0 shrink-0 grow basis-[38%]">
-              <p className="[font-size:clamp(0.75rem,1.7vh,0.85rem)] font-medium tracking-wide text-[#aaa]">
+        <div className="flex min-h-0 flex-1 flex-col justify-evenly gap-[clamp(0.35rem,1.2vh,1rem)] overflow-hidden rounded-2xl bg-[#f9f9f9] px-5 py-[clamp(0.75rem,2vh,1.5rem)]">
+          <div className="flex min-h-0 flex-col justify-start gap-[clamp(0.35rem,1.1vh,0.75rem)] text-center">
+            <div className="min-h-0 shrink-0">
+              <p className="[font-size:clamp(0.8rem,1.8vh,0.9rem)] font-medium tracking-wide text-[#aaa]">
                 {bl(sheet.product, ko.product)}
               </p>
-              <p className="mt-[clamp(0.25rem,0.7vh,0.45rem)] [font-size:clamp(1.45rem,4.2vh,2rem)] font-bold leading-snug text-[#1a1a2e]">
+              <p className="mt-[clamp(0.25rem,0.7vh,0.45rem)] [font-size:clamp(1.7rem,5vh,2.35rem)] font-bold leading-snug text-[#1a1a2e]">
                 {selected.products?.name || bl(sheet.product, ko.product)}
               </p>
               {selected.products?.description ? (
-                <p className="mt-[clamp(0.2rem,0.5vh,0.35rem)] line-clamp-3 [font-size:clamp(0.85rem,2vh,1.05rem)] leading-snug text-[#777]">
+                <p className="mt-[clamp(0.2rem,0.5vh,0.35rem)] line-clamp-3 [font-size:clamp(0.9rem,2.1vh,1.1rem)] leading-snug text-[#777]">
                   {selected.products.description}
                 </p>
               ) : null}
             </div>
 
-            <div className="mx-auto h-px w-12 shrink-0 bg-[#e8e8e8]" />
+            <div className="mx-auto my-[clamp(0.05rem,0.3vh,0.2rem)] h-px w-10 shrink-0 bg-[#e8e8e8]" />
 
             <div className="min-h-0 shrink">
               <p className="[font-size:clamp(0.72rem,1.5vh,0.8rem)] font-medium tracking-wide text-[#aaa]">
@@ -946,28 +946,37 @@ function PickupSheetBody({
               {t.cancelledCannotPickup}
             </p>
           ) : step === "review" ? (
-            <div className="flex gap-3">
+            <div className="flex gap-2.5">
               <button
                 type="button"
                 onClick={requestClose}
-                className="flex-1 rounded-2xl border border-[#e8e8e8] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[#666]"
+                className="w-[28%] shrink-0 rounded-2xl border border-[#e8e8e8] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[#666]"
               >
                 {t.close}
               </button>
               <button
                 type="button"
                 onClick={() => onStep("confirm")}
-                className="flex-1 rounded-2xl bg-[#6B3B1F] py-[clamp(0.65rem,1.8vh,0.9rem)] text-sm font-semibold leading-snug text-white"
+                className="min-w-0 flex-1 rounded-2xl bg-[#6B3B1F] px-3 py-[clamp(0.65rem,1.8vh,0.9rem)] text-sm font-semibold text-white"
               >
-                {bl(t.pickupConfirmBtn, INF_MESSAGES.ko.pickupConfirmBtn)}
+                <BilingualActionLabel
+                  locale={locale}
+                  local={t.pickupConfirmBtn}
+                  korean={INF_MESSAGES.ko.pickupConfirmBtn}
+                />
               </button>
             </div>
           ) : (
             <div className="space-y-2">
-              <p className="rounded-2xl bg-[#F5EDE3] px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] text-center text-sm leading-snug text-[#6B3B1F]">
-                {bl(t.pickupIrreversible, INF_MESSAGES.ko.pickupIrreversible)}
-              </p>
-              <div className="flex gap-3">
+              <div className="rounded-2xl bg-[#F5EDE3] px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] text-center text-sm leading-snug text-[#6B3B1F]">
+                <BilingualActionLabel
+                  locale={locale}
+                  local={t.pickupIrreversible}
+                  korean={INF_MESSAGES.ko.pickupIrreversible}
+                  muted
+                />
+              </div>
+              <div className="flex gap-2.5">
                 <button
                   type="button"
                   disabled={confirming}
@@ -975,7 +984,7 @@ function PickupSheetBody({
                     onStep("review");
                     onClearError();
                   }}
-                  className="flex-1 rounded-2xl border border-[#e8e8e8] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[#666] disabled:opacity-50"
+                  className="w-[28%] shrink-0 rounded-2xl border border-[#e8e8e8] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[#666] disabled:opacity-50"
                 >
                   {t.previous}
                 </button>
@@ -983,14 +992,17 @@ function PickupSheetBody({
                   type="button"
                   disabled={confirming}
                   onClick={onConfirm}
-                  className="flex-1 rounded-2xl bg-[#6B3B1F] py-[clamp(0.65rem,1.8vh,0.9rem)] text-sm font-semibold leading-snug text-white disabled:opacity-50"
+                  className="min-w-0 flex-1 rounded-2xl bg-[#6B3B1F] px-3 py-[clamp(0.65rem,1.8vh,0.9rem)] text-sm font-semibold text-white disabled:opacity-50"
                 >
-                  {confirming
-                    ? bl(t.confirming, INF_MESSAGES.ko.confirming)
-                    : bl(
-                        t.finalPickupConfirm,
-                        INF_MESSAGES.ko.finalPickupConfirm,
-                      )}
+                  <BilingualActionLabel
+                    locale={locale}
+                    local={confirming ? t.confirming : t.finalPickupConfirm}
+                    korean={
+                      confirming
+                        ? INF_MESSAGES.ko.confirming
+                        : INF_MESSAGES.ko.finalPickupConfirm
+                    }
+                  />
                 </button>
               </div>
             </div>
@@ -1001,6 +1013,34 @@ function PickupSheetBody({
 }
 
 /* ─── InfoRow ────────────────────────────────────────── */
+function BilingualActionLabel({
+  locale,
+  local,
+  korean,
+  muted = false,
+}: {
+  locale: "ko" | "en" | "ja" | "zh";
+  local: string;
+  korean: string;
+  muted?: boolean;
+}) {
+  if (locale === "ko" || local === korean) {
+    return <span className="block whitespace-nowrap">{korean}</span>;
+  }
+  return (
+    <span className="flex flex-col items-center gap-0.5 leading-tight">
+      <span className="whitespace-nowrap">{local}</span>
+      <span
+        className={`whitespace-nowrap text-[0.82em] font-medium ${
+          muted ? "opacity-80" : "opacity-90"
+        }`}
+      >
+        {korean}
+      </span>
+    </span>
+  );
+}
+
 function InfoRow({
   label,
   children,
