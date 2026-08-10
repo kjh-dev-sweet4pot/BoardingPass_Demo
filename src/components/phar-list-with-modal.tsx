@@ -135,7 +135,7 @@ function CounterDetailPanel({
           href={sns}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-14 items-center justify-center rounded-xl bg-[var(--accent)] text-base font-semibold text-white transition hover:brightness-110"
+          className="flex h-14 items-center justify-center rounded-xl bg-[var(--accent)] text-base font-bold !text-white transition hover:brightness-110"
         >
           SNS 프로필 확인
         </a>
@@ -1070,7 +1070,7 @@ export function PharListWithModal({
   if (simpleFilters) {
     const counterTall = fillHeight || isFullscreen;
     const counterGridClass =
-      "grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.8fr)]";
+      "grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(240px,0.55fr)]";
 
     return (
       <div
