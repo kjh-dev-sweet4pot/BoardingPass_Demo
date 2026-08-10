@@ -52,6 +52,11 @@ function CounterDetailPanel({
   const sns = formatSnsUrl(item.influencers?.sns_url);
   const d = visitDateKey(item);
   const picked = item.status === "picked_up" || Boolean(item.picked_up_at);
+  const [relatedOpen, setRelatedOpen] = useState(false);
+
+  useEffect(() => {
+    setRelatedOpen(false);
+  }, [item.influencer_id]);
 
   return (
     <div className="space-y-6">
@@ -156,44 +161,61 @@ function CounterDetailPanel({
 
       {related.length > 1 ? (
         <div>
-          <p className="mb-2.5 text-sm font-medium tracking-wide text-[var(--muted)]">
-            이 지점 배정 {related.length}건
-          </p>
-          <ul className="space-y-2.5">
-            {related.map((row) => {
-              const active = row.id === item.id;
-              const rd = visitDateKey(row);
-              return (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelectRelated(row.id)}
-                    className={`w-full rounded-xl border px-4 py-3 text-left transition ${
-                      active
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                        : "border-[var(--line)] bg-white hover:bg-[var(--accent-soft)]/40"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-[var(--ink)]">
-                          {row.products?.name || "상품"}
-                        </p>
-                        <p className="mt-0.5 text-sm tabular-nums text-[var(--muted)]">
-                          {rd || "미정"} · {row.quantity}개
-                        </p>
+          <button
+            type="button"
+            aria-expanded={relatedOpen}
+            onClick={() => setRelatedOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-left transition hover:bg-[var(--accent-soft)]/40"
+          >
+            <span className="text-sm font-medium tracking-wide text-[var(--muted)]">
+              이 지점 배정 {related.length}건
+            </span>
+            <span
+              className={`text-xs font-semibold text-[var(--accent)] transition ${
+                relatedOpen ? "rotate-180" : ""
+              }`}
+              aria-hidden
+            >
+              ▾
+            </span>
+          </button>
+          {relatedOpen ? (
+            <ul className="mt-2.5 space-y-2.5">
+              {related.map((row) => {
+                const active = row.id === item.id;
+                const rd = visitDateKey(row);
+                return (
+                  <li key={row.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectRelated(row.id)}
+                      className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                        active
+                          ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                          : "border-[var(--line)] bg-white hover:bg-[var(--accent-soft)]/40"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-[var(--ink)]">
+                            {row.products?.name || "상품"}
+                          </p>
+                          <p className="mt-0.5 text-sm tabular-nums text-[var(--muted)]">
+                            {rd || "미정"} · {row.quantity}개
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone(row.status)}`}
+                        >
+                          {ALLOCATION_STATUS_LABEL[row.status]}
+                        </span>
                       </div>
-                      <span
-                        className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone(row.status)}`}
-                      >
-                        {ALLOCATION_STATUS_LABEL[row.status]}
-                      </span>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
         </div>
       ) : null}
     </div>
