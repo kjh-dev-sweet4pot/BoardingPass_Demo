@@ -124,7 +124,7 @@ export function normalizeVisitDate(raw: string): string | null {
 
   // 시간 포함 값: "2026-08-11 00:00:00" / ISO
   const dateOnly = value.split(/[T\s]/)[0]!.trim();
-  const sep = "[.\\/-]";
+  const sep = "[./-]";
 
   // YYYY-M-D / YYYY.M.D / YYYY/M/D
   let match = dateOnly.match(

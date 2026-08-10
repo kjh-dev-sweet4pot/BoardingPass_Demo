@@ -606,7 +606,8 @@ export function PharListWithModal({
                   row.status === next.status &&
                   row.updated_at === next.updated_at &&
                   row.picked_up_at === next.picked_up_at &&
-                  row.verified_at === next.verified_at
+                  row.verified_at === next.verified_at &&
+                  row.last_visited_at === next.last_visited_at
                 );
               })
             ) {
