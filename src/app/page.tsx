@@ -36,6 +36,30 @@ const portals = [
     ),
   },
   {
+    href: "/com",
+    label: "Company",
+    title: "회원사",
+    body: "자사 배정의 방문·수령·콘텐츠 현황을 조회합니다.",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path
+          d="M4 20V8l8-4 8 4v12"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M9 20v-6h6v6"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/phar",
     label: "Pharmacist",
     title: "약사",

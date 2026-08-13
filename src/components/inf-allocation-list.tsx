@@ -7,8 +7,9 @@ import {
   useRef,
   useState,
 } from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
-import { useInfLocale } from "@/components/inf-locale-provider";
+import { InfLocaleEnsure, useInfLocale } from "@/components/inf-locale-provider";
 import {
   bilingualSheetText,
   formatVisitDateKo,
@@ -97,6 +98,39 @@ function isPickedUp(item: AllocationWithRelations) {
   return item.status === "picked_up" || Boolean(item.picked_up_at);
 }
 
+function hasRegisteredLink(item: AllocationWithRelations) {
+  return (item.creator_links || []).length > 0;
+}
+
+function LinkRegisterAction({
+  item,
+  label,
+  doneLabel,
+  className,
+  onClick,
+}: {
+  item: AllocationWithRelations;
+  label: string;
+  doneLabel: string;
+  className?: string;
+  onClick?: (e: React.MouseEvent) => void;
+}) {
+  const done = hasRegisteredLink(item);
+  return (
+    <Link
+      href="/inf/links"
+      onClick={onClick}
+      className={
+        done
+          ? `block rounded-2xl bg-[#f3eee3] py-3.5 text-center text-sm font-semibold text-[#8a7a5c] ${className || ""}`
+          : `block rounded-2xl bg-[#6B3B1F] py-3.5 text-center text-sm font-semibold !text-white ${className || ""}`
+      }
+    >
+      {done ? doneLabel : label}
+    </Link>
+  );
+}
+
 function sortItems(items: AllocationWithRelations[]) {
   return [...items].sort((a, b) => {
     const rank = (i: AllocationWithRelations) => {
@@ -143,7 +177,9 @@ function AllocationCard({
     ? t.cancelled
     : done
       ? t.pickupDone
-      : t.pickupAvailable;
+      : today
+        ? t.pickupAvailable
+        : t.visitScheduled;
   const statusChipClass = isCancelled
     ? "bg-[#ebe8e3] text-[#a39e96]"
     : done
@@ -266,6 +302,14 @@ function AllocationCard({
             {t.openPickupInfo}
           </div>
         )}
+        {done ? (
+          <LinkRegisterAction
+            item={item}
+            label={t.registerLink}
+            doneLabel={t.linkRegistered}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : null}
       </div>
     </button>
   );
@@ -296,6 +340,7 @@ function buildMockAllocations(): AllocationWithRelations[] {
       influencer_id: "mock-inf",
       product_id: "mock-prod-1",
       store_id: baseStore.id,
+      company_id: null,
       quantity: 2,
       status: "ready",
       visit_code: "V-8821",
@@ -303,6 +348,8 @@ function buildMockAllocations(): AllocationWithRelations[] {
       verified_at: nowIso,
       last_visited_at: nowIso,
       picked_up_at: null,
+      visit_source: "auto",
+      visit_confirmed_by: null,
       created_at: nowIso,
       updated_at: nowIso,
       products: {
@@ -320,6 +367,7 @@ function buildMockAllocations(): AllocationWithRelations[] {
       influencer_id: "mock-inf",
       product_id: "mock-prod-2",
       store_id: baseStore2.id,
+      company_id: null,
       quantity: 1,
       status: "ready",
       visit_code: "V-8822",
@@ -327,6 +375,8 @@ function buildMockAllocations(): AllocationWithRelations[] {
       verified_at: nowIso,
       last_visited_at: nowIso,
       picked_up_at: null,
+      visit_source: "auto",
+      visit_confirmed_by: null,
       created_at: nowIso,
       updated_at: nowIso,
       products: {
@@ -354,6 +404,29 @@ export function InfAllocationList({
   /** 로그인 환영 화면을 이미 본 경우 인트로 스킵 (하위 호환) */
   skipIntro?: boolean;
   /** 환영 화면 직후 진입 — 카드 스태거 + 컴팩트 헤더 */
+  fromWelcome?: boolean;
+}) {
+  return (
+    <InfLocaleEnsure>
+      <InfAllocationListInner
+        influencer={influencer}
+        initialAllocations={initialAllocations}
+        skipIntro={skipIntro}
+        fromWelcome={fromWelcome}
+      />
+    </InfLocaleEnsure>
+  );
+}
+
+function InfAllocationListInner({
+  influencer,
+  initialAllocations,
+  skipIntro = false,
+  fromWelcome = false,
+}: {
+  influencer: Influencer;
+  initialAllocations: AllocationWithRelations[];
+  skipIntro?: boolean;
   fromWelcome?: boolean;
 }) {
   const { t, locale } = useInfLocale();
@@ -936,11 +1009,19 @@ function PickupSheetBody({
 
         <div className="shrink-0 pb-1">
           {alreadyPickedUp ? (
-            <div className="rounded-2xl bg-[#f3eee3] px-4 py-[clamp(0.6rem,1.6vh,0.75rem)] text-center text-sm font-semibold text-[#8a7a5c]">
-              {t.pickupDoneBanner}
-              {selected.picked_up_at
-                ? ` · ${formatKst(selected.picked_up_at)}`
-                : ""}
+            <div className="space-y-2">
+              <div className="rounded-2xl bg-[#f3eee3] px-4 py-[clamp(0.6rem,1.6vh,0.75rem)] text-center text-sm font-semibold text-[#8a7a5c]">
+                {t.pickupDoneBanner}
+                {selected.picked_up_at
+                  ? ` · ${formatKst(selected.picked_up_at)}`
+                  : ""}
+              </div>
+              <LinkRegisterAction
+                item={selected}
+                label={t.registerLinkCta}
+                doneLabel={t.linkRegistered}
+                className="py-[clamp(0.75rem,2vh,1rem)]"
+              />
             </div>
           ) : cancelled ? (
             <p className="text-center text-sm text-[#aaa]">

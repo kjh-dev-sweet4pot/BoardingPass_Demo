@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isAdminSession } from "@/lib/session";
 import { normalizeHandle } from "@/lib/auth";
 import { normalizeVisitDate, parseProductAndQty } from "@/lib/csv-import";
+import { findDuplicateAllocation } from "@/lib/alloc-dup";
 
 async function ensureAdmin() {
   if (!(await isAdminSession())) redirect("/admin/login");
@@ -32,6 +33,7 @@ export async function createManualAllocation(formData: FormData) {
   const visit_date =
     normalizeVisitDate(String(formData.get("visit_date") || "").trim()) || "";
   const visit_code = String(formData.get("visit_code") || "").trim() || null;
+  const companyId = String(formData.get("company_id") || "").trim();
   const { name: productName, quantity } = parseProductAndQty(
     productRaw,
     (() => {
@@ -44,6 +46,7 @@ export async function createManualAllocation(formData: FormData) {
   if (!snsid) fail("인스타그램 핸들(snsid)을 입력하세요.");
   if (!storeIdRaw && !storeName) fail("방문지점을 선택하세요.");
   if (!productName) fail("상품을 입력하세요.");
+  if (!companyId) fail("회원사를 선택하세요.");
   if (!visit_date) fail("방문 예정일을 입력하세요.");
   if (!Number.isFinite(quantity) || quantity < 1) fail("수량이 올바르지 않습니다.");
 
@@ -129,23 +132,30 @@ export async function createManualAllocation(formData: FormData) {
     productId = created.id;
   }
 
-  const { data: dup } = await supabase
-    .from("allocations")
-    .select("id")
-    .eq("influencer_id", influencerId)
-    .eq("product_id", productId)
-    .eq("store_id", storeId)
-    .eq("visit_date", visit_date)
+  const { data: company } = await supabase
+    .from("companies")
+    .select("id, is_active")
+    .eq("id", companyId)
     .maybeSingle();
+  if (!company?.id) fail("선택한 회원사를 찾을 수 없습니다.");
+  if (!company.is_active) fail("비활성 회원사입니다.");
 
-  if (dup?.id) {
-    fail("동일한 배정(핸들·상품·매장·방문일)이 이미 있습니다.");
+  const dupId = await findDuplicateAllocation(supabase, {
+    influencerId,
+    productId,
+    storeId,
+    visitDate: visit_date,
+    companyId,
+  });
+  if (dupId) {
+    fail("동일한 배정(핸들·상품·매장·방문일·회원사)이 이미 있습니다.");
   }
 
   const { error } = await supabase.from("allocations").insert({
     influencer_id: influencerId,
     product_id: productId,
     store_id: storeId,
+    company_id: companyId,
     quantity,
     visit_date,
     visit_code,
@@ -155,5 +165,6 @@ export async function createManualAllocation(formData: FormData) {
   if (error) fail(error.message);
 
   revalidatePath("/admin");
+  revalidatePath("/com");
   redirect("/admin?message=" + encodeURIComponent("수동 등록이 완료되었습니다."));
 }

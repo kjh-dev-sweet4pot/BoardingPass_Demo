@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { createManualAllocation } from "@/app/actions/admin";
+import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
+import { AdminLinkReview } from "@/components/admin-link-review";
 import { AdminStoreOverview } from "@/components/admin-store-overview";
 import { PharListWithModal } from "@/components/phar-list-with-modal";
 import {
@@ -11,15 +13,17 @@ import {
   fieldClass,
   primaryBtnClass,
 } from "@/components/ui";
-import { type AllocationWithRelations, type Store } from "@/lib/types";
+import { type AllocationWithRelations, type Company, type Store } from "@/lib/types";
 
 export function AdminConsoleLayout({
   storeList,
+  companyList,
   list,
   error,
   message,
 }: {
   storeList: Store[];
+  companyList: Company[];
   list: AllocationWithRelations[];
   error?: string;
   message?: string;
@@ -51,7 +55,11 @@ export function AdminConsoleLayout({
             onSelectStore={setSelectedStoreId}
           />
 
-          <AdminImportPanel compact />
+          <AdminCompanyPanel companies={companyList} />
+
+          <AdminLinkReview />
+
+          <AdminImportPanel compact companies={companyList} />
 
           <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
             <button
@@ -76,6 +84,23 @@ export function AdminConsoleLayout({
                 action={createManualAllocation}
                 className="grid gap-3 border-t border-[var(--line)] px-5 pb-5 pt-4"
               >
+                <Field label="회원사">
+                  <select className={fieldClass} name="company_id" required>
+                    <option value="">회원사 선택</option>
+                    {companyList
+                      .filter((c) => c.is_active)
+                      .map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.name}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                {companyList.filter((c) => c.is_active).length === 0 && (
+                  <p className="text-xs text-[var(--danger)]">
+                    등록된 회원사가 없습니다. 회원사를 먼저 추가해 주세요.
+                  </p>
+                )}
                 <Field label="이름">
                   <input
                     className={fieldClass}
@@ -145,7 +170,10 @@ export function AdminConsoleLayout({
                 <button
                   className={primaryBtnClass}
                   type="submit"
-                  disabled={storeList.length === 0}
+                  disabled={
+                    storeList.length === 0 ||
+                    companyList.filter((c) => c.is_active).length === 0
+                  }
                 >
                   등록
                 </button>
@@ -175,6 +203,9 @@ export function AdminConsoleLayout({
               items={filteredList}
               fillHeight
               lockedStoreId={selectedStoreId || undefined}
+              allowAdminEdit
+              storeList={storeList}
+              companyList={companyList}
             />
           </div>
         </section>

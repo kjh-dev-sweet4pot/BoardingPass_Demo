@@ -31,7 +31,7 @@ export async function GET(
 
   let allocQuery = supabase
     .from("allocations")
-    .select("*, products(*), stores(*)")
+    .select("*, products(*), stores(*), companies(id, name), creator_links(*)")
     .eq("influencer_id", id)
     .order("created_at", { ascending: false });
 

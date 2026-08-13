@@ -74,12 +74,21 @@ export function InfLocaleProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const FALLBACK_LOCALE: InfLocaleContextValue = {
+  locale: "ko",
+  setLocale: () => {},
+  t: INF_MESSAGES.ko,
+};
+
 export function useInfLocale() {
+  return useContext(InfLocaleContext) ?? FALLBACK_LOCALE;
+}
+
+/** 레이아웃 프로바이더가 빠져도 INF 화면이 깨지지 않게 감쌉니다. */
+export function InfLocaleEnsure({ children }: { children: ReactNode }) {
   const ctx = useContext(InfLocaleContext);
-  if (!ctx) {
-    throw new Error("useInfLocale must be used within InfLocaleProvider");
-  }
-  return ctx;
+  if (ctx) return children;
+  return <InfLocaleProvider>{children}</InfLocaleProvider>;
 }
 
 export function InfLanguageToggle({

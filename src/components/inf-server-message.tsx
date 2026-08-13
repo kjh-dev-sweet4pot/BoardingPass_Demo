@@ -1,8 +1,20 @@
 "use client";
 
-import { useInfLocale } from "@/components/inf-locale-provider";
+import { InfLocaleEnsure, useInfLocale } from "@/components/inf-locale-provider";
 
 export function InfServerMessage({
+  kind,
+}: {
+  kind: "serverConfigError";
+}) {
+  return (
+    <InfLocaleEnsure>
+      <InfServerMessageInner kind={kind} />
+    </InfLocaleEnsure>
+  );
+}
+
+function InfServerMessageInner({
   kind,
 }: {
   kind: "serverConfigError";
