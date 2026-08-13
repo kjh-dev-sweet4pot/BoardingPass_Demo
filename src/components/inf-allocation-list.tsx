@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useInfLocale } from "@/components/inf-locale-provider";
 import {
@@ -143,7 +144,9 @@ function AllocationCard({
     ? t.cancelled
     : done
       ? t.pickupDone
-      : t.pickupAvailable;
+      : today
+        ? t.pickupAvailable
+        : t.visitScheduled;
   const statusChipClass = isCancelled
     ? "bg-[#ebe8e3] text-[#a39e96]"
     : done
@@ -266,6 +269,15 @@ function AllocationCard({
             {t.openPickupInfo}
           </div>
         )}
+        {done ? (
+          <Link
+            href="/inf/links"
+            onClick={(e) => e.stopPropagation()}
+            className="block rounded-2xl bg-[#6B3B1F] py-3.5 text-center text-sm font-semibold !text-white"
+          >
+            {t.registerLink}
+          </Link>
+        ) : null}
       </div>
     </button>
   );
@@ -296,6 +308,7 @@ function buildMockAllocations(): AllocationWithRelations[] {
       influencer_id: "mock-inf",
       product_id: "mock-prod-1",
       store_id: baseStore.id,
+      company_id: null,
       quantity: 2,
       status: "ready",
       visit_code: "V-8821",
@@ -303,6 +316,8 @@ function buildMockAllocations(): AllocationWithRelations[] {
       verified_at: nowIso,
       last_visited_at: nowIso,
       picked_up_at: null,
+      visit_source: "auto",
+      visit_confirmed_by: null,
       created_at: nowIso,
       updated_at: nowIso,
       products: {
@@ -320,6 +335,7 @@ function buildMockAllocations(): AllocationWithRelations[] {
       influencer_id: "mock-inf",
       product_id: "mock-prod-2",
       store_id: baseStore2.id,
+      company_id: null,
       quantity: 1,
       status: "ready",
       visit_code: "V-8822",
@@ -327,6 +343,8 @@ function buildMockAllocations(): AllocationWithRelations[] {
       verified_at: nowIso,
       last_visited_at: nowIso,
       picked_up_at: null,
+      visit_source: "auto",
+      visit_confirmed_by: null,
       created_at: nowIso,
       updated_at: nowIso,
       products: {
@@ -936,11 +954,19 @@ function PickupSheetBody({
 
         <div className="shrink-0 pb-1">
           {alreadyPickedUp ? (
-            <div className="rounded-2xl bg-[#f3eee3] px-4 py-[clamp(0.6rem,1.6vh,0.75rem)] text-center text-sm font-semibold text-[#8a7a5c]">
-              {t.pickupDoneBanner}
-              {selected.picked_up_at
-                ? ` · ${formatKst(selected.picked_up_at)}`
-                : ""}
+            <div className="space-y-2">
+              <div className="rounded-2xl bg-[#f3eee3] px-4 py-[clamp(0.6rem,1.6vh,0.75rem)] text-center text-sm font-semibold text-[#8a7a5c]">
+                {t.pickupDoneBanner}
+                {selected.picked_up_at
+                  ? ` · ${formatKst(selected.picked_up_at)}`
+                  : ""}
+              </div>
+              <Link
+                href="/inf/links"
+                className="block rounded-2xl bg-[#6B3B1F] py-[clamp(0.75rem,2vh,1rem)] text-center text-sm font-semibold !text-white"
+              >
+                {t.registerLinkCta}
+              </Link>
             </div>
           ) : cancelled ? (
             <p className="text-center text-sm text-[#aaa]">

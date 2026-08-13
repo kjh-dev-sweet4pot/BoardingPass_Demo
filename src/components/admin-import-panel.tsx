@@ -1,16 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  applyCompanyMatch,
+  buildImportCsvTemplate,
+  buildImportTemplateRows,
   IMPORT_ACCEPT,
-  IMPORT_CSV_TEMPLATE,
+  IMPORT_TEMPLATE_HEADER_LABEL,
   parseImportFile,
   type ParsedImportRow,
 } from "@/lib/csv-import";
 import { primaryBtnClass, secondaryBtnClass } from "@/components/ui";
+import { type Company } from "@/lib/types";
 
-export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
+export function AdminImportPanel({
+  compact = false,
+  companies = [],
+}: {
+  compact?: boolean;
+  companies?: Company[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(!compact);
   const [rows, setRows] = useState<ParsedImportRow[]>([]);
@@ -23,24 +33,51 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
   const [confirmed, setConfirmed] = useState(false);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [resultError, setResultError] = useState<string | null>(null);
+  const [companyList, setCompanyList] = useState(companies);
+  const [aliasTarget, setAliasTarget] = useState<Record<number, string>>({});
+  const hasCompanies = companyList.some((c) => c.is_active);
+
+  useEffect(() => {
+    setCompanyList(companies);
+  }, [companies]);
 
   const stats = useMemo(() => {
     const ok = rows.filter((r) => r.ok).length;
     return { total: rows.length, ok, bad: rows.length - ok };
   }, [rows]);
 
-  function downloadTemplate() {
-    // Excel(Windows)이 UTF-8 한글을 인식하도록 BOM 포함
-    const csv = `\uFEFF${IMPORT_CSV_TEMPLATE.replace(/\n/g, "\r\n")}`;
-    const blob = new Blob([csv], {
-      type: "text/csv;charset=utf-8",
-    });
+  function downloadCsvTemplate() {
+    const csv = `\uFEFF${buildImportCsvTemplate(companyList).replace(/\n/g, "\r\n")}`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = "boardingpass-import-template.csv";
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function downloadExcelTemplate() {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.aoa_to_sheet(buildImportTemplateRows(companyList)),
+      "배정",
+    );
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.aoa_to_sheet([
+        ["name", "aliases", "is_active"],
+        ...companyList.map((c) => [
+          c.name,
+          (c.aliases || []).join(", "),
+          c.is_active ? "true" : "false",
+        ]),
+      ]),
+      "회원사목록",
+    );
+    XLSX.writeFile(wb, "boardingpass-import-template.xlsx");
   }
 
   function resetFileState() {
@@ -59,7 +96,9 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
 
     setReading(true);
     try {
-      const parsed = await parseImportFile(file);
+      const parsed = (await parseImportFile(file)).map((row) =>
+        applyCompanyMatch(row, companyList),
+      );
       if (parsed.length === 0) {
         setParseError(
           "데이터 행이 없습니다. 첫 시트에 헤더와 예시 행이 있는지 확인해 주세요.",
@@ -101,6 +140,7 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rows: valid.map((r) => ({
+            company: r.company_raw,
             snsid: r.snsid,
             snsurl: r.snsurl || "",
             name: r.name,
@@ -136,6 +176,27 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
     }
   }
 
+  async function addAlias(row: ParsedImportRow) {
+    const companyId = aliasTarget[row.rowNumber];
+    if (!companyId || !row.company_raw) return;
+    const res = await fetch(`/api/admin/companies/${companyId}/aliases`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alias: row.company_raw }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setResultError(body.error || "별칭 추가 실패");
+      return;
+    }
+    const nextCompany = body.company as Company;
+    const nextList = companyList.map((c) =>
+      c.id === nextCompany.id ? nextCompany : c,
+    );
+    setCompanyList(nextList);
+    setRows((prev) => prev.map((r) => applyCompanyMatch(r, nextList)));
+  }
+
   return (
     <div className="space-y-4">
       <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
@@ -165,7 +226,7 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
               Excel / CSV 업로드
             </h2>
             <p className="mt-2 text-sm text-[var(--muted)]">
-              업로드 → 내용 확인 → 확인 체크
+              업로드 → 내용 확인 → 확인 체크. 회원사(`company`) 필수.
             </p>
           </div>
         )}
@@ -176,17 +237,36 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
           >
             {compact ? (
               <p className="mb-4 text-sm text-[var(--muted)]">
-                업로드 → 내용 확인 → 확인 체크
+                업로드 → 내용 확인 → 확인 체크. 회원사(`company`) 필수. 콘텐츠
+                링크는 넣지 마세요.
               </p>
             ) : null}
 
-        <button
-          type="button"
-          className={`${secondaryBtnClass} w-full`}
-          onClick={downloadTemplate}
-        >
-          템플릿 다운로드
-        </button>
+        {!hasCompanies ? (
+          <p className="mb-3 text-xs text-[var(--danger)]">
+            등록된 회원사가 없습니다. 회원사를 먼저 추가해 주세요.
+          </p>
+        ) : null}
+
+        <p className="mb-2 text-xs text-[var(--muted)]">
+          컬럼: {IMPORT_TEMPLATE_HEADER_LABEL}
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            className={`${secondaryBtnClass} w-full`}
+            onClick={downloadCsvTemplate}
+          >
+            CSV 템플릿 다운로드
+          </button>
+          <button
+            type="button"
+            className={`${secondaryBtnClass} w-full`}
+            onClick={() => void downloadExcelTemplate()}
+          >
+            Excel 템플릿 다운로드
+          </button>
+        </div>
 
         <label
           onDragEnter={(e) => {
@@ -207,12 +287,13 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
             dragging
               ? "border-[var(--accent)] bg-[var(--accent-soft)]"
               : "border-[var(--line)] bg-white/50 hover:border-[var(--accent)]"
-          }`}
+          } ${!hasCompanies ? "pointer-events-none opacity-40" : ""}`}
         >
           <input
             type="file"
             accept={IMPORT_ACCEPT}
             className="hidden"
+            disabled={!hasCompanies}
             onChange={(e) => {
               void onFileChange(e.target.files?.[0] ?? null);
               e.target.value = "";
@@ -225,7 +306,9 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
                 ? "여기에 놓으세요"
                 : "드래그 또는 클릭해서 선택"}
           </p>
-          <p className="mt-1 text-xs text-[var(--muted)]">.csv · .xlsx · .xls</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            .csv · .xlsx · .xls · company(회원사) 컬럼 필수
+          </p>
         </label>
 
         {fileName && (
@@ -302,6 +385,7 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
                     <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/40 text-xs text-[var(--muted)]">
                       <th className="px-3 py-2 font-medium">행</th>
                       <th className="px-3 py-2 font-medium">상태</th>
+                      <th className="px-3 py-2 font-medium">회원사</th>
                       <th className="px-3 py-2 font-medium">이름</th>
                       <th className="px-3 py-2 font-medium">snsid</th>
                       <th className="px-3 py-2 font-medium">방문일</th>
@@ -332,6 +416,37 @@ export function AdminImportPanel({ compact = false }: { compact?: boolean }) {
                           >
                             {row.ok ? "OK" : "오류"}
                           </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div>{row.company_name || row.company_raw || "—"}</div>
+                          {row.unmatchedCompany ? (
+                            <div className="mt-1 flex flex-wrap items-center gap-1">
+                              <select
+                                className="h-7 rounded border border-[var(--line)] px-1 text-xs"
+                                value={aliasTarget[row.rowNumber] || ""}
+                                onChange={(e) =>
+                                  setAliasTarget((prev) => ({
+                                    ...prev,
+                                    [row.rowNumber]: e.target.value,
+                                  }))
+                                }
+                              >
+                                <option value="">회원사 선택</option>
+                                {companyList.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="text-xs font-semibold text-[var(--accent)]"
+                                onClick={() => void addAlias(row)}
+                              >
+                                별칭 추가
+                              </button>
+                            </div>
+                          ) : null}
                         </td>
                         <td className="px-3 py-2">{row.name || "—"}</td>
                         <td className="px-3 py-2 text-[var(--accent)]">

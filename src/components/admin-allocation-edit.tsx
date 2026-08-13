@@ -5,6 +5,7 @@ import {
   ALLOCATION_STATUS_LABEL,
   type AllocationStatus,
   type AllocationWithRelations,
+  type Company,
   type Store,
 } from "@/lib/types";
 
@@ -26,16 +27,19 @@ function visitDateInputValue(item: AllocationWithRelations) {
 export function AdminAllocationEditForm({
   item,
   storeList,
+  companyList = [],
   compact = false,
   onUpdated,
 }: {
   item: AllocationWithRelations;
   storeList: Store[];
+  companyList?: Company[];
   compact?: boolean;
   onUpdated: (next: AllocationWithRelations) => void;
 }) {
   const [visitDate, setVisitDate] = useState(visitDateInputValue(item));
   const [storeId, setStoreId] = useState(item.store_id);
+  const [companyId, setCompanyId] = useState(item.company_id || "");
   const [quantity, setQuantity] = useState(String(item.quantity));
   const [visitCode, setVisitCode] = useState(item.visit_code || "");
   const [status, setStatus] = useState<AllocationStatus>(item.status);
@@ -52,6 +56,7 @@ export function AdminAllocationEditForm({
   useEffect(() => {
     setVisitDate(visitDateInputValue(item));
     setStoreId(item.store_id);
+    setCompanyId(item.company_id || "");
     setQuantity(String(item.quantity));
     setVisitCode(item.visit_code || "");
     setStatus(item.status);
@@ -62,6 +67,7 @@ export function AdminAllocationEditForm({
   const dirty =
     visitDate !== visitDateInputValue(item) ||
     storeId !== item.store_id ||
+    companyId !== (item.company_id || "") ||
     Number(quantity) !== item.quantity ||
     visitCode !== (item.visit_code || "") ||
     status !== item.status;
@@ -80,6 +86,7 @@ export function AdminAllocationEditForm({
         body: JSON.stringify({
           visit_date: visitDate,
           store_id: storeId,
+          company_id: companyId,
           quantity: Number(quantity),
           visit_code: visitCode,
           status,
@@ -125,6 +132,25 @@ export function AdminAllocationEditForm({
             }}
             required
           />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-[var(--muted)]">
+          회원사
+          <select
+            className={compactFieldClass}
+            value={companyId}
+            onChange={(e) => {
+              setCompanyId(e.target.value);
+              setSaved(false);
+            }}
+            required
+          >
+            <option value="">회원사 선택</option>
+            {companyList.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-[var(--muted)]">
           방문 지점

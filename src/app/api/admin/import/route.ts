@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 import { isAdminSession } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import {
+  applyCompanyMatch,
   validateImportRow,
   type ImportRowInput,
   type ParsedImportRow,
 } from "@/lib/csv-import";
+import { findDuplicateAllocation } from "@/lib/alloc-dup";
 
 type ImportResult = {
   rowNumber: number;
@@ -157,7 +160,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const parsed = rawRows.map((row, idx) => validateImportRow(idx + 2, row));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: AdminSupabase = createClient<any>(url, key);
+  const { data: companies } = await supabase
+    .from("companies")
+    .select("id, name, aliases, is_active");
+
+  const parsed = rawRows.map((row, idx) =>
+    applyCompanyMatch(validateImportRow(idx + 2, row), companies || []),
+  );
   const valid = parsed.filter((r) => r.ok);
   if (valid.length === 0) {
     return NextResponse.json(
@@ -169,9 +180,6 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase: AdminSupabase = createClient<any>(url, key);
   const influencerCache = new Map<string, string>();
   const storeCache = new Map<string, string>();
   const productCache = new Map<string, string>();
@@ -205,16 +213,19 @@ export async function POST(request: Request) {
         productCache,
       );
 
-      const { data: dup } = await supabase
-        .from("allocations")
-        .select("id")
-        .eq("influencer_id", influencerId)
-        .eq("product_id", productId)
-        .eq("store_id", storeId)
-        .eq("visit_date", row.visit_date)
-        .maybeSingle();
+      if (!row.company_id) {
+        throw new Error("회원사 매칭에 실패했습니다.");
+      }
 
-      if (dup?.id) {
+      const dupId = await findDuplicateAllocation(supabase, {
+        influencerId,
+        productId,
+        storeId,
+        visitDate: row.visit_date,
+        companyId: row.company_id,
+      });
+
+      if (dupId) {
         skipped++;
         results.push({
           rowNumber: row.rowNumber,
@@ -228,6 +239,7 @@ export async function POST(request: Request) {
         influencer_id: influencerId,
         product_id: productId,
         store_id: storeId,
+        company_id: row.company_id,
         quantity: row.quantity,
         visit_date: row.visit_date,
         status: "pending",
@@ -251,6 +263,8 @@ export async function POST(request: Request) {
     }
   }
 
+  revalidatePath("/admin");
+  revalidatePath("/com");
   return NextResponse.json({
     summary: {
       total: parsed.length,

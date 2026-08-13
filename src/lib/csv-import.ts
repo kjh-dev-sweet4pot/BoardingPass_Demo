@@ -1,6 +1,8 @@
 import { normalizeHandle } from "@/lib/auth";
+import { matchCompany, type CompanyMatchInput } from "@/lib/company";
 
 export type ImportRowInput = {
+  company?: string;
   snsid?: string;
   snsurl?: string;
   name?: string;
@@ -13,6 +15,10 @@ export type ImportRowInput = {
 
 export type ParsedImportRow = {
   rowNumber: number;
+  company_raw: string;
+  company_id: string | null;
+  company_name: string | null;
+  unmatchedCompany: boolean;
   snsid: string;
   snsurl: string | null;
   name: string;
@@ -25,6 +31,13 @@ export type ParsedImportRow = {
 };
 
 const HEADER_ALIASES: Record<string, keyof ImportRowInput> = {
+  company: "company",
+  company_name: "company",
+  회원사: "company",
+  회원사명: "company",
+  브랜드: "company",
+  업체: "company",
+  소속: "company",
   snsid: "snsid",
   sns_id: "snsid",
   handle: "snsid",
@@ -259,6 +272,7 @@ export function rowsFromCsvMatrix(matrix: unknown[][]): ParsedImportRow[] {
 
     // skip blank lines
     if (
+      !raw.company &&
       !raw.snsid &&
       !raw.visit_date &&
       !raw.visit_at &&
@@ -291,7 +305,9 @@ export function validateImportRow(
   );
   const name =
     String(raw.name || "").trim() || (snsid ? snsid : "");
+  const company_raw = String(raw.company || "").trim();
 
+  if (!company_raw) errors.push("회원사(company) 필요");
   if (!snsid) errors.push("snsid(핸들) 필요");
   if (!visit_date)
     errors.push("visit_date 형식 오류 (예: 2026-08-11, 2026.08.11, 26-08-11)");
@@ -301,6 +317,10 @@ export function validateImportRow(
 
   return {
     rowNumber,
+    company_raw,
+    company_id: null,
+    company_name: null,
+    unmatchedCompany: false,
     snsid,
     snsurl,
     name: name || snsid,
@@ -308,6 +328,68 @@ export function validateImportRow(
     store,
     product,
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    errors,
+    ok: errors.length === 0,
+  };
+}
+
+export function applyCompanyMatch(
+  row: ParsedImportRow,
+  companies: CompanyMatchInput[],
+): ParsedImportRow {
+  const companyErrors = row.errors.filter(
+    (e) =>
+      e === "회원사(company) 필요" ||
+      e.startsWith("미등록 회원사") ||
+      e.startsWith("비활성 회원사"),
+  );
+  const otherErrors = row.errors.filter((e) => !companyErrors.includes(e));
+  const errors = [...otherErrors];
+
+  if (!row.company_raw) {
+    errors.push("회원사(company) 필요");
+    return {
+      ...row,
+      company_id: null,
+      company_name: null,
+      unmatchedCompany: false,
+      errors,
+      ok: false,
+    };
+  }
+
+  const found = matchCompany(row.company_raw, companies);
+  if (!found) {
+    errors.push(
+      `미등록 회원사 : ${row.company_raw} — 회원사 등록 또는 별칭 추가 필요`,
+    );
+    return {
+      ...row,
+      company_id: null,
+      company_name: null,
+      unmatchedCompany: true,
+      errors,
+      ok: false,
+    };
+  }
+
+  if (!found.is_active) {
+    errors.push(`비활성 회원사 : ${found.name}`);
+    return {
+      ...row,
+      company_id: found.id,
+      company_name: found.name,
+      unmatchedCompany: false,
+      errors,
+      ok: false,
+    };
+  }
+
+  return {
+    ...row,
+    company_id: found.id,
+    company_name: found.name,
+    unmatchedCompany: false,
     errors,
     ok: errors.length === 0,
   };
@@ -355,10 +437,65 @@ export async function parseImportFile(file: File): Promise<ParsedImportRow[]> {
   return parseImportCsv(text);
 }
 
-export const IMPORT_CSV_TEMPLATE = `snsid,snsurl,name,visit_date,store,product,quantity
-@mina_beauty,https://instagram.com/mina_beauty,미나,2026-08-10,강남점,텔로액트 두피 스케일러,2
-@beauty_lee,,이지,2026-08-10,홍대점,앰플 세트 1개,
-`;
+export const IMPORT_TEMPLATE_HEADERS = [
+  "company",
+  "snsid",
+  "snsurl",
+  "name",
+  "visit_date",
+  "store",
+  "product",
+  "quantity",
+] as const;
+
+export const IMPORT_TEMPLATE_HEADER_LABEL =
+  "company(회원사), snsid, snsurl, name, visit_date, store, product, quantity";
+
+function csvCell(value: string) {
+  if (/[",\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+/** 등록된 회원사명을 예시로 넣은 행. 콘텐츠 링크 컬럼은 넣지 않음. */
+export function buildImportTemplateRows(
+  companies: { name: string; is_active?: boolean }[],
+): string[][] {
+  const active = companies.filter((c) => c.is_active !== false);
+  const examples =
+    active.length > 0
+      ? active.slice(0, 3).map((c, i) => [
+          c.name,
+          i === 0 ? "@mina_beauty" : `@example_${i + 1}`,
+          i === 0 ? "https://instagram.com/mina_beauty" : "",
+          i === 0 ? "미나" : `예시${i + 1}`,
+          "2026-08-20",
+          "강남점",
+          i === 0 ? "텔로액트 두피 스케일러" : "샘플 상품",
+          String(i === 0 ? 2 : 1),
+        ])
+      : [
+          [
+            "옵티마",
+            "@mina_beauty",
+            "https://instagram.com/mina_beauty",
+            "미나",
+            "2026-08-20",
+            "강남점",
+            "텔로액트 두피 스케일러",
+            "2",
+          ],
+        ];
+  return [[...IMPORT_TEMPLATE_HEADERS], ...examples];
+}
+
+export function buildImportCsvTemplate(
+  companies: { name: string; is_active?: boolean }[],
+) {
+  const rows = buildImportTemplateRows(companies);
+  return `${rows.map((row) => row.map(csvCell).join(",")).join("\n")}\n`;
+}
+
+export const IMPORT_CSV_TEMPLATE = buildImportCsvTemplate([]);
 
 export const IMPORT_ACCEPT =
   ".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";

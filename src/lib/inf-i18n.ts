@@ -65,6 +65,24 @@ export type InfMessages = {
   cancelledCannotPickup: string;
   pickupFailed: string;
   pickupError: string;
+  visitScheduled: string;
+  allocationsTab: string;
+  contentLinks: string;
+  registerLink: string;
+  registerLinkCta: string;
+  noPickedUpProducts: string;
+  enterLink: string;
+  invalidLink: string;
+  linkTooLong: string;
+  duplicateLink: string;
+  approvedCannotDelete: string;
+  pickupThenRegister: string;
+  linkSubmit: string;
+  linkDelete: string;
+  linkReviewing: string;
+  linkApproved: string;
+  linkRejected: string;
+  receivedOn: string;
   /** 시트 본문 라벨 (사용자 언어) */
   sheet: InfSheetLabels;
   /** 약사님께 보이는 한국어 고정 라벨 (시트 본문) */
@@ -237,6 +255,24 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     cancelledCannotPickup: "취소된 배정은 수령 확인할 수 없습니다.",
     pickupFailed: "수령 확인 실패",
     pickupError: "수령 확인 중 오류가 발생했습니다.",
+    visitScheduled: "방문 예정",
+    allocationsTab: "배정 목록",
+    contentLinks: "콘텐츠 링크",
+    registerLink: "링크 등록",
+    registerLinkCta: "링크 등록하기",
+    noPickedUpProducts: "수령 완료된 상품이 없습니다.",
+    enterLink: "링크를 입력해 주세요.",
+    invalidLink: "올바른 링크 형식이 아닙니다.",
+    linkTooLong: "링크가 너무 깁니다.",
+    duplicateLink: "이미 등록된 링크입니다.",
+    approvedCannotDelete: "승인된 링크는 삭제할 수 없습니다.",
+    pickupThenRegister: "수령 완료 후 등록할 수 있습니다.",
+    linkSubmit: "등록",
+    linkDelete: "삭제",
+    linkReviewing: "검수중",
+    linkApproved: "승인",
+    linkRejected: "반려",
+    receivedOn: "수령일",
     sheet: koSheet,
     koSheet,
   },
@@ -299,6 +335,24 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     cancelledCannotPickup: "Cancelled allocations cannot be picked up.",
     pickupFailed: "Pickup confirmation failed",
     pickupError: "An error occurred while confirming pickup.",
+    visitScheduled: "Scheduled",
+    allocationsTab: "Allocations",
+    contentLinks: "Content links",
+    registerLink: "Add link",
+    registerLinkCta: "Submit a link",
+    noPickedUpProducts: "No picked-up products yet.",
+    enterLink: "Please enter a link.",
+    invalidLink: "Please enter a valid URL.",
+    linkTooLong: "The link is too long.",
+    duplicateLink: "This link is already registered.",
+    approvedCannotDelete: "Approved links cannot be deleted.",
+    pickupThenRegister: "You can submit a link after pickup.",
+    linkSubmit: "Submit",
+    linkDelete: "Delete",
+    linkReviewing: "In review",
+    linkApproved: "Approved",
+    linkRejected: "Rejected",
+    receivedOn: "Picked up",
     sheet: {
       product: "Product",
       store: "Store",
@@ -373,6 +427,24 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     cancelledCannotPickup: "キャンセルされた割り当ては受け取れません。",
     pickupFailed: "受取確認に失敗しました",
     pickupError: "受取確認中にエラーが発生しました。",
+    visitScheduled: "来店予定",
+    allocationsTab: "割当一覧",
+    contentLinks: "コンテンツリンク",
+    registerLink: "リンク登録",
+    registerLinkCta: "リンクを登録する",
+    noPickedUpProducts: "受取済みの商品がありません。",
+    enterLink: "リンクを入力してください。",
+    invalidLink: "正しいリンク形式ではありません。",
+    linkTooLong: "リンクが長すぎます。",
+    duplicateLink: "すでに登録されたリンクです。",
+    approvedCannotDelete: "承認済みのリンクは削除できません。",
+    pickupThenRegister: "受取完了後に登録できます。",
+    linkSubmit: "登録",
+    linkDelete: "削除",
+    linkReviewing: "審査中",
+    linkApproved: "承認",
+    linkRejected: "差戻し",
+    receivedOn: "受取日",
     sheet: {
       product: "商品",
       store: "店舗",
@@ -445,6 +517,24 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     cancelledCannotPickup: "已取消的分配无法领取。",
     pickupFailed: "领取确认失败",
     pickupError: "领取确认时发生错误。",
+    visitScheduled: "到访预定",
+    allocationsTab: "分配列表",
+    contentLinks: "内容链接",
+    registerLink: "登记链接",
+    registerLinkCta: "去登记链接",
+    noPickedUpProducts: "暂无已领取商品。",
+    enterLink: "请输入链接。",
+    invalidLink: "链接格式不正确。",
+    linkTooLong: "链接过长。",
+    duplicateLink: "该链接已登记。",
+    approvedCannotDelete: "已通过的链接无法删除。",
+    pickupThenRegister: "领取完成后才能登记。",
+    linkSubmit: "登记",
+    linkDelete: "删除",
+    linkReviewing: "审核中",
+    linkApproved: "已通过",
+    linkRejected: "已驳回",
+    receivedOn: "领取日",
     sheet: {
       product: "商品",
       store: "门店",
@@ -485,6 +575,12 @@ export function translateInfApiError(
     "세션이 만료되었습니다. 다시 로그인해 주세요.": t.sessionExpired,
     "수령 확인 실패": t.pickupFailed,
     "수령 확인 중 오류가 발생했습니다.": t.pickupError,
+    "링크를 입력해 주세요.": t.enterLink,
+    "올바른 링크 형식이 아닙니다.": t.invalidLink,
+    "링크가 너무 깁니다.": t.linkTooLong,
+    "이미 등록된 링크입니다.": t.duplicateLink,
+    "승인된 링크는 삭제할 수 없습니다.": t.approvedCannotDelete,
+    "수령 완료 후 등록할 수 있습니다.": t.pickupThenRegister,
   };
 
   return map[msg] || msg;

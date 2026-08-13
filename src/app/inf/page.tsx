@@ -1,5 +1,6 @@
 import { InfAllocationList } from "@/components/inf-allocation-list";
 import { InfAppHeader } from "@/components/inf-app-header";
+import { InfBottomNav } from "@/components/inf-bottom-nav";
 import { InfLoginClient } from "@/components/inf-login-client";
 import { InfServerMessage } from "@/components/inf-server-message";
 import { applyInfluencerStoreVisit } from "@/lib/inf-visit";
@@ -79,6 +80,7 @@ export default async function InfPage({
           initialAllocations={allocations}
         />
       </main>
+      <InfBottomNav />
     </div>
   );
 }

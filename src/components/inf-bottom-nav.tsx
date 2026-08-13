@@ -1,0 +1,38 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useInfLocale } from "@/components/inf-locale-provider";
+
+export function InfBottomNav() {
+  const pathname = usePathname();
+  const { t } = useInfLocale();
+  const items = [
+    { href: "/inf", label: t.allocationsTab },
+    { href: "/inf/links", label: t.contentLinks },
+  ];
+
+  return (
+    <nav className="sticky bottom-0 z-20 border-t border-[#eee] bg-white/95 px-4 py-2 backdrop-blur">
+      <div className="mx-auto flex max-w-md">
+        {items.map((item) => {
+          const active =
+            item.href === "/inf"
+              ? pathname === "/inf"
+              : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex-1 rounded-xl py-2.5 text-center text-sm font-semibold ${
+                active ? "bg-[#F5EDE3] text-[#6B3B1F]" : "text-[#999]"
+              }`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}

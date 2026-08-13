@@ -11,10 +11,16 @@ import {
 import { AdminAllocationEditForm } from "@/components/admin-allocation-edit";
 import { PHAR_COUNTER_ROOT_ID } from "@/components/phar-header-actions";
 import {
+  ALLOCATION_LINK_LABEL_ADMIN,
+  summarizeAllocationLinks,
+} from "@/lib/creator-link";
+import {
   ALLOCATION_STATUS_LABEL,
   allocationStatusDisplayLabel,
+  VISIT_SOURCE_LABEL,
   type AllocationStatus,
   type AllocationWithRelations,
+  type Company,
   type Influencer,
   type Store,
 } from "@/lib/types";
@@ -37,6 +43,24 @@ function formatKst(iso: string | null) {
   return new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
+async function confirmVisit(
+  id: string,
+  action: "confirm" | "unconfirm",
+  onUpdated: (next: AllocationWithRelations) => void,
+) {
+  const res = await fetch(`/api/allocations/${id}/visit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    window.alert(body.error || "처리에 실패했습니다.");
+    return;
+  }
+  onUpdated(body.allocation as AllocationWithRelations);
+}
+
 function CounterDetailPanel({
   item,
   related,
@@ -45,6 +69,7 @@ function CounterDetailPanel({
   onSelectRelated,
   allowAdminEdit,
   storeList,
+  companyList,
   onUpdated,
 }: {
   item: AllocationWithRelations;
@@ -54,6 +79,7 @@ function CounterDetailPanel({
   onSelectRelated: (id: string) => void;
   allowAdminEdit?: boolean;
   storeList?: Store[];
+  companyList?: Company[];
   onUpdated?: (next: AllocationWithRelations) => void;
 }) {
   const handle = formatIgHandle(item.influencers);
@@ -162,10 +188,41 @@ function CounterDetailPanel({
         </p>
       ) : null}
 
+      {onUpdated &&
+      (item.status === "pending" ||
+        item.status === "visited" ||
+        item.status === "ready") ? (
+        <div className="flex flex-wrap gap-2">
+          {item.status === "pending" ? (
+            <button
+              type="button"
+              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"
+              onClick={() => void confirmVisit(item.id, "confirm", onUpdated)}
+            >
+              방문 확인
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm font-semibold"
+              onClick={() => void confirmVisit(item.id, "unconfirm", onUpdated)}
+            >
+              방문 확인 해제
+            </button>
+          )}
+          {item.visit_source ? (
+            <span className="self-center text-xs text-[var(--muted)]">
+              {VISIT_SOURCE_LABEL[item.visit_source]}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {allowAdminEdit && storeList && storeList.length > 0 && onUpdated ? (
         <AdminAllocationEditForm
           item={item}
           storeList={storeList}
+          companyList={companyList}
           onUpdated={onUpdated}
         />
       ) : null}
@@ -429,6 +486,7 @@ function AllocationDetailRows({
   item,
   allowAdminEdit,
   storeList,
+  companyList,
   editing,
   onToggleEdit,
   onUpdated,
@@ -436,6 +494,7 @@ function AllocationDetailRows({
   item: AllocationWithRelations;
   allowAdminEdit: boolean;
   storeList: Store[];
+  companyList: Company[];
   editing: boolean;
   onToggleEdit: () => void;
   onUpdated: (next: AllocationWithRelations) => void;
@@ -483,9 +542,40 @@ function AllocationDetailRows({
       {allowAdminEdit && editing ? (
         <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/30 last:border-b-0">
           <td colSpan={7} className="px-3 py-3">
+            {item.status === "pending" ||
+            item.status === "visited" ||
+            item.status === "ready" ? (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {item.status === "pending" ? (
+                  <button
+                    type="button"
+                    className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
+                    onClick={() => void confirmVisit(item.id, "confirm", onUpdated)}
+                  >
+                    방문 확인
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
+                    onClick={() =>
+                      void confirmVisit(item.id, "unconfirm", onUpdated)
+                    }
+                  >
+                    방문 확인 해제
+                  </button>
+                )}
+                {item.visit_source ? (
+                  <span className="text-xs text-[var(--muted)]">
+                    {VISIT_SOURCE_LABEL[item.visit_source]}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
             <AdminAllocationEditForm
               item={item}
               storeList={storeList}
+              companyList={companyList}
               compact
               onUpdated={onUpdated}
             />
@@ -502,6 +592,9 @@ function AllocationRow({
   selected,
   hideStore,
   counter,
+  showCompany,
+  showLink,
+  showVisitSource,
   onOpen,
 }: {
   item: AllocationWithRelations;
@@ -510,6 +603,9 @@ function AllocationRow({
   hideStore?: boolean;
   /** 지점 카운터: 글자·행 높이 확대 */
   counter?: boolean;
+  showCompany?: boolean;
+  showLink?: boolean;
+  showVisitSource?: boolean;
   onOpen: () => void;
 }) {
   const handle = formatIgHandle(item.influencers);
@@ -585,6 +681,11 @@ function AllocationRow({
           {item.stores?.name || "매장"}
         </td>
       ) : null}
+      {showCompany ? (
+        <td className={`${cell} text-[var(--muted)]`}>
+          {item.companies?.name || "미지정"}
+        </td>
+      ) : null}
       <td
         className={`${cell} text-right font-semibold tabular-nums text-[var(--accent)] ${
           counter ? "text-lg" : "text-base"
@@ -610,6 +711,20 @@ function AllocationRow({
           {allocationStatusDisplayLabel(item)}
         </span>
       </td>
+      {showVisitSource ? (
+        <td className={`${cell} text-xs text-[var(--muted)]`}>
+          {item.visit_source ? VISIT_SOURCE_LABEL[item.visit_source] : "—"}
+        </td>
+      ) : null}
+      {showLink ? (
+        <td className={`${cell} text-xs text-[var(--muted)]`}>
+          {
+            ALLOCATION_LINK_LABEL_ADMIN[
+              summarizeAllocationLinks(item.creator_links || [])
+            ]
+          }
+        </td>
+      ) : null}
       {!hideStore ? (
         <td className={`${cell} text-right text-xs text-[var(--accent)]`}>
           보기 →
@@ -625,6 +740,7 @@ export function PharListWithModal({
   lockedStoreId,
   allowAdminEdit = false,
   storeList = [],
+  companyList = [],
 }: {
   items: AllocationWithRelations[];
   /** 부모 높이에 맞춰 목록만 내부 스크롤 (운영 콘솔 등) */
@@ -634,6 +750,7 @@ export function PharListWithModal({
   /** 운영 콘솔: 방문일·지점·수량·상태 수정 */
   allowAdminEdit?: boolean;
   storeList?: Store[];
+  companyList?: Company[];
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
@@ -648,6 +765,7 @@ export function PharListWithModal({
   const [quantity, setQuantity] = useState("");
   const [visitDate, setVisitDate] = useState("");
   const [status, setStatus] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
   /** 지점(phar)은 기본 오늘만, Admin 전체 목록은 기본 전체 */
   const [todayOnly, setTodayOnly] = useState(() => Boolean(lockedStoreId));
   /** 지점 PC: 기본 미수령만 */
@@ -819,6 +937,14 @@ export function PharListWithModal({
       if (!matchesProductSearch(item, deferredProductQ)) return false;
       if (quantity && String(item.quantity) !== quantity) return false;
       if (visitDate && (item.visit_date || "") !== visitDate) return false;
+      if (companyFilter === "__unset__" && item.company_id) return false;
+      if (
+        companyFilter &&
+        companyFilter !== "__unset__" &&
+        item.company_id !== companyFilter
+      ) {
+        return false;
+      }
       return true;
     });
 
@@ -832,6 +958,7 @@ export function PharListWithModal({
     storeFilterId,
     quantity,
     visitDate,
+    companyFilter,
     status,
     hidePickedUp,
     statsBucket,
@@ -1136,6 +1263,7 @@ export function PharListWithModal({
     setQuantity("");
     setVisitDate("");
     setStatus("");
+    setCompanyFilter("");
     setStatsBucket(null);
     if (simpleFilters) setHidePickedUp(true);
   }
@@ -1194,7 +1322,7 @@ export function PharListWithModal({
     setOpenId(item.influencer_id);
   }
 
-  const colSpan = simpleFilters ? 5 : 7;
+  const colSpan = simpleFilters ? 5 : allowAdminEdit ? 10 : 7;
 
   /* ── 지점 PC 카운터: 좌 Counter+목록 / 우 검색+상세 ── */
   if (simpleFilters) {
@@ -1602,6 +1730,7 @@ export function PharListWithModal({
                     onSelectRelated={(id) => setSelectedAllocId(id)}
                     allowAdminEdit={allowAdminEdit}
                     storeList={storeList}
+                    companyList={companyList}
                     onUpdated={applyAllocationUpdate}
                   />
                 ) : (
@@ -1717,8 +1846,17 @@ export function PharListWithModal({
                 <th className="px-4 py-3 font-medium">계정</th>
                 <th className="px-4 py-3 font-medium">상품</th>
                 <th className="px-4 py-3 font-medium">매장</th>
+                {allowAdminEdit ? (
+                  <th className="px-4 py-3 font-medium">회원사</th>
+                ) : null}
                 <th className="px-4 py-3 font-medium text-right">수량</th>
                 <th className="px-4 py-3 font-medium">상태</th>
+                {allowAdminEdit ? (
+                  <th className="px-4 py-3 font-medium">확정</th>
+                ) : null}
+                {allowAdminEdit ? (
+                  <th className="px-4 py-3 font-medium">링크</th>
+                ) : null}
                 <th className="px-4 py-3 font-medium text-right">상세</th>
               </tr>
               <tr className="border-b border-[var(--line)] bg-[var(--surface)]">
@@ -1768,6 +1906,25 @@ export function PharListWithModal({
                     ))}
                   </select>
                 </th>
+                {allowAdminEdit ? (
+                  <th className="px-2 py-2 font-normal">
+                    <select
+                      className={filterSelectClass}
+                      style={{ backgroundImage: selectChevron }}
+                      value={companyFilter}
+                      onChange={(e) => setCompanyFilter(e.target.value)}
+                      aria-label="회원사 필터"
+                    >
+                      <option value="">회원사 전체</option>
+                      <option value="__unset__">회원사 미지정</option>
+                      {companyList.map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.name}
+                        </option>
+                      ))}
+                    </select>
+                  </th>
+                ) : null}
                 <th className="px-2 py-2 font-normal">
                   <select
                     className={filterSelectClass}
@@ -1800,6 +1957,8 @@ export function PharListWithModal({
                     ))}
                   </select>
                 </th>
+                {allowAdminEdit ? <th className="px-2 py-2" /> : null}
+                {allowAdminEdit ? <th className="px-2 py-2" /> : null}
                 <th className="px-2 py-2" />
               </tr>
             </thead>
@@ -1843,6 +2002,9 @@ export function PharListWithModal({
                         key={item.id}
                         item={item}
                         isToday
+                        showCompany={allowAdminEdit}
+                        showLink={allowAdminEdit}
+                        showVisitSource={allowAdminEdit}
                         onOpen={() => selectRow(item)}
                       />
                     ))
@@ -1862,6 +2024,9 @@ export function PharListWithModal({
                       key={item.id}
                       item={item}
                       isToday={false}
+                      showCompany={allowAdminEdit}
+                      showLink={allowAdminEdit}
+                      showVisitSource={allowAdminEdit}
                       onOpen={() => selectRow(item)}
                     />
                   ))}
@@ -1887,6 +2052,9 @@ export function PharListWithModal({
                         key={item.id}
                         item={item}
                         isToday
+                        showCompany={allowAdminEdit}
+                        showLink={allowAdminEdit}
+                        showVisitSource={allowAdminEdit}
                         onOpen={() => selectRow(item)}
                       />
                     ))
@@ -1904,6 +2072,9 @@ export function PharListWithModal({
                       key={item.id}
                       item={item}
                       isToday={false}
+                      showCompany={allowAdminEdit}
+                      showLink={allowAdminEdit}
+                      showVisitSource={allowAdminEdit}
                       onOpen={() => selectRow(item)}
                     />
                   ))}
@@ -2050,6 +2221,7 @@ export function PharListWithModal({
                               item={item}
                               allowAdminEdit={allowAdminEdit}
                               storeList={storeList}
+                              companyList={companyList}
                               editing={editingAllocId === item.id}
                               onToggleEdit={() =>
                                 setEditingAllocId((id) =>

@@ -5,6 +5,31 @@ export type AllocationStatus =
   | "picked_up"
   | "cancelled";
 
+export type VisitSource = "auto" | "pharmacist" | "admin";
+
+export type Company = {
+  id: string;
+  name: string;
+  login_id: string;
+  aliases: string[];
+  contact: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreatorLink = {
+  id: string;
+  allocation_id: string;
+  influencer_id: string;
+  url: string;
+  platform: "instagram" | "tiktok" | "youtube" | "naver_blog" | "etc";
+  status: "submitted" | "approved" | "rejected";
+  memo: string | null;
+  submitted_at: string;
+  updated_at: string;
+};
+
 export type Store = {
   id: string;
   name: string;
@@ -37,6 +62,7 @@ export type Allocation = {
   influencer_id: string;
   product_id: string;
   store_id: string;
+  company_id: string | null;
   quantity: number;
   status: AllocationStatus;
   visit_code: string | null;
@@ -47,6 +73,8 @@ export type Allocation = {
   /** 가장 최근 매장 방문 확인 시각 (재방문 시 갱신, 화면 표시용) */
   last_visited_at: string | null;
   picked_up_at: string | null;
+  visit_source: VisitSource | null;
+  visit_confirmed_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -54,8 +82,10 @@ export type Allocation = {
 export type AllocationWithRelations = Allocation & {
   products: Product | null;
   stores: Store | null;
+  companies?: Pick<Company, "id" | "name"> | null;
   /** 조인 시만 존재 (Inf 목록 등에서는 생략 가능) */
   influencers?: Influencer | null;
+  creator_links?: CreatorLink[];
 };
 
 export const ALLOCATION_STATUS_LABEL: Record<AllocationStatus, string> = {
@@ -64,6 +94,12 @@ export const ALLOCATION_STATUS_LABEL: Record<AllocationStatus, string> = {
   ready: "반출 준비",
   picked_up: "반출 완료",
   cancelled: "취소",
+};
+
+export const VISIT_SOURCE_LABEL: Record<VisitSource, string> = {
+  auto: "자동",
+  pharmacist: "약사 확인",
+  admin: "운영자 확인",
 };
 
 /** ISO / Date → YYYY-MM-DD (KST) */

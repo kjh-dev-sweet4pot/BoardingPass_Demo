@@ -5,6 +5,7 @@ import { isAdminSession } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { normalizeVisitDate } from "@/lib/csv-import";
 import { type AllocationStatus } from "@/lib/types";
+import { findDuplicateAllocation } from "@/lib/alloc-dup";
 
 const STATUSES: AllocationStatus[] = [
   "pending",
@@ -15,7 +16,7 @@ const STATUSES: AllocationStatus[] = [
 ];
 
 const ALLOC_SELECT =
-  "*, products(*), stores(*), influencers(*)";
+  "*, products(*), stores(*), influencers(*), companies(id, name), creator_links(*)";
 
 function asYmd(value: string | null | undefined) {
   if (!value) return null;
@@ -46,6 +47,7 @@ export async function PATCH(
   let body: {
     visit_date?: string | null;
     store_id?: string;
+    company_id?: string | null;
     quantity?: number | string;
     visit_code?: string | null;
     status?: string;
@@ -113,6 +115,31 @@ export async function PATCH(
     patch.store_id = storeId;
   }
 
+  if ("company_id" in body) {
+    const companyId = String(body.company_id || "").trim();
+    if (!companyId) {
+      return NextResponse.json(
+        { error: "회원사를 선택하세요." },
+        { status: 400 },
+      );
+    }
+    const { data: company, error: companyError } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("id", companyId)
+      .maybeSingle();
+    if (companyError) {
+      return NextResponse.json({ error: companyError.message }, { status: 500 });
+    }
+    if (!company) {
+      return NextResponse.json(
+        { error: "선택한 회원사를 찾을 수 없습니다." },
+        { status: 400 },
+      );
+    }
+    patch.company_id = companyId;
+  }
+
   if ("quantity" in body) {
     const quantity = Number(body.quantity);
     if (!Number.isFinite(quantity) || quantity < 1) {
@@ -147,32 +174,50 @@ export async function PATCH(
     if (status === "visited" || status === "ready") {
       if (!current.verified_at) patch.verified_at = now;
       if (!current.last_visited_at) patch.last_visited_at = now;
+      if (!current.visit_source) {
+        patch.visit_source = "admin";
+        patch.visit_confirmed_by = "admin";
+      }
+    } else if (status === "pending") {
+      patch.verified_at = null;
+      patch.last_visited_at = null;
+      patch.visit_source = null;
+      patch.visit_confirmed_by = null;
     }
   }
 
   const nextStoreId = String(patch.store_id ?? current.store_id);
   const nextVisitDate =
     asYmd(String(patch.visit_date ?? current.visit_date)) || "";
+  const nextCompanyId =
+    (patch.company_id as string | undefined) ?? current.company_id ?? null;
   const storeChanged = nextStoreId !== current.store_id;
   const dateChanged = nextVisitDate !== asYmd(current.visit_date);
+  const companyChanged = nextCompanyId !== (current.company_id ?? null);
 
-  if (storeChanged || dateChanged) {
-    const { data: dup, error: dupError } = await supabase
-      .from("allocations")
-      .select("id")
-      .eq("influencer_id", current.influencer_id)
-      .eq("product_id", current.product_id)
-      .eq("store_id", nextStoreId)
-      .eq("visit_date", nextVisitDate)
-      .neq("id", id)
-      .maybeSingle();
-    if (dupError) {
-      return NextResponse.json({ error: dupError.message }, { status: 500 });
-    }
-    if (dup?.id) {
+  if (storeChanged || dateChanged || companyChanged) {
+    try {
+      const dupId = await findDuplicateAllocation(supabase, {
+        influencerId: current.influencer_id,
+        productId: current.product_id,
+        storeId: nextStoreId,
+        visitDate: nextVisitDate,
+        companyId: nextCompanyId,
+        excludeId: id,
+      });
+      if (dupId) {
+        return NextResponse.json(
+          {
+            error:
+              "동일한 배정(핸들·상품·매장·방문일·회원사)이 이미 있습니다.",
+          },
+          { status: 409 },
+        );
+      }
+    } catch (err) {
       return NextResponse.json(
-        { error: "동일한 배정(핸들·상품·매장·방문일)이 이미 있습니다." },
-        { status: 409 },
+        { error: err instanceof Error ? err.message : "중복 확인 실패" },
+        { status: 500 },
       );
     }
   }
@@ -193,5 +238,6 @@ export async function PATCH(
 
   revalidatePath("/admin");
   revalidatePath("/phar");
+  revalidatePath("/com");
   return NextResponse.json({ allocation: updated });
 }

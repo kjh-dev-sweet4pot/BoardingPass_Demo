@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 export const INF_COOKIE = "bp_influencer_id";
 export const ADMIN_COOKIE = "bp_admin";
 export const STORE_COOKIE = "bp_store_id";
+export const COMPANY_COOKIE = "bp_company_id";
 
 export async function getInfluencerSessionId() {
   const jar = await cookies();
@@ -62,6 +63,26 @@ export async function setStoreSessionId(storeId: string) {
 export async function clearStoreSession() {
   const jar = await cookies();
   jar.delete(STORE_COOKIE);
+}
+
+export async function getCompanySessionId() {
+  const jar = await cookies();
+  return jar.get(COMPANY_COOKIE)?.value ?? null;
+}
+
+export async function setCompanySessionId(companyId: string) {
+  const jar = await cookies();
+  jar.set(COMPANY_COOKIE, companyId, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 12,
+  });
+}
+
+export async function clearCompanySession() {
+  const jar = await cookies();
+  jar.delete(COMPANY_COOKIE);
 }
 
 /** Plain username/password — no email. Case-insensitive username. */
