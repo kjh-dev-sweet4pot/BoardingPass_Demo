@@ -175,6 +175,8 @@ export function AdminConsoleLayout({
               items={filteredList}
               fillHeight
               lockedStoreId={selectedStoreId || undefined}
+              allowAdminEdit
+              storeList={storeList}
             />
           </div>
         </section>

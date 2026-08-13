@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { AdminAllocationEditForm } from "@/components/admin-allocation-edit";
 import { PHAR_COUNTER_ROOT_ID } from "@/components/phar-header-actions";
 import {
   ALLOCATION_STATUS_LABEL,
@@ -15,6 +16,7 @@ import {
   type AllocationStatus,
   type AllocationWithRelations,
   type Influencer,
+  type Store,
 } from "@/lib/types";
 
 type DetailPayload = {
@@ -41,12 +43,18 @@ function CounterDetailPanel({
   today,
   onClose,
   onSelectRelated,
+  allowAdminEdit,
+  storeList,
+  onUpdated,
 }: {
   item: AllocationWithRelations;
   related: AllocationWithRelations[];
   today: string;
   onClose: () => void;
   onSelectRelated: (id: string) => void;
+  allowAdminEdit?: boolean;
+  storeList?: Store[];
+  onUpdated?: (next: AllocationWithRelations) => void;
 }) {
   const handle = formatIgHandle(item.influencers);
   const name = (item.influencers?.name || "").trim();
@@ -152,6 +160,14 @@ function CounterDetailPanel({
             {item.visit_code}
           </span>
         </p>
+      ) : null}
+
+      {allowAdminEdit && storeList && storeList.length > 0 && onUpdated ? (
+        <AdminAllocationEditForm
+          item={item}
+          storeList={storeList}
+          onUpdated={onUpdated}
+        />
       ) : null}
 
       {item.influencers?.notes ? (
@@ -409,6 +425,77 @@ const SectionHeaderRow = forwardRef<
   );
 });
 
+function AllocationDetailRows({
+  item,
+  allowAdminEdit,
+  storeList,
+  editing,
+  onToggleEdit,
+  onUpdated,
+}: {
+  item: AllocationWithRelations;
+  allowAdminEdit: boolean;
+  storeList: Store[];
+  editing: boolean;
+  onToggleEdit: () => void;
+  onUpdated: (next: AllocationWithRelations) => void;
+}) {
+  return (
+    <>
+      <tr className="border-b border-[var(--line)] last:border-b-0">
+        <td className="px-3 py-2.5">
+          <span className="font-medium">{item.products?.name || "상품"}</span>
+          {item.products?.sku ? (
+            <span className="mt-0.5 block text-xs text-[var(--muted)]">
+              SKU {item.products.sku}
+            </span>
+          ) : null}
+        </td>
+        <td className="px-3 py-2.5 text-[var(--muted)]">
+          {item.stores?.name || "매장"}
+        </td>
+        <td className="px-3 py-2.5 text-right tabular-nums">{item.quantity}</td>
+        <td className="px-3 py-2.5 tabular-nums text-[var(--muted)]">
+          {item.visit_date || "—"}
+        </td>
+        <td className="px-3 py-2.5">
+          <span
+            className={`inline-block border px-2 py-0.5 text-xs font-medium ${statusTone(item.status)}`}
+          >
+            {allocationStatusDisplayLabel(item)}
+          </span>
+        </td>
+        <td className="px-3 py-2.5 text-xs text-[var(--muted)]">
+          {item.picked_up_at ? formatKst(item.picked_up_at) : "—"}
+        </td>
+        {allowAdminEdit ? (
+          <td className="px-3 py-2.5 text-right">
+            <button
+              type="button"
+              onClick={onToggleEdit}
+              className="text-xs font-semibold text-[var(--accent)] hover:underline"
+            >
+              {editing ? "닫기" : "수정"}
+            </button>
+          </td>
+        ) : null}
+      </tr>
+      {allowAdminEdit && editing ? (
+        <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/30 last:border-b-0">
+          <td colSpan={7} className="px-3 py-3">
+            <AdminAllocationEditForm
+              item={item}
+              storeList={storeList}
+              compact
+              onUpdated={onUpdated}
+            />
+          </td>
+        </tr>
+      ) : null}
+    </>
+  );
+}
+
 function AllocationRow({
   item,
   isToday,
@@ -536,17 +623,23 @@ export function PharListWithModal({
   items,
   fillHeight = false,
   lockedStoreId,
+  allowAdminEdit = false,
+  storeList = [],
 }: {
   items: AllocationWithRelations[];
   /** 부모 높이에 맞춰 목록만 내부 스크롤 (운영 콘솔 등) */
   fillHeight?: boolean;
   /** 지점 로그인 시 매장 필터 숨김 (서버에서 이미 해당 지점만 전달) */
   lockedStoreId?: string;
+  /** 운영 콘솔: 방문일·지점·수량·상태 수정 */
+  allowAdminEdit?: boolean;
+  storeList?: Store[];
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingAllocId, setEditingAllocId] = useState<string | null>(null);
 
   const [influencerQ, setInfluencerQ] = useState("");
   const [productQ, setProductQ] = useState("");
@@ -993,6 +1086,7 @@ export function PharListWithModal({
     if (!openId) {
       setDetail(null);
       setError(null);
+      setEditingAllocId(null);
       return;
     }
 
@@ -1071,6 +1165,25 @@ export function PharListWithModal({
     setStatsBucket(bucket);
     setStatus("");
     syncListDateToStatsPeriod(statsPeriod);
+  }
+
+  function applyAllocationUpdate(next: AllocationWithRelations) {
+    setLiveItems((prev) =>
+      prev.map((row) => (row.id === next.id ? { ...row, ...next } : row)),
+    );
+    setDetail((prev) =>
+      prev
+        ? {
+            ...prev,
+            allocations: prev.allocations.map((row) =>
+              row.id === next.id ? { ...row, ...next } : row,
+            ),
+          }
+        : prev,
+    );
+    if (selectedAllocId === next.id) {
+      setSelectedAllocId(next.id);
+    }
   }
 
   function selectRow(item: AllocationWithRelations) {
@@ -1487,6 +1600,9 @@ export function PharListWithModal({
                     today={today}
                     onClose={() => setSelectedAllocId(null)}
                     onSelectRelated={(id) => setSelectedAllocId(id)}
+                    allowAdminEdit={allowAdminEdit}
+                    storeList={storeList}
+                    onUpdated={applyAllocationUpdate}
                   />
                 ) : (
                   <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
@@ -1920,46 +2036,28 @@ export function PharListWithModal({
                             <th className="px-3 py-2 font-medium">방문일</th>
                             <th className="px-3 py-2 font-medium">상태</th>
                             <th className="px-3 py-2 font-medium">수령</th>
+                            {allowAdminEdit ? (
+                              <th className="px-3 py-2 font-medium text-right">
+                                수정
+                              </th>
+                            ) : null}
                           </tr>
                         </thead>
                         <tbody>
                           {detail.allocations.map((item) => (
-                            <tr
+                            <AllocationDetailRows
                               key={item.id}
-                              className="border-b border-[var(--line)] last:border-b-0"
-                            >
-                              <td className="px-3 py-2.5">
-                                <span className="font-medium">
-                                  {item.products?.name || "상품"}
-                                </span>
-                                {item.products?.sku ? (
-                                  <span className="mt-0.5 block text-xs text-[var(--muted)]">
-                                    SKU {item.products.sku}
-                                  </span>
-                                ) : null}
-                              </td>
-                              <td className="px-3 py-2.5 text-[var(--muted)]">
-                                {item.stores?.name || "매장"}
-                              </td>
-                              <td className="px-3 py-2.5 text-right tabular-nums">
-                                {item.quantity}
-                              </td>
-                              <td className="px-3 py-2.5 tabular-nums text-[var(--muted)]">
-                                {item.visit_date || "—"}
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <span
-                                  className={`inline-block border px-2 py-0.5 text-xs font-medium ${statusTone(item.status)}`}
-                                >
-                                  {allocationStatusDisplayLabel(item)}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2.5 text-xs text-[var(--muted)]">
-                                {item.picked_up_at
-                                  ? formatKst(item.picked_up_at)
-                                  : "—"}
-                              </td>
-                            </tr>
+                              item={item}
+                              allowAdminEdit={allowAdminEdit}
+                              storeList={storeList}
+                              editing={editingAllocId === item.id}
+                              onToggleEdit={() =>
+                                setEditingAllocId((id) =>
+                                  id === item.id ? null : item.id,
+                                )
+                              }
+                              onUpdated={applyAllocationUpdate}
+                            />
                           ))}
                         </tbody>
                       </table>
