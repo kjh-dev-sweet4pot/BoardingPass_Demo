@@ -6,13 +6,16 @@ import {
 } from "@/lib/content-insights";
 import { type AllocationWithRelations } from "@/lib/types";
 
-const CAPTIONS = [
-  "오늘 픽업한 제품 리뷰 남겨요",
-  "매장 방문 후기 · 실제 사용해 본 느낌",
-  "이번 시즌 꼭 써보고 싶었던 아이템",
-  "약사님 추천으로 받아왔어요",
-  "언박싱부터 첫인상까지",
-];
+function captionFor(productName: string, seed: string) {
+  const templates = [
+    `${productName}、銀座店で受け取って使ってみた`,
+    `${productName} 2주 사용 후기`,
+    `약사님 추천으로 픽업한 ${productName}`,
+    `${productName} unboxing & first impression`,
+    `Ginza pickup · ${productName}`,
+  ];
+  return templates[hash32(seed) % templates.length];
+}
 
 function hash32(input: string) {
   let h = 2166136261;
@@ -118,7 +121,7 @@ export function buildMockContentInsights(
         influencerName: item.influencers?.name || handleOf(item),
         influencerHandle: handleOf(item),
         storeName: item.stores?.name || "—",
-        caption: CAPTIONS[hash32(seed.id) % CAPTIONS.length],
+        caption: captionFor(item.products?.name || "상품", seed.id),
         views,
         likes,
         comments,
