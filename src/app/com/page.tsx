@@ -45,7 +45,7 @@ export default async function CompanyPage() {
   return (
     <AppShell
       full
-      compactHeader
+      fitViewport
       theme="owm"
       eyebrow="Company"
       title={company.name}

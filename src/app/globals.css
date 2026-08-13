@@ -531,3 +531,20 @@ button {
 }
 
 /* INF: prefers-reduced-motion 무시 — 브랜딩 인트로/시트 애니메이션 유지 */
+
+@keyframes owm-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.owm-drawer-backdrop {
+  animation: inf-sheet-backdrop 0.2s ease-out both;
+}
+
+.owm-drawer-panel {
+  animation: owm-drawer-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

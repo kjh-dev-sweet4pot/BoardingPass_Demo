@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { InfAppHeader } from "@/components/inf-app-header";
 import {
   InfLanguageToggle,
+  InfLocaleEnsure,
   useInfLocale,
 } from "@/components/inf-locale-provider";
 import { translateInfApiError } from "@/lib/inf-i18n";
@@ -109,6 +110,14 @@ function WelcomeScreen({
 }
 
 export function InfLoginClient({ initialError }: { initialError?: string }) {
+  return (
+    <InfLocaleEnsure>
+      <InfLoginClientInner initialError={initialError} />
+    </InfLocaleEnsure>
+  );
+}
+
+function InfLoginClientInner({ initialError }: { initialError?: string }) {
   const { t } = useInfLocale();
   const [phase, setPhase] = useState<Phase>("form");
   const [handle, setHandle] = useState("");

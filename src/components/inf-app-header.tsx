@@ -1,12 +1,24 @@
 "use client";
 
-import { InfLanguageToggle, useInfLocale } from "@/components/inf-locale-provider";
+import {
+  InfLanguageToggle,
+  InfLocaleEnsure,
+  useInfLocale,
+} from "@/components/inf-locale-provider";
 
 export function InfAppHeader({
   showLanguage = true,
 }: {
   showLanguage?: boolean;
 }) {
+  return (
+    <InfLocaleEnsure>
+      <InfAppHeaderInner showLanguage={showLanguage} />
+    </InfLocaleEnsure>
+  );
+}
+
+function InfAppHeaderInner({ showLanguage }: { showLanguage: boolean }) {
   const { t } = useInfLocale();
 
   return (

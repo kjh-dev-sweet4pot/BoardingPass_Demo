@@ -1,24 +1,80 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useInfLocale } from "@/components/inf-locale-provider";
+import { InfLocaleEnsure, useInfLocale } from "@/components/inf-locale-provider";
 import {
   CREATOR_PLATFORM_LABEL,
   summarizeAllocationLinks,
   type CreatorPlatform,
 } from "@/lib/creator-link";
-import { translateInfApiError } from "@/lib/inf-i18n";
+import {
+  formatVisitDateLocalized,
+  translateInfApiError,
+  type InfLocale,
+} from "@/lib/inf-i18n";
 import {
   type AllocationWithRelations,
   type CreatorLink,
 } from "@/lib/types";
 
-function rank(item: AllocationWithRelations) {
+type VisitGroup = {
+  key: string;
+  storeName: string;
+  visitYmd: string | null;
+  items: AllocationWithRelations[];
+};
+
+function asYmd(value: string | null | undefined) {
+  if (!value) return null;
+  return String(value).slice(0, 10) || null;
+}
+
+function visitKey(item: AllocationWithRelations) {
+  const date = asYmd(item.visit_date) || asYmd(item.picked_up_at) || "undated";
+  return `${item.store_id || "store"}|${date}`;
+}
+
+function groupByVisit(items: AllocationWithRelations[]): VisitGroup[] {
+  const map = new Map<string, VisitGroup>();
+  for (const item of items) {
+    const key = visitKey(item);
+    const existing = map.get(key);
+    if (existing) {
+      existing.items.push(item);
+      continue;
+    }
+    map.set(key, {
+      key,
+      storeName: item.stores?.name || "",
+      visitYmd: asYmd(item.visit_date) || asYmd(item.picked_up_at),
+      items: [item],
+    });
+  }
+  return [...map.values()].sort((a, b) =>
+    String(b.visitYmd || "").localeCompare(String(a.visitYmd || "")),
+  );
+}
+
+function needsLink(item: AllocationWithRelations) {
   const sum = summarizeAllocationLinks(item.creator_links || []);
-  if (sum === "none") return 0;
-  if (sum === "rejected") return 1;
-  if (sum === "reviewing") return 2;
-  return 3;
+  return sum === "none" || sum === "rejected";
+}
+
+function groupNeedsAction(group: VisitGroup) {
+  return group.items.some(needsLink);
+}
+
+function statusLabel(
+  status: CreatorLink["status"],
+  t: {
+    linkReviewing: string;
+    linkApproved: string;
+    linkRejected: string;
+  },
+) {
+  if (status === "submitted") return t.linkReviewing;
+  if (status === "approved") return t.linkApproved;
+  return t.linkRejected;
 }
 
 export function InfLinksClient({
@@ -26,16 +82,29 @@ export function InfLinksClient({
 }: {
   initialAllocations: AllocationWithRelations[];
 }) {
-  const { t } = useInfLocale();
+  return (
+    <InfLocaleEnsure>
+      <InfLinksClientInner initialAllocations={initialAllocations} />
+    </InfLocaleEnsure>
+  );
+}
+
+function InfLinksClientInner({
+  initialAllocations,
+}: {
+  initialAllocations: AllocationWithRelations[];
+}) {
+  const { t, locale } = useInfLocale();
   const [items, setItems] = useState(initialAllocations);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errorById, setErrorById] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [openDoneKey, setOpenDoneKey] = useState<string | null>(null);
 
-  const sorted = useMemo(
-    () => [...items].sort((a, b) => rank(a) - rank(b)),
-    [items],
-  );
+  const groups = useMemo(() => groupByVisit(items), [items]);
+  const pending = groups.filter(groupNeedsAction);
+  const done = groups.filter((g) => !groupNeedsAction(g));
+  const remainCount = items.filter(needsLink).length;
 
   async function submit(allocationId: string) {
     const url = (drafts[allocationId] || "").trim();
@@ -89,7 +158,7 @@ export function InfLinksClient({
           ? {
               ...row,
               creator_links: (row.creator_links || []).filter(
-                (l) => l.id !== linkId,
+                (link) => link.id !== linkId,
               ),
             }
           : row,
@@ -97,7 +166,7 @@ export function InfLinksClient({
     );
   }
 
-  if (sorted.length === 0) {
+  if (items.length === 0) {
     return (
       <p className="mt-10 text-center text-sm text-[#999]">
         {t.noPickedUpProducts}
@@ -106,85 +175,268 @@ export function InfLinksClient({
   }
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-4 pb-6">
-      <h1 className="pt-2 text-xl font-bold text-[#1a1a2e]">{t.contentLinks}</h1>
-      {sorted.map((item) => {
-        const links = item.creator_links || [];
-        return (
-          <article
-            key={item.id}
-            className="rounded-3xl border border-[#e8e8e8] bg-white p-5 shadow-sm"
-          >
-            <p className="text-lg font-bold text-[#1a1a2e]">
-              {item.products?.name || t.productFallback}
-            </p>
-            <p className="mt-1 text-sm text-[#8a6a4a]">
-              {item.stores?.name || t.storeFallback}
-              {item.picked_up_at
-                ? ` · ${t.receivedOn} ${new Date(item.picked_up_at).toLocaleDateString("ko-KR")}`
-                : ""}
-            </p>
-            <ul className="mt-3 space-y-2">
-              {links.map((link) => (
-                <li key={link.id} className="rounded-2xl bg-[#f9f9f9] px-3 py-2.5">
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="break-all text-sm text-[#6B3B1F] underline"
-                  >
-                    {link.url}
-                  </a>
-                  <div className="mt-1 flex items-center justify-between gap-2 text-xs text-[#999]">
-                    <span>
-                      {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform]} ·{" "}
-                      {link.status === "submitted"
-                        ? t.linkReviewing
-                        : link.status === "approved"
-                          ? t.linkApproved
-                          : t.linkRejected}
-                      {link.status === "rejected" && link.memo
-                        ? ` · ${link.memo}`
-                        : ""}
+    <div className="mx-auto w-full max-w-md space-y-6 pb-6">
+      <header className="pt-2">
+        <h1 className="text-xl font-bold text-[#1a1a2e]">{t.contentLinks}</h1>
+        <p className="mt-2 text-sm leading-relaxed text-[#8a6a4a]">
+          {t.linksHint}
+        </p>
+        <p className="mt-3 text-xs font-semibold tracking-wide text-[#C4956A]">
+          {t.linksRemainCount(remainCount)}
+        </p>
+      </header>
+
+      {pending.length > 0 ? (
+        <section className="space-y-4">
+          <h2 className="text-sm font-bold text-[#3D1F0A]">
+            {t.linksNeedSection}
+          </h2>
+          {pending.map((group) => (
+            <VisitCard
+              key={group.key}
+              group={group}
+              drafts={drafts}
+              errors={errorById}
+              savingId={savingId}
+              onDraft={(id, value) =>
+                setDrafts((prev) => ({ ...prev, [id]: value }))
+              }
+              onSubmit={(id) => void submit(id)}
+              onRemove={(id, linkId) => void remove(id, linkId)}
+            />
+          ))}
+        </section>
+      ) : (
+        <p className="rounded-2xl bg-[#f3eee3] px-4 py-3 text-center text-sm font-semibold text-[#8a7a5c]">
+          {t.linksAllDone}
+        </p>
+      )}
+
+      {done.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="text-sm font-bold text-[#999]">{t.linksDoneSection}</h2>
+          {done.map((group) => {
+            const open = openDoneKey === group.key;
+            const title = visitTitle(
+              group,
+              locale,
+              t.dateUndecided,
+              t.storeFallback,
+            );
+            const productNames = group.items
+              .map((item) => item.products?.name || t.productFallback)
+              .join(", ");
+            return (
+              <article
+                key={group.key}
+                className="overflow-hidden rounded-3xl border border-[#eee] bg-[#fafafa]"
+              >
+                <button
+                  type="button"
+                  className="flex w-full items-start justify-between gap-3 px-4 py-3.5 text-left"
+                  onClick={() =>
+                    setOpenDoneKey((prev) =>
+                      prev === group.key ? null : group.key,
+                    )
+                  }
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-[#3D1F0A]">
+                      {title}
                     </span>
-                    {link.status !== "approved" ? (
-                      <button
-                        type="button"
-                        className="font-semibold text-[#999]"
-                        onClick={() => void remove(item.id, link.id)}
-                      >
-                        {t.linkDelete}
-                      </button>
-                    ) : null}
+                    <span className="mt-0.5 block text-xs text-[#999]">
+                      {productNames}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-[#C4956A]">
+                    {t.linkRegisteredShort}
+                  </span>
+                </button>
+                {open ? (
+                  <div className="space-y-3 border-t border-[#eee] px-4 pb-4 pt-3">
+                    {group.items.map((item) => (
+                      <ProductLinks
+                        key={item.id}
+                        item={item}
+                        onRemove={(linkId) => void remove(item.id, linkId)}
+                      />
+                    ))}
                   </div>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 flex gap-2">
-              <input
-                className="h-11 min-w-0 flex-1 rounded-2xl border border-[#e8e8e8] px-3 text-sm"
-                type="url"
-                placeholder="https://"
-                value={drafts[item.id] || ""}
-                onChange={(e) =>
-                  setDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))
-                }
-              />
+                ) : null}
+              </article>
+            );
+          })}
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function visitTitle(
+  group: VisitGroup,
+  locale: InfLocale,
+  undecided: string,
+  storeFallback: string,
+) {
+  const date = formatVisitDateLocalized(group.visitYmd, locale, undecided);
+  return `${date} · ${group.storeName || storeFallback}`;
+}
+
+function VisitCard({
+  group,
+  drafts,
+  errors,
+  savingId,
+  onDraft,
+  onSubmit,
+  onRemove,
+}: {
+  group: VisitGroup;
+  drafts: Record<string, string>;
+  errors: Record<string, string>;
+  savingId: string | null;
+  onDraft: (id: string, value: string) => void;
+  onSubmit: (id: string) => void;
+  onRemove: (id: string, linkId: string) => void;
+}) {
+  const { t, locale } = useInfLocale();
+  const title = visitTitle(group, locale, t.dateUndecided, t.storeFallback);
+
+  return (
+    <article className="rounded-3xl border border-[#e8e8e8] bg-white p-5 shadow-sm">
+      <p className="text-lg font-bold text-[#1a1a2e]">{title}</p>
+      <p className="mt-4 text-[11px] font-semibold tracking-wide text-[#C4956A]">
+        {t.linksProductsReceived}
+      </p>
+      <div className="mt-3 space-y-4">
+        {group.items.map((item) => {
+          const missing = needsLink(item);
+          const links = item.creator_links || [];
+          return (
+            <div
+              key={item.id}
+              className="rounded-2xl border border-[#f0e6d8] bg-[#faf7f2] px-3.5 py-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-bold text-[#1a1a2e]">
+                  {item.products?.name || t.productFallback}
+                  {item.quantity > 1 ? ` ×${item.quantity}` : ""}
+                </p>
+                <span
+                  className={`shrink-0 text-xs font-semibold ${
+                    missing ? "text-[#C4956A]" : "text-[#8a7a5c]"
+                  }`}
+                >
+                  {missing ? t.linkNotRegistered : t.linkRegisteredShort}
+                </span>
+              </div>
+
+              {links.length > 0 ? (
+                <div className="mt-2">
+                  <LinkList
+                    links={links}
+                    onRemove={(linkId) => onRemove(item.id, linkId)}
+                  />
+                </div>
+              ) : null}
+
+              {missing ? (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    className="h-11 min-w-0 flex-1 rounded-2xl border border-[#e8e8e8] bg-white px-3 text-sm"
+                    type="url"
+                    placeholder={t.linkPlaceholder}
+                    value={drafts[item.id] || ""}
+                    onChange={(e) => onDraft(item.id, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onSubmit(item.id);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={savingId === item.id || !(drafts[item.id] || "").trim()}
+                    onClick={() => onSubmit(item.id)}
+                    className="rounded-2xl bg-[#6B3B1F] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {t.linkSubmit}
+                  </button>
+                </div>
+              ) : null}
+              {errors[item.id] ? (
+                <p className="mt-2 text-xs text-red-400">{errors[item.id]}</p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </article>
+  );
+}
+
+function ProductLinks({
+  item,
+  onRemove,
+}: {
+  item: AllocationWithRelations;
+  onRemove: (linkId: string) => void;
+}) {
+  const { t } = useInfLocale();
+  return (
+    <div>
+      <p className="mb-1.5 text-sm font-semibold text-[#1a1a2e]">
+        {item.products?.name || t.productFallback}
+      </p>
+      <LinkList
+        links={item.creator_links || []}
+        onRemove={onRemove}
+      />
+    </div>
+  );
+}
+
+function LinkList({
+  links,
+  onRemove,
+}: {
+  links: CreatorLink[];
+  onRemove: (linkId: string) => void;
+}) {
+  const { t } = useInfLocale();
+  if (links.length === 0) return null;
+
+  return (
+    <ul className="space-y-2">
+      {links.map((link) => (
+        <li key={link.id} className="rounded-2xl bg-white px-3 py-2.5">
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all text-sm text-[#6B3B1F] underline"
+          >
+            {link.url}
+          </a>
+          <div className="mt-1 flex items-center justify-between gap-2 text-xs text-[#999]">
+            <span>
+              {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform]} ·{" "}
+              {statusLabel(link.status, t)}
+              {link.status === "rejected" && link.memo ? ` · ${link.memo}` : ""}
+            </span>
+            {link.status !== "approved" ? (
               <button
                 type="button"
-                disabled={savingId === item.id}
-                onClick={() => void submit(item.id)}
-                className="rounded-2xl bg-[#6B3B1F] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                className="font-semibold text-[#999]"
+                onClick={() => onRemove(link.id)}
               >
-                {t.linkSubmit}
+                {t.linkDelete}
               </button>
-            </div>
-            {errorById[item.id] ? (
-              <p className="mt-2 text-xs text-red-400">{errorById[item.id]}</p>
             ) : null}
-          </article>
-        );
-      })}
-    </div>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

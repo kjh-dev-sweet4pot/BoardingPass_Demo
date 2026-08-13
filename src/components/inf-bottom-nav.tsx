@@ -2,9 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useInfLocale } from "@/components/inf-locale-provider";
+import { InfLocaleEnsure, useInfLocale } from "@/components/inf-locale-provider";
 
 export function InfBottomNav() {
+  return (
+    <InfLocaleEnsure>
+      <InfBottomNavInner />
+    </InfLocaleEnsure>
+  );
+}
+
+function InfBottomNavInner() {
   const pathname = usePathname();
   const { t } = useInfLocale();
   const items = [

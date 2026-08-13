@@ -2,6 +2,12 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
+  CompanyContentDashboard,
+  type ContentFocus,
+} from "@/components/company-content-dashboard";
+import { buildMockContentInsights } from "@/lib/content-insights-mock";
+import { formatMetric } from "@/lib/content-insights";
+import {
   ALLOCATION_LINK_LABEL,
   summarizeAllocationLinks,
   type AllocationLinkSummary,
@@ -103,6 +109,7 @@ export function CompanyConsole({
   company: Company;
   items: AllocationWithRelations[];
 }) {
+  const [view, setView] = useState<"alloc" | "content">("alloc");
   const [period, setPeriod] = useState<"month" | "all">("month");
   const [searchQ, setSearchQ] = useState("");
   const [storeId, setStoreId] = useState("");
@@ -111,6 +118,7 @@ export function CompanyConsole({
     "all" | "none" | "has" | "approved"
   >("all");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [contentFocus, setContentFocus] = useState<ContentFocus>(null);
   const deferredQ = useDeferredValue(searchQ.trim().toLowerCase());
   const today = todayYmdKst();
   const monthKey = today.slice(0, 7);
@@ -141,6 +149,11 @@ export function CompanyConsole({
     }
     return { total, visited, picked, linked };
   }, [scoped]);
+
+  const insights = useMemo(
+    () => buildMockContentInsights(items, period),
+    [items, period],
+  );
 
   const storeOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -182,7 +195,7 @@ export function CompanyConsole({
     });
   }, [items, period, monthKey, storeId, status, deferredQ, linkFilter]);
 
-  const selected = filtered.find((i) => i.id === openId) || null;
+  const selected = items.find((i) => i.id === openId) || null;
   const related = selected
     ? items.filter((i) => i.influencer_id === selected.influencer_id)
     : [];
@@ -214,9 +227,60 @@ export function CompanyConsole({
     setLinkFilter("approved");
   }
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  function openAllocFromContent(opts: {
+    allocationId?: string | null;
+    search: string;
+  }) {
+    setView("alloc");
+    setSearchQ(opts.search);
+    setStoreId("");
+    setStatus("");
+    setLinkFilter("all");
+    setOpenId(opts.allocationId || null);
+  }
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <div
+          className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
+          role="tablist"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "alloc"}
+            onClick={() => setView("alloc")}
+            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
+              view === "alloc"
+                ? "bg-[var(--accent)] !text-white"
+                : "text-[var(--muted)]"
+            }`}
+          >
+            배정 현황
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "content"}
+            onClick={() => setView("content")}
+            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
+              view === "content"
+                ? "bg-[var(--accent)] !text-white"
+                : "text-[var(--muted)]"
+            }`}
+          >
+            콘텐츠
+          </button>
+        </div>
         <div
           className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
           role="group"
@@ -248,7 +312,17 @@ export function CompanyConsole({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {view === "content" ? (
+        <CompanyContentDashboard
+          snapshot={insights}
+          focus={contentFocus}
+          onFocus={setContentFocus}
+          onOpenAllocation={openAllocFromContent}
+        />
+      ) : (
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.7fr)]">
+        <div className="flex min-h-0 flex-col gap-3">
+      <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
         {(
           [
             ["all", "배정", counters.total, counterActive.all],
@@ -279,7 +353,7 @@ export function CompanyConsole({
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex shrink-0 flex-wrap gap-2">
         <input
           className="h-10 min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
           placeholder="인플루언서 · 상품 검색"
@@ -333,15 +407,15 @@ export function CompanyConsole({
         </button>
       </div>
 
-      <div className="overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
+      <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
         {filtered.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
             조건에 맞는 배정이 없습니다.
           </p>
         ) : (
           <table className="min-w-[860px] w-full border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/50 text-xs text-[var(--muted)]">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs text-[var(--muted)]">
                 <th className="px-4 py-3 font-medium">방문 예정일</th>
                 <th className="px-4 py-3 font-medium">인플루언서</th>
                 <th className="px-4 py-3 font-medium">매장</th>
@@ -359,8 +433,14 @@ export function CompanyConsole({
                 return (
                   <tr
                     key={item.id}
-                    className="cursor-pointer border-b border-[var(--line)] last:border-b-0 hover:bg-[var(--accent-soft)]/40"
-                    onClick={() => setOpenId(item.id)}
+                    className={`cursor-pointer border-b border-[var(--line)] last:border-b-0 ${
+                      item.id === openId
+                        ? "bg-[var(--accent-soft)]"
+                        : "hover:bg-[var(--accent-soft)]/40"
+                    }`}
+                    onClick={() =>
+                      setOpenId((id) => (id === item.id ? null : item.id))
+                    }
                   >
                     <td className="px-4 py-3">
                       <span className="font-medium">
@@ -408,53 +488,73 @@ export function CompanyConsole({
         )}
       </div>
 
-      {selected ? (
-        <CompanyInfModal
-          item={selected}
-          related={related}
-          onClose={() => setOpenId(null)}
-          onSelect={(id) => setOpenId(id)}
-        />
-      ) : null}
+        </div>
+
+        <aside className="min-h-[50vh] min-w-0 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm lg:min-h-0">
+          {selected ? (
+            <CompanyInfPanel
+              item={selected}
+              related={related}
+              insight={
+                insights.posts.find((p) => p.allocationId === selected.id) ||
+                null
+              }
+              onClose={() => setOpenId(null)}
+              onSelect={(id) => setOpenId(id)}
+              onOpenContent={(postId) => {
+                setView("content");
+                setContentFocus({ kind: "post", id: postId });
+              }}
+            />
+          ) : (
+            <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
+              <p className="text-base font-medium text-[var(--ink)]">
+                행을 선택하면 상세가 여기에 표시됩니다
+              </p>
+              <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
+                목록에서 인플루언서를 선택하세요
+              </p>
+            </div>
+          )}
+        </aside>
+      </div>
+      )}
     </div>
   );
 }
 
-function CompanyInfModal({
+function CompanyInfPanel({
   item,
   related,
+  insight,
   onClose,
   onSelect,
+  onOpenContent,
 }: {
   item: AllocationWithRelations;
   related: AllocationWithRelations[];
+  insight: {
+    id: string;
+    views: number;
+    likes: number;
+    comments: number;
+    source: "mock" | "apify";
+  } | null;
   onClose: () => void;
   onSelect: (id: string) => void;
+  onOpenContent: (postId: string) => void;
 }) {
   const [relatedOpen, setRelatedOpen] = useState(false);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    setRelatedOpen(false);
+  }, [item.influencer_id]);
   const handle = formatHandle(item);
   const sns = snsUrl(item.influencers?.sns_url);
   const links = (item.creator_links || []) as CreatorLink[];
   const linkSum = summarizeAllocationLinks(links);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div>
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
             <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
@@ -541,6 +641,44 @@ function CompanyInfModal({
           </div>
         </dl>
 
+        {insight ? (
+          <div className="mt-5 rounded-2xl border border-[var(--line)] px-4 py-4">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold">콘텐츠 성과</h4>
+              <span className="text-[11px] text-[var(--muted)]">
+                {insight.source === "mock" ? "미리보기" : "수집"}
+              </span>
+            </div>
+            <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <div>
+                <dt className="text-[11px] text-[var(--muted)]">조회</dt>
+                <dd className="mt-0.5 text-sm font-semibold tabular-nums">
+                  {formatMetric(insight.views)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] text-[var(--muted)]">좋아요</dt>
+                <dd className="mt-0.5 text-sm font-semibold tabular-nums">
+                  {formatMetric(insight.likes)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] text-[var(--muted)]">댓글</dt>
+                <dd className="mt-0.5 text-sm font-semibold tabular-nums">
+                  {formatMetric(insight.comments)}
+                </dd>
+              </div>
+            </dl>
+            <button
+              type="button"
+              onClick={() => onOpenContent(insight.id)}
+              className="mt-3 w-full rounded-xl border border-[var(--line)] px-3 py-2 text-xs font-medium"
+            >
+              콘텐츠 대시보드에서 보기
+            </button>
+          </div>
+        ) : null}
+
         <div className="mt-5">
           <h4 className="mb-2 text-sm font-semibold">콘텐츠 링크</h4>
           {links.length === 0 ? (
@@ -612,7 +750,6 @@ function CompanyInfModal({
             ) : null}
           </div>
         ) : null}
-      </div>
     </div>
   );
 }

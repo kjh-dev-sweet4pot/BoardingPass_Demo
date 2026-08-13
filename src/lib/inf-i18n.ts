@@ -70,6 +70,7 @@ export type InfMessages = {
   contentLinks: string;
   registerLink: string;
   registerLinkCta: string;
+  linkRegistered: string;
   noPickedUpProducts: string;
   enterLink: string;
   invalidLink: string;
@@ -83,6 +84,15 @@ export type InfMessages = {
   linkApproved: string;
   linkRejected: string;
   receivedOn: string;
+  linksHint: string;
+  linksNeedSection: string;
+  linksDoneSection: string;
+  linksProductsReceived: string;
+  linksAllDone: string;
+  linkPlaceholder: string;
+  linksRemainCount: (n: number) => string;
+  linkRegisteredShort: string;
+  linkNotRegistered: string;
   /** 시트 본문 라벨 (사용자 언어) */
   sheet: InfSheetLabels;
   /** 약사님께 보이는 한국어 고정 라벨 (시트 본문) */
@@ -260,6 +270,7 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     contentLinks: "콘텐츠 링크",
     registerLink: "링크 등록",
     registerLinkCta: "링크 등록하기",
+    linkRegistered: "링크 등록이 완료되었습니다 !",
     noPickedUpProducts: "수령 완료된 상품이 없습니다.",
     enterLink: "링크를 입력해 주세요.",
     invalidLink: "올바른 링크 형식이 아닙니다.",
@@ -273,6 +284,16 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     linkApproved: "승인",
     linkRejected: "반려",
     receivedOn: "수령일",
+    linksHint:
+      "수령한 상품을 소개한 SNS 게시물 링크를 올려 주세요. 같은 날 같은 매장이어도 상품마다 링크를 따로 등록해 주세요.",
+    linksNeedSection: "등록이 필요해요",
+    linksDoneSection: "등록 완료",
+    linksProductsReceived: "받은 상품",
+    linksAllDone: "등록할 링크가 없어요.",
+    linkPlaceholder: "게시물 링크 https://",
+    linksRemainCount: (n) => (n === 0 ? "모두 등록했어요" : `${n}건 남음`),
+    linkRegisteredShort: "등록됨",
+    linkNotRegistered: "미등록",
     sheet: koSheet,
     koSheet,
   },
@@ -340,6 +361,7 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     contentLinks: "Content links",
     registerLink: "Add link",
     registerLinkCta: "Submit a link",
+    linkRegistered: "Link submitted!",
     noPickedUpProducts: "No picked-up products yet.",
     enterLink: "Please enter a link.",
     invalidLink: "Please enter a valid URL.",
@@ -353,6 +375,17 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     linkApproved: "Approved",
     linkRejected: "Rejected",
     receivedOn: "Picked up",
+    linksHint:
+      "Submit the SNS post for each product you picked up. Even on the same day at the same store, register a separate link per product.",
+    linksNeedSection: "Needs a link",
+    linksDoneSection: "Submitted",
+    linksProductsReceived: "Products picked up",
+    linksAllDone: "No links left to submit.",
+    linkPlaceholder: "Post URL https://",
+    linksRemainCount: (n) =>
+      n === 0 ? "All submitted" : `${n} left to submit`,
+    linkRegisteredShort: "Submitted",
+    linkNotRegistered: "Not yet",
     sheet: {
       product: "Product",
       store: "Store",
@@ -432,6 +465,7 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     contentLinks: "コンテンツリンク",
     registerLink: "リンク登録",
     registerLinkCta: "リンクを登録する",
+    linkRegistered: "リンク登録が完了しました！",
     noPickedUpProducts: "受取済みの商品がありません。",
     enterLink: "リンクを入力してください。",
     invalidLink: "正しいリンク形式ではありません。",
@@ -445,6 +479,17 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     linkApproved: "承認",
     linkRejected: "差戻し",
     receivedOn: "受取日",
+    linksHint:
+      "受け取った商品を紹介したSNS投稿のリンクを登録してください。同じ日・同じ店舗でも、商品ごとに別のリンクを登録してください。",
+    linksNeedSection: "登録が必要です",
+    linksDoneSection: "登録済み",
+    linksProductsReceived: "受け取った商品",
+    linksAllDone: "登録するリンクはありません。",
+    linkPlaceholder: "投稿リンク https://",
+    linksRemainCount: (n) =>
+      n === 0 ? "すべて登録済み" : `残り${n}件`,
+    linkRegisteredShort: "登録済み",
+    linkNotRegistered: "未登録",
     sheet: {
       product: "商品",
       store: "店舗",
@@ -522,6 +567,7 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     contentLinks: "内容链接",
     registerLink: "登记链接",
     registerLinkCta: "去登记链接",
+    linkRegistered: "链接登记已完成！",
     noPickedUpProducts: "暂无已领取商品。",
     enterLink: "请输入链接。",
     invalidLink: "链接格式不正确。",
@@ -535,6 +581,16 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     linkApproved: "已通过",
     linkRejected: "已驳回",
     receivedOn: "领取日",
+    linksHint:
+      "请为每件已领取商品提交社交帖链接。即使同一天、同一门店，也请按商品分别登记。",
+    linksNeedSection: "待登记",
+    linksDoneSection: "已登记",
+    linksProductsReceived: "已领取商品",
+    linksAllDone: "没有待登记的链接。",
+    linkPlaceholder: "帖子链接 https://",
+    linksRemainCount: (n) => (n === 0 ? "已全部登记" : `剩余 ${n} 项`),
+    linkRegisteredShort: "已登记",
+    linkNotRegistered: "未登记",
     sheet: {
       product: "商品",
       store: "门店",

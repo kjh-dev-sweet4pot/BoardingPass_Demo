@@ -55,10 +55,146 @@ async function confirmVisit(
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    window.alert(body.error || "처리에 실패했습니다.");
-    return;
+    throw new Error(body.error || "처리에 실패했습니다.");
   }
   onUpdated(body.allocation as AllocationWithRelations);
+}
+
+function VisitConfirmControls({
+  item,
+  onUpdated,
+  full = false,
+}: {
+  item: AllocationWithRelations;
+  onUpdated: (next: AllocationWithRelations) => void;
+  full?: boolean;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{
+    type: "ok" | "err";
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    setAsking(false);
+    setBusy(false);
+    setNotice(null);
+  }, [item.id]);
+
+  async function run(action: "confirm" | "unconfirm") {
+    if (busy) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      await confirmVisit(item.id, action, onUpdated);
+      setAsking(false);
+      setNotice({
+        type: "ok",
+        text:
+          action === "confirm"
+            ? "방문이 확정되었습니다."
+            : "방문 확인이 해제되었습니다.",
+      });
+    } catch (err) {
+      setNotice({
+        type: "err",
+        text: err instanceof Error ? err.message : "처리에 실패했습니다.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const pending = item.status === "pending";
+  const btnClass = full
+    ? pending
+      ? "flex h-14 w-full cursor-pointer items-center justify-center rounded-xl bg-[var(--accent)] text-base font-bold !text-white shadow-sm transition hover:brightness-110 hover:shadow-md active:scale-[0.98] disabled:opacity-50"
+      : "flex h-14 w-full cursor-pointer items-center justify-center rounded-xl border border-[var(--line)] bg-white text-base font-bold text-[var(--ink)] shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] active:scale-[0.98] disabled:opacity-50"
+    : pending
+      ? "cursor-pointer rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white shadow-sm transition hover:brightness-110 hover:shadow-md active:scale-[0.98] disabled:opacity-50"
+      : "cursor-pointer rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] active:scale-[0.98] disabled:opacity-50";
+
+  return (
+    <div className="space-y-2">
+      <div className={full ? "" : "flex flex-wrap items-center gap-2"}>
+        {pending ? (
+          <button
+            type="button"
+            className={btnClass}
+            disabled={busy}
+            aria-expanded={asking}
+            onClick={() => {
+              setNotice(null);
+              setAsking(true);
+            }}
+          >
+            방문 확인
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={btnClass}
+            disabled={busy}
+            onClick={() => void run("unconfirm")}
+          >
+            {busy ? "처리 중…" : "방문 확인 해제"}
+          </button>
+        )}
+        {!full && item.visit_source ? (
+          <span className="text-xs text-[var(--muted)]">
+            {VISIT_SOURCE_LABEL[item.visit_source]}
+          </span>
+        ) : null}
+      </div>
+
+      {asking && pending ? (
+        <div className="rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-3">
+          <p className="text-sm font-semibold text-[var(--ink)]">
+            방문을 확정할까요?
+          </p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            확정하면 상태가 방문 완료로 바뀝니다.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              className="cursor-pointer rounded-lg bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold !text-white disabled:opacity-50"
+              onClick={() => void run("confirm")}
+            >
+              {busy ? "확정 중…" : "확정"}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              className="cursor-pointer rounded-lg border border-[var(--line)] bg-white px-3.5 py-2 text-sm font-semibold disabled:opacity-50"
+              onClick={() => setAsking(false)}
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {notice ? (
+        <p
+          className={`text-sm font-medium ${
+            notice.type === "err"
+              ? "text-[var(--danger)]"
+              : "text-[var(--accent)]"
+          }`}
+          role="status"
+        >
+          {notice.text}
+        </p>
+      ) : full && item.visit_source ? (
+        <p className="text-center text-xs text-[var(--muted)]">
+          {VISIT_SOURCE_LABEL[item.visit_source]}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function CounterDetailPanel({
@@ -192,30 +328,7 @@ function CounterDetailPanel({
       (item.status === "pending" ||
         item.status === "visited" ||
         item.status === "ready") ? (
-        <div className="flex flex-wrap gap-2">
-          {item.status === "pending" ? (
-            <button
-              type="button"
-              className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"
-              onClick={() => void confirmVisit(item.id, "confirm", onUpdated)}
-            >
-              방문 확인
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm font-semibold"
-              onClick={() => void confirmVisit(item.id, "unconfirm", onUpdated)}
-            >
-              방문 확인 해제
-            </button>
-          )}
-          {item.visit_source ? (
-            <span className="self-center text-xs text-[var(--muted)]">
-              {VISIT_SOURCE_LABEL[item.visit_source]}
-            </span>
-          ) : null}
-        </div>
+        <VisitConfirmControls item={item} onUpdated={onUpdated} full />
       ) : null}
 
       {allowAdminEdit && storeList && storeList.length > 0 && onUpdated ? (
@@ -545,31 +658,8 @@ function AllocationDetailRows({
             {item.status === "pending" ||
             item.status === "visited" ||
             item.status === "ready" ? (
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                {item.status === "pending" ? (
-                  <button
-                    type="button"
-                    className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
-                    onClick={() => void confirmVisit(item.id, "confirm", onUpdated)}
-                  >
-                    방문 확인
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
-                    onClick={() =>
-                      void confirmVisit(item.id, "unconfirm", onUpdated)
-                    }
-                  >
-                    방문 확인 해제
-                  </button>
-                )}
-                {item.visit_source ? (
-                  <span className="text-xs text-[var(--muted)]">
-                    {VISIT_SOURCE_LABEL[item.visit_source]}
-                  </span>
-                ) : null}
+              <div className="mb-3">
+                <VisitConfirmControls item={item} onUpdated={onUpdated} />
               </div>
             ) : null}
             <AdminAllocationEditForm
@@ -2087,14 +2177,14 @@ export function PharListWithModal({
 
       {openId && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          className="owm-drawer-backdrop fixed inset-0 z-50 flex justify-end bg-black/40"
           role="dialog"
           aria-modal="true"
           aria-label="인플루언서 상세"
           onClick={() => setOpenId(null)}
         >
           <div
-            className="max-h-[85vh] w-full max-w-3xl overflow-y-auto border border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl"
+            className="owm-drawer-panel flex h-full w-full max-w-2xl flex-col overflow-y-auto border-l border-[var(--line)] bg-[var(--surface)] p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-5 flex items-start justify-between gap-4">

@@ -9,7 +9,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import { useInfLocale } from "@/components/inf-locale-provider";
+import { InfLocaleEnsure, useInfLocale } from "@/components/inf-locale-provider";
 import {
   bilingualSheetText,
   formatVisitDateKo,
@@ -96,6 +96,39 @@ function formatSnsUrl(url?: string | null) {
 
 function isPickedUp(item: AllocationWithRelations) {
   return item.status === "picked_up" || Boolean(item.picked_up_at);
+}
+
+function hasRegisteredLink(item: AllocationWithRelations) {
+  return (item.creator_links || []).length > 0;
+}
+
+function LinkRegisterAction({
+  item,
+  label,
+  doneLabel,
+  className,
+  onClick,
+}: {
+  item: AllocationWithRelations;
+  label: string;
+  doneLabel: string;
+  className?: string;
+  onClick?: (e: React.MouseEvent) => void;
+}) {
+  const done = hasRegisteredLink(item);
+  return (
+    <Link
+      href="/inf/links"
+      onClick={onClick}
+      className={
+        done
+          ? `block rounded-2xl bg-[#f3eee3] py-3.5 text-center text-sm font-semibold text-[#8a7a5c] ${className || ""}`
+          : `block rounded-2xl bg-[#6B3B1F] py-3.5 text-center text-sm font-semibold !text-white ${className || ""}`
+      }
+    >
+      {done ? doneLabel : label}
+    </Link>
+  );
 }
 
 function sortItems(items: AllocationWithRelations[]) {
@@ -270,13 +303,12 @@ function AllocationCard({
           </div>
         )}
         {done ? (
-          <Link
-            href="/inf/links"
+          <LinkRegisterAction
+            item={item}
+            label={t.registerLink}
+            doneLabel={t.linkRegistered}
             onClick={(e) => e.stopPropagation()}
-            className="block rounded-2xl bg-[#6B3B1F] py-3.5 text-center text-sm font-semibold !text-white"
-          >
-            {t.registerLink}
-          </Link>
+          />
         ) : null}
       </div>
     </button>
@@ -372,6 +404,29 @@ export function InfAllocationList({
   /** 로그인 환영 화면을 이미 본 경우 인트로 스킵 (하위 호환) */
   skipIntro?: boolean;
   /** 환영 화면 직후 진입 — 카드 스태거 + 컴팩트 헤더 */
+  fromWelcome?: boolean;
+}) {
+  return (
+    <InfLocaleEnsure>
+      <InfAllocationListInner
+        influencer={influencer}
+        initialAllocations={initialAllocations}
+        skipIntro={skipIntro}
+        fromWelcome={fromWelcome}
+      />
+    </InfLocaleEnsure>
+  );
+}
+
+function InfAllocationListInner({
+  influencer,
+  initialAllocations,
+  skipIntro = false,
+  fromWelcome = false,
+}: {
+  influencer: Influencer;
+  initialAllocations: AllocationWithRelations[];
+  skipIntro?: boolean;
   fromWelcome?: boolean;
 }) {
   const { t, locale } = useInfLocale();
@@ -961,12 +1016,12 @@ function PickupSheetBody({
                   ? ` · ${formatKst(selected.picked_up_at)}`
                   : ""}
               </div>
-              <Link
-                href="/inf/links"
-                className="block rounded-2xl bg-[#6B3B1F] py-[clamp(0.75rem,2vh,1rem)] text-center text-sm font-semibold !text-white"
-              >
-                {t.registerLinkCta}
-              </Link>
+              <LinkRegisterAction
+                item={selected}
+                label={t.registerLinkCta}
+                doneLabel={t.linkRegistered}
+                className="py-[clamp(0.75rem,2vh,1rem)]"
+              />
             </div>
           ) : cancelled ? (
             <p className="text-center text-sm text-[#aaa]">
