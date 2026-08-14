@@ -16,6 +16,35 @@ export type ContentFocus =
   | { kind: "post"; id: string }
   | null;
 
+function ymdKst(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function addDaysYmd(ymd: string, days: number) {
+  const [year, month, day] = ymd.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + days));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+function formatMdMidnight(ymd: string) {
+  const [, month, day] = ymd.split("-").map(Number);
+  return `${month}월 ${day}일 00:00`;
+}
+
+function contentRefreshCopy(source: ContentInsightsSnapshot["source"]) {
+  const today = ymdKst();
+  const todayLabel = formatMdMidnight(today);
+  if (source === "mock") {
+    return `${todayLabel} 기준 : ${formatMdMidnight(addDaysYmd(today, 1))}에 데이터를 갱신합니다.`;
+  }
+  return `${todayLabel} 수집 데이터`;
+}
+
 export function CompanyContentDashboard({
   snapshot,
   focus,
@@ -57,9 +86,7 @@ export function CompanyContentDashboard({
       <div className="flex min-h-0 flex-col gap-3">
         <div className="flex shrink-0 items-center justify-between gap-2">
           <p className="text-xs text-[var(--muted)]">
-            {snapshot.source === "mock"
-              ? "0월 0일 00:00 기준 : 0월 0일 00:00에 데이터를 갱신합니다."
-              : "0월 0일 00:00 수집 데이터"}
+            {contentRefreshCopy(snapshot.source)}
           </p>
         </div>
 
@@ -197,6 +224,7 @@ export function CompanyContentDashboard({
         {selectedPost ? (
           <PostDetail
             post={selectedPost}
+            onBack={() => onFocus(null)}
             onOpenAllocation={() =>
               onOpenAllocation({
                 allocationId: selectedPost.allocationId,
@@ -210,6 +238,7 @@ export function CompanyContentDashboard({
             posts={snapshot.posts.filter(
               (p) => p.productId === selectedProduct.productId,
             )}
+            onBack={() => onFocus(null)}
             onOpenAllocation={() =>
               onOpenAllocation({ search: selectedProduct.productName })
             }
@@ -221,6 +250,7 @@ export function CompanyContentDashboard({
             posts={snapshot.posts.filter(
               (p) => p.influencerId === selectedInfluencer.influencerId,
             )}
+            onBack={() => onFocus(null)}
             onOpenAllocation={() =>
               onOpenAllocation({
                 search: selectedInfluencer.handle.replace(/^@/, ""),
@@ -238,6 +268,18 @@ export function CompanyContentDashboard({
         )}
       </aside>
     </div>
+  );
+}
+
+function AsideBack({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-[var(--muted)] hover:text-[var(--ink)]"
+    >
+      ← 뒤로
+    </button>
   );
 }
 
@@ -267,14 +309,17 @@ function Kpi({
 
 function PostDetail({
   post,
+  onBack,
   onOpenAllocation,
 }: {
   post: ContentPostInsight;
+  onBack: () => void;
   onOpenAllocation: () => void;
 }) {
   const er = engagementRate(post.views, post.likes, post.comments);
   return (
     <div>
+      <AsideBack onBack={onBack} />
       <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
         Content
       </p>
@@ -333,16 +378,19 @@ function PostDetail({
 function ProductDetail({
   product,
   posts,
+  onBack,
   onOpenAllocation,
   onSelectPost,
 }: {
   product: ContentProductInsight;
   posts: ContentPostInsight[];
+  onBack: () => void;
   onOpenAllocation: () => void;
   onSelectPost: (id: string) => void;
 }) {
   return (
     <div>
+      <AsideBack onBack={onBack} />
       <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
         Product
       </p>
@@ -402,16 +450,19 @@ function ProductDetail({
 function InfluencerDetail({
   influencer,
   posts,
+  onBack,
   onOpenAllocation,
   onSelectPost,
 }: {
   influencer: ContentInfluencerInsight;
   posts: ContentPostInsight[];
+  onBack: () => void;
   onOpenAllocation: () => void;
   onSelectPost: (id: string) => void;
 }) {
   return (
     <div>
+      <AsideBack onBack={onBack} />
       <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
         Influencer
       </p>

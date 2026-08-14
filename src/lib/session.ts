@@ -116,6 +116,8 @@ export const PHAR_STORE_PASSWORDS: Record<string, string> = {
   이태원점: "itaeowm26",
   분당서현: "bdshowm2608",
   분당서현점: "bdshowm2608",
+  긴자: "ginzaa",
+  긴자점: "ginzaa",
 };
 
 /** 맵에 없는 지점용 기본 비밀번호 */
