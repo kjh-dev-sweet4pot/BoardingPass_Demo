@@ -9,6 +9,7 @@ import {
   formatMd,
   getCreatorBrief,
   MARKET_LABEL,
+  OVERLAP_LABEL,
   POOL_PAGE,
   type CreatorChannel,
   type CreatorMarket,
@@ -21,17 +22,23 @@ function avatarLetter(name: string) {
   return (name.trim()[0] || "?").toUpperCase();
 }
 
+type PickMap = Record<string, "selected" | "excluded">;
+
 export function CompanyCreatorPool() {
   const [visible, setVisible] = useState(POOL_PAGE);
   const [market, setMarket] = useState<CreatorMarket | "">("");
   const [channel, setChannel] = useState<CreatorChannel | "">("");
   const [q, setQ] = useState("");
+  const [hideOverlap, setHideOverlap] = useState(false);
   const [requested, setRequested] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [picks, setPicks] = useState<PickMap>({});
+  const [replaceId, setReplaceId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return POOL.filter((row) => {
+      if (hideOverlap && row.overlap) return false;
       if (market && row.market !== market) return false;
       if (channel && row.channel !== channel) return false;
       if (!needle) return true;
@@ -40,7 +47,7 @@ export function CompanyCreatorPool() {
         row.handle.toLowerCase().includes(needle)
       );
     });
-  }, [market, channel, q]);
+  }, [market, channel, q, hideOverlap]);
 
   const shown = filtered.slice(0, visible);
   const hasMore = visible < filtered.length;
@@ -48,155 +55,285 @@ export function CompanyCreatorPool() {
     ? (POOL.find((r) => r.id === openId) ?? null)
     : null;
 
+  const selectedRows = useMemo(
+    () => POOL.filter((r) => picks[r.id] === "selected"),
+    [picks],
+  );
+  const excludedCount = useMemo(
+    () => Object.values(picks).filter((v) => v === "excluded").length,
+    [picks],
+  );
+  const budget = selectedRows.reduce((sum, r) => sum + r.priceKrw, 0);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenId(null);
+      if (e.key === "Escape") {
+        if (replaceId) setReplaceId(null);
+        else setOpenId(null);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [replaceId]);
+
+  function setPick(id: string, next: "selected" | "excluded" | null) {
+    setPicks((prev) => {
+      const copy = { ...prev };
+      if (!next) delete copy[id];
+      else copy[id] = next;
+      return copy;
+    });
+  }
+
+  function onRowActivate(row: PoolCreator) {
+    if (replaceId) {
+      if (row.id === replaceId) {
+        setReplaceId(null);
+        return;
+      }
+      setPicks((prev) => {
+        const copy = { ...prev };
+        delete copy[replaceId];
+        copy[row.id] = "selected";
+        return copy;
+      });
+      setReplaceId(null);
+      setOpenId(row.id);
+      return;
+    }
+    setOpenId((id) => (id === row.id ? null : row.id));
+  }
 
   return (
-    <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.7fr)]">
-      <div className="flex min-h-0 flex-col gap-3">
-        <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs text-[var(--muted)]">
-              마케팅 풀 {filtered.length.toLocaleString("ko-KR")}명
-              {filtered.length !== POOL.length
-                ? ` · 전체 ${POOL.length.toLocaleString("ko-KR")}`
-                : null}
-            </p>
-            <p className="mt-0.5 text-sm text-[var(--ink)]">
-              국가·채널·단가 기준으로 집행 후보를 훑어보세요
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setRequested(true)}
-            className="h-10 rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold !text-white"
-          >
-            {requested ? "추가 풀 요청됨" : "리스트 더 받기"}
-          </button>
-        </div>
-
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <input
-            className="h-10 min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
-            placeholder="이름 · 핸들 검색"
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setVisible(POOL_PAGE);
-            }}
-          />
-          <select
-            className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
-            value={market}
-            onChange={(e) => {
-              setMarket(e.target.value as CreatorMarket | "");
-              setVisible(POOL_PAGE);
-            }}
-          >
-            <option value="">국가 전체</option>
-            {(Object.keys(MARKET_LABEL) as CreatorMarket[]).map((key) => (
-              <option key={key} value={key}>
-                {MARKET_LABEL[key]}
-              </option>
-            ))}
-          </select>
-          <select
-            className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
-            value={channel}
-            onChange={(e) => {
-              setChannel(e.target.value as CreatorChannel | "");
-              setVisible(POOL_PAGE);
-            }}
-          >
-            <option value="">채널 전체</option>
-            {(Object.keys(CHANNEL_LABEL) as CreatorChannel[]).map((key) => (
-              <option key={key} value={key}>
-                {CHANNEL_LABEL[key]}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {requested ? (
-          <p className="shrink-0 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--accent)]">
-            추가 풀 요청이 접수되었습니다. 운영팀이 후보를 보강한 뒤 리스트에
-            반영합니다.
-          </p>
-        ) : null}
-
-        <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
-          {shown.length === 0 ? (
-            <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
-              조건에 맞는 크리에이터가 없습니다.
-            </p>
-          ) : (
-            <table className="min-w-[780px] w-full border-collapse text-left text-sm">
-              <thead className="sticky top-0 z-10">
-                <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs text-[var(--muted)]">
-                  <th className="px-4 py-3 font-medium">크리에이터</th>
-                  <th className="px-4 py-3 font-medium">활동 국가</th>
-                  <th className="px-4 py-3 font-medium">채널</th>
-                  <th className="px-4 py-3 font-medium">팔로워</th>
-                  <th className="px-4 py-3 font-medium text-right">집행 단가</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((row) => (
-                  <CreatorRow
-                    key={row.id}
-                    row={row}
-                    active={row.id === openId}
-                    onSelect={() =>
-                      setOpenId((id) => (id === row.id ? null : row.id))
-                    }
-                  />
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-[var(--muted)]">
-            {shown.length.toLocaleString("ko-KR")} /{" "}
-            {filtered.length.toLocaleString("ko-KR")}명 표시
-          </p>
-          {hasMore ? (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.7fr)]">
+        <div className="flex min-h-0 flex-col gap-3">
+          <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs text-[var(--muted)]">
+                마케팅 풀 {filtered.length.toLocaleString("ko-KR")}명
+                {filtered.length !== POOL.length
+                  ? ` · 전체 ${POOL.length.toLocaleString("ko-KR")}`
+                  : null}
+              </p>
+              <p className="mt-0.5 text-sm text-[var(--ink)]">
+                후보를 선택·제외·교체하며 집행 풀을 조율하세요
+              </p>
+            </div>
             <button
               type="button"
-              onClick={() => setVisible((n) => n + POOL_PAGE)}
-              className="h-10 rounded-xl border border-[var(--line)] bg-white px-4 text-sm font-semibold"
+              onClick={() => setRequested(true)}
+              className="h-10 rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold !text-white"
             >
-              리스트 더 보기
+              {requested ? "추가 풀 요청됨" : "리스트 더 받기"}
             </button>
-          ) : filtered.length > 0 ? (
-            <p className="text-xs text-[var(--muted)]">끝까지 불러왔습니다</p>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <input
+              className="h-10 min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+              placeholder="이름 · 핸들 검색"
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setVisible(POOL_PAGE);
+              }}
+            />
+            <select
+              className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+              value={market}
+              onChange={(e) => {
+                setMarket(e.target.value as CreatorMarket | "");
+                setVisible(POOL_PAGE);
+              }}
+            >
+              <option value="">국가 전체</option>
+              {(Object.keys(MARKET_LABEL) as CreatorMarket[]).map((key) => (
+                <option key={key} value={key}>
+                  {MARKET_LABEL[key]}
+                </option>
+              ))}
+            </select>
+            <select
+              className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+              value={channel}
+              onChange={(e) => {
+                setChannel(e.target.value as CreatorChannel | "");
+                setVisible(POOL_PAGE);
+              }}
+            >
+              <option value="">채널 전체</option>
+              {(Object.keys(CHANNEL_LABEL) as CreatorChannel[]).map((key) => (
+                <option key={key} value={key}>
+                  {CHANNEL_LABEL[key]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              aria-pressed={hideOverlap}
+              onClick={() => {
+                setHideOverlap((v) => !v);
+                setVisible(POOL_PAGE);
+              }}
+              className={`h-10 rounded-xl border px-3 text-sm font-medium ${
+                hideOverlap
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "border-[var(--line)] text-[var(--muted)]"
+              }`}
+            >
+              중복 제외
+            </button>
+          </div>
+
+          {replaceId ? (
+            <p className="shrink-0 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--accent)]">
+              교체 모드: 대신 넣을 크리에이터 행을 클릭하세요 (Esc 취소)
+            </p>
           ) : null}
+
+          {requested ? (
+            <p className="shrink-0 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--accent)]">
+              추가 풀 요청이 접수되었습니다. 운영팀이 후보를 보강한 뒤 리스트에
+              반영합니다.
+            </p>
+          ) : null}
+
+          <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
+            {shown.length === 0 ? (
+              <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
+                조건에 맞는 크리에이터가 없습니다.
+              </p>
+            ) : (
+              <table className="min-w-[920px] w-full border-collapse text-left text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs text-[var(--muted)]">
+                    <th className="px-3 py-3 font-medium">선택</th>
+                    <th className="px-4 py-3 font-medium">크리에이터</th>
+                    <th className="px-4 py-3 font-medium">활동 국가</th>
+                    <th className="px-4 py-3 font-medium">채널</th>
+                    <th className="px-4 py-3 font-medium">팔로워</th>
+                    <th className="px-4 py-3 font-medium text-right">
+                      집행 단가
+                    </th>
+                    <th className="px-3 py-3 font-medium">조율</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((row) => (
+                    <CreatorRow
+                      key={row.id}
+                      row={row}
+                      active={row.id === openId}
+                      pick={picks[row.id] || null}
+                      replacing={replaceId === row.id}
+                      onActivate={() => onRowActivate(row)}
+                      onSelectToggle={() =>
+                        setPick(
+                          row.id,
+                          picks[row.id] === "selected" ? null : "selected",
+                        )
+                      }
+                      onExclude={() =>
+                        setPick(
+                          row.id,
+                          picks[row.id] === "excluded" ? null : "excluded",
+                        )
+                      }
+                      onReplace={() =>
+                        setReplaceId((id) => (id === row.id ? null : row.id))
+                      }
+                    />
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-[var(--muted)]">
+              {shown.length.toLocaleString("ko-KR")} /{" "}
+              {filtered.length.toLocaleString("ko-KR")}명 표시
+            </p>
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={() => setVisible((n) => n + POOL_PAGE)}
+                className="h-10 rounded-xl border border-[var(--line)] bg-white px-4 text-sm font-semibold"
+              >
+                리스트 더 보기
+              </button>
+            ) : filtered.length > 0 ? (
+              <p className="text-xs text-[var(--muted)]">끝까지 불러왔습니다</p>
+            ) : null}
+          </div>
         </div>
+
+        <aside className="min-h-[50vh] min-w-0 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm lg:min-h-0">
+          {selected ? (
+            <CreatorDetail
+              creator={selected}
+              pick={picks[selected.id] || null}
+              onClose={() => setOpenId(null)}
+              onSelect={() =>
+                setPick(
+                  selected.id,
+                  picks[selected.id] === "selected" ? null : "selected",
+                )
+              }
+              onExclude={() =>
+                setPick(
+                  selected.id,
+                  picks[selected.id] === "excluded" ? null : "excluded",
+                )
+              }
+              onReplace={() =>
+                setReplaceId((id) =>
+                  id === selected.id ? null : selected.id,
+                )
+              }
+            />
+          ) : (
+            <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
+              <p className="text-base font-medium text-[var(--ink)]">
+                행을 선택하면 상세가 여기에 표시됩니다
+              </p>
+              <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
+                콘텐츠 가이드와 방문·제작 일정을 확인할 수 있습니다
+              </p>
+            </div>
+          )}
+        </aside>
       </div>
 
-      <aside className="min-h-[50vh] min-w-0 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm lg:min-h-0">
-        {selected ? (
-          <CreatorDetail
-            creator={selected}
-            onClose={() => setOpenId(null)}
-          />
-        ) : (
-          <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
-            <p className="text-base font-medium text-[var(--ink)]">
-              행을 선택하면 상세가 여기에 표시됩니다
-            </p>
-            <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
-              콘텐츠 가이드와 방문·제작 일정을 확인할 수 있습니다
-            </p>
+      <div className="shrink-0 rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <span>
+              선택{" "}
+              <strong className="tabular-nums text-[var(--accent)]">
+                {selectedRows.length}
+              </strong>
+              명
+            </span>
+            <span className="text-[var(--muted)]">
+              제외{" "}
+              <strong className="tabular-nums">{excludedCount}</strong>명
+            </span>
+            {replaceId ? (
+              <span className="font-medium text-[var(--accent)]">
+                교체 대기 중
+              </span>
+            ) : null}
           </div>
-        )}
-      </aside>
+          <p className="text-right">
+            <span className="text-xs text-[var(--muted)]">예상 집행 견적</span>
+            <span className="ml-2 text-xl font-semibold tabular-nums text-[var(--accent)]">
+              {formatKrw(budget)}원
+            </span>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -204,19 +341,47 @@ export function CompanyCreatorPool() {
 function CreatorRow({
   row,
   active,
-  onSelect,
+  pick,
+  replacing,
+  onActivate,
+  onSelectToggle,
+  onExclude,
+  onReplace,
 }: {
   row: PoolCreator;
   active: boolean;
-  onSelect: () => void;
+  pick: "selected" | "excluded" | null;
+  replacing: boolean;
+  onActivate: () => void;
+  onSelectToggle: () => void;
+  onExclude: () => void;
+  onReplace: () => void;
 }) {
   return (
     <tr
       className={`cursor-pointer border-b border-[var(--line)] last:border-b-0 ${
-        active ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--accent-soft)]/40"
+        pick === "excluded"
+          ? "bg-[#f8e4e4]/50 opacity-70"
+          : pick === "selected"
+            ? "bg-[var(--accent-soft)]/70"
+            : replacing
+              ? "bg-[var(--accent-soft)]"
+              : active
+                ? "bg-[var(--accent-soft)]"
+                : "hover:bg-[var(--accent-soft)]/40"
       }`}
-      onClick={onSelect}
+      onClick={onActivate}
     >
+      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={pick === "selected"}
+          disabled={pick === "excluded"}
+          onChange={onSelectToggle}
+          aria-label={`${row.name} 선택`}
+          className="h-4 w-4 accent-[var(--accent)]"
+        />
+      </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           <span
@@ -226,8 +391,18 @@ function CreatorRow({
             {avatarLetter(row.name)}
           </span>
           <span>
-            <span className="block font-semibold text-[var(--ink)]">
-              {row.name}
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span className="font-semibold text-[var(--ink)]">{row.name}</span>
+              {row.overlap ? (
+                <span className="rounded-full bg-[#f8e4e4] px-2 py-0.5 text-[11px] font-medium text-[#9b2c2c]">
+                  {OVERLAP_LABEL[row.overlap]}
+                </span>
+              ) : null}
+              {pick === "excluded" ? (
+                <span className="rounded-full bg-[#f0ece6] px-2 py-0.5 text-[11px] font-medium text-[#8a8074]">
+                  제외
+                </span>
+              ) : null}
             </span>
             <span className="text-[var(--accent)]">{row.handle}</span>
           </span>
@@ -241,16 +416,50 @@ function CreatorRow({
       <td className="px-4 py-3 text-right font-semibold tabular-nums text-[var(--ink)]">
         {formatKrw(row.priceKrw)}원
       </td>
+      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            onClick={onExclude}
+            className={`rounded-lg border px-2 py-1 text-[11px] font-medium ${
+              pick === "excluded"
+                ? "border-[#9b2c2c] bg-[#f8e4e4] text-[#9b2c2c]"
+                : "border-[var(--line)] text-[var(--muted)]"
+            }`}
+          >
+            제외
+          </button>
+          <button
+            type="button"
+            onClick={onReplace}
+            className={`rounded-lg border px-2 py-1 text-[11px] font-medium ${
+              replacing
+                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                : "border-[var(--line)] text-[var(--muted)]"
+            }`}
+          >
+            교체
+          </button>
+        </div>
+      </td>
     </tr>
   );
 }
 
 function CreatorDetail({
   creator,
+  pick,
   onClose,
+  onSelect,
+  onExclude,
+  onReplace,
 }: {
   creator: PoolCreator;
+  pick: "selected" | "excluded" | null;
   onClose: () => void;
+  onSelect: () => void;
+  onExclude: () => void;
+  onReplace: () => void;
 }) {
   const brief = getCreatorBrief(creator);
 
@@ -272,6 +481,11 @@ function CreatorDetail({
             <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
               {CHANNEL_LABEL[creator.channel]}
             </span>
+            {creator.overlap ? (
+              <span className="rounded-full bg-[#f8e4e4] px-2 py-0.5 text-xs font-medium text-[#9b2c2c]">
+                {OVERLAP_LABEL[creator.overlap]}
+              </span>
+            ) : null}
           </div>
         </div>
         <button
@@ -280,6 +494,38 @@ function CreatorDetail({
           className="text-sm text-[var(--muted)]"
         >
           닫기
+        </button>
+      </div>
+
+      <div className="mb-5 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onSelect}
+          className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+            pick === "selected"
+              ? "bg-[var(--accent)] !text-white"
+              : "border border-[var(--line)]"
+          }`}
+        >
+          {pick === "selected" ? "선택됨" : "선택"}
+        </button>
+        <button
+          type="button"
+          onClick={onExclude}
+          className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+            pick === "excluded"
+              ? "border-[#9b2c2c] bg-[#f8e4e4] text-[#9b2c2c]"
+              : "border-[var(--line)]"
+          }`}
+        >
+          제외
+        </button>
+        <button
+          type="button"
+          onClick={onReplace}
+          className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold"
+        >
+          교체
         </button>
       </div>
 

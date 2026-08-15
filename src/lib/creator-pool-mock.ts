@@ -17,6 +17,8 @@ export type PoolCreator = {
   /** 집행 단가 (원) */
   priceKrw: number;
   followers: number;
+  /** 타채널·총판 중복 리스크 (데모 뱃지) */
+  overlap: null | "channel" | "distributor";
 };
 
 export const MARKET_LABEL: Record<CreatorMarket, string> = {
@@ -26,12 +28,9 @@ export const MARKET_LABEL: Record<CreatorMarket, string> = {
   kr: "한국",
 };
 
-export const CHANNEL_LABEL: Record<CreatorChannel, string> = {
-  xiaohongshu: "샤오홍슈",
-  douyin: "더우인",
-  instagram: "Instagram",
-  tiktok: "TikTok",
-  youtube: "YouTube",
+export const OVERLAP_LABEL: Record<"channel" | "distributor", string> = {
+  channel: "타채널 중복",
+  distributor: "총판 중복",
 };
 
 const MARKETS: CreatorMarket[] = ["cn", "cn", "cn", "us", "us", "jp", "kr"];
@@ -119,6 +118,7 @@ export function buildCreatorPool(count = POOL_SIZE): PoolCreator[] {
     const last = pick(`${seed}:l`, LAST);
     const name = `${first} ${last}`;
     const handle = `@${first.toLowerCase()}_${last.toLowerCase()}${i % 97}`;
+    const overlapRoll = hash32(`${seed}:ov`) % 10;
     rows.push({
       id: `cr-${String(i + 1).padStart(3, "0")}`,
       name,
@@ -127,6 +127,12 @@ export function buildCreatorPool(count = POOL_SIZE): PoolCreator[] {
       channel,
       priceKrw: priceFor(market, channel, seed),
       followers: 8_000 + (hash32(`${seed}:fl`) % 920_000),
+      overlap:
+        overlapRoll === 0
+          ? "channel"
+          : overlapRoll === 1
+            ? "distributor"
+            : null,
     });
   }
   return rows;
