@@ -5,6 +5,7 @@ import {
   CompanyContentDashboard,
   type ContentFocus,
 } from "@/components/company-content-dashboard";
+import { CompanyCreatorPool } from "@/components/company-creator-pool";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import { formatMetric } from "@/lib/content-insights";
 import {
@@ -109,7 +110,7 @@ export function CompanyConsole({
   company: Company;
   items: AllocationWithRelations[];
 }) {
-  const [view, setView] = useState<"alloc" | "content">("alloc");
+  const [view, setView] = useState<"alloc" | "content" | "pool">("pool");
   const [period, setPeriod] = useState<"month" | "all">("month");
   const [searchQ, setSearchQ] = useState("");
   const [storeId, setStoreId] = useState("");
@@ -257,6 +258,19 @@ export function CompanyConsole({
           <button
             type="button"
             role="tab"
+            aria-selected={view === "pool"}
+            onClick={() => setView("pool")}
+            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
+              view === "pool"
+                ? "bg-[var(--accent)] !text-white"
+                : "text-[var(--muted)]"
+            }`}
+          >
+            크리에이터
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={view === "alloc"}
             onClick={() => setView("alloc")}
             className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
@@ -281,6 +295,7 @@ export function CompanyConsole({
             콘텐츠
           </button>
         </div>
+        {view !== "pool" ? (
         <div
           className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
           role="group"
@@ -310,9 +325,12 @@ export function CompanyConsole({
             전체
           </button>
         </div>
+        ) : null}
       </div>
 
-      {view === "content" ? (
+      {view === "pool" ? (
+        <CompanyCreatorPool />
+      ) : view === "content" ? (
         <CompanyContentDashboard
           snapshot={insights}
           focus={contentFocus}

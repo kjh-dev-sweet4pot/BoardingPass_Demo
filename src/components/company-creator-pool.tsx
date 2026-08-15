@@ -1,0 +1,354 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  buildCreatorPool,
+  CHANNEL_LABEL,
+  formatFollowers,
+  formatKrw,
+  formatMd,
+  getCreatorBrief,
+  MARKET_LABEL,
+  POOL_PAGE,
+  type CreatorChannel,
+  type CreatorMarket,
+  type PoolCreator,
+} from "@/lib/creator-pool-mock";
+
+const POOL = buildCreatorPool();
+
+function avatarLetter(name: string) {
+  return (name.trim()[0] || "?").toUpperCase();
+}
+
+export function CompanyCreatorPool() {
+  const [visible, setVisible] = useState(POOL_PAGE);
+  const [market, setMarket] = useState<CreatorMarket | "">("");
+  const [channel, setChannel] = useState<CreatorChannel | "">("");
+  const [q, setQ] = useState("");
+  const [requested, setRequested] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return POOL.filter((row) => {
+      if (market && row.market !== market) return false;
+      if (channel && row.channel !== channel) return false;
+      if (!needle) return true;
+      return (
+        row.name.toLowerCase().includes(needle) ||
+        row.handle.toLowerCase().includes(needle)
+      );
+    });
+  }, [market, channel, q]);
+
+  const shown = filtered.slice(0, visible);
+  const hasMore = visible < filtered.length;
+  const selected = openId
+    ? (POOL.find((r) => r.id === openId) ?? null)
+    : null;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.7fr)]">
+      <div className="flex min-h-0 flex-col gap-3">
+        <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs text-[var(--muted)]">
+              마케팅 풀 {filtered.length.toLocaleString("ko-KR")}명
+              {filtered.length !== POOL.length
+                ? ` · 전체 ${POOL.length.toLocaleString("ko-KR")}`
+                : null}
+            </p>
+            <p className="mt-0.5 text-sm text-[var(--ink)]">
+              국가·채널·단가 기준으로 집행 후보를 훑어보세요
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRequested(true)}
+            className="h-10 rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold !text-white"
+          >
+            {requested ? "추가 풀 요청됨" : "리스트 더 받기"}
+          </button>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <input
+            className="h-10 min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+            placeholder="이름 · 핸들 검색"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setVisible(POOL_PAGE);
+            }}
+          />
+          <select
+            className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+            value={market}
+            onChange={(e) => {
+              setMarket(e.target.value as CreatorMarket | "");
+              setVisible(POOL_PAGE);
+            }}
+          >
+            <option value="">국가 전체</option>
+            {(Object.keys(MARKET_LABEL) as CreatorMarket[]).map((key) => (
+              <option key={key} value={key}>
+                {MARKET_LABEL[key]}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+            value={channel}
+            onChange={(e) => {
+              setChannel(e.target.value as CreatorChannel | "");
+              setVisible(POOL_PAGE);
+            }}
+          >
+            <option value="">채널 전체</option>
+            {(Object.keys(CHANNEL_LABEL) as CreatorChannel[]).map((key) => (
+              <option key={key} value={key}>
+                {CHANNEL_LABEL[key]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {requested ? (
+          <p className="shrink-0 rounded-xl border border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--accent)]">
+            추가 풀 요청이 접수되었습니다. 운영팀이 후보를 보강한 뒤 리스트에
+            반영합니다.
+          </p>
+        ) : null}
+
+        <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
+          {shown.length === 0 ? (
+            <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
+              조건에 맞는 크리에이터가 없습니다.
+            </p>
+          ) : (
+            <table className="min-w-[780px] w-full border-collapse text-left text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs text-[var(--muted)]">
+                  <th className="px-4 py-3 font-medium">크리에이터</th>
+                  <th className="px-4 py-3 font-medium">활동 국가</th>
+                  <th className="px-4 py-3 font-medium">채널</th>
+                  <th className="px-4 py-3 font-medium">팔로워</th>
+                  <th className="px-4 py-3 font-medium text-right">집행 단가</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((row) => (
+                  <CreatorRow
+                    key={row.id}
+                    row={row}
+                    active={row.id === openId}
+                    onSelect={() =>
+                      setOpenId((id) => (id === row.id ? null : row.id))
+                    }
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-[var(--muted)]">
+            {shown.length.toLocaleString("ko-KR")} /{" "}
+            {filtered.length.toLocaleString("ko-KR")}명 표시
+          </p>
+          {hasMore ? (
+            <button
+              type="button"
+              onClick={() => setVisible((n) => n + POOL_PAGE)}
+              className="h-10 rounded-xl border border-[var(--line)] bg-white px-4 text-sm font-semibold"
+            >
+              리스트 더 보기
+            </button>
+          ) : filtered.length > 0 ? (
+            <p className="text-xs text-[var(--muted)]">끝까지 불러왔습니다</p>
+          ) : null}
+        </div>
+      </div>
+
+      <aside className="min-h-[50vh] min-w-0 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm lg:min-h-0">
+        {selected ? (
+          <CreatorDetail
+            creator={selected}
+            onClose={() => setOpenId(null)}
+          />
+        ) : (
+          <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
+            <p className="text-base font-medium text-[var(--ink)]">
+              행을 선택하면 상세가 여기에 표시됩니다
+            </p>
+            <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
+              콘텐츠 가이드와 방문·제작 일정을 확인할 수 있습니다
+            </p>
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function CreatorRow({
+  row,
+  active,
+  onSelect,
+}: {
+  row: PoolCreator;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <tr
+      className={`cursor-pointer border-b border-[var(--line)] last:border-b-0 ${
+        active ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--accent-soft)]/40"
+      }`}
+      onClick={onSelect}
+    >
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent)]"
+          >
+            {avatarLetter(row.name)}
+          </span>
+          <span>
+            <span className="block font-semibold text-[var(--ink)]">
+              {row.name}
+            </span>
+            <span className="text-[var(--accent)]">{row.handle}</span>
+          </span>
+        </div>
+      </td>
+      <td className="px-4 py-3">{MARKET_LABEL[row.market]}</td>
+      <td className="px-4 py-3">{CHANNEL_LABEL[row.channel]}</td>
+      <td className="px-4 py-3 tabular-nums text-[var(--muted)]">
+        {formatFollowers(row.followers)}
+      </td>
+      <td className="px-4 py-3 text-right font-semibold tabular-nums text-[var(--ink)]">
+        {formatKrw(row.priceKrw)}원
+      </td>
+    </tr>
+  );
+}
+
+function CreatorDetail({
+  creator,
+  onClose,
+}: {
+  creator: PoolCreator;
+  onClose: () => void;
+}) {
+  const brief = getCreatorBrief(creator);
+
+  return (
+    <div>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
+            Creator
+          </p>
+          <h3 className="mt-1 text-2xl font-bold text-[var(--ink)]">
+            {creator.name}
+          </h3>
+          <p className="mt-1 text-[var(--accent)]">{creator.handle}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+              {MARKET_LABEL[creator.market]}
+            </span>
+            <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+              {CHANNEL_LABEL[creator.channel]}
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-sm text-[var(--muted)]"
+        >
+          닫기
+        </button>
+      </div>
+
+      <dl className="grid gap-3 rounded-2xl bg-[var(--accent-soft)]/50 px-4 py-4 sm:grid-cols-2">
+        <div>
+          <dt className="text-xs text-[var(--muted)]">팔로워</dt>
+          <dd className="mt-1 font-semibold tabular-nums">
+            {formatFollowers(creator.followers)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[var(--muted)]">집행 단가</dt>
+          <dd className="mt-1 font-semibold tabular-nums">
+            {formatKrw(creator.priceKrw)}원
+          </dd>
+        </div>
+      </dl>
+
+      <div className="mt-5">
+        <h4 className="text-sm font-semibold">집행 콘텐츠 포맷</h4>
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {brief.formats.map((f) => (
+            <li
+              key={f}
+              className="rounded-full border border-[var(--line)] px-2.5 py-1 text-xs font-medium"
+            >
+              {f}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-[var(--line)] px-4 py-4">
+        <h4 className="text-sm font-semibold">{brief.guideTitle}</h4>
+        <ul className="mt-3 space-y-2 text-sm leading-5 text-[var(--ink)]">
+          {brief.guideBullets.map((line) => (
+            <li key={line} className="flex gap-2">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[var(--accent)]" />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mt-5">
+        <h4 className="text-sm font-semibold">방문 · 제작 일정</h4>
+        <ol className="mt-3 space-y-0">
+          <li className="relative border-l-2 border-[var(--line)] pb-4 pl-4">
+            <span className="absolute top-1 -left-[5px] h-2 w-2 rounded-full bg-[var(--accent)]" />
+            <p className="text-xs text-[var(--muted)]">
+              {brief.mode === "visit" ? "매장 방문" : "시딩 수령"}
+            </p>
+            <p className="mt-0.5 font-semibold">{formatMd(brief.visitYmd)}</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              {brief.mode === "visit"
+                ? "지정 매장 방문 후 제품 수령"
+                : "시딩 키트 수령 · 언박싱 촬영"}
+            </p>
+          </li>
+          <li className="relative border-l-2 border-transparent pl-4">
+            <span className="absolute top-1 -left-[5px] h-2 w-2 rounded-full bg-[var(--accent)]" />
+            <p className="text-xs text-[var(--muted)]">콘텐츠 마감</p>
+            <p className="mt-0.5 font-semibold">{formatMd(brief.dueYmd)}</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              가이드 포맷으로 발행 · 링크 제출
+            </p>
+          </li>
+        </ol>
+      </div>
+    </div>
+  );
+}
