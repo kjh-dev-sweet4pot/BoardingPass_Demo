@@ -35,6 +35,8 @@ export function CompanyCreatorPool() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [picks, setPicks] = useState<PickMap>({});
   const [replaceId, setReplaceId] = useState<string | null>(null);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -80,12 +82,31 @@ export function CompanyCreatorPool() {
   }, [replaceId]);
 
   function setPick(id: string, next: "selected" | "excluded" | null) {
+    setSubmitted(false);
     setPicks((prev) => {
       const copy = { ...prev };
       if (!next) delete copy[id];
       else copy[id] = next;
       return copy;
     });
+    if (next === "selected") setCartOpen(true);
+  }
+
+  function clearCart() {
+    setSubmitted(false);
+    setPicks((prev) => {
+      const copy = { ...prev };
+      for (const id of Object.keys(copy)) {
+        if (copy[id] === "selected") delete copy[id];
+      }
+      return copy;
+    });
+  }
+
+  function submitCart() {
+    if (selectedRows.length === 0) return;
+    setSubmitted(true);
+    setCartOpen(true);
   }
 
   function onRowActivate(row: PoolCreator) {
@@ -311,32 +332,120 @@ export function CompanyCreatorPool() {
         </aside>
       </div>
 
-      <div className="shrink-0 rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            <span>
-              선택{" "}
+      <div className="shrink-0 rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm">
+        {submitted ? (
+          <p className="border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-2.5 text-sm text-[var(--accent)]">
+            장바구니 {selectedRows.length}명 · {formatKrw(budget)}원 견적이
+            제출되었습니다. 운영 확인 후 풀이 확정됩니다.
+          </p>
+        ) : null}
+
+        {cartOpen ? (
+          <div className="border-b border-[var(--line)] px-4 py-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-[var(--ink)]">
+                장바구니
+              </p>
+              <button
+                type="button"
+                onClick={() => setCartOpen(false)}
+                className="text-xs text-[var(--muted)]"
+              >
+                접기
+              </button>
+            </div>
+            {selectedRows.length === 0 ? (
+              <p className="py-4 text-center text-sm text-[var(--muted)]">
+                아직 담은 크리에이터가 없습니다. 카드에서 선택해 주세요.
+              </p>
+            ) : (
+              <ul className="flex max-h-40 gap-2 overflow-x-auto pb-1">
+                {selectedRows.map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex w-36 shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--line)] bg-white"
+                  >
+                    <button
+                      type="button"
+                      className="text-left"
+                      onClick={() => setOpenId(row.id)}
+                    >
+                      <div className="aspect-square w-full overflow-hidden bg-[#efe4d6]">
+                        <CreatorPhoto creator={row} />
+                      </div>
+                      <div className="px-2 py-1.5">
+                        <p className="truncate text-xs font-semibold text-[var(--ink)]">
+                          {row.name}
+                        </p>
+                        <p className="truncate text-[10px] text-[var(--accent)]">
+                          {row.handle}
+                        </p>
+                        <p className="mt-0.5 text-[10px] font-semibold tabular-nums text-[var(--muted)]">
+                          {formatKrw(row.priceKrw)}원
+                        </p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPick(row.id, null)}
+                      className="border-t border-[var(--line)] px-2 py-1.5 text-[11px] font-medium text-[var(--muted)] hover:text-[var(--danger)]"
+                    >
+                      빼기
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setCartOpen((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold"
+            >
+              장바구니
+              <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-xs tabular-nums !text-white">
+                {selectedRows.length}
+              </span>
+            </button>
+            <div className="text-sm">
+              <span className="text-[var(--muted)]">담은 인원 </span>
               <strong className="tabular-nums text-[var(--accent)]">
                 {selectedRows.length}
               </strong>
-              명
-            </span>
-            <span className="text-[var(--muted)]">
-              제외{" "}
-              <strong className="tabular-nums">{excludedCount}</strong>명
-            </span>
-            {replaceId ? (
-              <span className="font-medium text-[var(--accent)]">
-                교체 대기 중
+              <span className="text-[var(--muted)]">
+                명
+                {excludedCount > 0 ? ` · 제외 ${excludedCount}` : ""}
               </span>
-            ) : null}
+            </div>
+            <div className="text-sm">
+              <span className="text-xs text-[var(--muted)]">예상 견적 </span>
+              <span className="font-semibold tabular-nums text-[var(--accent)]">
+                {formatKrw(budget)}원
+              </span>
+            </div>
           </div>
-          <p className="text-right">
-            <span className="text-xs text-[var(--muted)]">예상 집행 견적</span>
-            <span className="ml-2 text-xl font-semibold tabular-nums text-[var(--accent)]">
-              {formatKrw(budget)}원
-            </span>
-          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={selectedRows.length === 0}
+              onClick={clearCart}
+              className="h-10 rounded-xl border border-[var(--line)] bg-white px-4 text-sm font-semibold disabled:opacity-40"
+            >
+              비우기
+            </button>
+            <button
+              type="button"
+              disabled={selectedRows.length === 0 || submitted}
+              onClick={submitCart}
+              className="h-10 rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold !text-white disabled:opacity-40"
+            >
+              {submitted ? "제출 완료" : "제출하기"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -440,10 +549,15 @@ function CreatorCard({
             checked={pick === "selected"}
             disabled={pick === "excluded"}
             onChange={onSelectToggle}
-            aria-label={`${row.name} 선택`}
+            aria-label={`${row.name} 장바구니 담기`}
             className="h-3.5 w-3.5 accent-[var(--accent)]"
           />
         </label>
+        {pick === "selected" ? (
+          <span className="absolute bottom-2 left-2 rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold !text-white shadow-sm">
+            담김
+          </span>
+        ) : null}
         <span className="absolute top-2 right-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] shadow-sm">
           {TIER_LABEL[row.tier]}
         </span>
@@ -513,6 +627,18 @@ function CreatorCard({
           className="flex gap-1"
           onClick={(e) => e.stopPropagation()}
         >
+          <button
+            type="button"
+            onClick={onSelectToggle}
+            disabled={pick === "excluded"}
+            className={`flex-1 rounded-lg border px-1.5 py-1 text-[10px] font-medium ${
+              pick === "selected"
+                ? "border-[var(--accent)] bg-[var(--accent)] !text-white"
+                : "border-[var(--line)] text-[var(--muted)]"
+            }`}
+          >
+            {pick === "selected" ? "담김" : "담기"}
+          </button>
           <button
             type="button"
             onClick={onExclude}
@@ -619,7 +745,7 @@ function CreatorDetail({
               : "border border-[var(--line)]"
           }`}
         >
-          {pick === "selected" ? "선택됨" : "선택"}
+          {pick === "selected" ? "장바구니에 담김" : "장바구니 담기"}
         </button>
         <button
           type="button"
