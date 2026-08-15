@@ -5,6 +5,10 @@ import {
   CompanyContentDashboard,
   type ContentFocus,
 } from "@/components/company-content-dashboard";
+import {
+  CompanyBudgetGate,
+  useBudgetGate,
+} from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import { formatMetric } from "@/lib/content-insights";
@@ -105,11 +109,13 @@ function linkChipClass(sum: AllocationLinkSummary) {
 }
 
 export function CompanyConsole({
+  company,
   items,
 }: {
   company: Company;
   items: AllocationWithRelations[];
 }) {
+  const gate = useBudgetGate(company.id);
   const [view, setView] = useState<"alloc" | "content" | "pool">("pool");
   const [period, setPeriod] = useState<"month" | "all">("month");
   const [searchQ, setSearchQ] = useState("");
@@ -248,6 +254,23 @@ export function CompanyConsole({
     setOpenId(opts.allocationId || null);
   }
 
+  if (!gate.ready) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--muted)]">
+        불러오는 중…
+      </div>
+    );
+  }
+
+  if (!gate.unlocked) {
+    return (
+      <CompanyBudgetGate
+        companyName={company.name}
+        onUnlock={() => gate.unlock()}
+      />
+    );
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
@@ -326,6 +349,14 @@ export function CompanyConsole({
           </button>
         </div>
         ) : null}
+        <button
+          type="button"
+          onClick={() => gate.lock()}
+          className="rounded-full border border-[var(--line)] bg-white px-3.5 py-2 text-xs font-semibold text-[var(--muted)]"
+          title="데모: 입금 게이트 화면으로 돌아가기"
+        >
+          게이트 다시 보기
+        </button>
       </div>
 
       {view === "pool" ? (
