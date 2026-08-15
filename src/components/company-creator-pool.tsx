@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   buildCreatorPool,
   CHANNEL_LABEL,
+  creatorAvatarCandidates,
   formatFollowers,
   formatKrw,
   formatMd,
@@ -20,10 +21,6 @@ import {
 } from "@/lib/creator-pool-mock";
 
 const POOL = buildCreatorPool();
-
-function avatarLetter(name: string) {
-  return (name.trim()[0] || "?").toUpperCase();
-}
 
 type PickMap = Record<string, "selected" | "excluded">;
 
@@ -222,54 +219,39 @@ export function CompanyCreatorPool() {
             </p>
           ) : null}
 
-          <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
+          <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3">
             {shown.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
                 조건에 맞는 크리에이터가 없습니다.
               </p>
             ) : (
-              <table className="min-w-[920px] w-full border-collapse text-left text-sm">
-                <thead className="sticky top-0 z-10">
-                  <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs text-[var(--muted)]">
-                    <th className="px-3 py-3 font-medium">선택</th>
-                    <th className="px-4 py-3 font-medium">크리에이터</th>
-                    <th className="px-4 py-3 font-medium">채널</th>
-                    <th className="px-4 py-3 font-medium">상품</th>
-                    <th className="px-4 py-3 font-medium">팔로워</th>
-                    <th className="px-4 py-3 font-medium text-right">
-                      집행 단가
-                    </th>
-                    <th className="px-3 py-3 font-medium">조율</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((row) => (
-                    <CreatorRow
-                      key={row.id}
-                      row={row}
-                      active={row.id === openId}
-                      pick={picks[row.id] || null}
-                      replacing={replaceId === row.id}
-                      onActivate={() => onRowActivate(row)}
-                      onSelectToggle={() =>
-                        setPick(
-                          row.id,
-                          picks[row.id] === "selected" ? null : "selected",
-                        )
-                      }
-                      onExclude={() =>
-                        setPick(
-                          row.id,
-                          picks[row.id] === "excluded" ? null : "excluded",
-                        )
-                      }
-                      onReplace={() =>
-                        setReplaceId((id) => (id === row.id ? null : row.id))
-                      }
-                    />
-                  ))}
-                </tbody>
-              </table>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+                {shown.map((row) => (
+                  <CreatorCard
+                    key={row.id}
+                    row={row}
+                    active={row.id === openId}
+                    pick={picks[row.id] || null}
+                    replacing={replaceId === row.id}
+                    onActivate={() => onRowActivate(row)}
+                    onSelectToggle={() =>
+                      setPick(
+                        row.id,
+                        picks[row.id] === "selected" ? null : "selected",
+                      )
+                    }
+                    onExclude={() =>
+                      setPick(
+                        row.id,
+                        picks[row.id] === "excluded" ? null : "excluded",
+                      )
+                    }
+                    onReplace={() =>
+                      setReplaceId((id) => (id === row.id ? null : row.id))
+                    }
+                  />
+                ))}
+              </div>
             )}
           </div>
 
@@ -319,7 +301,7 @@ export function CompanyCreatorPool() {
           ) : (
             <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
               <p className="text-base font-medium text-[var(--ink)]">
-                행을 선택하면 상세가 여기에 표시됩니다
+                카드를 선택하면 상세가 여기에 표시됩니다
               </p>
               <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
                 콘텐츠 가이드와 방문·제작 일정을 확인할 수 있습니다
@@ -361,7 +343,48 @@ export function CompanyCreatorPool() {
   );
 }
 
-function CreatorRow({
+function CreatorPhoto({
+  creator,
+  size = "card",
+}: {
+  creator: PoolCreator;
+  size?: "card" | "detail";
+}) {
+  const candidates = useMemo(
+    () => creatorAvatarCandidates(creator),
+    [creator],
+  );
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    setIdx(0);
+  }, [creator.id]);
+  const src = candidates[Math.min(idx, candidates.length - 1)];
+  const box =
+    size === "detail"
+      ? "h-28 w-28 rounded-2xl"
+      : "aspect-square w-full rounded-xl";
+
+  return (
+    <div
+      className={`relative overflow-hidden bg-[var(--accent-soft)] ${box}`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        key={src}
+        src={src}
+        alt=""
+        className="h-full w-full object-cover"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() =>
+          setIdx((i) => (i + 1 < candidates.length ? i + 1 : i))
+        }
+      />
+    </div>
+  );
+}
+
+function CreatorCard({
   row,
   active,
   pick,
@@ -381,80 +404,104 @@ function CreatorRow({
   onReplace: () => void;
 }) {
   return (
-    <tr
-      className={`cursor-pointer border-b border-[var(--line)] last:border-b-0 ${
+    <article
+      className={`flex cursor-pointer flex-col overflow-hidden rounded-2xl border bg-[#fffdfb] shadow-[0_1px_0_rgba(61,31,10,0.06)] transition ${
         pick === "excluded"
-          ? "bg-[#f8e4e4]/50 opacity-70"
-          : pick === "selected"
-            ? "bg-[var(--accent-soft)]/70"
-            : replacing
-              ? "bg-[var(--accent-soft)]"
-              : active
-                ? "bg-[var(--accent-soft)]"
-                : "hover:bg-[var(--accent-soft)]/40"
+          ? "border-[#e8b4b4] opacity-70"
+          : pick === "selected" || active || replacing
+            ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/30"
+            : "border-[var(--line)] hover:border-[var(--accent)]/50"
       }`}
       onClick={onActivate}
     >
-      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-        <input
-          type="checkbox"
-          checked={pick === "selected"}
-          disabled={pick === "excluded"}
-          onChange={onSelectToggle}
-          aria-label={`${row.name} 선택`}
-          className="h-4 w-4 accent-[var(--accent)]"
-        />
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent)]"
-          >
-            {avatarLetter(row.name)}
-          </span>
-          <span>
-            <span className="flex flex-wrap items-center gap-1.5">
-              <span className="font-semibold text-[var(--ink)]">{row.name}</span>
-              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
-                {TIER_LABEL[row.tier]}
-              </span>
-              {row.posts.length > 0 ? (
-                <span className="rounded-full bg-[#e7f3ea] px-2 py-0.5 text-[11px] font-medium text-[#2f6b3c]">
-                  업로드 {row.posts.length}
-                </span>
-              ) : null}
-              {row.overlap ? (
-                <span className="rounded-full bg-[#f8e4e4] px-2 py-0.5 text-[11px] font-medium text-[#9b2c2c]">
-                  {OVERLAP_LABEL[row.overlap]}
-                </span>
-              ) : null}
-              {pick === "excluded" ? (
-                <span className="rounded-full bg-[#f0ece6] px-2 py-0.5 text-[11px] font-medium text-[#8a8074]">
-                  제외
-                </span>
-              ) : null}
-            </span>
-            <span className="text-[var(--accent)]">{row.handle}</span>
-          </span>
+      <div className="relative">
+        <CreatorPhoto creator={row} />
+        <label
+          className="absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-lg bg-white/90 shadow-sm"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={pick === "selected"}
+            disabled={pick === "excluded"}
+            onChange={onSelectToggle}
+            aria-label={`${row.name} 선택`}
+            className="h-3.5 w-3.5 accent-[var(--accent)]"
+          />
+        </label>
+        <span className="absolute top-2 right-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] shadow-sm">
+          {TIER_LABEL[row.tier]}
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1.5 p-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-[var(--ink)]">
+            {row.name}
+          </p>
+          <p className="truncate text-xs text-[var(--accent)]">{row.handle}</p>
         </div>
-      </td>
-      <td className="px-4 py-3">{CHANNEL_LABEL[row.channel]}</td>
-      <td className="max-w-[12rem] truncate px-4 py-3 text-[var(--muted)]">
-        {row.product || "—"}
-      </td>
-      <td className="px-4 py-3 tabular-nums text-[var(--muted)]">
-        {formatFollowers(row.followers)}
-      </td>
-      <td className="px-4 py-3 text-right font-semibold tabular-nums text-[var(--ink)]">
-        {formatKrw(row.priceKrw)}원
-      </td>
-      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+
         <div className="flex flex-wrap gap-1">
+          <span className="rounded-full bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent)]">
+            {CHANNEL_LABEL[row.channel]}
+          </span>
+          {row.posts.length > 0 ? (
+            <span className="rounded-full bg-[#e7f3ea] px-1.5 py-0.5 text-[10px] font-medium text-[#2f6b3c]">
+              업로드 {row.posts.length}
+            </span>
+          ) : null}
+          {row.overlap ? (
+            <span className="rounded-full bg-[#f8e4e4] px-1.5 py-0.5 text-[10px] font-medium text-[#9b2c2c]">
+              {OVERLAP_LABEL[row.overlap]}
+            </span>
+          ) : null}
+          {pick === "excluded" ? (
+            <span className="rounded-full bg-[#f0ece6] px-1.5 py-0.5 text-[10px] font-medium text-[#8a8074]">
+              제외
+            </span>
+          ) : null}
+        </div>
+
+        <p className="line-clamp-2 min-h-[2rem] text-[11px] leading-4 text-[var(--muted)]">
+          {row.product || "시딩 상품 미기재"}
+        </p>
+
+        <div className="mt-auto flex items-end justify-between gap-2 pt-1">
+          <div>
+            <p className="text-[10px] text-[var(--muted)]">팔로워</p>
+            <p className="text-xs font-semibold tabular-nums">
+              {formatFollowers(row.followers)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] text-[var(--muted)]">단가</p>
+            <p className="text-xs font-semibold tabular-nums text-[var(--accent)]">
+              {formatKrw(row.priceKrw)}
+            </p>
+          </div>
+        </div>
+
+        {row.profileUrl ? (
+          <a
+            href={row.profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 inline-flex justify-center rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-[11px] font-semibold text-[var(--accent)]"
+          >
+            SNS 프로필
+          </a>
+        ) : null}
+
+        <div
+          className="flex gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
             type="button"
             onClick={onExclude}
-            className={`rounded-lg border px-2 py-1 text-[11px] font-medium ${
+            className={`flex-1 rounded-lg border px-1.5 py-1 text-[10px] font-medium ${
               pick === "excluded"
                 ? "border-[#9b2c2c] bg-[#f8e4e4] text-[#9b2c2c]"
                 : "border-[var(--line)] text-[var(--muted)]"
@@ -465,7 +512,7 @@ function CreatorRow({
           <button
             type="button"
             onClick={onReplace}
-            className={`rounded-lg border px-2 py-1 text-[11px] font-medium ${
+            className={`flex-1 rounded-lg border px-1.5 py-1 text-[10px] font-medium ${
               replacing
                 ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
                 : "border-[var(--line)] text-[var(--muted)]"
@@ -474,8 +521,8 @@ function CreatorRow({
             교체
           </button>
         </div>
-      </td>
-    </tr>
+      </div>
+    </article>
   );
 }
 
@@ -499,29 +546,32 @@ function CreatorDetail({
   return (
     <div>
       <div className="mb-5 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
-            Creator
-          </p>
-          <h3 className="mt-1 text-2xl font-bold text-[var(--ink)]">
-            {creator.name}
-          </h3>
-          <p className="mt-1 text-[var(--accent)]">{creator.handle}</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
-              {MARKET_LABEL[creator.market]}
-            </span>
-            <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
-              {CHANNEL_LABEL[creator.channel]}
-            </span>
-            <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
-              {TIER_LABEL[creator.tier]}
-            </span>
-            {creator.overlap ? (
-              <span className="rounded-full bg-[#f8e4e4] px-2 py-0.5 text-xs font-medium text-[#9b2c2c]">
-                {OVERLAP_LABEL[creator.overlap]}
+        <div className="flex min-w-0 items-start gap-3">
+          <CreatorPhoto creator={creator} size="detail" />
+          <div className="min-w-0">
+            <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
+              Creator
+            </p>
+            <h3 className="mt-1 text-2xl font-bold text-[var(--ink)]">
+              {creator.name}
+            </h3>
+            <p className="mt-1 text-[var(--accent)]">{creator.handle}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+                {MARKET_LABEL[creator.market]}
               </span>
-            ) : null}
+              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+                {CHANNEL_LABEL[creator.channel]}
+              </span>
+              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+                {TIER_LABEL[creator.tier]}
+              </span>
+              {creator.overlap ? (
+                <span className="rounded-full bg-[#f8e4e4] px-2 py-0.5 text-xs font-medium text-[#9b2c2c]">
+                  {OVERLAP_LABEL[creator.overlap]}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
         <button

@@ -79,8 +79,79 @@ export const POST_PLATFORM_LABEL: Record<string, string> = {
 export const POOL_SIZE = (jpPool as PoolCreator[]).length;
 export const POOL_PAGE = 40;
 
+function bareHandle(handle: string) {
+  return handle.replace(/^@+/, "").trim();
+}
+
+function profileUrlFor(channel: CreatorChannel, handle: string) {
+  const h = bareHandle(handle);
+  if (!h) return null;
+  if (channel === "tiktok") return `https://www.tiktok.com/@${h}`;
+  if (channel === "x") return `https://x.com/${h}`;
+  return `https://www.instagram.com/${h}/`;
+}
+
+function ensureProfile(c: PoolCreator): PoolCreator {
+  if (c.profileUrl) return c;
+  return { ...c, profileUrl: profileUrlFor(c.channel, c.handle) };
+}
+
 export function buildCreatorPool(): PoolCreator[] {
-  return jpPool as PoolCreator[];
+  return (jpPool as PoolCreator[]).map(ensureProfile);
+}
+
+/** 프로필 사진 후보. 실패 시 다음(최근 포스트 핸들 → 이니셜 아바타). */
+export function creatorAvatarCandidates(creator: PoolCreator): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (url: string | null | undefined) => {
+    const u = (url || "").trim();
+    if (!u || seen.has(u)) return;
+    seen.add(u);
+    out.push(u);
+  };
+
+  const provider = (channel: string) => {
+    if (channel === "tiktok") return "tiktok";
+    if (channel === "x" || channel === "twitter") return "twitter";
+    if (channel === "youtube") return "youtube";
+    return "instagram";
+  };
+
+  const unavatar = (channel: string, handle: string) => {
+    const h = bareHandle(handle);
+    if (!h || /[^\w.]/.test(h)) return null; // non-latin handles often fail providers
+    return `https://unavatar.io/${provider(channel)}/${encodeURIComponent(h)}?fallback=false`;
+  };
+
+  push(unavatar(creator.channel, creator.handle));
+
+  for (const post of creator.posts) {
+    const fromPost =
+      post.platform === "tiktok"
+        ? post.url.match(/tiktok\.com\/@([^\/\?#]+)/i)?.[1]
+        : post.platform === "x"
+          ? post.url.match(/(?:x|twitter)\.com\/([^\/\?#]+)/i)?.[1]
+          : post.url.match(/instagram\.com\/(?:reel|reels|p)\/[^\/]+/i)
+            ? bareHandle(creator.handle)
+            : post.url.match(/instagram\.com\/([^\/\?#]+)/i)?.[1];
+    if (
+      fromPost &&
+      !["reel", "reels", "p", "status", "video"].includes(fromPost.toLowerCase())
+    ) {
+      push(unavatar(post.platform, fromPost));
+    }
+    // 최근 게시물 썸네일 (IG media endpoint — 실패하면 onError로 다음 후보)
+    const igCode = post.url.match(
+      /instagram\.com\/(?:reel|reels|p)\/([^\/\?#]+)/i,
+    )?.[1];
+    if (igCode) push(`https://www.instagram.com/p/${igCode}/media/?size=l`);
+  }
+
+  push(
+    `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(creator.name)}&backgroundColor=f5ede3&textColor=6b3b1f`,
+  );
+  return out;
 }
 
 export function formatKrw(n: number) {
