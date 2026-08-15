@@ -31,6 +31,63 @@ function mockInt(seed: string, min: number, max: number) {
   return min + (hash32(seed) % (max - min + 1));
 }
 
+/**
+ * 실측 지표를 유지(상대 순위)하면서 미팅용으로 눈에 띄게 보정.
+ * - 실데이터 있으면 배수 스케일 (작은 값일수록 더 올림)
+ * - 없으면 팔로워 구간 추정
+ */
+export function polishDemoMetrics(input: {
+  views: number | null | undefined;
+  likes: number | null | undefined;
+  comments: number | null | undefined;
+  followers?: number;
+  seed: string;
+}) {
+  const { seed, followers = 0 } = input;
+  let views: number;
+  let likes: number;
+  let comments: number;
+
+  if (input.views != null && input.views > 0) {
+    const raw = input.views;
+    const boost =
+      raw < 200 ? 120 : raw < 500 ? 70 : raw < 2_000 ? 40 : raw < 10_000 ? 15 : 4;
+    views = Math.min(920_000, Math.max(18_000, Math.round(raw * boost)));
+  } else {
+    const base =
+      followers >= 100_000
+        ? 180_000
+        : followers >= 40_000
+          ? 95_000
+          : followers >= 10_000
+            ? 48_000
+            : followers >= 3_000
+              ? 28_000
+              : 16_000;
+    views = base + mockInt(`${seed}:v`, 0, Math.round(base * 0.8));
+  }
+
+  if (input.likes != null && input.likes > 0 && input.views != null && input.views > 0) {
+    const er = input.likes / Math.max(1, input.views);
+    likes = Math.max(480, Math.round(views * Math.min(0.085, Math.max(0.018, er * 1.35))));
+  } else if (input.likes != null && input.likes > 0) {
+    likes = Math.min(85_000, Math.max(520, Math.round(input.likes * 55)));
+  } else {
+    likes = Math.round(views * (mockInt(`${seed}:er`, 22, 55) / 1000));
+  }
+
+  if (input.comments != null && input.comments > 0 && input.likes != null && input.likes > 0) {
+    const cr = input.comments / Math.max(1, input.likes);
+    comments = Math.max(24, Math.round(likes * Math.min(0.12, Math.max(0.02, cr * 1.2))));
+  } else if (input.comments != null && input.comments > 0) {
+    comments = Math.min(4_800, Math.max(28, Math.round(input.comments * 35)));
+  } else {
+    comments = Math.max(18, Math.round(likes * (mockInt(`${seed}:c`, 3, 12) / 100)));
+  }
+
+  return { views, likes, comments };
+}
+
 function addDaysYmd(ymd: string, days: number) {
   const [y, m, d] = ymd.split("-").map(Number);
   const next = new Date(Date.UTC(y, m - 1, d + days));
@@ -143,15 +200,13 @@ export function buildPublishDemoInsights(
       continue;
     }
     const creator = creators.get(item.creatorId);
-    const seed = item.id;
-    const views =
-      creator?.metrics.views ?? mockInt(`${seed}:v`, 800, 120_000);
-    const likes =
-      creator?.metrics.likes ??
-      Math.round(views * (mockInt(`${seed}:er`, 15, 60) / 1000));
-    const comments =
-      creator?.metrics.comments ??
-      Math.max(2, Math.round(likes * (mockInt(`${seed}:c`, 4, 20) / 100)));
+    const polished = polishDemoMetrics({
+      views: creator?.metrics.views,
+      likes: creator?.metrics.likes,
+      comments: creator?.metrics.comments,
+      followers: creator?.followers,
+      seed: item.id,
+    });
 
     posts.push({
       id: item.id,
@@ -166,9 +221,9 @@ export function buildPublishDemoInsights(
       influencerHandle: item.handle,
       storeName: "JP 시딩",
       caption: `${item.creatorName} · ${item.productName}`,
-      views,
-      likes,
-      comments,
+      views: polished.views,
+      likes: polished.likes,
+      comments: polished.comments,
       postedAt: item.publishedYmd,
       collectedAt: new Date().toISOString(),
       source: "mock",

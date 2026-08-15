@@ -19,6 +19,7 @@ import {
   type CreatorMarket,
   type PoolCreator,
 } from "@/lib/creator-pool-mock";
+import { polishDemoMetrics } from "@/lib/publish-demo-data";
 
 const POOL = buildCreatorPool();
 
@@ -683,6 +684,13 @@ function CreatorDetail({
   onReplace: () => void;
 }) {
   const brief = getCreatorBrief(creator);
+  const metrics = polishDemoMetrics({
+    views: creator.metrics.views,
+    likes: creator.metrics.likes,
+    comments: creator.metrics.comments,
+    followers: creator.followers,
+    seed: creator.id,
+  });
 
   return (
     <div>
@@ -787,13 +795,13 @@ function CreatorDetail({
         <div>
           <dt className="text-xs text-[var(--muted)]">조회</dt>
           <dd className="mt-1 font-semibold tabular-nums">
-            {formatMetric(creator.metrics.views)}
+            {formatMetric(metrics.views)}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-[var(--muted)]">좋아요</dt>
           <dd className="mt-1 font-semibold tabular-nums">
-            {formatMetric(creator.metrics.likes)}
+            {formatMetric(metrics.likes)}
           </dd>
         </div>
       </dl>
