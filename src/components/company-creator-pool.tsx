@@ -366,15 +366,16 @@ function CreatorPhoto({
 
   return (
     <div
-      className={`relative overflow-hidden bg-[var(--accent-soft)] ${box}`}
+      className={`relative overflow-hidden bg-[#efe4d6] ${box}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={src}
         src={src}
-        alt=""
+        alt={`${creator.name} profile`}
         className="h-full w-full object-cover"
         loading="lazy"
+        decoding="async"
         referrerPolicy="no-referrer"
         onError={() =>
           setIdx((i) => (i + 1 < candidates.length ? i + 1 : i))
