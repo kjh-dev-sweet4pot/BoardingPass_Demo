@@ -355,32 +355,46 @@ function CreatorPhoto({
     [creator],
   );
   const [idx, setIdx] = useState(0);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     setIdx(0);
+    setFailed(false);
   }, [creator.id]);
-  const src = candidates[Math.min(idx, candidates.length - 1)];
+
+  const exhausted = candidates.length === 0 || failed;
+  const src = exhausted
+    ? null
+    : candidates[Math.min(idx, candidates.length - 1)];
   const box =
     size === "detail"
       ? "h-28 w-28 rounded-2xl"
       : "aspect-square w-full rounded-xl";
 
   return (
-    <div
-      className={`relative overflow-hidden bg-[#efe4d6] ${box}`}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        key={src}
-        src={src}
-        alt={`${creator.name} profile`}
-        className="h-full w-full object-cover"
-        loading="lazy"
-        decoding="async"
-        referrerPolicy="no-referrer"
-        onError={() =>
-          setIdx((i) => (i + 1 < candidates.length ? i + 1 : i))
-        }
-      />
+    <div className={`relative overflow-hidden bg-[#efe4d6] ${box}`}>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={src}
+          src={src}
+          alt={`${creator.name} SNS`}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => {
+            if (idx + 1 < candidates.length) setIdx((i) => i + 1);
+            else setFailed(true);
+          }}
+        />
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-center">
+          <p className="text-xs font-semibold text-[var(--accent)]">SNS</p>
+          <p className="line-clamp-2 text-[10px] text-[var(--muted)]">
+            {creator.handle}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

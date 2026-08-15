@@ -1,6 +1,7 @@
 /** 브랜드사 마케팅 풀 — JP 시딩 실데이터 (주소·전화 제외). */
 
 import jpPool from "./data/jp-creator-pool.json";
+import avatarManifest from "./data/jp-creator-avatar-manifest.json";
 
 export type CreatorMarket = "cn" | "us" | "jp" | "kr";
 export type CreatorChannel =
@@ -97,13 +98,10 @@ function ensureProfile(c: PoolCreator): PoolCreator {
 }
 
 export function buildCreatorPool(): PoolCreator[] {
-  return (jpPool as PoolCreator[]).map(ensureProfile);
-}
-
-/** 전원 프로필 이미지가 보이도록: SNS 아바타 → 실패 시 시드 얼굴 사진. */
-export function creatorFaceFallback(creator: PoolCreator) {
-  // ponytail: 미팅용 보장 이미지. SNS 아바타 실패해도 항상 얼굴이 나옴.
-  return `https://i.pravatar.cc/400?u=${encodeURIComponent(creator.id)}`;
+  const rows = (jpPool as PoolCreator[]).map(ensureProfile);
+  const has = avatarManifest as Record<string, string>;
+  // 실사진 있는 인원을 앞에 (미팅 스크롤 첫 화면)
+  return rows.sort((a, b) => Number(!!has[b.id]) - Number(!!has[a.id]));
 }
 
 function extractHandleFromUrl(url: string, channel: string) {
@@ -117,7 +115,11 @@ function extractHandleFromUrl(url: string, channel: string) {
         : u.match(/instagram\.com\/([^\/\?#]+)/i);
   if (!m) return "";
   const h = decodeURIComponent(m[1]).replace(/^@/, "");
-  if (["reels", "reel", "p", "stories", "status", "video", "photo"].includes(h.toLowerCase())) {
+  if (
+    ["reels", "reel", "p", "stories", "status", "video", "photo"].includes(
+      h.toLowerCase(),
+    )
+  ) {
     return "";
   }
   return h;
@@ -144,7 +146,7 @@ function avatarProvider(channel: string) {
   return "instagram";
 }
 
-/** 프로필 사진 후보. 마지막은 항상 로드되는 얼굴 사진. */
+/** 실제 SNS만: 1) 프로필 사진 2) 없으면 게시물 사진. 로컬 캐시 우선. */
 export function creatorAvatarCandidates(creator: PoolCreator): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -155,21 +157,29 @@ export function creatorAvatarCandidates(creator: PoolCreator): string[] {
     out.push(u);
   };
 
-  const face = creatorFaceFallback(creator);
-  const handle = bestHandle(creator);
+  const cached = (avatarManifest as Record<string, string>)[creator.id];
+  if (cached) push(`/creator-avatars/${creator.id}.jpg`);
 
+  const handle = bestHandle(creator);
   if (handle) {
-    // 한 요청으로 SNS 프로필 → 실패 시 얼굴 사진 보장
     push(
-      `https://unavatar.io/${avatarProvider(creator.channel)}/${encodeURIComponent(handle)}?fallback=${encodeURIComponent(face)}`,
+      `https://unavatar.io/${avatarProvider(creator.channel)}/${encodeURIComponent(handle)}?fallback=false`,
     );
   }
 
-  // 핸들 없거나 unavatar 장애여도 전원 얼굴 사진
-  push(face);
-  push(
-    `https://api.dicebear.com/9.x/notionists/png?seed=${encodeURIComponent(creator.id)}&size=400`,
-  );
+  for (const post of creator.posts) {
+    const igCode = post.url.match(
+      /instagram\.com\/(?:reel|reels|p)\/([^\/\?#]+)/i,
+    )?.[1];
+    if (igCode) {
+      push(`https://www.instagram.com/p/${igCode}/media/?size=l`);
+    }
+    // TikTok/X 등: 게시물 OG 이미지 (실제 SNS 미디어)
+    push(
+      `https://api.microlink.io/?url=${encodeURIComponent(post.url)}&embed=image.url`,
+    );
+  }
+
   return out;
 }
 
