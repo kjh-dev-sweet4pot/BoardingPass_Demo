@@ -32,10 +32,10 @@ export function CompanyPublishFeed() {
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="shrink-0">
         <p className="text-xs text-[var(--muted)]">
-          발행 완료 {FEED.length.toLocaleString("ko-KR")}건 · 루틴 발행 현황
+          발행 완료 {FEED.length.toLocaleString("ko-KR")}건 · JP 시딩 실업로드
         </p>
         <p className="mt-0.5 text-sm text-[var(--ink)]">
-          브랜드 콘텐츠가 유형별로 꾸준히 올라오고 있는지 확인하세요
+          실제 업로드 링크로 루틴 발행 현황을 확인하세요
         </p>
       </div>
 
@@ -101,7 +101,7 @@ function PublishRow({ row }: { row: PublishItem }) {
               {PUBLISH_KIND_LABEL[row.kind]}
             </span>
             <span className="text-[11px] text-[var(--muted)]">
-              {PUBLISH_PLATFORM_LABEL[row.platform]}
+              {PUBLISH_PLATFORM_LABEL[row.platform] || row.platform}
             </span>
           </span>
           <span className="mt-1 block text-sm font-semibold text-[var(--ink)]">

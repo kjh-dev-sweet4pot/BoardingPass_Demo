@@ -1,4 +1,6 @@
-/** 브랜드별 발행 완료 콘텐츠 피드 목업 (데모 볼륨용). */
+/** 발행 피드 — JP 크리에이터 실업로드 링크 기반. */
+
+import { buildCreatorPool } from "@/lib/creator-pool-mock";
 
 export type PublishKind = "carousel" | "visit" | "seeding";
 
@@ -9,7 +11,7 @@ export type PublishItem = {
   creatorName: string;
   handle: string;
   url: string;
-  platform: "instagram" | "tiktok" | "xiaohongshu" | "youtube";
+  platform: string;
   publishedYmd: string;
   productName: string;
 };
@@ -20,74 +22,13 @@ export const PUBLISH_KIND_LABEL: Record<PublishKind, string> = {
   seeding: "시딩 리뷰",
 };
 
-export const PUBLISH_PLATFORM_LABEL: Record<PublishItem["platform"], string> = {
+export const PUBLISH_PLATFORM_LABEL: Record<string, string> = {
   instagram: "Instagram",
   tiktok: "TikTok",
-  xiaohongshu: "샤오홍슈",
+  x: "X",
+  lips: "LIPS",
   youtube: "YouTube",
 };
-
-const KINDS: PublishKind[] = [
-  "carousel",
-  "carousel",
-  "visit",
-  "seeding",
-  "seeding",
-];
-const PLATFORMS: PublishItem["platform"][] = [
-  "instagram",
-  "tiktok",
-  "xiaohongshu",
-  "youtube",
-];
-const PRODUCTS = [
-  "앰플 세럼",
-  "선크림 SPF50",
-  "클렌징 폼",
-  "아이크림",
-  "토너 패드",
-  "립밤",
-];
-const NAMES = [
-  "Amy Chen",
-  "Lina Wang",
-  "Maya Kim",
-  "Sora Park",
-  "Yuki Sato",
-  "Nina Lee",
-  "Chloe Brown",
-  "Jia Zhang",
-  "Hana Choi",
-  "Elena Miller",
-];
-
-function hash32(input: string) {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i += 1) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function pick<T>(seed: string, arr: readonly T[]): T {
-  return arr[hash32(seed) % arr.length];
-}
-
-function todayYmdKst() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
-
-function addDaysYmd(ymd: string, days: number) {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const next = new Date(Date.UTC(y, m - 1, d + days));
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
-}
 
 export function formatPublishMd(ymd: string) {
   const [, m, d] = ymd.split("-").map(Number);
@@ -95,37 +36,40 @@ export function formatPublishMd(ymd: string) {
   return `${m}월 ${d}일`;
 }
 
-/** ponytail: 고정 80건. 실데이터면 creator_links 조회로 교체. */
-export const PUBLISH_FEED_SIZE = 80;
+function kindFromUrl(url: string, platform: string): PublishKind {
+  if (/\/p\//i.test(url) && platform === "instagram") return "carousel";
+  if (/visit|ginza|店舗|방문/i.test(url)) return "visit";
+  return "seeding";
+}
 
-export function buildPublishFeed(count = PUBLISH_FEED_SIZE): PublishItem[] {
-  const today = todayYmdKst();
+/** ponytail: 실포스트 URL이 있는 크리에이터만. */
+export function buildPublishFeed(): PublishItem[] {
   const rows: PublishItem[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const seed = `pub:${i}`;
-    const kind = pick(`${seed}:k`, KINDS);
-    const platform = pick(`${seed}:p`, PLATFORMS);
-    const name = pick(`${seed}:n`, NAMES);
-    const product = pick(`${seed}:pr`, PRODUCTS);
-    const handle = `@${name.split(" ")[0].toLowerCase()}_pub${i % 61}`;
-    const title =
-      kind === "carousel"
-        ? `${product} 사용컷 캐러셀`
-        : kind === "visit"
-          ? `매장 방문 · ${product}`
-          : `${product} 시딩 후기`;
-    const daysAgo = 1 + (hash32(`${seed}:d`) % 45);
-    rows.push({
-      id: `pub-${String(i + 1).padStart(3, "0")}`,
-      kind,
-      title,
-      creatorName: name,
-      handle,
-      url: `https://example.com/p/${platform}/${i + 1}`,
-      platform,
-      publishedYmd: addDaysYmd(today, -daysAgo),
-      productName: product,
-    });
+  let i = 0;
+  for (const c of buildCreatorPool()) {
+    if (!c.posts.length) continue;
+    for (const post of c.posts) {
+      i += 1;
+      rows.push({
+        id: `pub-${String(i).padStart(3, "0")}`,
+        kind: kindFromUrl(post.url, post.platform),
+        title: c.product
+          ? `${c.product} · ${PUBLISH_PLATFORM_LABEL[post.platform] || post.platform}`
+          : `${c.name} 업로드`,
+        creatorName: c.name,
+        handle: c.handle,
+        url: post.url,
+        platform: post.platform,
+        publishedYmd: c.uploadYmd || "2026-05-01",
+        productName: c.product || "—",
+      });
+    }
   }
   return rows.sort((a, b) => b.publishedYmd.localeCompare(a.publishedYmd));
 }
+
+export const PUBLISH_FEED_SIZE = (() => {
+  let n = 0;
+  for (const c of buildCreatorPool()) n += c.posts.length;
+  return n;
+})();

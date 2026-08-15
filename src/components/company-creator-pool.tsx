@@ -7,10 +7,13 @@ import {
   formatFollowers,
   formatKrw,
   formatMd,
+  formatMetric,
   getCreatorBrief,
   MARKET_LABEL,
   OVERLAP_LABEL,
   POOL_PAGE,
+  POST_PLATFORM_LABEL,
+  TIER_LABEL,
   type CreatorChannel,
   type CreatorMarket,
   type PoolCreator,
@@ -26,10 +29,11 @@ type PickMap = Record<string, "selected" | "excluded">;
 
 export function CompanyCreatorPool() {
   const [visible, setVisible] = useState(POOL_PAGE);
-  const [market, setMarket] = useState<CreatorMarket | "">("");
+  const [market, setMarket] = useState<CreatorMarket | "">("jp");
   const [channel, setChannel] = useState<CreatorChannel | "">("");
   const [q, setQ] = useState("");
   const [hideOverlap, setHideOverlap] = useState(false);
+  const [postedOnly, setPostedOnly] = useState(false);
   const [requested, setRequested] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [picks, setPicks] = useState<PickMap>({});
@@ -39,15 +43,17 @@ export function CompanyCreatorPool() {
     const needle = q.trim().toLowerCase();
     return POOL.filter((row) => {
       if (hideOverlap && row.overlap) return false;
+      if (postedOnly && row.posts.length === 0) return false;
       if (market && row.market !== market) return false;
       if (channel && row.channel !== channel) return false;
       if (!needle) return true;
       return (
         row.name.toLowerCase().includes(needle) ||
-        row.handle.toLowerCase().includes(needle)
+        row.handle.toLowerCase().includes(needle) ||
+        (row.product || "").toLowerCase().includes(needle)
       );
     });
-  }, [market, channel, q, hideOverlap]);
+  }, [market, channel, q, hideOverlap, postedOnly]);
 
   const shown = filtered.slice(0, visible);
   const hasMore = visible < filtered.length;
@@ -117,7 +123,7 @@ export function CompanyCreatorPool() {
                   : null}
               </p>
               <p className="mt-0.5 text-sm text-[var(--ink)]">
-                후보를 선택·제외·교체하며 집행 풀을 조율하세요
+                JP 시딩 실인원 · 프로필·업로드 콘텐츠 기준으로 풀을 조율하세요
               </p>
             </div>
             <button
@@ -132,7 +138,7 @@ export function CompanyCreatorPool() {
           <div className="flex shrink-0 flex-wrap gap-2">
             <input
               className="h-10 min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
-              placeholder="이름 · 핸들 검색"
+              placeholder="이름 · 핸들 · 상품 검색"
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
@@ -163,12 +169,29 @@ export function CompanyCreatorPool() {
               }}
             >
               <option value="">채널 전체</option>
-              {(Object.keys(CHANNEL_LABEL) as CreatorChannel[]).map((key) => (
+              {(
+                ["instagram", "tiktok", "x"] as CreatorChannel[]
+              ).map((key) => (
                 <option key={key} value={key}>
                   {CHANNEL_LABEL[key]}
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              aria-pressed={postedOnly}
+              onClick={() => {
+                setPostedOnly((v) => !v);
+                setVisible(POOL_PAGE);
+              }}
+              className={`h-10 rounded-xl border px-3 text-sm font-medium ${
+                postedOnly
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "border-[var(--line)] text-[var(--muted)]"
+              }`}
+            >
+              업로드 있음
+            </button>
             <button
               type="button"
               aria-pressed={hideOverlap}
@@ -210,8 +233,8 @@ export function CompanyCreatorPool() {
                   <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs text-[var(--muted)]">
                     <th className="px-3 py-3 font-medium">선택</th>
                     <th className="px-4 py-3 font-medium">크리에이터</th>
-                    <th className="px-4 py-3 font-medium">활동 국가</th>
                     <th className="px-4 py-3 font-medium">채널</th>
+                    <th className="px-4 py-3 font-medium">상품</th>
                     <th className="px-4 py-3 font-medium">팔로워</th>
                     <th className="px-4 py-3 font-medium text-right">
                       집행 단가
@@ -393,6 +416,14 @@ function CreatorRow({
           <span>
             <span className="flex flex-wrap items-center gap-1.5">
               <span className="font-semibold text-[var(--ink)]">{row.name}</span>
+              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
+                {TIER_LABEL[row.tier]}
+              </span>
+              {row.posts.length > 0 ? (
+                <span className="rounded-full bg-[#e7f3ea] px-2 py-0.5 text-[11px] font-medium text-[#2f6b3c]">
+                  업로드 {row.posts.length}
+                </span>
+              ) : null}
               {row.overlap ? (
                 <span className="rounded-full bg-[#f8e4e4] px-2 py-0.5 text-[11px] font-medium text-[#9b2c2c]">
                   {OVERLAP_LABEL[row.overlap]}
@@ -408,8 +439,10 @@ function CreatorRow({
           </span>
         </div>
       </td>
-      <td className="px-4 py-3">{MARKET_LABEL[row.market]}</td>
       <td className="px-4 py-3">{CHANNEL_LABEL[row.channel]}</td>
+      <td className="max-w-[12rem] truncate px-4 py-3 text-[var(--muted)]">
+        {row.product || "—"}
+      </td>
       <td className="px-4 py-3 tabular-nums text-[var(--muted)]">
         {formatFollowers(row.followers)}
       </td>
@@ -481,6 +514,9 @@ function CreatorDetail({
             <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
               {CHANNEL_LABEL[creator.channel]}
             </span>
+            <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+              {TIER_LABEL[creator.tier]}
+            </span>
             {creator.overlap ? (
               <span className="rounded-full bg-[#f8e4e4] px-2 py-0.5 text-xs font-medium text-[#9b2c2c]">
                 {OVERLAP_LABEL[creator.overlap]}
@@ -496,6 +532,17 @@ function CreatorDetail({
           닫기
         </button>
       </div>
+
+      {creator.profileUrl ? (
+        <a
+          href={creator.profileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-5 inline-flex rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white"
+        >
+          SNS 프로필 열기
+        </a>
+      ) : null}
 
       <div className="mb-5 flex flex-wrap gap-2">
         <button
@@ -542,7 +589,48 @@ function CreatorDetail({
             {formatKrw(creator.priceKrw)}원
           </dd>
         </div>
+        <div className="sm:col-span-2">
+          <dt className="text-xs text-[var(--muted)]">시딩 상품</dt>
+          <dd className="mt-1 font-semibold">{creator.product || "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[var(--muted)]">조회</dt>
+          <dd className="mt-1 font-semibold tabular-nums">
+            {formatMetric(creator.metrics.views)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[var(--muted)]">좋아요</dt>
+          <dd className="mt-1 font-semibold tabular-nums">
+            {formatMetric(creator.metrics.likes)}
+          </dd>
+        </div>
       </dl>
+
+      <div className="mt-5">
+        <h4 className="text-sm font-semibold">업로드 콘텐츠</h4>
+        {creator.posts.length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            아직 등록된 업로드 링크가 없습니다.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {creator.posts.map((post) => (
+              <li key={post.url}>
+                <a
+                  href={post.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-xl border border-[var(--line)] px-3 py-2.5 text-sm text-[var(--accent)] underline"
+                >
+                  {POST_PLATFORM_LABEL[post.platform] || post.platform} · 콘텐츠
+                  열기
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="mt-5">
         <h4 className="text-sm font-semibold">집행 콘텐츠 포맷</h4>
@@ -575,19 +663,17 @@ function CreatorDetail({
         <ol className="mt-3 space-y-0">
           <li className="relative border-l-2 border-[var(--line)] pb-4 pl-4">
             <span className="absolute top-1 -left-[5px] h-2 w-2 rounded-full bg-[var(--accent)]" />
-            <p className="text-xs text-[var(--muted)]">
-              {brief.mode === "visit" ? "매장 방문" : "시딩 수령"}
-            </p>
+            <p className="text-xs text-[var(--muted)]">시딩 수령</p>
             <p className="mt-0.5 font-semibold">{formatMd(brief.visitYmd)}</p>
             <p className="mt-1 text-xs text-[var(--muted)]">
-              {brief.mode === "visit"
-                ? "지정 매장 방문 후 제품 수령"
-                : "시딩 키트 수령 · 언박싱 촬영"}
+              시딩 키트 수령 · 언박싱 촬영
             </p>
           </li>
           <li className="relative border-l-2 border-transparent pl-4">
             <span className="absolute top-1 -left-[5px] h-2 w-2 rounded-full bg-[var(--accent)]" />
-            <p className="text-xs text-[var(--muted)]">콘텐츠 마감</p>
+            <p className="text-xs text-[var(--muted)]">
+              {creator.uploadYmd ? "업로드일" : "콘텐츠 마감"}
+            </p>
             <p className="mt-0.5 font-semibold">{formatMd(brief.dueYmd)}</p>
             <p className="mt-1 text-xs text-[var(--muted)]">
               가이드 포맷으로 발행 · 링크 제출

@@ -1,4 +1,6 @@
-/** 브랜드사 마케팅 풀 데모용 목업. DB 연동 전까지 로컬 생성. */
+/** 브랜드사 마케팅 풀 — JP 시딩 실데이터 (주소·전화 제외). */
+
+import jpPool from "./data/jp-creator-pool.json";
 
 export type CreatorMarket = "cn" | "us" | "jp" | "kr";
 export type CreatorChannel =
@@ -6,7 +8,13 @@ export type CreatorChannel =
   | "douyin"
   | "instagram"
   | "tiktok"
-  | "youtube";
+  | "youtube"
+  | "x";
+
+export type CreatorPost = {
+  platform: string;
+  url: string;
+};
 
 export type PoolCreator = {
   id: string;
@@ -14,11 +22,23 @@ export type PoolCreator = {
   handle: string;
   market: CreatorMarket;
   channel: CreatorChannel;
-  /** 집행 단가 (원) */
+  profileUrl: string | null;
+  /** 집행 단가 (원) — 팔로워 구간 추정 */
   priceKrw: number;
   followers: number;
-  /** 타채널·총판 중복 리스크 (데모 뱃지) */
   overlap: null | "channel" | "distributor";
+  tier: "middle" | "micro";
+  product: string | null;
+  posts: CreatorPost[];
+  uploadYmd: string | null;
+  metrics: {
+    views: number | null;
+    likes: number | null;
+    comments: number | null;
+    saves: number | null;
+    shares: number | null;
+  };
+  category: string | null;
 };
 
 export const MARKET_LABEL: Record<CreatorMarket, string> = {
@@ -34,6 +54,7 @@ export const CHANNEL_LABEL: Record<CreatorChannel, string> = {
   instagram: "Instagram",
   tiktok: "TikTok",
   youtube: "YouTube",
+  x: "X",
 };
 
 export const OVERLAP_LABEL: Record<"channel" | "distributor", string> = {
@@ -41,109 +62,25 @@ export const OVERLAP_LABEL: Record<"channel" | "distributor", string> = {
   distributor: "총판 중복",
 };
 
-const MARKETS: CreatorMarket[] = ["cn", "cn", "cn", "us", "us", "jp", "kr"];
-const CHANNELS_BY_MARKET: Record<CreatorMarket, CreatorChannel[]> = {
-  cn: ["xiaohongshu", "douyin", "tiktok"],
-  us: ["instagram", "tiktok", "youtube"],
-  jp: ["instagram", "tiktok", "youtube"],
-  kr: ["instagram", "tiktok", "youtube"],
+export const TIER_LABEL: Record<PoolCreator["tier"], string> = {
+  middle: "미들",
+  micro: "마이크로",
 };
 
-const FIRST = [
-  "Amy",
-  "Lina",
-  "Maya",
-  "Sora",
-  "Yuki",
-  "Nina",
-  "Chloe",
-  "Jia",
-  "Hana",
-  "Elena",
-  "Mina",
-  "Rina",
-  "Zoe",
-  "Ava",
-  "Mei",
-];
-const LAST = [
-  "Chen",
-  "Wang",
-  "Kim",
-  "Park",
-  "Lee",
-  "Sato",
-  "Tanaka",
-  "Nguyen",
-  "Garcia",
-  "Brown",
-  "Lopez",
-  "Zhang",
-  "Choi",
-  "Suzuki",
-  "Miller",
-];
+export const POST_PLATFORM_LABEL: Record<string, string> = {
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  x: "X",
+  lips: "LIPS",
+  youtube: "YouTube",
+};
 
-function hash32(input: string) {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i += 1) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function pick<T>(seed: string, arr: readonly T[]): T {
-  return arr[hash32(seed) % arr.length];
-}
-
-function priceFor(market: CreatorMarket, channel: CreatorChannel, seed: string) {
-  const base =
-    market === "cn"
-      ? 180_000
-      : market === "us"
-        ? 420_000
-        : market === "jp"
-          ? 280_000
-          : 220_000;
-  const channelBoost =
-    channel === "youtube" ? 1.6 : channel === "douyin" ? 1.35 : 1;
-  const jitter = 0.7 + (hash32(`${seed}:p`) % 80) / 100;
-  return Math.round((base * channelBoost * jitter) / 10_000) * 10_000;
-}
-
-/** ponytail: 고정 320명. 실데이터 붙이면 API 페이징으로 교체. */
-export const POOL_SIZE = 320;
+/** ponytail: 엑셀 임포트 실인원. 갱신 시 scripts/import-jp-creator-pool.mjs */
+export const POOL_SIZE = (jpPool as PoolCreator[]).length;
 export const POOL_PAGE = 40;
 
-export function buildCreatorPool(count = POOL_SIZE): PoolCreator[] {
-  const rows: PoolCreator[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const seed = `pool:${i}`;
-    const market = pick(`${seed}:m`, MARKETS);
-    const channel = pick(`${seed}:c`, CHANNELS_BY_MARKET[market]);
-    const first = pick(`${seed}:f`, FIRST);
-    const last = pick(`${seed}:l`, LAST);
-    const name = `${first} ${last}`;
-    const handle = `@${first.toLowerCase()}_${last.toLowerCase()}${i % 97}`;
-    const overlapRoll = hash32(`${seed}:ov`) % 10;
-    rows.push({
-      id: `cr-${String(i + 1).padStart(3, "0")}`,
-      name,
-      handle,
-      market,
-      channel,
-      priceKrw: priceFor(market, channel, seed),
-      followers: 8_000 + (hash32(`${seed}:fl`) % 920_000),
-      overlap:
-        overlapRoll === 0
-          ? "channel"
-          : overlapRoll === 1
-            ? "distributor"
-            : null,
-    });
-  }
-  return rows;
+export function buildCreatorPool(): PoolCreator[] {
+  return jpPool as PoolCreator[];
 }
 
 export function formatKrw(n: number) {
@@ -151,8 +88,16 @@ export function formatKrw(n: number) {
 }
 
 export function formatFollowers(n: number) {
+  if (!n) return "—";
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return String(n);
+}
+
+export function formatMetric(n: number | null | undefined) {
+  if (n == null) return "—";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
   return String(n);
 }
 
@@ -162,6 +107,7 @@ const FORMATS_BY_CHANNEL: Record<CreatorChannel, string[]> = {
   instagram: ["릴스", "캐러셀", "스토리"],
   tiktok: ["숏폼", "시딩 리뷰", "방문 브이로그"],
   youtube: ["숏츠", "리뷰 본편", "방문 브이로그"],
+  x: ["포스트", "시딩 인증", "후기 스레드"],
 };
 
 const GUIDE_BY_MARKET: Record<
@@ -190,8 +136,9 @@ const GUIDE_BY_MARKET: Record<
     title: "일본 가이드 샘플",
     bullets: [
       "景表法에 맞는 표현, 효과 단정 금지",
-      "긴자 방문·수령 장면을 자연스럽게 포함",
+      "시딩 수령·사용 장면을 자연스럽게 포함",
       "일본어 자막 또는 내레이션",
+      "지정 제품명·해시태그 고지",
     ],
   },
   kr: {
@@ -208,9 +155,7 @@ export type CreatorSchedule = {
   formats: string[];
   guideTitle: string;
   guideBullets: string[];
-  /** 방문 또는 시딩 예정일 YYYY-MM-DD */
   visitYmd: string;
-  /** 콘텐츠 마감일 YYYY-MM-DD */
   dueYmd: string;
   mode: "visit" | "seeding";
 };
@@ -236,21 +181,48 @@ export function formatMd(ymd: string) {
   return `${m}월 ${d}일`;
 }
 
-/** 크리에이터별 집행 포맷·국가 가이드·방문/제작 일정 (데모 목업). */
+function hash32(input: string) {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/** 실업로드일이 있으면 그 기준으로, 없으면 데모 일정. */
 export function getCreatorBrief(creator: PoolCreator): CreatorSchedule {
   const guide = GUIDE_BY_MARKET[creator.market];
+  const formatsFromPosts = [
+    ...new Set(
+      creator.posts.map(
+        (p) => POST_PLATFORM_LABEL[p.platform] || p.platform,
+      ),
+    ),
+  ];
+  if (creator.uploadYmd) {
+    return {
+      formats:
+        formatsFromPosts.length > 0
+          ? formatsFromPosts
+          : FORMATS_BY_CHANNEL[creator.channel],
+      guideTitle: guide.title,
+      guideBullets: guide.bullets,
+      visitYmd: addDaysYmd(creator.uploadYmd, -7),
+      dueYmd: creator.uploadYmd,
+      mode: "seeding",
+    };
+  }
   const today = todayYmdKst();
   const visitOffset = 3 + (hash32(`${creator.id}:v`) % 18);
   const dueOffset = 7 + (hash32(`${creator.id}:d`) % 10);
   const visitYmd = addDaysYmd(today, visitOffset);
-  const mode: "visit" | "seeding" =
-    hash32(`${creator.id}:mode`) % 3 === 0 ? "seeding" : "visit";
   return {
     formats: FORMATS_BY_CHANNEL[creator.channel],
     guideTitle: guide.title,
     guideBullets: guide.bullets,
     visitYmd,
     dueYmd: addDaysYmd(visitYmd, dueOffset),
-    mode,
+    mode: "seeding",
   };
 }
