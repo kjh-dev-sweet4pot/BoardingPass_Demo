@@ -10,6 +10,7 @@ import {
   useBudgetGate,
 } from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
+import { CompanyPublishFeed } from "@/components/company-publish-feed";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import { formatMetric } from "@/lib/content-insights";
 import {
@@ -116,7 +117,9 @@ export function CompanyConsole({
   items: AllocationWithRelations[];
 }) {
   const gate = useBudgetGate(company.id);
-  const [view, setView] = useState<"alloc" | "content" | "pool">("pool");
+  const [view, setView] = useState<"alloc" | "content" | "pool" | "publish">(
+    "pool",
+  );
   const [period, setPeriod] = useState<"month" | "all">("month");
   const [searchQ, setSearchQ] = useState("");
   const [storeId, setStoreId] = useState("");
@@ -317,8 +320,21 @@ export function CompanyConsole({
           >
             콘텐츠
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "publish"}
+            onClick={() => setView("publish")}
+            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
+              view === "publish"
+                ? "bg-[var(--accent)] !text-white"
+                : "text-[var(--muted)]"
+            }`}
+          >
+            발행
+          </button>
         </div>
-        {view !== "pool" ? (
+        {view !== "pool" && view !== "publish" ? (
         <div
           className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
           role="group"
@@ -361,6 +377,8 @@ export function CompanyConsole({
 
       {view === "pool" ? (
         <CompanyCreatorPool />
+      ) : view === "publish" ? (
+        <CompanyPublishFeed />
       ) : view === "content" ? (
         <CompanyContentDashboard
           snapshot={insights}
