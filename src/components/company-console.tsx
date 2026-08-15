@@ -11,7 +11,10 @@ import {
 } from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
 import { CompanyPublishFeed } from "@/components/company-publish-feed";
-import { buildMockContentInsights } from "@/lib/content-insights-mock";
+import {
+  buildPublishDemoAllocations,
+  buildPublishDemoInsights,
+} from "@/lib/publish-demo-data";
 import { formatMetric } from "@/lib/content-insights";
 import {
   ALLOCATION_LINK_LABEL,
@@ -111,7 +114,6 @@ function linkChipClass(sum: AllocationLinkSummary) {
 
 export function CompanyConsole({
   company,
-  items,
 }: {
   company: Company;
   items: AllocationWithRelations[];
@@ -120,7 +122,7 @@ export function CompanyConsole({
   const [view, setView] = useState<"alloc" | "content" | "pool" | "publish">(
     "pool",
   );
-  const [period, setPeriod] = useState<"month" | "all">("month");
+  const [period, setPeriod] = useState<"month" | "all">("all");
   const [searchQ, setSearchQ] = useState("");
   const [storeId, setStoreId] = useState("");
   const [status, setStatus] = useState("");
@@ -132,6 +134,9 @@ export function CompanyConsole({
   const deferredQ = useDeferredValue(searchQ.trim().toLowerCase());
   const today = todayYmdKst();
   const monthKey = today.slice(0, 7);
+
+  // 발행(JP 시딩) 리스트 기준으로 배정·콘텐츠 표시
+  const items = useMemo(() => buildPublishDemoAllocations(), []);
 
   const scoped = useMemo(() => {
     return items.filter((item) => {
@@ -161,8 +166,8 @@ export function CompanyConsole({
   }, [scoped]);
 
   const insights = useMemo(
-    () => buildMockContentInsights(items, period),
-    [items, period],
+    () => buildPublishDemoInsights(period),
+    [period],
   );
 
   const storeOptions = useMemo(() => {
