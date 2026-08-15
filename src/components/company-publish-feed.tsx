@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   buildPublishFeed,
   formatPublishMd,
+  publishThumbCandidates,
   PUBLISH_KIND_LABEL,
   PUBLISH_PLATFORM_LABEL,
   type PublishItem,
@@ -35,7 +36,7 @@ export function CompanyPublishFeed() {
           발행 완료 {FEED.length.toLocaleString("ko-KR")}건 · JP 시딩 실업로드
         </p>
         <p className="mt-0.5 text-sm text-[var(--ink)]">
-          실제 업로드 링크로 루틴 발행 현황을 확인하세요
+          게시물 썸네일로 루틴 발행 현황을 확인하세요
         </p>
       </div>
 
@@ -69,55 +70,91 @@ export function CompanyPublishFeed() {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
+      <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3">
         {filtered.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
             해당 유형의 발행 콘텐츠가 없습니다.
           </p>
         ) : (
-          <ul>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
             {filtered.map((row) => (
-              <PublishRow key={row.id} row={row} />
+              <PublishCard key={row.id} row={row} />
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function PublishRow({ row }: { row: PublishItem }) {
+function PublishThumb({ item }: { item: PublishItem }) {
+  const candidates = useMemo(() => publishThumbCandidates(item), [item]);
+  const [idx, setIdx] = useState(0);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setIdx(0);
+    setFailed(false);
+  }, [item.id]);
+
+  const src =
+    !failed && candidates.length > 0
+      ? candidates[Math.min(idx, candidates.length - 1)]
+      : null;
+
   return (
-    <li className="border-b border-[var(--line)] last:border-b-0">
-      <a
-        href={row.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 transition hover:bg-[var(--accent-soft)]/40"
-      >
-        <span className="min-w-0">
-          <span className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
-              {PUBLISH_KIND_LABEL[row.kind]}
-            </span>
-            <span className="text-[11px] text-[var(--muted)]">
-              {PUBLISH_PLATFORM_LABEL[row.platform] || row.platform}
-            </span>
-          </span>
-          <span className="mt-1 block text-sm font-semibold text-[var(--ink)]">
-            {row.title}
-          </span>
-          <span className="mt-0.5 block text-xs text-[var(--muted)]">
-            {row.creatorName} · {row.handle} · {row.productName}
-          </span>
+    <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-[#efe4d6]">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={src}
+          src={src}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => {
+            if (idx + 1 < candidates.length) setIdx((i) => i + 1);
+            else setFailed(true);
+          }}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-xs text-[var(--muted)]">
+          {PUBLISH_PLATFORM_LABEL[item.platform] || item.platform}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PublishCard({ row }: { row: PublishItem }) {
+  return (
+    <a
+      href={row.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[#fffdfb] shadow-[0_1px_0_rgba(61,31,10,0.06)] transition hover:border-[var(--accent)]/50"
+    >
+      <div className="relative">
+        <PublishThumb item={row} />
+        <span className="absolute top-2 left-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] shadow-sm">
+          {PUBLISH_KIND_LABEL[row.kind]}
         </span>
-        <span className="shrink-0 text-right text-xs tabular-nums text-[var(--muted)]">
-          <span className="block font-medium text-[var(--accent)]">
-            {formatPublishMd(row.publishedYmd)}
-          </span>
-          링크 열기
+        <span className="absolute top-2 right-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-medium text-[var(--muted)] shadow-sm">
+          {PUBLISH_PLATFORM_LABEL[row.platform] || row.platform}
         </span>
-      </a>
-    </li>
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-3">
+        <p className="line-clamp-2 text-sm font-semibold text-[var(--ink)]">
+          {row.title}
+        </p>
+        <p className="truncate text-xs text-[var(--accent)]">
+          {row.creatorName} · {row.handle}
+        </p>
+        <p className="mt-auto pt-1 text-[11px] tabular-nums text-[var(--muted)]">
+          {formatPublishMd(row.publishedYmd)} · 게시물 열기
+        </p>
+      </div>
+    </a>
   );
 }
