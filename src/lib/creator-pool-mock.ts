@@ -28,6 +28,14 @@ export const MARKET_LABEL: Record<CreatorMarket, string> = {
   kr: "한국",
 };
 
+export const CHANNEL_LABEL: Record<CreatorChannel, string> = {
+  xiaohongshu: "샤오홍슈",
+  douyin: "더우인",
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+};
+
 export const OVERLAP_LABEL: Record<"channel" | "distributor", string> = {
   channel: "타채널 중복",
   distributor: "총판 중복",
