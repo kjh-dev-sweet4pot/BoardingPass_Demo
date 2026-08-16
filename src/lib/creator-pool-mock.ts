@@ -1,7 +1,11 @@
 /** 브랜드사 마케팅 풀 — JP 시딩 실데이터 (주소·전화 제외). */
 
+import { hash32 } from "@/lib/demo-metrics";
+import { addDaysYmd, formatMd, ymdKst } from "@/lib/types";
 import jpPool from "./data/jp-creator-pool.json";
 import avatarManifest from "./data/jp-creator-avatar-manifest.json";
+
+export { formatMd };
 
 export type CreatorMarket = "cn" | "us" | "jp" | "kr";
 export type CreatorChannel =
@@ -77,7 +81,6 @@ export const POST_PLATFORM_LABEL: Record<string, string> = {
 };
 
 /** ponytail: 엑셀 임포트 실인원. 갱신 시 scripts/import-jp-creator-pool.mjs */
-export const POOL_SIZE = (jpPool as PoolCreator[]).length;
 export const POOL_PAGE = 40;
 
 function bareHandle(handle: string) {
@@ -260,36 +263,6 @@ export type CreatorSchedule = {
   mode: "visit" | "seeding";
 };
 
-function addDaysYmd(ymd: string, days: number) {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const next = new Date(Date.UTC(y, m - 1, d + days));
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
-}
-
-function todayYmdKst() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
-
-export function formatMd(ymd: string) {
-  const [, m, d] = ymd.split("-").map(Number);
-  if (!m || !d) return ymd;
-  return `${m}월 ${d}일`;
-}
-
-function hash32(input: string) {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i += 1) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
 /** 실업로드일이 있으면 그 기준으로, 없으면 데모 일정. */
 export function getCreatorBrief(creator: PoolCreator): CreatorSchedule {
   const guide = GUIDE_BY_MARKET[creator.market];
@@ -313,7 +286,7 @@ export function getCreatorBrief(creator: PoolCreator): CreatorSchedule {
       mode: "seeding",
     };
   }
-  const today = todayYmdKst();
+  const today = ymdKst(new Date());
   const visitOffset = 3 + (hash32(`${creator.id}:v`) % 18);
   const dueOffset = 7 + (hash32(`${creator.id}:d`) % 10);
   const visitYmd = addDaysYmd(today, visitOffset);

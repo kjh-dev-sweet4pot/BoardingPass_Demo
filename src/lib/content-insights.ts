@@ -1,4 +1,4 @@
-import { type CreatorPlatform } from "@/lib/creator-link";
+import { type CreatorPlatform, CREATOR_PLATFORM_LABEL } from "@/lib/creator-link";
 
 /** 성과 수집 출처. Apify 연동 후 live 로 바뀝니다. */
 export type ContentMetricsSource = "mock" | "apify";
@@ -9,6 +9,8 @@ export type ContentPostInsight = {
   id: string;
   url: string;
   platform: CreatorPlatform;
+  /** 활동 국가 (jp/cn/us/kr 등) */
+  market?: string;
   allocationId: string | null;
   linkId: string | null;
   productId: string | null;
@@ -24,6 +26,16 @@ export type ContentPostInsight = {
   postedAt: string | null;
   collectedAt: string | null;
   source: ContentMetricsSource;
+};
+
+export type ContentBreakdownRow = {
+  key: string;
+  label: string;
+  posts: number;
+  views: number;
+  likes: number;
+  comments: number;
+  influencerCount: number;
 };
 
 export type ContentProductInsight = {
@@ -62,29 +74,9 @@ export type ContentInsightsSnapshot = {
   products: ContentProductInsight[];
   influencers: ContentInfluencerInsight[];
   posts: ContentPostInsight[];
+  byMarket: ContentBreakdownRow[];
+  byPlatform: ContentBreakdownRow[];
 };
-
-export function emptyContentInsights(
-  period: ContentPeriod,
-  source: ContentMetricsSource = "mock",
-): ContentInsightsSnapshot {
-  return {
-    source,
-    generatedAt: new Date().toISOString(),
-    period,
-    totals: {
-      views: 0,
-      likes: 0,
-      comments: 0,
-      posts: 0,
-      influencers: 0,
-      products: 0,
-    },
-    products: [],
-    influencers: [],
-    posts: [],
-  };
-}
 
 export function aggregateContentInsights(
   posts: ContentPostInsight[],
@@ -154,6 +146,17 @@ export function aggregateContentInsights(
     }))
     .sort((a, b) => b.views - a.views);
 
+  const byMarket = breakdownRows(
+    posts,
+    (p) => p.market || "unknown",
+    marketLabel,
+  );
+  const byPlatform = breakdownRows(
+    posts,
+    (p) => p.platform,
+    (key) => CREATOR_PLATFORM_LABEL[key as CreatorPlatform] || key,
+  );
+
   return {
     source,
     generatedAt: new Date().toISOString(),
@@ -174,7 +177,57 @@ export function aggregateContentInsights(
       if (da !== db) return db.localeCompare(da);
       return b.views - a.views;
     }),
+    byMarket,
+    byPlatform,
   };
+}
+
+function breakdownRows(
+  posts: ContentPostInsight[],
+  keyOf: (p: ContentPostInsight) => string,
+  labelOf: (key: string) => string,
+): ContentBreakdownRow[] {
+  const map = new Map<
+    string,
+    ContentBreakdownRow & { influencerIds: Set<string> }
+  >();
+  for (const post of posts) {
+    const key = keyOf(post);
+    const row = map.get(key) || {
+      key,
+      label: labelOf(key),
+      posts: 0,
+      views: 0,
+      likes: 0,
+      comments: 0,
+      influencerCount: 0,
+      influencerIds: new Set<string>(),
+    };
+    row.posts += 1;
+    row.views += post.views;
+    row.likes += post.likes;
+    row.comments += post.comments;
+    if (post.influencerId) row.influencerIds.add(post.influencerId);
+    map.set(key, row);
+  }
+  return [...map.values()]
+    .map(({ influencerIds, ...row }) => ({
+      ...row,
+      influencerCount: influencerIds.size,
+    }))
+    .sort((a, b) => b.views - a.views);
+}
+
+const MARKET_LABEL: Record<string, string> = {
+  jp: "일본",
+  cn: "중국",
+  us: "미국/영어권",
+  kr: "한국",
+};
+
+export function marketLabel(market?: string | null) {
+  if (!market) return "—";
+  return MARKET_LABEL[market] || market;
 }
 
 export function formatMetric(n: number) {

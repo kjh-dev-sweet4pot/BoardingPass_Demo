@@ -4,11 +4,14 @@ import { CREATOR_PLATFORM_LABEL } from "@/lib/creator-link";
 import {
   engagementRate,
   formatMetric,
+  marketLabel,
+  type ContentBreakdownRow,
   type ContentInfluencerInsight,
   type ContentInsightsSnapshot,
   type ContentPostInsight,
   type ContentProductInsight,
 } from "@/lib/content-insights";
+import { addDaysYmd, formatMd, ymdKst } from "@/lib/types";
 
 export type ContentFocus =
   | { kind: "product"; productId: string }
@@ -16,31 +19,11 @@ export type ContentFocus =
   | { kind: "post"; id: string }
   | null;
 
-function ymdKst(date = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function addDaysYmd(ymd: string, days: number) {
-  const [year, month, day] = ymd.split("-").map(Number);
-  const next = new Date(Date.UTC(year, month - 1, day + days));
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
-}
-
-function formatMdMidnight(ymd: string) {
-  const [, month, day] = ymd.split("-").map(Number);
-  return `${month}월 ${day}일 00:00`;
-}
-
 function contentRefreshCopy(source: ContentInsightsSnapshot["source"]) {
-  const today = ymdKst();
-  const todayLabel = formatMdMidnight(today);
+  const today = ymdKst(new Date());
+  const todayLabel = `${formatMd(today)} 00:00`;
   if (source === "mock") {
-    return `${todayLabel} 기준 : ${formatMdMidnight(addDaysYmd(today, 1))}에 데이터를 갱신합니다.`;
+    return `${todayLabel} 기준 : ${formatMd(addDaysYmd(today, 1))} 00:00에 데이터를 갱신합니다.`;
   }
   return `${todayLabel} 수집 데이터`;
 }
@@ -100,6 +83,21 @@ export function CompanyContentDashboard({
             unit="명"
           />
         </div>
+
+        {snapshot.posts.length > 0 ? (
+          <div className="grid shrink-0 gap-3 sm:grid-cols-2">
+            <BreakdownPanel
+              title="국가별 성과"
+              rows={snapshot.byMarket}
+              totalViews={snapshot.totals.views}
+            />
+            <BreakdownPanel
+              title="플랫폼별 성과"
+              rows={snapshot.byPlatform}
+              totalViews={snapshot.totals.views}
+            />
+          </div>
+        ) : null}
 
         {snapshot.posts.length === 0 ? (
           <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-6 py-12 text-center">
@@ -200,8 +198,9 @@ export function CompanyContentDashboard({
                             {post.productName}
                           </span>
                           <span className="mt-0.5 block text-xs text-[var(--muted)]">
-                            {post.influencerName} · {post.influencerHandle} ·{" "}
-                            {CREATOR_PLATFORM_LABEL[post.platform]}
+                            {marketLabel(post.market)} ·{" "}
+                            {CREATOR_PLATFORM_LABEL[post.platform]} ·{" "}
+                            {post.influencerName} · {post.influencerHandle}
                           </span>
                         </span>
                         <span className="shrink-0 text-right text-xs tabular-nums text-[var(--muted)]">
@@ -307,6 +306,58 @@ function Kpi({
   );
 }
 
+function BreakdownPanel({
+  title,
+  rows,
+  totalViews,
+}: {
+  title: string;
+  rows: ContentBreakdownRow[];
+  totalViews: number;
+}) {
+  const maxViews = rows[0]?.views || 1;
+  return (
+    <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
+      <header className="border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3">
+        <h2 className="text-sm font-semibold">{title}</h2>
+      </header>
+      <ul className="divide-y divide-[var(--line)]">
+        {rows.map((row) => {
+          const share =
+            totalViews > 0 ? Math.round((row.views / totalViews) * 100) : 0;
+          return (
+            <li key={row.key} className="px-4 py-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="text-sm font-semibold text-[var(--ink)]">
+                  {row.label}
+                </p>
+                <p className="shrink-0 text-xs tabular-nums text-[var(--muted)]">
+                  <span className="font-semibold text-[var(--accent)]">
+                    {formatMetric(row.views)}
+                  </span>{" "}
+                  조회 · {share}%
+                </p>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--accent-soft)]">
+                <div
+                  className="h-full rounded-full bg-[var(--accent)]"
+                  style={{
+                    width: `${Math.max(6, (row.views / maxViews) * 100)}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-1.5 text-[11px] text-[var(--muted)]">
+                콘텐츠 {row.posts}건 · 인플 {row.influencerCount}명 · 좋아요{" "}
+                {formatMetric(row.likes)}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function PostDetail({
   post,
   onBack,
@@ -351,8 +402,8 @@ function PostDetail({
         </div>
       </dl>
       <p className="mt-2 text-xs text-[var(--muted)]">
-        참여율 {er.toFixed(1)}% · {CREATOR_PLATFORM_LABEL[post.platform]} ·{" "}
-        {post.storeName}
+        참여율 {er.toFixed(1)}% · {marketLabel(post.market)} ·{" "}
+        {CREATOR_PLATFORM_LABEL[post.platform]} · {post.storeName}
       </p>
       <div className="mt-5 flex flex-col gap-2">
         <a

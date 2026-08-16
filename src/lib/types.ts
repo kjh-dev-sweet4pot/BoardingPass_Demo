@@ -112,6 +112,20 @@ export function ymdKst(input: string | Date) {
   }).format(typeof input === "string" ? new Date(input) : input);
 }
 
+/** YYYY-MM-DD ± days (calendar, UTC date parts) */
+export function addDaysYmd(ymd: string, days: number) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + days));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+/** YYYY-MM-DD → `M월 D일` */
+export function formatMd(ymd: string) {
+  const [, m, d] = ymd.split("-").map(Number);
+  if (!m || !d) return ymd;
+  return `${m}월 ${d}일`;
+}
+
 function formatVisitCompleteLabel(ymd: string) {
   const [y, m, d] = ymd.split("-").map(Number);
   if (!y || !m || !d) return ALLOCATION_STATUS_LABEL.visited;

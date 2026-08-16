@@ -5,7 +5,7 @@ import { AppShell, Notice, secondaryBtnClass } from "@/components/ui";
 import { getCompanySessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { type AllocationWithRelations, type Company } from "@/lib/types";
+import { type Company } from "@/lib/types";
 
 export default async function CompanyPage() {
   const companyId = await getCompanySessionId();
@@ -21,22 +21,13 @@ export default async function CompanyPage() {
   }
 
   const supabase = await createClient();
-  const [{ data: company, error: companyError }, { data: rows, error }] =
-    await Promise.all([
-      supabase
-        .from("companies")
-        .select("id, name, login_id, aliases, contact, is_active, created_at, updated_at")
-        .eq("id", companyId)
-        .maybeSingle(),
-      supabase
-        .from("allocations")
-        .select(
-          "*, products(*), stores(*), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url), creator_links(*)",
-        )
-        .eq("company_id", companyId)
-        .order("visit_date", { ascending: false })
-        .order("created_at", { ascending: false }),
-    ]);
+  const { data: company, error: companyError } = await supabase
+    .from("companies")
+    .select(
+      "id, name, login_id, aliases, contact, is_active, created_at, updated_at",
+    )
+    .eq("id", companyId)
+    .maybeSingle();
 
   if (companyError || !company || !company.is_active) {
     redirect("/com/login");
@@ -58,11 +49,7 @@ export default async function CompanyPage() {
         </form>
       }
     >
-      <Notice error={error?.message} />
-      <CompanyConsole
-        company={company as Company}
-        items={(rows as AllocationWithRelations[]) || []}
-      />
+      <CompanyConsole company={company as Company} />
     </AppShell>
   );
 }

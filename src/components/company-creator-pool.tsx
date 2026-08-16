@@ -19,7 +19,7 @@ import {
   type CreatorMarket,
   type PoolCreator,
 } from "@/lib/creator-pool-mock";
-import { polishDemoMetrics } from "@/lib/publish-demo-data";
+import { polishDemoMetrics } from "@/lib/demo-metrics";
 
 const POOL = buildCreatorPool();
 

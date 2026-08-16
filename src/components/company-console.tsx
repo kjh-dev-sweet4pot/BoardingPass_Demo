@@ -21,8 +21,10 @@ import {
   summarizeAllocationLinks,
   type AllocationLinkSummary,
 } from "@/lib/creator-link";
+import { todayYmdKst } from "@/lib/inf-visit";
 import {
   allocationStatusDisplayLabel,
+  formatMd,
   type AllocationWithRelations,
   type Company,
   type CreatorLink,
@@ -30,15 +32,6 @@ import {
 
 function visitKey(item: AllocationWithRelations) {
   return item.visit_date ? String(item.visit_date).slice(0, 10) : "";
-}
-
-function todayYmdKst() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 }
 
 function statusRank(item: AllocationWithRelations) {
@@ -84,9 +77,7 @@ function matchesSearch(item: AllocationWithRelations, q: string) {
 
 function formatVisitLabel(ymd: string) {
   if (!ymd) return "날짜 미정";
-  const [y, m, d] = ymd.split("-").map(Number);
-  if (!y || !m || !d) return ymd;
-  return `${m}월 ${d}일`;
+  return formatMd(ymd);
 }
 
 function statusChipClass(item: AllocationWithRelations) {
@@ -116,7 +107,6 @@ export function CompanyConsole({
   company,
 }: {
   company: Company;
-  items: AllocationWithRelations[];
 }) {
   const gate = useBudgetGate(company.id);
   const [view, setView] = useState<"alloc" | "content" | "pool" | "publish">(

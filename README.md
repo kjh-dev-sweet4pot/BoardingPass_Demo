@@ -14,7 +14,7 @@
 
 `stores` · `products` · `influencers` · `allocations` · `companies` · `creator_links`
 
-스키마 확장: 루트의 `schema-v02.sql` 을 Supabase SQL editor 에서 실행한 뒤, 운영 콘솔에서 회원사를 먼저 등록하세요.
+스키마: Supabase 프로젝트 스키마를 기준으로 합니다. 회원사는 운영 콘솔에서 먼저 등록하세요.
 
 ## 본인확인 흐름
 

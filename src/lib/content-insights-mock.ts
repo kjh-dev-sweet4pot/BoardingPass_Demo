@@ -4,7 +4,11 @@ import {
   type ContentPeriod,
   type ContentPostInsight,
 } from "@/lib/content-insights";
-import { type AllocationWithRelations } from "@/lib/types";
+import { hash32, mockInt } from "@/lib/demo-metrics";
+import {
+  type AllocationWithRelations,
+  ymdKst,
+} from "@/lib/types";
 
 function captionFor(productName: string, seed: string) {
   const templates = [
@@ -15,19 +19,6 @@ function captionFor(productName: string, seed: string) {
     `Ginza pickup · ${productName}`,
   ];
   return templates[hash32(seed) % templates.length];
-}
-
-function hash32(input: string) {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i += 1) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function mockInt(seed: string, min: number, max: number) {
-  return min + (hash32(seed) % (max - min + 1));
 }
 
 function handleOf(item: AllocationWithRelations) {
@@ -43,32 +34,26 @@ function asYmd(value: string | null | undefined) {
   return value ? String(value).slice(0, 10) : null;
 }
 
-function inPeriod(item: AllocationWithRelations, period: ContentPeriod, monthKey: string) {
+function inPeriod(
+  item: AllocationWithRelations,
+  period: ContentPeriod,
+  monthKey: string,
+) {
   if (period === "all") return true;
   const d = asYmd(item.visit_date) || asYmd(item.picked_up_at);
   return Boolean(d && d.startsWith(monthKey));
 }
 
-function monthKeyKst() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  })
-    .format(new Date())
-    .slice(0, 7);
-}
-
 /**
  * 실제 배정·링크를 뼈대로 조회수/좋아요만 목업합니다.
  * Apify 연동 시 이 함수 대신 live snapshot 을 쓰면 됩니다.
+ * ponytail: /com UI 는 publish-demo-data 경로. 이 파일은 API·Apify 교체 지점용.
  */
 export function buildMockContentInsights(
   items: AllocationWithRelations[],
   period: ContentPeriod,
 ) {
-  const monthKey = monthKeyKst();
+  const monthKey = ymdKst(new Date()).slice(0, 7);
   const scoped = items.filter(
     (item) => item.status !== "cancelled" && inPeriod(item, period, monthKey),
   );
@@ -104,7 +89,9 @@ export function buildMockContentInsights(
 
     for (const seed of seeds) {
       const views = mockInt(`${seed.id}:views`, 2400, 186000);
-      const likes = Math.round(views * (mockInt(`${seed.id}:er`, 18, 72) / 1000));
+      const likes = Math.round(
+        views * (mockInt(`${seed.id}:er`, 18, 72) / 1000),
+      );
       const comments = Math.max(
         4,
         Math.round(likes * (mockInt(`${seed.id}:cmt`, 4, 18) / 100)),
@@ -113,6 +100,7 @@ export function buildMockContentInsights(
         id: seed.id,
         url: seed.url,
         platform: seed.platform,
+        market: "jp",
         allocationId: item.id,
         linkId: seed.linkId,
         productId: item.product_id,

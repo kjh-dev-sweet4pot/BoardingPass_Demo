@@ -1,5 +1,6 @@
 /** 발행 피드 — JP 실업로드, 카드용 150건. */
 
+import { formatMd } from "@/lib/types";
 import { buildCreatorPool } from "@/lib/creator-pool-mock";
 import publishThumbManifest from "./data/jp-publish-thumb-manifest.json";
 
@@ -35,11 +36,7 @@ export const PUBLISH_PLATFORM_LABEL: Record<string, string> = {
 /** ponytail: 미팅용 150건. */
 export const PUBLISH_FEED_LIMIT = 150;
 
-export function formatPublishMd(ymd: string) {
-  const [, m, d] = ymd.split("-").map(Number);
-  if (!m || !d) return ymd;
-  return `${m}월 ${d}일`;
-}
+export { formatMd as formatPublishMd };
 
 function kindFromUrl(url: string, platform: string): PublishKind {
   if (/\/p\//i.test(url) && platform === "instagram") return "carousel";
@@ -116,5 +113,3 @@ export function buildPublishFeed(
       id: `pub-${String(idx + 1).padStart(3, "0")}`,
     }));
 }
-
-export const PUBLISH_FEED_SIZE = PUBLISH_FEED_LIMIT;
