@@ -1,8 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  CREATOR_LINK_PUBLIC_COLUMNS,
+  collectTikTokLinkThumbnail,
+} from "@/lib/collect-link-thumbnail";
 import { getInfluencerSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { detectPlatform, validateCreatorUrl } from "@/lib/creator-link";
+
+const LINKS_ON_ALLOCATION = `creator_links(${CREATOR_LINK_PUBLIC_COLUMNS})`;
 
 export async function GET() {
   const influencerId = await getInfluencerSessionId();
@@ -21,7 +27,7 @@ export async function GET() {
   const { data: allocations, error } = await supabase
     .from("allocations")
     .select(
-      "*, products(id, name, sku, description), stores(id, name, address), creator_links(*)",
+      `*, products(id, name, sku, description), stores(id, name, address), ${LINKS_ON_ALLOCATION}`,
     )
     .eq("influencer_id", influencerId)
     .eq("status", "picked_up")
@@ -110,8 +116,9 @@ export async function POST(request: Request) {
       url: linkUrl,
       platform: detectPlatform(linkUrl),
       status: "submitted",
+      thumbnail_status: "pending",
     })
-    .select("*")
+    .select(CREATOR_LINK_PUBLIC_COLUMNS)
     .single();
 
   if (error || !created) {
@@ -120,5 +127,12 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+
+  if (created.platform === "tiktok") {
+    after(async () => {
+      await collectTikTokLinkThumbnail(supabase, created.id, linkUrl);
+    });
+  }
+
   return NextResponse.json({ link: created });
 }

@@ -18,16 +18,28 @@ export type Company = {
   updated_at: string;
 };
 
+export type CreatorLinkStatus = "submitted" | "approved" | "rejected";
+
+export type ThumbnailStatus = "pending" | "ok" | "failed";
+
 export type CreatorLink = {
   id: string;
   allocation_id: string;
   influencer_id: string;
   url: string;
   platform: "instagram" | "tiktok" | "youtube" | "naver_blog" | "etc";
-  status: "submitted" | "approved" | "rejected";
+  status: CreatorLinkStatus;
   memo: string | null;
   submitted_at: string;
   updated_at: string;
+  thumbnail_status?: ThumbnailStatus;
+  thumbnail_source_url?: string | null;
+  thumbnail_fetched_at?: string | null;
+  tiktok_video_id?: string | null;
+  views?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  metrics_collected_at?: string | null;
 };
 
 export type Store = {

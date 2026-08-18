@@ -901,6 +901,7 @@ function CreatorDetail({
           </li>
         </ol>
       </div>
+
     </div>
   );
 }

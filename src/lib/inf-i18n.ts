@@ -90,6 +90,11 @@ export type InfMessages = {
   linksProductsReceived: string;
   linksAllDone: string;
   linkPlaceholder: string;
+  linkPreview: string;
+  linkPreviewLoading: string;
+  linkPreviewTitle: string;
+  linkPreviewUnsupported: string;
+  linkPreviewProfileFallback: string;
   linksRemainCount: (n: number) => string;
   linkRegisteredShort: string;
   linkNotRegistered: string;
@@ -291,6 +296,11 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     linksProductsReceived: "받은 상품",
     linksAllDone: "등록할 링크가 없어요.",
     linkPlaceholder: "게시물 링크 https://",
+    linkPreview: "미리 확인",
+    linkPreviewLoading: "확인 중…",
+    linkPreviewTitle: "제출 전 미리보기",
+    linkPreviewUnsupported: "현재는 TikTok 링크만 이름/썸네일 미리보기를 지원해요.",
+    linkPreviewProfileFallback: "프로필 이름 확인 불가",
     linksRemainCount: (n) => (n === 0 ? "모두 등록했어요" : `${n}건 남음`),
     linkRegisteredShort: "등록됨",
     linkNotRegistered: "미등록",
@@ -382,6 +392,12 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     linksProductsReceived: "Products picked up",
     linksAllDone: "No links left to submit.",
     linkPlaceholder: "Post URL https://",
+    linkPreview: "Preview",
+    linkPreviewLoading: "Loading…",
+    linkPreviewTitle: "Preview before submit",
+    linkPreviewUnsupported:
+      "Name and thumbnail preview is currently available for TikTok links only.",
+    linkPreviewProfileFallback: "Profile name unavailable",
     linksRemainCount: (n) =>
       n === 0 ? "All submitted" : `${n} left to submit`,
     linkRegisteredShort: "Submitted",
@@ -486,6 +502,12 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     linksProductsReceived: "受け取った商品",
     linksAllDone: "登録するリンクはありません。",
     linkPlaceholder: "投稿リンク https://",
+    linkPreview: "プレビュー",
+    linkPreviewLoading: "確認中…",
+    linkPreviewTitle: "送信前プレビュー",
+    linkPreviewUnsupported:
+      "現在、名前とサムネイルのプレビューはTikTokリンクのみ対応しています。",
+    linkPreviewProfileFallback: "プロフィール名を確認できません",
     linksRemainCount: (n) =>
       n === 0 ? "すべて登録済み" : `残り${n}件`,
     linkRegisteredShort: "登録済み",
@@ -588,6 +610,11 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     linksProductsReceived: "已领取商品",
     linksAllDone: "没有待登记的链接。",
     linkPlaceholder: "帖子链接 https://",
+    linkPreview: "预览",
+    linkPreviewLoading: "确认中…",
+    linkPreviewTitle: "提交前预览",
+    linkPreviewUnsupported: "目前仅支持 TikTok 链接的昵称和缩略图预览。",
+    linkPreviewProfileFallback: "无法获取账号名称",
     linksRemainCount: (n) => (n === 0 ? "已全部登记" : `剩余 ${n} 项`),
     linkRegisteredShort: "已登记",
     linkNotRegistered: "未登记",

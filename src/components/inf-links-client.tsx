@@ -24,6 +24,13 @@ type VisitGroup = {
   items: AllocationWithRelations[];
 };
 
+type DraftPreview = {
+  platform: CreatorPlatform;
+  profileName: string | null;
+  thumbnailUrl: string | null;
+  unsupported?: boolean;
+};
+
 function asYmd(value: string | null | undefined) {
   if (!value) return null;
   return String(value).slice(0, 10) || null;
@@ -97,8 +104,10 @@ function InfLinksClientInner({
   const { t, locale } = useInfLocale();
   const [items, setItems] = useState(initialAllocations);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [modalPreview, setModalPreview] = useState<DraftPreview | null>(null);
   const [errorById, setErrorById] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
   const [openDoneKey, setOpenDoneKey] = useState<string | null>(null);
 
   const groups = useMemo(() => groupByVisit(items), [items]);
@@ -142,6 +151,34 @@ function InfLinksClientInner({
     }
   }
 
+  async function preview(allocationId: string) {
+    const url = (drafts[allocationId] || "").trim();
+    setPreviewingId(allocationId);
+    setErrorById((prev) => ({ ...prev, [allocationId]: "" }));
+    try {
+      const res = await fetch("/api/inf/links/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || t.verifyError);
+      }
+      setModalPreview(body.preview ?? null);
+    } catch (err) {
+      setErrorById((prev) => ({
+        ...prev,
+        [allocationId]: translateInfApiError(
+          err instanceof Error ? err.message : "",
+          t,
+        ),
+      }));
+    } finally {
+      setPreviewingId(null);
+    }
+  }
+
   async function remove(allocationId: string, linkId: string) {
     const res = await fetch(`/api/inf/links/${linkId}`, { method: "DELETE" });
     const body = await res.json().catch(() => ({}));
@@ -176,6 +213,10 @@ function InfLinksClientInner({
 
   return (
     <div className="mx-auto w-full max-w-md space-y-6 pb-6">
+      {/* 프리뷰 모달 */}
+      {modalPreview ? (
+        <PreviewModal preview={modalPreview} onClose={() => setModalPreview(null)} />
+      ) : null}
       <header className="pt-2">
         <h1 className="text-xl font-bold text-[#1a1a2e]">{t.contentLinks}</h1>
         <p className="mt-2 text-sm leading-relaxed text-[#8a6a4a]">
@@ -198,11 +239,13 @@ function InfLinksClientInner({
               drafts={drafts}
               errors={errorById}
               savingId={savingId}
-              onDraft={(id, value) =>
-                setDrafts((prev) => ({ ...prev, [id]: value }))
-              }
+              onDraft={(id, value) => {
+                setDrafts((prev) => ({ ...prev, [id]: value }));
+              }}
               onSubmit={(id) => void submit(id)}
+              onPreview={(id) => void preview(id)}
               onRemove={(id, linkId) => void remove(id, linkId)}
+              previewingId={previewingId}
             />
           ))}
         </section>
@@ -287,16 +330,20 @@ function VisitCard({
   drafts,
   errors,
   savingId,
+  previewingId,
   onDraft,
   onSubmit,
+  onPreview,
   onRemove,
 }: {
   group: VisitGroup;
   drafts: Record<string, string>;
   errors: Record<string, string>;
   savingId: string | null;
+  previewingId: string | null;
   onDraft: (id: string, value: string) => void;
   onSubmit: (id: string) => void;
+  onPreview: (id: string) => void;
   onRemove: (id: string, linkId: string) => void;
 }) {
   const { t, locale } = useInfLocale();
@@ -341,28 +388,40 @@ function VisitCard({
               ) : null}
 
               {missing ? (
-                <div className="mt-2 flex gap-2">
-                  <input
-                    className="h-11 min-w-0 flex-1 rounded-2xl border border-[#e8e8e8] bg-white px-3 text-sm"
-                    type="url"
-                    placeholder={t.linkPlaceholder}
-                    value={drafts[item.id] || ""}
-                    onChange={(e) => onDraft(item.id, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        onSubmit(item.id);
+                <div className="mt-2 space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      className="h-11 min-w-0 flex-1 rounded-2xl border border-[#e8e8e8] bg-white px-3 text-sm"
+                      type="url"
+                      placeholder={t.linkPlaceholder}
+                      value={drafts[item.id] || ""}
+                      onChange={(e) => onDraft(item.id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          onPreview(item.id);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={
+                        previewingId === item.id || !(drafts[item.id] || "").trim()
                       }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={savingId === item.id || !(drafts[item.id] || "").trim()}
-                    onClick={() => onSubmit(item.id)}
-                    className="rounded-2xl bg-[#6B3B1F] px-4 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    {t.linkSubmit}
-                  </button>
+                      onClick={() => onPreview(item.id)}
+                      className="rounded-2xl border border-[#d8c0ab] bg-white px-4 text-sm font-semibold text-[#6B3B1F] disabled:opacity-50"
+                    >
+                      {previewingId === item.id ? t.linkPreviewLoading : t.linkPreview}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingId === item.id || !(drafts[item.id] || "").trim()}
+                      onClick={() => onSubmit(item.id)}
+                      className="rounded-2xl bg-[#6B3B1F] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      {t.linkSubmit}
+                    </button>
+                  </div>
                 </div>
               ) : null}
               {errors[item.id] ? (
@@ -375,6 +434,71 @@ function VisitCard({
     </article>
   );
 }
+
+function imgProxy(url: string) {
+  return `/api/inf/links/img-proxy?url=${encodeURIComponent(url)}`;
+}
+
+function PreviewModal({
+  preview,
+  onClose,
+}: {
+  preview: DraftPreview;
+  onClose: () => void;
+}) {
+  const { t } = useInfLocale();
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 px-4 pb-8"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm font-bold text-[#1a1a2e]">{t.linkPreviewTitle}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-lg text-[#aaa] leading-none"
+          >
+            ✕
+          </button>
+        </div>
+
+        {preview.unsupported ? (
+          <p className="text-sm text-[#8a7a5c]">{t.linkPreviewUnsupported}</p>
+        ) : (
+          <div className="space-y-3">
+            {preview.thumbnailUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imgProxy(preview.thumbnailUrl)}
+                alt={preview.profileName || "thumbnail"}
+                className="aspect-[9/16] w-full rounded-2xl object-cover"
+              />
+            ) : (
+              <div className="flex aspect-[9/16] w-full items-center justify-center rounded-2xl bg-[#f3eee3] text-sm text-[#8a7a5c]">
+                No Image
+              </div>
+            )}
+            <div className="flex items-center gap-2 px-1">
+              <span className="rounded-full bg-[#f3eee3] px-2.5 py-1 text-[11px] font-semibold text-[#8a6a4a]">
+                {CREATOR_PLATFORM_LABEL[preview.platform]}
+              </span>
+              <p className="truncate text-sm font-bold text-[#1a1a2e]">
+                {preview.profileName || t.linkPreviewProfileFallback}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function ProductLinks({
   item,
