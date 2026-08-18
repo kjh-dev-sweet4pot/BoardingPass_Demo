@@ -33,10 +33,11 @@ export async function GET(request: Request) {
       }
     }
 
+    const refererOrigin = `${parsed.protocol}//${parsed.hostname}/`;
     const upstream = await fetch(fetchUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; BoardingPass/1.0)",
-        Referer: "https://www.tiktok.com/",
+        Referer: refererOrigin,
       },
     });
 

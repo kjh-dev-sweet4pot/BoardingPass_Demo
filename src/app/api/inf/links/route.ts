@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
   CREATOR_LINK_PUBLIC_COLUMNS,
+  collectInstagramLinkThumbnail,
   collectTikTokLinkThumbnail,
 } from "@/lib/collect-link-thumbnail";
 import { getInfluencerSessionId } from "@/lib/session";
@@ -131,6 +132,12 @@ export async function POST(request: Request) {
   if (created.platform === "tiktok") {
     after(async () => {
       await collectTikTokLinkThumbnail(supabase, created.id, linkUrl);
+    });
+  }
+
+  if (created.platform === "instagram") {
+    after(async () => {
+      await collectInstagramLinkThumbnail(supabase, created.id, linkUrl);
     });
   }
 

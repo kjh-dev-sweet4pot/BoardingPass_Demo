@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { detectPlatform, validateCreatorUrl } from "@/lib/creator-link";
+import {
+  extractInstagramProfileName,
+  extractInstagramThumbnailUrl,
+  findInstagramResultForUrl,
+  scrapeInstagramPosts,
+} from "@/lib/apify-instagram";
 import { findResultForUrl, scrapeTikTokPosts, extractThumbnailUrl } from "@/lib/apify-tiktok";
 import { fetchTikTokOEmbed } from "@/lib/tiktok-oembed";
 import { getInfluencerSessionId } from "@/lib/session";
@@ -24,7 +30,7 @@ export async function POST(request: Request) {
   }
 
   const platform = detectPlatform(url);
-  if (platform !== "tiktok") {
+  if (platform !== "tiktok" && platform !== "instagram") {
     return NextResponse.json({
       preview: {
         platform,
@@ -33,6 +39,34 @@ export async function POST(request: Request) {
         unsupported: true,
       },
     });
+  }
+
+  if (platform === "instagram") {
+    try {
+      const items = await scrapeInstagramPosts([url]).catch(
+        () => [] as Awaited<ReturnType<typeof scrapeInstagramPosts>>,
+      );
+      const result = findInstagramResultForUrl(items, url);
+
+      return NextResponse.json({
+        preview: {
+          platform,
+          profileName: extractInstagramProfileName(result),
+          thumbnailUrl: extractInstagramThumbnailUrl(result),
+          unsupported: false,
+        },
+      });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "미리보기 정보를 불러오지 못했습니다.",
+        },
+        { status: 500 },
+      );
+    }
   }
 
   try {

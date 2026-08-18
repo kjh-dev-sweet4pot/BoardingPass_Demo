@@ -8,12 +8,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { AdminAllocationEditForm } from "@/components/admin-allocation-edit";
 import { PHAR_COUNTER_ROOT_ID } from "@/components/phar-header-actions";
+import { AdminAllocationEditForm } from "@/components/admin-allocation-edit";
 import {
   ALLOCATION_LINK_LABEL_ADMIN,
+  CREATOR_LINK_STATUS_LABEL,
+  CREATOR_PLATFORM_LABEL,
   summarizeAllocationLinks,
 } from "@/lib/creator-link";
+import type { CreatorPlatform } from "@/lib/creator-link";
 import {
   ALLOCATION_STATUS_LABEL,
   allocationStatusDisplayLabel,
@@ -847,6 +850,8 @@ export function PharListWithModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingAllocId, setEditingAllocId] = useState<string | null>(null);
+  const [refreshingLinkId, setRefreshingLinkId] = useState<string | null>(null);
+  const [allocTableOpen, setAllocTableOpen] = useState(false);
 
   const [influencerQ, setInfluencerQ] = useState("");
   const [productQ, setProductQ] = useState("");
@@ -1304,6 +1309,7 @@ export function PharListWithModal({
       setDetail(null);
       setError(null);
       setEditingAllocId(null);
+      setAllocTableOpen(false);
       return;
     }
 
@@ -1401,6 +1407,34 @@ export function PharListWithModal({
     );
     if (selectedAllocId === next.id) {
       setSelectedAllocId(next.id);
+    }
+  }
+
+  async function refreshLinkMetrics(linkId: string) {
+    if (refreshingLinkId) return;
+    setRefreshingLinkId(linkId);
+    try {
+      const res = await fetch(`/api/admin/links/${linkId}/refresh-metrics`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && body.metrics) {
+        setDetail((prev) =>
+          prev
+            ? {
+                ...prev,
+                allocations: prev.allocations.map((alloc) => ({
+                  ...alloc,
+                  creator_links: (alloc.creator_links || []).map((l) =>
+                    l.id === linkId ? { ...l, ...body.metrics } : l,
+                  ),
+                })),
+              }
+            : prev,
+        );
+      }
+    } finally {
+      setRefreshingLinkId(null);
     }
   }
 
@@ -2273,57 +2307,154 @@ export function PharListWithModal({
                   </div>
                 </dl>
 
-                <div>
-                  <h3
-                    className="mb-3 text-lg"
-                    style={{ fontFamily: "var(--font-display), serif" }}
-                  >
-                    수령 배정
-                  </h3>
-                  {detail.allocations.length === 0 ? (
-                    <p className="text-sm text-[var(--muted)]">
-                      배정된 상품이 없습니다.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto border border-[var(--line)]">
-                      <table className="min-w-[640px] w-full border-collapse text-left text-sm">
-                        <thead>
-                          <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/40 text-xs text-[var(--muted)]">
-                            <th className="px-3 py-2 font-medium">상품</th>
-                            <th className="px-3 py-2 font-medium">매장</th>
-                            <th className="px-3 py-2 font-medium text-right">
-                              수량
-                            </th>
-                            <th className="px-3 py-2 font-medium">방문일</th>
-                            <th className="px-3 py-2 font-medium">상태</th>
-                            <th className="px-3 py-2 font-medium">수령</th>
-                            {allowAdminEdit ? (
-                              <th className="px-3 py-2 font-medium text-right">
-                                수정
-                              </th>
-                            ) : null}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detail.allocations.map((item) => (
-                            <AllocationDetailRows
-                              key={item.id}
-                              item={item}
-                              allowAdminEdit={allowAdminEdit}
-                              storeList={storeList}
-                              companyList={companyList}
-                              editing={editingAllocId === item.id}
-                              onToggleEdit={() =>
-                                setEditingAllocId((id) =>
-                                  id === item.id ? null : item.id,
-                                )
-                              }
-                              onUpdated={applyAllocationUpdate}
-                            />
-                          ))}
-                        </tbody>
-                      </table>
+                {(() => {
+                  const allLinks = detail.allocations.flatMap(
+                    (a) => a.creator_links || [],
+                  );
+                  if (allLinks.length === 0) return null;
+                  return (
+                    <div>
+                      <h3
+                        className="mb-3 text-lg"
+                        style={{ fontFamily: "var(--font-display), serif" }}
+                      >
+                        업로드 콘텐츠
+                      </h3>
+                      <div className="space-y-2">
+                        {allLinks.map((link) => (
+                          <div
+                            key={link.id}
+                            className="rounded-xl border border-[var(--line)] bg-white/60 px-4 py-3"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent)]">
+                                    {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform] ?? link.platform}
+                                  </span>
+                                  <span className="text-[11px] text-[var(--muted)]">
+                                    {CREATOR_LINK_STATUS_LABEL[link.status]}
+                                  </span>
+                                </div>
+                                <a
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-1 block truncate text-sm text-[var(--accent)] underline underline-offset-2 hover:brightness-90"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {link.url}
+                                </a>
+                                {(link.platform === "tiktok" ||
+                                  link.platform === "instagram") &&
+                                (link.views != null ||
+                                  link.likes != null ||
+                                  link.comments != null) ? (
+                                  <div className="mt-2 flex flex-wrap gap-3 text-xs tabular-nums text-[var(--ink)]">
+                                    <span>
+                                      👁 {(link.views ?? 0).toLocaleString()}
+                                    </span>
+                                    <span>
+                                      ♥ {(link.likes ?? 0).toLocaleString()}
+                                    </span>
+                                    <span>
+                                      💬 {(link.comments ?? 0).toLocaleString()}
+                                    </span>
+                                    {link.metrics_collected_at ? (
+                                      <span className="text-[var(--muted)]">
+                                        · {formatKst(link.metrics_collected_at)}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                              </div>
+                              {(link.platform === "tiktok" ||
+                                link.platform === "instagram") &&
+                              allowAdminEdit ? (
+                                <button
+                                  type="button"
+                                  disabled={refreshingLinkId === link.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void refreshLinkMetrics(link.id);
+                                  }}
+                                  className="shrink-0 rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+                                >
+                                  {refreshingLinkId === link.id
+                                    ? "갱신 중…"
+                                    : "↻ 갱신"}
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  );
+                })()}
+
+                <div>
+                  <button
+                    type="button"
+                    aria-expanded={allocTableOpen}
+                    onClick={() => setAllocTableOpen((v) => !v)}
+                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-left transition hover:bg-[var(--accent-soft)]/40"
+                  >
+                    <span className="text-sm font-medium text-[var(--ink)]">
+                      수령 배정{" "}
+                      <span className="text-[var(--muted)]">
+                        {detail.allocations.length}건
+                      </span>
+                    </span>
+                    <span
+                      className={`text-xs font-semibold text-[var(--accent)] transition-transform duration-150 ${allocTableOpen ? "rotate-180" : ""}`}
+                      aria-hidden
+                    >
+                      ▾
+                    </span>
+                  </button>
+                  {allocTableOpen && (
+                    detail.allocations.length === 0 ? (
+                      <p className="mt-2 px-1 text-sm text-[var(--muted)]">
+                        배정된 상품이 없습니다.
+                      </p>
+                    ) : (
+                      <div className="mt-2 overflow-x-auto border border-[var(--line)]">
+                        <table className="min-w-[640px] w-full border-collapse text-left text-sm">
+                          <thead>
+                            <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/40 text-xs text-[var(--muted)]">
+                              <th className="px-3 py-2 font-medium">상품</th>
+                              <th className="px-3 py-2 font-medium">매장</th>
+                              <th className="px-3 py-2 font-medium text-right">수량</th>
+                              <th className="px-3 py-2 font-medium">방문일</th>
+                              <th className="px-3 py-2 font-medium">상태</th>
+                              <th className="px-3 py-2 font-medium">수령</th>
+                              {allowAdminEdit ? (
+                                <th className="px-3 py-2 font-medium text-right">수정</th>
+                              ) : null}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {detail.allocations.map((item) => (
+                              <AllocationDetailRows
+                                key={item.id}
+                                item={item}
+                                allowAdminEdit={allowAdminEdit}
+                                storeList={storeList}
+                                companyList={companyList}
+                                editing={editingAllocId === item.id}
+                                onToggleEdit={() =>
+                                  setEditingAllocId((id) =>
+                                    id === item.id ? null : item.id,
+                                  )
+                                }
+                                onUpdated={applyAllocationUpdate}
+                              />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
                   )}
                 </div>
               </div>

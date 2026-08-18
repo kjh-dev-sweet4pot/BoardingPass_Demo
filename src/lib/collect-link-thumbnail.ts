@@ -1,4 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  extractInstagramThumbnailUrl,
+  extractInstagramViews,
+  findInstagramResultForUrl,
+  isInstagramUrl,
+  scrapeInstagramPosts,
+} from "@/lib/apify-instagram";
 import { isTikTokUrl } from "@/lib/tiktok-oembed";
 import { findResultForUrl, scrapeTikTokPosts, extractThumbnailUrl } from "@/lib/apify-tiktok";
 
@@ -40,6 +47,48 @@ export async function collectTikTokLinkThumbnail(
 
     if (error) throw new Error(error.message);
   } catch {    await supabase
+      .from("creator_links")
+      .update({
+        thumbnail_status: "failed" satisfies ThumbStatus,
+        thumbnail_fetched_at: now,
+        updated_at: now,
+      })
+      .eq("id", linkId);
+  }
+}
+
+export async function collectInstagramLinkThumbnail(
+  supabase: SupabaseClient,
+  linkId: string,
+  pageUrl: string,
+) {
+  if (!isInstagramUrl(pageUrl)) return;
+
+  const now = new Date().toISOString();
+
+  try {
+    const items = await scrapeInstagramPosts([pageUrl]);
+    const result = findInstagramResultForUrl(items, pageUrl);
+
+    if (!result) throw new Error("Apify returned no matching result");
+
+    const { error } = await supabase
+      .from("creator_links")
+      .update({
+        thumbnail_status: "ok" satisfies ThumbStatus,
+        thumbnail_source_url: extractInstagramThumbnailUrl(result),
+        thumbnail_fetched_at: now,
+        views: extractInstagramViews(result),
+        likes: result.likesCount ?? null,
+        comments: result.commentsCount ?? null,
+        metrics_collected_at: now,
+        updated_at: now,
+      })
+      .eq("id", linkId);
+
+    if (error) throw new Error(error.message);
+  } catch {
+    await supabase
       .from("creator_links")
       .update({
         thumbnail_status: "failed" satisfies ThumbStatus,
