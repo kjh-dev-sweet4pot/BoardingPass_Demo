@@ -97,10 +97,10 @@ async function upsertCompany() {
   if (error) fail("company lookup", error);
 
   const patch = {
-    name: "KnownBeauty",
+    name: "23yearsold",
     login_id: "company",
     password_hash: hashPassword("company"),
-    aliases: ["KnownBeuaty", "KB", "노운뷰티"],
+    aliases: ["23 Years Old", "23years", "KnownBeauty", "KB"],
     contact: "partnership@knownbeauty.jp",
     is_active: true,
     updated_at: new Date().toISOString(),

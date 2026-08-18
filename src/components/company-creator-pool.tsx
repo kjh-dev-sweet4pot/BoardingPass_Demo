@@ -7,7 +7,6 @@ import {
   creatorAvatarCandidates,
   formatFollowers,
   formatKrw,
-  formatMd,
   formatMetric,
   getCreatorBrief,
   MARKET_LABEL,
@@ -15,10 +14,14 @@ import {
   POOL_PAGE,
   POST_PLATFORM_LABEL,
   TIER_LABEL,
+  VISIT_CONTENT_GUIDE_URL,
   type CreatorChannel,
   type CreatorMarket,
   type PoolCreator,
 } from "@/lib/creator-pool-mock";
+
+const contentGuideLinkClass =
+  "inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-2 text-xs font-bold text-[var(--accent)] shadow-sm transition hover:bg-[var(--accent)] hover:!text-white";
 import { polishDemoMetrics } from "@/lib/demo-metrics";
 
 const POOL = buildCreatorPool();
@@ -321,13 +324,24 @@ export function CompanyCreatorPool() {
               }
             />
           ) : (
-            <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
-              <p className="text-base font-medium text-[var(--ink)]">
-                카드를 선택하면 상세가 여기에 표시됩니다
-              </p>
-              <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
-                콘텐츠 가이드와 방문·제작 일정을 확인할 수 있습니다
-              </p>
+            <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-4 text-center">
+              <div>
+                <p className="text-base font-medium text-[var(--ink)]">
+                  카드를 선택하면 상세가 여기에 표시됩니다
+                </p>
+                <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
+                  콘텐츠 가이드와 방문·제작 일정을 확인할 수 있습니다
+                </p>
+              </div>
+              <a
+                href={VISIT_CONTENT_GUIDE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={contentGuideLinkClass}
+              >
+                컨텐츠 가이드라인 보기
+                <span aria-hidden>↗</span>
+              </a>
             </div>
           )}
         </aside>
@@ -855,6 +869,15 @@ function CreatorDetail({
             </li>
           ))}
         </ul>
+        <a
+          href={VISIT_CONTENT_GUIDE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`mt-4 w-full justify-center py-2.5 text-sm ${contentGuideLinkClass}`}
+        >
+          컨텐츠 가이드라인 보기
+          <span aria-hidden>↗</span>
+        </a>
       </div>
 
       <div className="mt-5">
@@ -862,18 +885,16 @@ function CreatorDetail({
         <ol className="mt-3 space-y-0">
           <li className="relative border-l-2 border-[var(--line)] pb-4 pl-4">
             <span className="absolute top-1 -left-[5px] h-2 w-2 rounded-full bg-[var(--accent)]" />
-            <p className="text-xs text-[var(--muted)]">시딩 수령</p>
-            <p className="mt-0.5 font-semibold">{formatMd(brief.visitYmd)}</p>
+            <p className="text-xs text-[var(--muted)]">방문</p>
+            <p className="mt-0.5 font-semibold">{brief.visitWindow}</p>
             <p className="mt-1 text-xs text-[var(--muted)]">
-              시딩 키트 수령 · 언박싱 촬영
+              매장 방문 · 시딩 수령
             </p>
           </li>
           <li className="relative border-l-2 border-transparent pl-4">
             <span className="absolute top-1 -left-[5px] h-2 w-2 rounded-full bg-[var(--accent)]" />
-            <p className="text-xs text-[var(--muted)]">
-              {creator.uploadYmd ? "업로드일" : "콘텐츠 마감"}
-            </p>
-            <p className="mt-0.5 font-semibold">{formatMd(brief.dueYmd)}</p>
+            <p className="text-xs text-[var(--muted)]">제작 일정</p>
+            <p className="mt-0.5 font-semibold">{brief.contentWindow}</p>
             <p className="mt-1 text-xs text-[var(--muted)]">
               가이드 포맷으로 발행 · 링크 제출
             </p>

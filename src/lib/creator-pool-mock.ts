@@ -1,7 +1,6 @@
 /** 브랜드사 마케팅 풀 — JP 시딩 실데이터 (주소·전화 제외). */
 
-import { hash32 } from "@/lib/demo-metrics";
-import { addDaysYmd, formatMd, ymdKst } from "@/lib/types";
+import { formatMd } from "@/lib/types";
 import jpPool from "./data/jp-creator-pool.json";
 import avatarManifest from "./data/jp-creator-avatar-manifest.json";
 
@@ -258,12 +257,16 @@ export type CreatorSchedule = {
   formats: string[];
   guideTitle: string;
   guideBullets: string[];
-  visitYmd: string;
-  dueYmd: string;
+  visitWindow: string;
+  contentWindow: string;
   mode: "visit" | "seeding";
 };
 
-/** 실업로드일이 있으면 그 기준으로, 없으면 데모 일정. */
+export const CREATOR_VISIT_WINDOW = "신청 후 10일 내";
+export const CREATOR_CONTENT_WINDOW = "수령 후 7일 내";
+export const VISIT_CONTENT_GUIDE_URL =
+  "https://slam-pick-three.vercel.app/";
+
 export function getCreatorBrief(creator: PoolCreator): CreatorSchedule {
   const guide = GUIDE_BY_MARKET[creator.market];
   const formatsFromPosts = [
@@ -273,29 +276,15 @@ export function getCreatorBrief(creator: PoolCreator): CreatorSchedule {
       ),
     ),
   ];
-  if (creator.uploadYmd) {
-    return {
-      formats:
-        formatsFromPosts.length > 0
-          ? formatsFromPosts
-          : FORMATS_BY_CHANNEL[creator.channel],
-      guideTitle: guide.title,
-      guideBullets: guide.bullets,
-      visitYmd: addDaysYmd(creator.uploadYmd, -7),
-      dueYmd: creator.uploadYmd,
-      mode: "seeding",
-    };
-  }
-  const today = ymdKst(new Date());
-  const visitOffset = 3 + (hash32(`${creator.id}:v`) % 18);
-  const dueOffset = 7 + (hash32(`${creator.id}:d`) % 10);
-  const visitYmd = addDaysYmd(today, visitOffset);
   return {
-    formats: FORMATS_BY_CHANNEL[creator.channel],
+    formats:
+      formatsFromPosts.length > 0
+        ? formatsFromPosts
+        : FORMATS_BY_CHANNEL[creator.channel],
     guideTitle: guide.title,
     guideBullets: guide.bullets,
-    visitYmd,
-    dueYmd: addDaysYmd(visitYmd, dueOffset),
+    visitWindow: CREATOR_VISIT_WINDOW,
+    contentWindow: CREATOR_CONTENT_WINDOW,
     mode: "seeding",
   };
 }

@@ -22,6 +22,7 @@ import {
   type AllocationLinkSummary,
 } from "@/lib/creator-link";
 import { todayYmdKst } from "@/lib/inf-visit";
+import { VISIT_CONTENT_GUIDE_URL } from "@/lib/creator-pool-mock";
 import {
   allocationStatusDisplayLabel,
   formatMd,
@@ -29,6 +30,9 @@ import {
   type Company,
   type CreatorLink,
 } from "@/lib/types";
+
+const contentGuideLinkClass =
+  "inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-2 text-xs font-bold text-[var(--accent)] shadow-sm transition hover:bg-[var(--accent)] hover:!text-white";
 
 function visitKey(item: AllocationWithRelations) {
   return item.visit_date ? String(item.visit_date).slice(0, 10) : "";
@@ -103,6 +107,63 @@ function linkChipClass(sum: AllocationLinkSummary) {
   return "bg-[#f0ece6] text-[#8a8074]";
 }
 
+type AllocSortKey = "visit" | "views" | "likes" | "comments";
+type SortDir = "asc" | "desc";
+
+function compareAllocRows(
+  a: AllocationWithRelations,
+  b: AllocationWithRelations,
+  sort: { key: AllocSortKey; dir: SortDir },
+  insightMap: Map<string, { views: number; likes: number; comments: number }>,
+) {
+  const sign = sort.dir === "asc" ? 1 : -1;
+  if (sort.key === "visit") {
+    return sign * visitKey(a).localeCompare(visitKey(b));
+  }
+  const va = insightMap.get(a.id)?.[sort.key] ?? -1;
+  const vb = insightMap.get(b.id)?.[sort.key] ?? -1;
+  return sign * (va - vb);
+}
+
+function AllocSortTh({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+  className = "",
+}: {
+  label: string;
+  sortKey: AllocSortKey;
+  activeKey: AllocSortKey;
+  dir: SortDir;
+  onSort: (key: AllocSortKey) => void;
+  className?: string;
+}) {
+  const active = activeKey === sortKey;
+  const right = className.includes("text-right");
+  return (
+    <th className={`px-4 py-3 font-medium ${className}`}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition ${
+          right ? "ml-auto" : ""
+        } ${
+          active
+            ? "font-semibold text-[var(--accent)]"
+            : "text-[var(--muted)] hover:text-[var(--ink)]"
+        } ${right ? "flex w-full justify-end" : ""}`}
+      >
+        {label}
+        <span className="text-[10px] tabular-nums" aria-hidden>
+          {active ? (dir === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 export function CompanyConsole({
   company,
 }: {
@@ -121,6 +182,10 @@ export function CompanyConsole({
   >("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [contentFocus, setContentFocus] = useState<ContentFocus>(null);
+  const [allocSort, setAllocSort] = useState<{
+    key: AllocSortKey;
+    dir: SortDir;
+  }>({ key: "visit", dir: "desc" });
   const deferredQ = useDeferredValue(searchQ.trim().toLowerCase());
   const today = todayYmdKst();
   const monthKey = today.slice(0, 7);
@@ -160,6 +225,31 @@ export function CompanyConsole({
     [period],
   );
 
+  const insightByAllocId = useMemo(() => {
+    const map = new Map<
+      string,
+      { views: number; likes: number; comments: number }
+    >();
+    for (const post of buildPublishDemoInsights("all").posts) {
+      if (post.allocationId) {
+        map.set(post.allocationId, {
+          views: post.views,
+          likes: post.likes,
+          comments: post.comments,
+        });
+      }
+    }
+    return map;
+  }, []);
+
+  function toggleAllocSort(key: AllocSortKey) {
+    setAllocSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "desc" },
+    );
+  }
+
   const storeOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const item of items) {
@@ -190,15 +280,24 @@ export function CompanyConsole({
       return true;
     });
     return next.sort((a, b) => {
-      const da = visitKey(a);
-      const db = visitKey(b);
-      if (da !== db) return db.localeCompare(da);
+      const primary = compareAllocRows(a, b, allocSort, insightByAllocId);
+      if (primary !== 0) return primary;
       const sa = statusRank(a);
       const sb = statusRank(b);
       if (sa !== sb) return sa - sb;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [items, period, monthKey, storeId, status, deferredQ, linkFilter]);
+  }, [
+    items,
+    period,
+    monthKey,
+    storeId,
+    status,
+    deferredQ,
+    linkFilter,
+    allocSort,
+    insightByAllocId,
+  ]);
 
   const selected = items.find((i) => i.id === openId) || null;
   const related = selected
@@ -360,14 +459,27 @@ export function CompanyConsole({
           </button>
         </div>
         ) : null}
-        <button
-          type="button"
-          onClick={() => gate.lock()}
-          className="rounded-full border border-[var(--line)] bg-white px-3.5 py-2 text-xs font-semibold text-[var(--muted)]"
-          title="데모: 입금 게이트 화면으로 돌아가기"
-        >
-          게이트 다시 보기
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {view === "pool" || view === "alloc" ? (
+            <a
+              href={VISIT_CONTENT_GUIDE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={contentGuideLinkClass}
+            >
+              컨텐츠 가이드라인 보기
+              <span aria-hidden>↗</span>
+            </a>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => gate.lock()}
+            className="rounded-full border border-[var(--line)] bg-white px-3.5 py-2 text-xs font-semibold text-[var(--muted)]"
+            title="데모: 입금 게이트 화면으로 돌아가기"
+          >
+            게이트 다시 보기
+          </button>
+        </div>
       </div>
 
       {view === "pool" ? (
@@ -475,15 +587,45 @@ export function CompanyConsole({
             조건에 맞는 배정이 없습니다.
           </p>
         ) : (
-          <table className="min-w-[860px] w-full border-collapse text-left text-sm">
+          <table className="min-w-[1020px] w-full border-collapse text-left text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs text-[var(--muted)]">
-                <th className="px-4 py-3 font-medium">방문 예정일</th>
+                <AllocSortTh
+                  label="방문 예정일"
+                  sortKey="visit"
+                  activeKey={allocSort.key}
+                  dir={allocSort.dir}
+                  onSort={toggleAllocSort}
+                />
                 <th className="px-4 py-3 font-medium">인플루언서</th>
                 <th className="px-4 py-3 font-medium">매장</th>
                 <th className="px-4 py-3 font-medium">상품 / 수량</th>
                 <th className="px-4 py-3 font-medium">진행 상태</th>
                 <th className="px-4 py-3 font-medium">링크</th>
+                <AllocSortTh
+                  label="조회"
+                  sortKey="views"
+                  activeKey={allocSort.key}
+                  dir={allocSort.dir}
+                  onSort={toggleAllocSort}
+                  className="text-right"
+                />
+                <AllocSortTh
+                  label="좋아요"
+                  sortKey="likes"
+                  activeKey={allocSort.key}
+                  dir={allocSort.dir}
+                  onSort={toggleAllocSort}
+                  className="text-right"
+                />
+                <AllocSortTh
+                  label="댓글"
+                  sortKey="comments"
+                  activeKey={allocSort.key}
+                  dir={allocSort.dir}
+                  onSort={toggleAllocSort}
+                  className="text-right"
+                />
               </tr>
             </thead>
             <tbody>
@@ -492,6 +634,7 @@ export function CompanyConsole({
                 const linkSum = summarizeAllocationLinks(
                   item.creator_links || [],
                 );
+                const perf = insightByAllocId.get(item.id);
                 return (
                   <tr
                     key={item.id}
@@ -542,6 +685,21 @@ export function CompanyConsole({
                         {ALLOCATION_LINK_LABEL[linkSum]}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {perf ? (
+                        <span className="font-semibold text-[var(--ink)]">
+                          {formatMetric(perf.views)}
+                        </span>
+                      ) : (
+                        <span className="text-[var(--muted)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[var(--muted)]">
+                      {perf ? formatMetric(perf.likes) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[var(--muted)]">
+                      {perf ? formatMetric(perf.comments) : "—"}
+                    </td>
                   </tr>
                 );
               })}
@@ -569,13 +727,24 @@ export function CompanyConsole({
               }}
             />
           ) : (
-            <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
-              <p className="text-base font-medium text-[var(--ink)]">
-                행을 선택하면 상세가 여기에 표시됩니다
-              </p>
-              <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
-                목록에서 인플루언서를 선택하세요
-              </p>
+            <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-4 text-center">
+              <div>
+                <p className="text-base font-medium text-[var(--ink)]">
+                  행을 선택하면 상세가 여기에 표시됩니다
+                </p>
+                <p className="mt-2 text-sm leading-5 text-[var(--muted)]">
+                  목록에서 인플루언서를 선택하세요
+                </p>
+              </div>
+              <a
+                href={VISIT_CONTENT_GUIDE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={contentGuideLinkClass}
+              >
+                컨텐츠 가이드라인 보기
+                <span aria-hidden>↗</span>
+              </a>
             </div>
           )}
         </aside>
@@ -658,6 +827,16 @@ function CompanyInfPanel({
             SNS 프로필
           </a>
         ) : null}
+
+        <a
+          href={VISIT_CONTENT_GUIDE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`mb-5 w-full justify-center py-2.5 text-sm ${contentGuideLinkClass}`}
+        >
+          컨텐츠 가이드라인 보기
+          <span aria-hidden>↗</span>
+        </a>
 
         <dl className="grid gap-3 rounded-2xl bg-[var(--accent-soft)]/50 px-4 py-4 sm:grid-cols-2">
           <div>
