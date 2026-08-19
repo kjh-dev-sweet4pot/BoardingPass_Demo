@@ -10,7 +10,7 @@ import {
   useBudgetGate,
 } from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
-import { CompanyPublishFeed } from "@/components/company-publish-feed";
+import { CompanyProgressTab } from "@/components/company-progress-tab";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import {
   buildPublishDemoAllocations,
@@ -506,7 +506,7 @@ export function CompanyConsole({
       {view === "pool" ? (
         <CompanyCreatorPool companyId={company.id} />
       ) : view === "publish" ? (
-        <CompanyPublishFeed />
+        <CompanyProgressTab companyId={company.id} />
       ) : view === "content" ? (
         <CompanyContentDashboard
           snapshot={insights}
