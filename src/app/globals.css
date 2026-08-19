@@ -11,6 +11,19 @@
   --accent-soft: #d4ebe1;
   --danger: #9b2c2c;
   --ink: #0b1712;
+
+  /* T4: status badge design tokens */
+  --badge-neutral-bg: #f0ece6;
+  --badge-neutral-fg: #8a8074;
+  --badge-warn-bg: #f8ecd8;
+  --badge-warn-fg: #8a4b12;
+  --badge-ok-bg: #e7f3ea;
+  --badge-ok-fg: #2f6b3c;
+  --badge-danger-bg: #f8e4e4;
+  --badge-danger-fg: #9b2c2c;
+
+  --badge-radius: 9999px;
+  --badge-radius-md: 0.75rem;
 }
 
 @theme inline {
