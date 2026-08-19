@@ -412,15 +412,15 @@ export function CompanyConsole({
           <button
             type="button"
             role="tab"
-            aria-selected={view === "alloc"}
-            onClick={() => setView("alloc")}
+            aria-selected={view === "publish"}
+            onClick={() => setView("publish")}
             className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-              view === "alloc"
+              view === "publish"
                 ? "bg-[var(--accent)] !text-white"
                 : "text-[var(--muted)]"
             }`}
           >
-            배정 현황
+            진행 현황
           </button>
           <button
             type="button"
@@ -433,20 +433,20 @@ export function CompanyConsole({
                 : "text-[var(--muted)]"
             }`}
           >
-            콘텐츠
+            성과
           </button>
           <button
             type="button"
             role="tab"
-            aria-selected={view === "publish"}
-            onClick={() => setView("publish")}
+            aria-selected={view === "alloc"}
+            onClick={() => setView("alloc")}
             className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-              view === "publish"
+              view === "alloc"
                 ? "bg-[var(--accent)] !text-white"
                 : "text-[var(--muted)]"
             }`}
           >
-            발행
+            배정 현황
           </button>
         </div>
         {view !== "pool" && view !== "publish" ? (
@@ -504,7 +504,7 @@ export function CompanyConsole({
       </div>
 
       {view === "pool" ? (
-        <CompanyCreatorPool />
+        <CompanyCreatorPool companyId={company.id} />
       ) : view === "publish" ? (
         <CompanyPublishFeed />
       ) : view === "content" ? (

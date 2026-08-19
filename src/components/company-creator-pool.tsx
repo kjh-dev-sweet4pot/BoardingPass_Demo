@@ -28,7 +28,10 @@ const POOL = buildCreatorPool();
 
 type PickMap = Record<string, "selected" | "excluded">;
 
-export function CompanyCreatorPool() {
+// castingId로 관리 — key: pool creator id, value: castingId(담긴 경우) | "excluded"
+type CastingMap = Record<string, { castingId: string } | "excluded">;
+
+export function CompanyCreatorPool({ companyId }: { companyId: string }) {
   const [visible, setVisible] = useState(POOL_PAGE);
   const [market, setMarket] = useState<CreatorMarket | "">("jp");
   const [channel, setChannel] = useState<CreatorChannel | "">("");
@@ -38,9 +41,59 @@ export function CompanyCreatorPool() {
   const [requested, setRequested] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [picks, setPicks] = useState<PickMap>({});
+  const [castings, setCastings] = useState<CastingMap>({});
   const [replaceId, setReplaceId] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  // 기존 castings 로드 (handle 기준 매핑)
+  useEffect(() => {
+    fetch("/api/com/castings")
+      .then((r) => r.json())
+      .then((rows: Array<{ id: string; status: string; influencers?: { instagram_handle_normalized?: string; instagram_handle?: string } }>) => {
+        const map: CastingMap = {};
+        for (const row of rows) {
+          const handle = (
+            row.influencers?.instagram_handle_normalized ||
+            row.influencers?.instagram_handle ||
+            ""
+          ).replace(/^@+/, "").toLowerCase();
+          const poolRow = POOL.find(
+            (p) => p.handle.replace(/^@+/, "").toLowerCase() === handle,
+          );
+          if (poolRow) {
+            if (row.status !== "결렬") {
+              map[poolRow.id] = { castingId: row.id };
+              setPicks((prev) => ({ ...prev, [poolRow.id]: "selected" }));
+            }
+          }
+        }
+        setCastings(map);
+      })
+      .catch(() => {});
+  }, [companyId]);
+
+  // 담기 → API POST (campaign_id는 임시로 null 허용 시까지 skip, 추후 T10에서 연결)
+  async function addCasting(poolId: string) {
+    const row = POOL.find((r) => r.id === poolId);
+    if (!row) return;
+    // castings에는 campaign_id 필수이므로, 없으면 낙관적 UI만 업데이트
+    setPicks((prev) => ({ ...prev, [poolId]: "selected" }));
+    setCartOpen(true);
+  }
+
+  async function removeCasting(poolId: string) {
+    const entry = castings[poolId];
+    if (entry && entry !== "excluded" && "castingId" in entry) {
+      await fetch("/api/com/castings", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ casting_id: entry.castingId }),
+      });
+      setCastings((prev) => { const c = { ...prev }; delete c[poolId]; return c; });
+    }
+    setPicks((prev) => { const c = { ...prev }; delete c[poolId]; return c; });
+  }
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -87,24 +140,23 @@ export function CompanyCreatorPool() {
 
   function setPick(id: string, next: "selected" | "excluded" | null) {
     setSubmitted(false);
-    setPicks((prev) => {
-      const copy = { ...prev };
-      if (!next) delete copy[id];
-      else copy[id] = next;
-      return copy;
-    });
-    if (next === "selected") setCartOpen(true);
+    if (next === "selected") {
+      addCasting(id);
+    } else if (next === null) {
+      removeCasting(id);
+    } else {
+      // excluded
+      removeCasting(id);
+      setPicks((prev) => ({ ...prev, [id]: "excluded" }));
+    }
   }
 
   function clearCart() {
     setSubmitted(false);
-    setPicks((prev) => {
-      const copy = { ...prev };
-      for (const id of Object.keys(copy)) {
-        if (copy[id] === "selected") delete copy[id];
-      }
-      return copy;
-    });
+    const selectedIds = Object.entries(picks)
+      .filter(([, v]) => v === "selected")
+      .map(([k]) => k);
+    for (const id of selectedIds) removeCasting(id);
   }
 
   function submitCart() {
