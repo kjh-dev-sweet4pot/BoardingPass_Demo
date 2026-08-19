@@ -2,10 +2,11 @@ import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
 import { CompanyConsole } from "@/components/company-console";
 import { AppShell, Notice, secondaryBtnClass } from "@/components/ui";
+import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import { getCompanySessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { type Company } from "@/lib/types";
+import { type AllocationWithRelations, type Company } from "@/lib/types";
 
 export default async function CompanyPage() {
   const companyId = await getCompanySessionId();
@@ -21,17 +22,32 @@ export default async function CompanyPage() {
   }
 
   const supabase = await createClient();
-  const { data: company, error: companyError } = await supabase
-    .from("companies")
-    .select(
-      "id, name, login_id, aliases, contact, is_active, created_at, updated_at",
-    )
-    .eq("id", companyId)
-    .maybeSingle();
+  const [{ data: company, error: companyError }, { data: allocations, error: allocError }] =
+    await Promise.all([
+      supabase
+        .from("companies")
+        .select(
+          "id, name, login_id, aliases, contact, is_active, created_at, updated_at",
+        )
+        .eq("id", companyId)
+        .maybeSingle(),
+      supabase
+        .from("allocations")
+        .select(
+          "*, products(*), stores(*), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url), creator_links(*)",
+        )
+        .eq("company_id", companyId)
+        .order("visit_date", { ascending: false })
+        .order("created_at", { ascending: false }),
+    ]);
 
-  if (companyError || !company || !company.is_active) {
+  if (companyError || allocError || !company || !company.is_active) {
     redirect("/com/login");
   }
+
+  const initialAllocations = (allocations as AllocationWithRelations[]) || [];
+  const initialMonthInsights = buildMockContentInsights(initialAllocations, "month");
+  const initialAllInsights = buildMockContentInsights(initialAllocations, "all");
 
   return (
     <AppShell
@@ -49,7 +65,12 @@ export default async function CompanyPage() {
         </form>
       }
     >
-      <CompanyConsole company={company as Company} />
+      <CompanyConsole
+        company={company as Company}
+        initialAllocations={initialAllocations}
+        initialMonthInsights={initialMonthInsights}
+        initialAllInsights={initialAllInsights}
+      />
     </AppShell>
   );
 }

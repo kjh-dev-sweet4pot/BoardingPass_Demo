@@ -11,6 +11,7 @@ import {
 } from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
 import { CompanyPublishFeed } from "@/components/company-publish-feed";
+import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import {
   buildPublishDemoAllocations,
   buildPublishDemoInsights,
@@ -166,8 +167,14 @@ function AllocSortTh({
 
 export function CompanyConsole({
   company,
+  initialAllocations,
+  initialMonthInsights,
+  initialAllInsights,
 }: {
   company: Company;
+  initialAllocations: AllocationWithRelations[];
+  initialMonthInsights: ReturnType<typeof buildMockContentInsights>;
+  initialAllInsights: ReturnType<typeof buildMockContentInsights>;
 }) {
   const gate = useBudgetGate(company.id);
   const [view, setView] = useState<"alloc" | "content" | "pool" | "publish">(
@@ -190,8 +197,14 @@ export function CompanyConsole({
   const today = todayYmdKst();
   const monthKey = today.slice(0, 7);
 
-  // 발행(JP 시딩) 리스트 기준으로 배정·콘텐츠 표시
-  const items = useMemo(() => buildPublishDemoAllocations(), []);
+  const hasSeededAllocations = initialAllocations.length > 0;
+
+  // TS 시드가 있으면 DB 우선, 없으면 기존 JP 목업 유지
+  const items = useMemo(
+    () =>
+      hasSeededAllocations ? initialAllocations : buildPublishDemoAllocations(),
+    [hasSeededAllocations, initialAllocations],
+  );
 
   const scoped = useMemo(() => {
     return items.filter((item) => {
@@ -220,17 +233,25 @@ export function CompanyConsole({
     return { total, visited, picked, linked };
   }, [scoped]);
 
-  const insights = useMemo(
-    () => buildPublishDemoInsights(period),
-    [period],
-  );
+  const insights = useMemo(() => {
+    if (!hasSeededAllocations) return buildPublishDemoInsights(period);
+    return period === "month" ? initialMonthInsights : initialAllInsights;
+  }, [
+    hasSeededAllocations,
+    initialAllInsights,
+    initialMonthInsights,
+    period,
+  ]);
 
   const insightByAllocId = useMemo(() => {
     const map = new Map<
       string,
       { views: number; likes: number; comments: number }
     >();
-    for (const post of buildPublishDemoInsights("all").posts) {
+    const posts = hasSeededAllocations
+      ? initialAllInsights.posts
+      : buildPublishDemoInsights("all").posts;
+    for (const post of posts) {
       if (post.allocationId) {
         map.set(post.allocationId, {
           views: post.views,
@@ -240,7 +261,7 @@ export function CompanyConsole({
       }
     }
     return map;
-  }, []);
+  }, [hasSeededAllocations, initialAllInsights.posts]);
 
   function toggleAllocSort(key: AllocSortKey) {
     setAllocSort((prev) =>
