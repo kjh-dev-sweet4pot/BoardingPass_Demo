@@ -3,6 +3,21 @@ import { getInfluencerSessionId } from "@/lib/session";
 
 const APIFY_KV_HOST = "api.apify.com";
 
+function resolveReferer(hostname: string) {
+  const host = hostname.replace(/^www\./, "").toLowerCase();
+  if (host.includes("tiktokcdn") || host.includes("tiktok.com")) {
+    return "https://www.tiktok.com/";
+  }
+  if (
+    host.includes("cdninstagram.com") ||
+    host.includes("instagram.com") ||
+    host.includes("fbcdn.net")
+  ) {
+    return "https://www.instagram.com/";
+  }
+  return null;
+}
+
 /**
  * 외부 이미지 URL을 서버에서 프록시.
  * - Apify KV Store URL → APIFY_TOKEN 쿼리 파라미터 추가
@@ -33,10 +48,14 @@ export async function GET(request: Request) {
       }
     }
 
-    const refererOrigin = `${parsed.protocol}//${parsed.hostname}/`;
+    const refererOrigin =
+      resolveReferer(parsed.hostname) ||
+      `${parsed.protocol}//${parsed.hostname}/`;
     const upstream = await fetch(fetchUrl, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; BoardingPass/1.0)",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         Referer: refererOrigin,
       },
     });
@@ -46,8 +65,10 @@ export async function GET(request: Request) {
     }
 
     const buffer = await upstream.arrayBuffer();
-    const contentType =
-      upstream.headers.get("content-type") || "image/jpeg";
+    const contentType = upstream.headers.get("content-type") || "image/jpeg";
+    if (!contentType.startsWith("image/")) {
+      return new NextResponse(null, { status: 502 });
+    }
 
     return new NextResponse(Buffer.from(buffer), {
       headers: {

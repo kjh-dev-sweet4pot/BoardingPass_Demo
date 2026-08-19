@@ -1,10 +1,11 @@
-const ACTOR_ID = "apify/instagram-scraper";
+const ACTOR_ID = "shu8hvrXbJbY3Eb9W";
 const APIFY_BASE = "https://api.apify.com/v2";
 
 export interface InstagramScraperResult {
   id: string;
   inputUrl?: string;
   url?: string;
+  shortCode?: string;
   type?: string;
   displayUrl?: string;
   images?: string[];
@@ -14,6 +15,8 @@ export interface InstagramScraperResult {
   ownerUsername?: string;
   videoViewCount?: number;
   videoPlayCount?: number;
+  viewCount?: number;
+  playCount?: number;
 }
 
 function getApifyToken(): string {
@@ -33,6 +36,17 @@ function normalizeInstagramUrl(url: string) {
   }
 }
 
+function extractInstagramShortCode(url: string): string | null {
+  try {
+    const path = new URL(url.trim()).pathname;
+    const match = path.match(/\/(?:p|reel|reels)\/([^/]+)/i);
+    return match?.[1]?.toLowerCase() || null;
+  } catch {
+    const match = url.match(/\/(?:p|reel|reels)\/([^/?#]+)/i);
+    return match?.[1]?.toLowerCase() || null;
+  }
+}
+
 export function isInstagramUrl(url: string) {
   try {
     const host = new URL(url.trim()).hostname.replace(/^www\./, "").toLowerCase();
@@ -45,7 +59,10 @@ export function isInstagramUrl(url: string) {
 export function getInstagramResultsType(url: string): "posts" | "reels" {
   try {
     const path = new URL(url.trim()).pathname.toLowerCase();
-    return path.includes("/reel/") || path.includes("/reels/") ? "reels" : "posts";
+    if (/^\/(?:p|reel|reels)\/[^/]+\/?$/.test(path)) {
+      return "posts";
+    }
+    return path.endsWith("/reels/") ? "reels" : "posts";
   } catch {
     return "posts";
   }
@@ -84,10 +101,15 @@ export function findInstagramResultForUrl(
   url: string,
 ): InstagramScraperResult | undefined {
   const target = normalizeInstagramUrl(url);
-  return items.find((item) => {
-    const candidate = normalizeInstagramUrl(item.url || item.inputUrl || "");
-    return candidate === target || Boolean(item.id && target.includes(item.id));
-  });
+  const shortCode = extractInstagramShortCode(url);
+  return (
+    items.find((item) => {
+      const candidate = normalizeInstagramUrl(item.url || item.inputUrl || "");
+      return candidate === target || Boolean(item.id && target.includes(item.id));
+    }) ??
+    items.find((item) => item.shortCode?.toLowerCase() === shortCode) ??
+    (items.length === 1 ? items[0] : undefined)
+  );
 }
 
 export function extractInstagramThumbnailUrl(
@@ -110,5 +132,17 @@ export function extractInstagramViews(
   result: InstagramScraperResult | null | undefined,
 ): number | null {
   if (!result) return null;
-  return result.videoViewCount ?? result.videoPlayCount ?? null;
+  const dynamic = result as InstagramScraperResult & {
+    video_view_count?: number;
+    video_play_count?: number;
+  };
+  return (
+    result.videoViewCount ??
+    result.videoPlayCount ??
+    result.viewCount ??
+    result.playCount ??
+    dynamic.video_view_count ??
+    dynamic.video_play_count ??
+    null
+  );
 }

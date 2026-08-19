@@ -43,10 +43,11 @@ export async function POST(request: Request) {
 
   if (platform === "instagram") {
     try {
-      const items = await scrapeInstagramPosts([url]).catch(
-        () => [] as Awaited<ReturnType<typeof scrapeInstagramPosts>>,
-      );
+      const items = await scrapeInstagramPosts([url]);
       const result = findInstagramResultForUrl(items, url);
+      if (!result) {
+        throw new Error("Instagram 미리보기 결과를 찾지 못했습니다.");
+      }
 
       return NextResponse.json({
         preview: {

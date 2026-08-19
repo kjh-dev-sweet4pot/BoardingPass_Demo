@@ -63,6 +63,23 @@ async function confirmVisit(
   onUpdated(body.allocation as AllocationWithRelations);
 }
 
+async function updateAllocationStatus(
+  id: string,
+  status: AllocationStatus,
+  onUpdated: (next: AllocationWithRelations) => void,
+) {
+  const res = await fetch(`/api/admin/allocations/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.error || "처리에 실패했습니다.");
+  }
+  onUpdated(body.allocation as AllocationWithRelations);
+}
+
 function VisitConfirmControls({
   item,
   onUpdated,
@@ -200,6 +217,269 @@ function VisitConfirmControls({
   );
 }
 
+function PickupToggleControls({
+  item,
+  onUpdated,
+}: {
+  item: AllocationWithRelations;
+  onUpdated: (next: AllocationWithRelations) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{
+    type: "ok" | "err";
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    setBusy(false);
+    setNotice(null);
+  }, [item.id, item.status, item.picked_up_at]);
+
+  const picked = item.status === "picked_up" || Boolean(item.picked_up_at);
+  if (item.status === "cancelled") return null;
+
+  async function run(nextStatus: AllocationStatus) {
+    if (busy) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      await updateAllocationStatus(item.id, nextStatus, onUpdated);
+      setNotice({
+        type: "ok",
+        text:
+          nextStatus === "picked_up"
+            ? "수령 완료로 변경되었습니다."
+            : "수령 완료가 해제되었습니다.",
+      });
+    } catch (err) {
+      setNotice({
+        type: "err",
+        text: err instanceof Error ? err.message : "처리에 실패했습니다.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-2xl border border-[var(--line)] bg-white px-4 py-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs tracking-[0.16em] text-[var(--muted)] uppercase">
+            Pickup
+          </p>
+          <p className="mt-1 text-sm font-semibold text-[var(--ink)]">
+            수령 여부
+          </p>
+        </div>
+        <span
+          className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+            picked
+              ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+              : "border-[var(--line)] bg-white text-[var(--muted)]"
+          }`}
+        >
+          {picked ? "수령 완료" : "미수령"}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy || picked}
+          onClick={() => void run("picked_up")}
+          className="rounded-xl bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-40"
+        >
+          {busy && !picked ? "처리 중…" : "수령 처리"}
+        </button>
+        <button
+          type="button"
+          disabled={busy || !picked}
+          onClick={() => void run("ready")}
+          className="rounded-xl border border-[var(--line)] px-3.5 py-2 text-sm font-semibold text-[var(--ink)] disabled:opacity-40"
+        >
+          {busy && picked ? "해제 중…" : "수령 해제"}
+        </button>
+      </div>
+      {item.picked_up_at ? (
+        <p className="text-xs text-[var(--muted)]">
+          최근 수령 시각 · {formatKst(item.picked_up_at)}
+        </p>
+      ) : null}
+      {notice ? (
+        <p
+          className={`text-sm ${
+            notice.type === "err"
+              ? "text-[var(--danger)]"
+              : "text-[var(--accent)]"
+          }`}
+        >
+          {notice.text}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function InfluencerEditCard({
+  influencer,
+  onUpdated,
+}: {
+  influencer: Influencer;
+  onUpdated: (next: Influencer) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    name: influencer.name || "",
+    instagram_handle:
+      influencer.instagram_handle_normalized || influencer.instagram_handle || "",
+    sns_url: influencer.sns_url || "",
+    notes: influencer.notes || "",
+  });
+
+  useEffect(() => {
+    setEditing(false);
+    setSaving(false);
+    setError(null);
+    setForm({
+      name: influencer.name || "",
+      instagram_handle:
+        influencer.instagram_handle_normalized || influencer.instagram_handle || "",
+      sns_url: influencer.sns_url || "",
+      notes: influencer.notes || "",
+    });
+  }, [influencer.id, influencer.name, influencer.instagram_handle, influencer.instagram_handle_normalized, influencer.sns_url, influencer.notes]);
+
+  async function save() {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/influencers/${influencer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.influencer) {
+        throw new Error(body.error || "인플루언서 정보 저장 실패");
+      }
+      onUpdated(body.influencer as Influencer);
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "인플루언서 정보 저장 실패");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs tracking-[0.16em] text-[var(--muted)] uppercase">
+            Influencer
+          </p>
+          <h4 className="mt-1 text-base font-semibold text-[var(--ink)]">
+            인플루언서 정보
+          </h4>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setEditing((v) => !v);
+            setError(null);
+          }}
+          className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+        >
+          {editing ? "닫기" : "수정"}
+        </button>
+      </div>
+
+      {editing ? (
+        <div className="mt-4 grid gap-3">
+          <label className="grid gap-1.5">
+            <span className="text-xs text-[var(--muted)]">이름</span>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs text-[var(--muted)]">인스타그램 핸들</span>
+            <input
+              type="text"
+              value={form.instagram_handle}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, instagram_handle: e.target.value }))
+              }
+              className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs text-[var(--muted)]">SNS URL</span>
+            <input
+              type="url"
+              value={form.sns_url}
+              onChange={(e) => setForm((prev) => ({ ...prev, sns_url: e.target.value }))}
+              className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs text-[var(--muted)]">메모</span>
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+              rows={4}
+              className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+          {error ? (
+            <p className="text-sm text-[var(--danger)]">{error}</p>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="rounded-xl border border-[var(--line)] px-3.5 py-2 text-sm font-medium"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void save()}
+              className="rounded-xl bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {saving ? "저장 중…" : "저장"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 grid gap-2 text-sm text-[var(--ink)]">
+          <p>
+            <span className="text-[var(--muted)]">이름</span> · {influencer.name || "—"}
+          </p>
+          <p>
+            <span className="text-[var(--muted)]">핸들</span> ·{" "}
+            {formatIgHandle(influencer) || "—"}
+          </p>
+          <p className="break-all">
+            <span className="text-[var(--muted)]">SNS URL</span> ·{" "}
+            {formatSnsUrl(influencer.sns_url) || "—"}
+          </p>
+          <p className="whitespace-pre-wrap">
+            <span className="text-[var(--muted)]">메모</span> · {influencer.notes || "—"}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CounterDetailPanel({
   item,
   related,
@@ -210,6 +490,7 @@ function CounterDetailPanel({
   storeList,
   companyList,
   onUpdated,
+  onInfluencerUpdated,
 }: {
   item: AllocationWithRelations;
   related: AllocationWithRelations[];
@@ -220,6 +501,7 @@ function CounterDetailPanel({
   storeList?: Store[];
   companyList?: Company[];
   onUpdated?: (next: AllocationWithRelations) => void;
+  onInfluencerUpdated?: (next: Influencer) => void;
 }) {
   const handle = formatIgHandle(item.influencers);
   const name = (item.influencers?.name || "").trim();
@@ -327,6 +609,10 @@ function CounterDetailPanel({
         </p>
       ) : null}
 
+      {allowAdminEdit && onUpdated ? (
+        <PickupToggleControls item={item} onUpdated={onUpdated} />
+      ) : null}
+
       {onUpdated &&
       (item.status === "pending" ||
         item.status === "visited" ||
@@ -343,7 +629,12 @@ function CounterDetailPanel({
         />
       ) : null}
 
-      {item.influencers?.notes ? (
+      {allowAdminEdit && item.influencers && onInfluencerUpdated ? (
+        <InfluencerEditCard
+          influencer={item.influencers}
+          onUpdated={onInfluencerUpdated}
+        />
+      ) : item.influencers?.notes ? (
         <p className="text-base leading-7 text-[var(--muted)]">
           {item.influencers.notes}
         </p>
@@ -665,6 +956,9 @@ function AllocationDetailRows({
                 <VisitConfirmControls item={item} onUpdated={onUpdated} />
               </div>
             ) : null}
+            <div className="mb-3">
+              <PickupToggleControls item={item} onUpdated={onUpdated} />
+            </div>
             <AdminAllocationEditForm
               item={item}
               storeList={storeList}
@@ -1410,6 +1704,32 @@ export function PharListWithModal({
     }
   }
 
+  function applyInfluencerUpdate(next: Influencer) {
+    setLiveItems((prev) =>
+      prev.map((row) =>
+        row.influencer_id === next.id
+          ? { ...row, influencers: { ...(row.influencers || next), ...next } }
+          : row,
+      ),
+    );
+    setDetail((prev) =>
+      prev
+        ? {
+            ...prev,
+            influencer: { ...prev.influencer, ...next },
+            allocations: prev.allocations.map((row) =>
+              row.influencer_id === next.id
+                ? {
+                    ...row,
+                    influencers: { ...(row.influencers || next), ...next },
+                  }
+                : row,
+            ),
+          }
+        : prev,
+    );
+  }
+
   async function refreshLinkMetrics(linkId: string) {
     if (refreshingLinkId) return;
     setRefreshingLinkId(linkId);
@@ -1856,6 +2176,7 @@ export function PharListWithModal({
                     storeList={storeList}
                     companyList={companyList}
                     onUpdated={applyAllocationUpdate}
+                    onInfluencerUpdated={applyInfluencerUpdate}
                   />
                 ) : (
                   <div className="flex h-full min-h-[240px] flex-col items-center justify-center text-center">
@@ -2306,6 +2627,13 @@ export function PharListWithModal({
                     </dd>
                   </div>
                 </dl>
+
+                {allowAdminEdit ? (
+                  <InfluencerEditCard
+                    influencer={detail.influencer}
+                    onUpdated={applyInfluencerUpdate}
+                  />
+                ) : null}
 
                 {(() => {
                   const allLinks = detail.allocations.flatMap(

@@ -435,7 +435,8 @@ function VisitCard({
   );
 }
 
-function imgProxy(url: string) {
+function imgSrc(url: string, platform: CreatorPlatform) {
+  if (platform === "instagram") return url;
   return `/api/inf/links/img-proxy?url=${encodeURIComponent(url)}`;
 }
 
@@ -475,7 +476,7 @@ function PreviewModal({
             {preview.thumbnailUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={imgProxy(preview.thumbnailUrl)}
+                src={imgSrc(preview.thumbnailUrl, preview.platform)}
                 alt={preview.profileName || "thumbnail"}
                 className="aspect-[9/16] w-full rounded-2xl object-cover"
               />
