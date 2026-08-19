@@ -43,18 +43,25 @@ function submittedLinks(links: CreatorLink[]) {
   return links.filter((l) => l.status === "제출");
 }
 
-export function CompanyProgressTab({ companyId }: { companyId: string }) {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(true);
+export function CompanyProgressTab({
+  companyId,
+  initialCampaigns,
+}: {
+  companyId: string;
+  initialCampaigns?: Campaign[];
+}) {
+  const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns ?? []);
+  const [loading, setLoading] = useState(!initialCampaigns);
   const [openCampaignId, setOpenCampaignId] = useState<string | null>(null);
   const [openAllocId, setOpenAllocId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialCampaigns) return; // 목업 주입 시 fetch 생략
     fetch("/api/com/campaigns")
       .then((r) => r.json())
       .then((data) => { setCampaigns(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [companyId]);
+  }, [companyId, initialCampaigns]);
 
   if (loading) return <div className="py-16 text-center text-sm text-[var(--muted)]">불러오는 중…</div>;
 

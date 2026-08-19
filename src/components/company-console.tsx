@@ -1,10 +1,9 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import {
-  CompanyContentDashboard,
-  type ContentFocus,
-} from "@/components/company-content-dashboard";
+import { CompanyPerformanceTab } from "@/components/company-performance-tab";
+import type { ContentFocus } from "@/components/company-content-dashboard";
+import { DEMO_CAMPAIGNS_23YO, buildDemo23YoPerformance } from "@/lib/demo-23yo";
 import {
   CompanyBudgetGate,
   useBudgetGate,
@@ -506,13 +505,14 @@ export function CompanyConsole({
       {view === "pool" ? (
         <CompanyCreatorPool companyId={company.id} />
       ) : view === "publish" ? (
-        <CompanyProgressTab companyId={company.id} />
+        <CompanyProgressTab
+          companyId={company.id}
+          initialCampaigns={DEMO_CAMPAIGNS_23YO as any}
+        />
       ) : view === "content" ? (
-        <CompanyContentDashboard
-          snapshot={insights}
-          focus={contentFocus}
-          onFocus={setContentFocus}
-          onOpenAllocation={openAllocFromContent}
+        <CompanyPerformanceTab
+          companyId={company.id}
+          initialData={buildDemo23YoPerformance() as any}
         />
       ) : (
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.7fr)]">
