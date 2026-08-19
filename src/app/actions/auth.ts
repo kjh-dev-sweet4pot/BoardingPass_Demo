@@ -3,17 +3,21 @@
 import { redirect } from "next/navigation";
 import {
   clearAdminSession,
+  clearAuthToken,
   clearCompanySession,
   clearInfluencerSession,
   clearStoreSession,
-  isValidAdminCredentials,
+  isValidAdminManagerCredentials,
+  isValidAdminOperatorCredentials,
   isValidStorePassword,
+  mintAndSetAuthToken,
   setAdminSession,
   setCompanySessionId,
   setStoreSessionId,
 } from "@/lib/session";
 import { normalizeLoginId } from "@/lib/company";
 import { verifyPassword } from "@/lib/password";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { type Store } from "@/lib/types";
 
@@ -21,13 +25,18 @@ export async function signInAdmin(formData: FormData) {
   const username = String(formData.get("username") || "");
   const password = String(formData.get("password") || "");
 
-  if (!isValidAdminCredentials(username, password)) {
+  const isManager = isValidAdminManagerCredentials(username, password);
+  const isOperator = isValidAdminOperatorCredentials(username, password);
+
+  if (!isManager && !isOperator) {
     redirect(
       `/admin/login?error=${encodeURIComponent("아이디 또는 비밀번호가 올바르지 않습니다.")}`,
     );
   }
 
-  await setAdminSession();
+  const role = isManager ? "admin_manager" : "admin_operator";
+  await setAdminSession(role);
+  await mintAndSetAuthToken({ role });
   redirect("/admin");
 }
 
@@ -41,7 +50,9 @@ export async function signInStore(formData: FormData) {
     );
   }
 
-  const supabase = await createClient();
+  const supabase = hasServiceRoleKey()
+    ? createServiceClient()
+    : await createClient();
   const { data: store, error } = await supabase
     .from("stores")
     .select("id, name")
@@ -62,6 +73,7 @@ export async function signInStore(formData: FormData) {
   }
 
   await setStoreSessionId(storeRow.id);
+  await mintAndSetAuthToken({ role: "store", store_id: storeRow.id });
   redirect("/phar");
 }
 
@@ -75,7 +87,9 @@ export async function signInCompany(formData: FormData) {
     );
   }
 
-  const supabase = await createClient();
+  const supabase = hasServiceRoleKey()
+    ? createServiceClient()
+    : await createClient();
   const { data: company, error } = await supabase
     .from("companies")
     .select("id, login_id, password_hash, is_active")
@@ -95,6 +109,7 @@ export async function signInCompany(formData: FormData) {
   }
 
   await setCompanySessionId(company.id);
+  await mintAndSetAuthToken({ role: "company", company_id: company.id });
   redirect("/com");
 }
 
@@ -104,5 +119,6 @@ export async function signOut(formData: FormData) {
   await clearInfluencerSession();
   await clearStoreSession();
   await clearCompanySession();
+  await clearAuthToken();
   redirect(next);
 }

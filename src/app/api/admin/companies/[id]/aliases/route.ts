@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { isAdminSession } from "@/lib/session";
-import { getSupabaseEnv } from "@/lib/supabase/env";
+import { requireAdminManager } from "@/lib/access";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { normalizeCompanyKey } from "@/lib/company";
 
 const COMPANY_SELECT =
@@ -11,17 +10,12 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (!(await isAdminSession())) {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 401 });
-  }
+  const auth = await requireAdminManager();
+  if ("error" in auth) return auth.error;
+
   const { id } = await context.params;
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
 
   let body: { alias?: string };
   try {
@@ -35,7 +29,6 @@ export async function POST(
     return NextResponse.json({ error: "별칭을 입력하세요." }, { status: 400 });
   }
 
-  const supabase = createClient(url, key);
   const { data: current, error: fetchError } = await supabase
     .from("companies")
     .select("id, aliases")

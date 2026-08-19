@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { getInfluencerSessionId } from "@/lib/session";
-import { getSupabaseEnv } from "@/lib/supabase/env";
 
 /** creator_links.thumbnail_source_url → 302 리다이렉트 (본인 링크만) */
 export async function GET(
@@ -14,15 +13,9 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
 
-  const supabase = createClient(url, key);
   const { data, error } = await supabase
     .from("creator_links")
     .select("influencer_id, thumbnail_source_url, thumbnail_status")

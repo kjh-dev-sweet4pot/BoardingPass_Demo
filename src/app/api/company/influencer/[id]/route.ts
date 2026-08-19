@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { assertRowCompany } from "@/lib/access";
 import { getCompanySessionId } from "@/lib/session";
-import { getSupabaseEnv } from "@/lib/supabase/env";
 
 export async function GET(
   _request: Request,
@@ -13,15 +13,8 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
-
-  const supabase = createClient(url, key);
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
   const [
     { data: influencer, error: infError },
     { data: allocations, error: allocError },
@@ -52,6 +45,9 @@ export async function GET(
       { error: "해당 인플루언서의 자사 배정이 없습니다." },
       { status: 404 },
     );
+  }
+  if (!allocations.every((row) => assertRowCompany(row, companyId))) {
+    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   }
 
   const links = allocations.flatMap(

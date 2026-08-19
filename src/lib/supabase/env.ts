@@ -25,3 +25,11 @@ export function requireSupabaseEnv() {
   }
   return env;
 }
+
+export function getJwtSecret() {
+  return cleanEnv(process.env.SUPABASE_JWT_SECRET);
+}
+
+export function getServiceRoleKey() {
+  return cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
+}

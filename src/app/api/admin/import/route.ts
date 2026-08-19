@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { type SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
-import { isAdminSession } from "@/lib/session";
-import { getSupabaseEnv } from "@/lib/supabase/env";
+import { requireAdminManager } from "@/lib/access";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import {
   applyCompanyMatch,
   validateImportRow,
@@ -130,17 +130,11 @@ async function findOrCreateProduct(
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdminSession())) {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 401 });
-  }
+  const auth = await requireAdminManager();
+  if ("error" in auth) return auth.error;
 
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
+  const supabaseClient = await createApiClientIfConfigured();
+  if (!supabaseClient) return supabaseConfigError();
 
   let body: { rows?: ImportRowInput[] };
   try {
@@ -161,7 +155,7 @@ export async function POST(request: Request) {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase: AdminSupabase = createClient<any>(url, key);
+  const supabase: AdminSupabase = supabaseClient as AdminSupabase;
   const { data: companies } = await supabase
     .from("companies")
     .select("id, name, aliases, is_active");

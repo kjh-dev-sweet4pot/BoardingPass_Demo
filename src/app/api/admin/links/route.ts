@@ -1,20 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { isAdminSession } from "@/lib/session";
-import { getSupabaseEnv } from "@/lib/supabase/env";
+import { requireAnyAdmin } from "@/lib/access";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 
 export async function GET() {
-  if (!(await isAdminSession())) {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 401 });
-  }
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
-  const supabase = createClient(url, key);
+  const auth = await requireAnyAdmin();
+  if ("error" in auth) return auth.error;
+
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
+
   const { data, error } = await supabase
     .from("creator_links")
     .select(

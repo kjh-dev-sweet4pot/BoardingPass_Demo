@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { isAdminSession } from "@/lib/session";
-import { getSupabaseEnv } from "@/lib/supabase/env";
+import { requireAdminManager, requireAnyAdmin } from "@/lib/access";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { hashPassword } from "@/lib/password";
 import { normalizeLoginId } from "@/lib/company";
 
@@ -9,17 +8,12 @@ const COMPANY_SELECT =
   "id, name, login_id, aliases, contact, is_active, created_at, updated_at";
 
 export async function GET() {
-  if (!(await isAdminSession())) {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 401 });
-  }
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
-  const supabase = createClient(url, key);
+  const auth = await requireAnyAdmin();
+  if ("error" in auth) return auth.error;
+
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
+
   const { data, error } = await supabase
     .from("companies")
     .select(COMPANY_SELECT)
@@ -31,16 +25,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdminSession())) {
-    return NextResponse.json({ error: "권한이 없습니다." }, { status: 401 });
-  }
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
+  const auth = await requireAdminManager();
+  if ("error" in auth) return auth.error;
+
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
 
   let body: {
     name?: string;
@@ -73,7 +62,6 @@ export async function POST(request: Request) {
     ? body.aliases.map((a) => String(a).trim()).filter(Boolean)
     : [];
 
-  const supabase = createClient(url, key);
   const { data, error } = await supabase
     .from("companies")
     .insert({
