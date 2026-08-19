@@ -6,6 +6,7 @@ import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import { getCompanySessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { type AllocationWithRelations, type Company } from "@/lib/types";
 
 export default async function CompanyPage() {
@@ -21,7 +22,7 @@ export default async function CompanyPage() {
     );
   }
 
-  const supabase = await createClient();
+  const supabase = hasServiceRoleKey() ? createServiceClient() : await createClient();
   const [{ data: company, error: companyError }, { data: allocations, error: allocError }] =
     await Promise.all([
       supabase
@@ -41,7 +42,7 @@ export default async function CompanyPage() {
         .order("created_at", { ascending: false }),
     ]);
 
-  if (companyError || allocError || !company || !company.is_active) {
+  if (companyError || !company || !company.is_active) {
     redirect("/com/login");
   }
 
