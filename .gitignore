@@ -46,3 +46,6 @@ supabase/
 
 # cursor
 /.cursor/
+
+#docs
+/docs/
