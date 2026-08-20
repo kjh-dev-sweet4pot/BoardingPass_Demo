@@ -213,7 +213,10 @@ export function CompanyConsole({
   const [liveAllocations, setLiveAllocations] =
     useState<AllocationWithRelations[]>(initialAllocations);
   const [allocsLoading, setAllocsLoading] = useState(false);
-  const allocsFetchedRef = useRef(false);
+  /** 성공 로드된 company.id — fetch 시작 전에 올리면 Strict Mode cleanup에 막힘 */
+  const loadedCompanyIdRef = useRef<string | null>(
+    initialAllocations.length > 0 ? company.id : null,
+  );
   const [period, setPeriod] = useState<"month" | "all">("all");
   const [searchQ, setSearchQ] = useState("");
   const [storeId, setStoreId] = useState("");
@@ -239,17 +242,18 @@ export function CompanyConsole({
   useEffect(() => {
     if (isDemo) return;
     if (view !== "publish" && view !== "alloc") return;
-    if (allocsFetchedRef.current) return;
-    allocsFetchedRef.current = true;
+    if (loadedCompanyIdRef.current === company.id) return;
+
     let cancelled = false;
     setAllocsLoading(true);
     void (async () => {
       try {
         const res = await fetch("/api/company/allocations");
         const json = await res.json();
-        if (!cancelled && Array.isArray(json.allocations)) {
-          setLiveAllocations(json.allocations);
-        }
+        if (cancelled) return;
+        if (!res.ok || !Array.isArray(json.allocations)) return;
+        setLiveAllocations(json.allocations);
+        loadedCompanyIdRef.current = company.id;
       } finally {
         if (!cancelled) setAllocsLoading(false);
       }
