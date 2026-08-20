@@ -116,17 +116,7 @@ export function AdminDashboard({ companies }: { companies: Company[] }) {
   const hasMargin = budget && "margin" in budget;
 
   return (
-    <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
-      <div className="px-5 py-4 border-b border-[var(--line)]">
-        <h2
-          className="text-lg text-[var(--ink)]"
-          style={{ fontFamily: "var(--font-display), serif" }}
-        >
-          대시보드
-        </h2>
-      </div>
-
-      <div className="px-5 py-4 space-y-5">
+    <div className="space-y-5">
         {/* 처리 대기 큐 */}
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
@@ -227,7 +217,6 @@ export function AdminDashboard({ companies }: { companies: Company[] }) {
             </div>
           </div>
         )}
-      </div>
-    </section>
+    </div>
   );
 }

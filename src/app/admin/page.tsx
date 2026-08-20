@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
 import { AdminConsoleLayout } from "@/components/admin-console-layout";
-import { AppShell, secondaryBtnClass } from "@/components/ui";
+import { AppShell } from "@/components/ui";
 import { isAdminSession, getAdminRole } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { type AllocationWithRelations, type Company, type Product, type Store } from "@/lib/types";
@@ -45,21 +45,7 @@ export default async function AdminPage({
   const productList = (products as Product[]) || [];
 
   return (
-    <AppShell
-      full
-      compactHeader
-      theme="owm"
-      eyebrow="Admin"
-      title="운영 콘솔"
-      actions={
-        <form action={signOut}>
-          <input type="hidden" name="next" value="/" />
-          <button className={secondaryBtnClass} type="submit">
-            로그아웃
-          </button>
-        </form>
-      }
-    >
+    <AppShell full fitViewport theme="owm" hideHeader>
       <AdminConsoleLayout
         storeList={storeList}
         companyList={companyList}
@@ -68,6 +54,17 @@ export default async function AdminPage({
         isManager={adminRole === "admin_manager"}
         error={params.error || error?.message}
         message={params.message}
+        sidebarActions={
+          <form action={signOut}>
+            <input type="hidden" name="next" value="/" />
+            <button
+              className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--muted)] transition hover:bg-[var(--surface-hover)]"
+              type="submit"
+            >
+              로그아웃
+            </button>
+          </form>
+        }
       />
     </AppShell>
   );
