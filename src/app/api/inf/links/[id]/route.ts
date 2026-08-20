@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { getInfluencerSessionId } from "@/lib/session";
-import { getSupabaseEnv } from "@/lib/supabase/env";
 
 export async function DELETE(
   _request: Request,
@@ -12,15 +11,9 @@ export async function DELETE(
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
   const { id } = await context.params;
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
 
-  const supabase = createClient(url, key);
   const { data: link, error: fetchError } = await supabase
     .from("creator_links")
     .select("id, influencer_id, status")

@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { PHAR_COUNTER_ROOT_ID } from "@/components/phar-header-actions";
+import { StateBadge } from "@/components/state-badge";
 import { AdminAllocationEditForm } from "@/components/admin-allocation-edit";
 import {
   ALLOCATION_LINK_LABEL_ADMIN,
@@ -566,11 +567,7 @@ function CounterDetailPanel({
               </span>
             ) : null}
           </p>
-          <span
-            className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${statusTone(item.status)}`}
-          >
-            {allocationStatusDisplayLabel(item)}
-          </span>
+          <StateBadge value={item.status} />
         </div>
         <p
           className={`text-base font-medium ${
@@ -685,11 +682,7 @@ function CounterDetailPanel({
                             {rd || "미정"} · {row.quantity}개
                           </p>
                         </div>
-                        <span
-                          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone(row.status)}`}
-                        >
-                          {ALLOCATION_STATUS_LABEL[row.status]}
-                        </span>
+                        <StateBadge value={row.status} />
                       </div>
                     </button>
                   </li>
@@ -724,18 +717,6 @@ function formatSnsUrl(url?: string | null) {
   return `https://${raw}`;
 }
 
-function statusTone(status: AllocationWithRelations["status"]) {
-  if (status === "picked_up") {
-    return "border-[#c4b79a] bg-[#efe8d8] text-[#5c4f35]";
-  }
-  if (status === "cancelled") {
-    return "border-[var(--line)] bg-[#e8ebe9] text-[var(--muted)]";
-  }
-  if (status === "visited" || status === "ready") {
-    return "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]";
-  }
-  return "border-[var(--line)] bg-white text-[var(--muted)]";
-}
 
 function matchesInfluencerSearch(item: AllocationWithRelations, q: string) {
   if (!q) return true;
@@ -925,11 +906,7 @@ function AllocationDetailRows({
           {item.visit_date || "—"}
         </td>
         <td className="px-3 py-2.5">
-          <span
-            className={`inline-block border px-2 py-0.5 text-xs font-medium ${statusTone(item.status)}`}
-          >
-            {allocationStatusDisplayLabel(item)}
-          </span>
+          <StateBadge value={item.status} />
         </td>
         <td className="px-3 py-2.5 text-xs text-[var(--muted)]">
           {item.picked_up_at ? formatKst(item.picked_up_at) : "—"}
@@ -1088,15 +1065,7 @@ function AllocationRow({
         </span>
       </td>
       <td className={cell}>
-        <span
-          className={`inline-block border font-medium ${statusTone(item.status)} ${
-            counter
-              ? "px-3 py-1.5 text-sm"
-              : "px-2.5 py-1 text-xs"
-          }`}
-        >
-          {allocationStatusDisplayLabel(item)}
-        </span>
+        <StateBadge value={item.status} />
       </td>
       {showVisitSource ? (
         <td className={`${cell} text-xs text-[var(--muted)]`}>

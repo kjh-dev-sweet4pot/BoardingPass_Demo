@@ -29,6 +29,9 @@ export type CreatorLink = {
   url: string;
   platform: "instagram" | "tiktok" | "youtube" | "naver_blog" | "etc";
   status: CreatorLinkStatus;
+  content_status?: "제출" | "승인" | "발행완료" | "반려" | null;
+  publish_url?: string | null;
+  verification_failed?: boolean;
   memo: string | null;
   submitted_at: string;
   updated_at: string;
@@ -75,6 +78,9 @@ export type Allocation = {
   product_id: string;
   store_id: string;
   company_id: string | null;
+  campaign_id?: string | null;
+  target_content_count?: number | null;
+  rollup_status?: string | null;
   quantity: number;
   status: AllocationStatus;
   visit_code: string | null;

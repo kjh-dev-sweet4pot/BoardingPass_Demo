@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseEnv } from "@/lib/supabase/env";
-import { INF_COOKIE } from "@/lib/session";
+import {
+  AUTH_TOKEN_COOKIE,
+  INF_COOKIE,
+} from "@/lib/session";
+import { signSessionJwt } from "@/lib/supabase/jwt";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { normalizeHandle } from "@/lib/auth";
 import { applyInfluencerStoreVisit } from "@/lib/inf-visit";
 
@@ -97,7 +102,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const supabase = createClient(url, key);
+    const supabase = hasServiceRoleKey()
+      ? createServiceClient()
+      : createClient(url, key);
     const result = await findInfluencer(supabase, query);
 
     if (result.error) {
@@ -121,26 +128,38 @@ export async function POST(request: Request) {
     // 로그인 직후 방문 반영 (bootstrap 과 중복되어도 안전)
     await applyInfluencerStoreVisit(supabase, influencer.id);
 
-    if (!wantsJson) {
-      const origin = new URL(request.url).origin;
-      const response = NextResponse.redirect(new URL("/inf", origin), 303);
-      response.cookies.set(INF_COOKIE, influencer.id, {
+    const infId = influencer.id;
+    const authToken = signSessionJwt({
+      role: "influencer",
+      influencer_id: infId,
+    });
+
+    function applySessionCookies(response: NextResponse) {
+      response.cookies.set(INF_COOKIE, infId, {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
         maxAge: 60 * 60 * 12,
       });
+      if (authToken) {
+        response.cookies.set(AUTH_TOKEN_COOKIE, authToken, {
+          httpOnly: true,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 60 * 60 * 12,
+        });
+      }
       return response;
     }
 
-    const response = NextResponse.json({ influencer });
-    response.cookies.set(INF_COOKIE, influencer.id, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 12,
-    });
-    return response;
+    if (!wantsJson) {
+      const origin = new URL(request.url).origin;
+      return applySessionCookies(
+        NextResponse.redirect(new URL("/inf", origin), 303),
+      );
+    }
+
+    return applySessionCookies(NextResponse.json({ influencer }));
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "본인확인 중 오류가 발생했습니다.";

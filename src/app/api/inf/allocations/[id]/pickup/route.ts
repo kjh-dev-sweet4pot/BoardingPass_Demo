@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { getInfluencerSessionId } from "@/lib/session";
-import { getSupabaseEnv } from "@/lib/supabase/env";
 
 export async function POST(
   _request: Request,
@@ -9,14 +8,6 @@ export async function POST(
 ) {
   const { id } = await context.params;
   const influencerId = await getInfluencerSessionId();
-  const { url, key, configured } = getSupabaseEnv();
-
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
 
   if (!influencerId) {
     return NextResponse.json(
@@ -29,7 +20,8 @@ export async function POST(
     return NextResponse.json({ error: "배정 ID가 필요합니다." }, { status: 400 });
   }
 
-  const supabase = createClient(url, key);
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
 
   const { data: existing, error: fetchError } = await supabase
     .from("allocations")

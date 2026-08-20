@@ -3,13 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { isAdminSession } from "@/lib/session";
+import { isAdminManagerSession } from "@/lib/session";
 import { normalizeHandle } from "@/lib/auth";
 import { normalizeVisitDate, parseProductAndQty } from "@/lib/csv-import";
 import { findDuplicateAllocation } from "@/lib/alloc-dup";
 
-async function ensureAdmin() {
-  if (!(await isAdminSession())) redirect("/admin/login");
+async function ensureAdminManager() {
+  if (!(await isAdminManagerSession())) redirect("/admin/login");
 }
 
 function fail(message: string): never {
@@ -17,7 +17,7 @@ function fail(message: string): never {
 }
 
 export async function createManualAllocation(formData: FormData) {
-  await ensureAdmin();
+  await ensureAdminManager();
   const supabase = await createClient();
 
   const name = String(formData.get("name") || "").trim();

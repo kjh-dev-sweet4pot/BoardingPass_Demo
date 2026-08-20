@@ -5,6 +5,7 @@ import { createManualAllocation } from "@/app/actions/admin";
 import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
 import { AdminLinkReview } from "@/components/admin-link-review";
+import { AdminDashboard } from "@/components/admin-dashboard";
 import { AdminStoreOverview } from "@/components/admin-store-overview";
 import { PharListWithModal } from "@/components/phar-list-with-modal";
 import {
@@ -48,6 +49,8 @@ export function AdminConsoleLayout({
 
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
         <aside className="flex flex-col gap-4">
+          <AdminDashboard companies={companyList} />
+
           <AdminStoreOverview
             storeList={storeList}
             list={list}

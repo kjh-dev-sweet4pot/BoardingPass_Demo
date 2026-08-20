@@ -1,16 +1,16 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import {
-  CompanyContentDashboard,
-  type ContentFocus,
-} from "@/components/company-content-dashboard";
+import { CompanyPerformanceTab } from "@/components/company-performance-tab";
+import type { ContentFocus } from "@/components/company-content-dashboard";
+import { DEMO_CAMPAIGNS_23YO, buildDemo23YoPerformance } from "@/lib/demo-23yo";
 import {
   CompanyBudgetGate,
   useBudgetGate,
 } from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
-import { CompanyPublishFeed } from "@/components/company-publish-feed";
+import { CompanyProgressTab } from "@/components/company-progress-tab";
+import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import {
   buildPublishDemoAllocations,
   buildPublishDemoInsights,
@@ -166,8 +166,14 @@ function AllocSortTh({
 
 export function CompanyConsole({
   company,
+  initialAllocations,
+  initialMonthInsights,
+  initialAllInsights,
 }: {
   company: Company;
+  initialAllocations: AllocationWithRelations[];
+  initialMonthInsights: ReturnType<typeof buildMockContentInsights>;
+  initialAllInsights: ReturnType<typeof buildMockContentInsights>;
 }) {
   const gate = useBudgetGate(company.id);
   const [view, setView] = useState<"alloc" | "content" | "pool" | "publish">(
@@ -190,8 +196,14 @@ export function CompanyConsole({
   const today = todayYmdKst();
   const monthKey = today.slice(0, 7);
 
-  // 발행(JP 시딩) 리스트 기준으로 배정·콘텐츠 표시
-  const items = useMemo(() => buildPublishDemoAllocations(), []);
+  const hasSeededAllocations = initialAllocations.length > 0;
+
+  // TS 시드가 있으면 DB 우선, 없으면 기존 JP 목업 유지
+  const items = useMemo(
+    () =>
+      hasSeededAllocations ? initialAllocations : buildPublishDemoAllocations(),
+    [hasSeededAllocations, initialAllocations],
+  );
 
   const scoped = useMemo(() => {
     return items.filter((item) => {
@@ -220,17 +232,25 @@ export function CompanyConsole({
     return { total, visited, picked, linked };
   }, [scoped]);
 
-  const insights = useMemo(
-    () => buildPublishDemoInsights(period),
-    [period],
-  );
+  const insights = useMemo(() => {
+    if (!hasSeededAllocations) return buildPublishDemoInsights(period);
+    return period === "month" ? initialMonthInsights : initialAllInsights;
+  }, [
+    hasSeededAllocations,
+    initialAllInsights,
+    initialMonthInsights,
+    period,
+  ]);
 
   const insightByAllocId = useMemo(() => {
     const map = new Map<
       string,
       { views: number; likes: number; comments: number }
     >();
-    for (const post of buildPublishDemoInsights("all").posts) {
+    const posts = hasSeededAllocations
+      ? initialAllInsights.posts
+      : buildPublishDemoInsights("all").posts;
+    for (const post of posts) {
       if (post.allocationId) {
         map.set(post.allocationId, {
           views: post.views,
@@ -240,7 +260,7 @@ export function CompanyConsole({
       }
     }
     return map;
-  }, []);
+  }, [hasSeededAllocations, initialAllInsights.posts]);
 
   function toggleAllocSort(key: AllocSortKey) {
     setAllocSort((prev) =>
@@ -391,15 +411,15 @@ export function CompanyConsole({
           <button
             type="button"
             role="tab"
-            aria-selected={view === "alloc"}
-            onClick={() => setView("alloc")}
+            aria-selected={view === "publish"}
+            onClick={() => setView("publish")}
             className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-              view === "alloc"
+              view === "publish"
                 ? "bg-[var(--accent)] !text-white"
                 : "text-[var(--muted)]"
             }`}
           >
-            배정 현황
+            진행 현황
           </button>
           <button
             type="button"
@@ -412,20 +432,20 @@ export function CompanyConsole({
                 : "text-[var(--muted)]"
             }`}
           >
-            콘텐츠
+            성과
           </button>
           <button
             type="button"
             role="tab"
-            aria-selected={view === "publish"}
-            onClick={() => setView("publish")}
+            aria-selected={view === "alloc"}
+            onClick={() => setView("alloc")}
             className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-              view === "publish"
+              view === "alloc"
                 ? "bg-[var(--accent)] !text-white"
                 : "text-[var(--muted)]"
             }`}
           >
-            발행
+            배정 현황
           </button>
         </div>
         {view !== "pool" && view !== "publish" ? (
@@ -483,15 +503,16 @@ export function CompanyConsole({
       </div>
 
       {view === "pool" ? (
-        <CompanyCreatorPool />
+        <CompanyCreatorPool companyId={company.id} />
       ) : view === "publish" ? (
-        <CompanyPublishFeed />
+        <CompanyProgressTab
+          companyId={company.id}
+          initialCampaigns={DEMO_CAMPAIGNS_23YO as any}
+        />
       ) : view === "content" ? (
-        <CompanyContentDashboard
-          snapshot={insights}
-          focus={contentFocus}
-          onFocus={setContentFocus}
-          onOpenAllocation={openAllocFromContent}
+        <CompanyPerformanceTab
+          companyId={company.id}
+          initialData={buildDemo23YoPerformance() as any}
         />
       ) : (
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.7fr)]">

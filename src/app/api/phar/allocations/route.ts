@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { getStoreSessionId, isAdminSession } from "@/lib/session";
-import { getSupabaseEnv } from "@/lib/supabase/env";
 
 export async function GET() {
   const isAdmin = await isAdminSession();
@@ -14,15 +13,8 @@ export async function GET() {
     );
   }
 
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
-
-  const supabase = createClient(url, key);
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
   let query = supabase
     .from("allocations")
     .select("*, products(*), stores(*), influencers(*)")

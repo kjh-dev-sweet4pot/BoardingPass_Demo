@@ -88,14 +88,26 @@ export function buildMockContentInsights(
           : [];
 
     for (const seed of seeds) {
-      const views = mockInt(`${seed.id}:views`, 2400, 186000);
-      const likes = Math.round(
-        views * (mockInt(`${seed.id}:er`, 18, 72) / 1000),
-      );
-      const comments = Math.max(
-        4,
-        Math.round(likes * (mockInt(`${seed.id}:cmt`, 4, 18) / 100)),
-      );
+      const liveLink =
+        seed.linkId != null
+          ? links.find((link) => link.id === seed.linkId) || null
+          : null;
+      const hasLiveMetrics =
+        typeof liveLink?.views === "number" &&
+        typeof liveLink?.likes === "number" &&
+        typeof liveLink?.comments === "number";
+      const views = hasLiveMetrics
+        ? Math.max(0, Number(liveLink?.views ?? 0))
+        : mockInt(`${seed.id}:views`, 2400, 186000);
+      const likes = hasLiveMetrics
+        ? Math.max(0, Number(liveLink?.likes ?? 0))
+        : Math.round(views * (mockInt(`${seed.id}:er`, 18, 72) / 1000));
+      const comments = hasLiveMetrics
+        ? Math.max(0, Number(liveLink?.comments ?? 0))
+        : Math.max(
+            4,
+            Math.round(likes * (mockInt(`${seed.id}:cmt`, 4, 18) / 100)),
+          );
       posts.push({
         id: seed.id,
         url: seed.url,
@@ -114,11 +126,15 @@ export function buildMockContentInsights(
         likes,
         comments,
         postedAt: seed.postedAt,
-        collectedAt: new Date().toISOString(),
-        source: "mock",
+        collectedAt: liveLink?.metrics_collected_at || new Date().toISOString(),
+        source: hasLiveMetrics ? "apify" : "mock",
       });
     }
   }
 
-  return aggregateContentInsights(posts, period, "mock");
+  return aggregateContentInsights(
+    posts,
+    period,
+    posts.some((post) => post.source === "apify") ? "apify" : "mock",
+  );
 }

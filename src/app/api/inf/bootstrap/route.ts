@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { getSupabaseEnv } from "@/lib/supabase/env";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { getInfluencerSessionId } from "@/lib/session";
 import { applyInfluencerStoreVisit } from "@/lib/inf-visit";
 
@@ -14,8 +13,8 @@ export async function POST() {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) {
     return NextResponse.json(
       { error: "Supabase 환경변수가 설정되지 않았습니다." },
       { status: 500 },
@@ -23,8 +22,6 @@ export async function POST() {
   }
 
   try {
-    const supabase = createClient(url, key);
-
     await applyInfluencerStoreVisit(supabase, influencerId);
 
     const [infResult, allocResult] = await Promise.all([

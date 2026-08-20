@@ -5,6 +5,7 @@ import { Notice, fieldClass, primaryBtnClass } from "@/components/ui";
 import { getStoreSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { type Store } from "@/lib/types";
 
 const inputClass = `${fieldClass} h-auto w-full rounded-2xl border-[#E8D5BE] px-5 py-4 text-sm text-[#3D1F0A] placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10`;
@@ -27,7 +28,7 @@ export default async function PharLoginPage({
     );
   }
 
-  const supabase = await createClient();
+  const supabase = hasServiceRoleKey() ? createServiceClient() : await createClient();
   const { data: stores, error } = await supabase
     .from("stores")
     .select("id, name")

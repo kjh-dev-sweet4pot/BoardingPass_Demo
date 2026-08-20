@@ -1,9 +1,20 @@
 import { cookies } from "next/headers";
+import {
+  type AppAuthClaims,
+  signSessionJwt,
+} from "@/lib/supabase/jwt";
 
 export const INF_COOKIE = "bp_influencer_id";
 export const ADMIN_COOKIE = "bp_admin";
+export const ADMIN_ROLE_COOKIE = "bp_admin_role";
 export const STORE_COOKIE = "bp_store_id";
 export const COMPANY_COOKIE = "bp_company_id";
+export const AUTH_TOKEN_COOKIE = "bp_auth_token";
+
+export type AdminRole = "admin_manager" | "admin_operator";
+
+const SESSION_MAX_AGE = 60 * 60 * 12;
+const ADMIN_MAX_AGE = 60 * 60 * 24;
 
 export async function getInfluencerSessionId() {
   const jar = await cookies();
@@ -16,7 +27,7 @@ export async function setInfluencerSessionId(id: string) {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 12,
+    maxAge: SESSION_MAX_AGE,
   });
 }
 
@@ -30,19 +41,38 @@ export async function isAdminSession() {
   return jar.get(ADMIN_COOKIE)?.value === "1";
 }
 
-export async function setAdminSession() {
+export async function getAdminRole(): Promise<AdminRole | null> {
+  if (!(await isAdminSession())) return null;
+  const jar = await cookies();
+  const role = jar.get(ADMIN_ROLE_COOKIE)?.value;
+  if (role === "admin_operator") return "admin_operator";
+  return "admin_manager";
+}
+
+export async function isAdminManagerSession() {
+  return (await getAdminRole()) === "admin_manager";
+}
+
+export async function setAdminSession(role: AdminRole = "admin_manager") {
   const jar = await cookies();
   jar.set(ADMIN_COOKIE, "1", {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24,
+    maxAge: ADMIN_MAX_AGE,
+  });
+  jar.set(ADMIN_ROLE_COOKIE, role, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: ADMIN_MAX_AGE,
   });
 }
 
 export async function clearAdminSession() {
   const jar = await cookies();
   jar.delete(ADMIN_COOKIE);
+  jar.delete(ADMIN_ROLE_COOKIE);
 }
 
 export async function getStoreSessionId() {
@@ -56,7 +86,7 @@ export async function setStoreSessionId(storeId: string) {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 12,
+    maxAge: SESSION_MAX_AGE,
   });
 }
 
@@ -76,7 +106,7 @@ export async function setCompanySessionId(companyId: string) {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 12,
+    maxAge: SESSION_MAX_AGE,
   });
 }
 
@@ -85,14 +115,56 @@ export async function clearCompanySession() {
   jar.delete(COMPANY_COOKIE);
 }
 
+export async function setAuthToken(token: string) {
+  const jar = await cookies();
+  jar.set(AUTH_TOKEN_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_MAX_AGE,
+  });
+}
+
+export async function clearAuthToken() {
+  const jar = await cookies();
+  jar.delete(AUTH_TOKEN_COOKIE);
+}
+
+export async function mintAndSetAuthToken(claims: AppAuthClaims) {
+  const token = signSessionJwt(claims);
+  if (token) await setAuthToken(token);
+}
+
 /** Plain username/password — no email. Case-insensitive username. */
 export const ADMIN_USERNAME = "manager01";
 export const ADMIN_PASSWORD = "slamglobal260801";
+export const OPERATOR_USERNAME = "operator01";
+export const OPERATOR_PASSWORD = "slamglobal260802";
 
-export function isValidAdminCredentials(username: string, password: string) {
+export function isValidAdminManagerCredentials(
+  username: string,
+  password: string,
+) {
   return (
     username.trim().toLowerCase() === ADMIN_USERNAME.toLowerCase() &&
     password === ADMIN_PASSWORD
+  );
+}
+
+export function isValidAdminOperatorCredentials(
+  username: string,
+  password: string,
+) {
+  return (
+    username.trim().toLowerCase() === OPERATOR_USERNAME.toLowerCase() &&
+    password === OPERATOR_PASSWORD
+  );
+}
+
+export function isValidAdminCredentials(username: string, password: string) {
+  return (
+    isValidAdminManagerCredentials(username, password) ||
+    isValidAdminOperatorCredentials(username, password)
   );
 }
 

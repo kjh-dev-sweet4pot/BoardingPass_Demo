@@ -1,12 +1,11 @@
 import { NextResponse, after } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import {
   CREATOR_LINK_PUBLIC_COLUMNS,
   collectInstagramLinkThumbnail,
   collectTikTokLinkThumbnail,
 } from "@/lib/collect-link-thumbnail";
 import { getInfluencerSessionId } from "@/lib/session";
-import { getSupabaseEnv } from "@/lib/supabase/env";
+import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { detectPlatform, validateCreatorUrl } from "@/lib/creator-link";
 
 const LINKS_ON_ALLOCATION = `creator_links(${CREATOR_LINK_PUBLIC_COLUMNS})`;
@@ -16,15 +15,8 @@ export async function GET() {
   if (!influencerId) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
-
-  const supabase = createClient(url, key);
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
   const { data: allocations, error } = await supabase
     .from("allocations")
     .select(
@@ -45,13 +37,8 @@ export async function POST(request: Request) {
   if (!influencerId) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
-  const { url, key, configured } = getSupabaseEnv();
-  if (!configured) {
-    return NextResponse.json(
-      { error: "Supabase 환경변수가 없습니다." },
-      { status: 500 },
-    );
-  }
+  const supabase = await createApiClientIfConfigured();
+  if (!supabase) return supabaseConfigError();
 
   let body: { allocation_id?: string; url?: string };
   try {
@@ -70,7 +57,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "배정이 필요합니다." }, { status: 400 });
   }
 
-  const supabase = createClient(url, key);
   const { data: allocation, error: allocError } = await supabase
     .from("allocations")
     .select("id, influencer_id, status")

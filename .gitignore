@@ -46,3 +46,16 @@ supabase/
 
 # cursor
 /.cursor/
+
+#docs
+/docs/
+
+#env files
+.env.local
+
+# 로컬 개발용 시드·목업 스크립트 (저장소에 포함하지 않음)
+/scripts/mock/
+/scripts/sql/
+
+#sql files
+/scripts/sql/
