@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { CompanyPerformanceTab } from "@/components/company-performance-tab";
 import {
   CompanyConsoleShell,
@@ -209,6 +209,11 @@ export function CompanyConsole({
   const [view, setView] = useState<"alloc" | "content" | "pool" | "publish">(
     isDemo ? "pool" : "publish",
   );
+  // live: 배정은 진행현황·배정 탭 진입 시 지연 로드
+  const [liveAllocations, setLiveAllocations] =
+    useState<AllocationWithRelations[]>(initialAllocations);
+  const [allocsLoading, setAllocsLoading] = useState(false);
+  const allocsFetchedRef = useRef(false);
   const [period, setPeriod] = useState<"month" | "all">("all");
   const [searchQ, setSearchQ] = useState("");
   const [storeId, setStoreId] = useState("");
@@ -231,14 +236,37 @@ export function CompanyConsole({
   const today = todayYmdKst();
   const monthKey = today.slice(0, 7);
 
+  useEffect(() => {
+    if (isDemo) return;
+    if (view !== "publish" && view !== "alloc") return;
+    if (allocsFetchedRef.current) return;
+    allocsFetchedRef.current = true;
+    let cancelled = false;
+    setAllocsLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch("/api/company/allocations");
+        const json = await res.json();
+        if (!cancelled && Array.isArray(json.allocations)) {
+          setLiveAllocations(json.allocations);
+        }
+      } finally {
+        if (!cancelled) setAllocsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDemo, view, company.id]);
+
   const items = useMemo(
-    () => (isDemo ? buildPublishDemoAllocations() : initialAllocations),
-    [isDemo, initialAllocations],
+    () => (isDemo ? buildPublishDemoAllocations() : liveAllocations),
+    [isDemo, liveAllocations],
   );
 
   const progressItems = useMemo(
-    () => (isDemo ? buildProgressPoolAllocations() : initialAllocations),
-    [isDemo, initialAllocations],
+    () => (isDemo ? buildProgressPoolAllocations() : liveAllocations),
+    [isDemo, liveAllocations],
   );
 
   const scoped = useMemo(() => {
@@ -488,6 +516,7 @@ export function CompanyConsole({
           companyId={company.id}
           initialAllocations={progressItems}
           live={!isDemo}
+          loading={allocsLoading}
         />
       ) : view === "content" ? (
         <CompanyPerformanceTab
@@ -503,6 +532,10 @@ export function CompanyConsole({
           onPeriodChange={setPeriod}
           onMetaChange={setPerformanceMeta}
         />
+      ) : allocsLoading && !isDemo ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--muted)]">
+          배정 불러오는 중…
+        </div>
       ) : (
       <div className="grid min-h-0 flex-1 gap-3 overflow-auto px-[28px] py-[26px] lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.7fr)]">
         <div className="flex min-h-0 flex-col gap-3">

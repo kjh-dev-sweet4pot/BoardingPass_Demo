@@ -329,12 +329,10 @@ export function CompanyProgressTab({
   companyId: _companyId,
   initialAllocations = [],
   live = false,
-  loading = false,
 }: {
   companyId: string;
   initialAllocations?: AllocationWithRelations[];
   live?: boolean;
-  loading?: boolean;
 }) {
   const [productFilter, setProductFilter] = useState("");
   const [selected, setSelected] = useState<ProgressKanbanCard | null>(null);
@@ -427,11 +425,7 @@ export function CompanyProgressTab({
         </div>
       </div>
 
-      {loading && cards.length === 0 ? (
-        <p className="py-16 text-center text-sm text-[var(--muted)]">
-          배정 불러오는 중…
-        </p>
-      ) : cards.length === 0 ? (
+      {cards.length === 0 ? (
         <EmptyState
           title="진행 중인 배정이 없습니다"
           message="운영팀이 배정을 생성하면 여기에 표시됩니다."
