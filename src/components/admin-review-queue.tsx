@@ -10,6 +10,7 @@ type QueueItem = {
   id: string;
   url?: string | null;
   platform?: string | null;
+  content_status?: string | null;
   submitted_at: string | null;
   submitted_file_path: string | null;
   thumbnail_source_url?: string | null;
@@ -128,19 +129,33 @@ function Preview({
   );
 }
 
-export function AdminReviewQueue() {
+const QUEUE_COPY = {
+  reviewPending: { title: "검수 대기", list: "제출 대기" },
+  verifyFailed: { title: "검증 실패", list: "검증 실패" },
+  collectFailed: { title: "수집 연속 실패", list: "수집 실패" },
+  publishStale: { title: "발행 미이행", list: "발행 미이행" },
+} as const;
+
+export function AdminReviewQueue({
+  queue = "reviewPending",
+}: {
+  queue?: keyof typeof QUEUE_COPY;
+}) {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [index, setIndex] = useState(0);
   const [memo, setMemo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [collectMsg, setCollectMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/review-queue", { cache: "no-store" });
+      const res = await fetch(`/api/admin/review-queue?queue=${queue}`, {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "검수 큐 조회 실패");
       setItems(json.items ?? []);
@@ -151,7 +166,37 @@ export function AdminReviewQueue() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queue]);
+
+  async function manualCollect(linkId: string) {
+    setBusy(true);
+    setError(null);
+    setCollectMsg(null);
+    try {
+      const res = await fetch(`/api/admin/links/${linkId}/refresh-metrics`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "수집 실패");
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === linkId ? { ...item, verification_failed: false } : item,
+        ),
+      );
+      const m = json.metrics as {
+        views?: number;
+        likes?: number;
+        comments?: number;
+        collected_at?: string;
+      };
+      const when = m.collected_at ? fmtDt(m.collected_at) : "—";
+      setCollectMsg(`수집 완료 (${when})`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "수집 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -202,7 +247,7 @@ export function AdminReviewQueue() {
           className="text-lg text-[var(--ink)]"
           style={{ fontFamily: "var(--font-display), serif" }}
         >
-          검수 큐
+          {QUEUE_COPY[queue].title}
         </h2>
         <p className="mt-4 text-sm text-[var(--muted)]">처리 대기 없음</p>
       </section>
@@ -213,7 +258,9 @@ export function AdminReviewQueue() {
     <div className="grid min-h-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
         <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
-          <h2 className="text-sm font-semibold">제출 대기 {items.length}건</h2>
+          <h2 className="text-sm font-semibold">
+            {QUEUE_COPY[queue].list} {items.length}건
+          </h2>
           <button type="button" className="text-xs text-[var(--accent)]" onClick={() => void load()}>
             새로고침
           </button>
@@ -227,6 +274,7 @@ export function AdminReviewQueue() {
                   setIndex(i);
                   setMemo("");
                   setError(null);
+                  setCollectMsg(null);
                 }}
                 className={`w-full border-b border-[var(--line)] px-4 py-3 text-left text-sm ${
                   i === index ? "bg-[var(--surface-hover)]" : ""
@@ -282,7 +330,20 @@ export function AdminReviewQueue() {
           </dl>
 
           {current.verification_failed ? (
-            <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">검증실패</p>
+            <div className="space-y-2 rounded-xl bg-red-50 px-3 py-2">
+              <p className="text-sm text-red-700">검증실패 플래그 (이전 기록)</p>
+              <button
+                type="button"
+                className={secondaryBtnClass}
+                disabled={busy}
+                onClick={() => void manualCollect(current.id)}
+              >
+                {busy ? "수집 중…" : "수동 수집"}
+              </button>
+              {collectMsg ? (
+                <p className="text-xs text-[var(--muted)]">{collectMsg}</p>
+              ) : null}
+            </div>
           ) : null}
 
           <div>
@@ -318,6 +379,7 @@ export function AdminReviewQueue() {
             )}
           </div>
 
+          {current.content_status === "제출" ? (
           <div className="mt-auto grid gap-3 border-t border-[var(--line)] pt-4">
             <textarea
               className="min-h-[72px] rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
@@ -344,6 +406,7 @@ export function AdminReviewQueue() {
               </button>
             </div>
           </div>
+          ) : null}
         </section>
       ) : null}
     </div>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { requireAdminManager } from "@/lib/access";
-import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAdminDbClient } from "@/lib/supabase/api-client";
 import {
   applyCompanyMatch,
   validateImportRow,
@@ -10,6 +10,15 @@ import {
   type ParsedImportRow,
 } from "@/lib/csv-import";
 import { findDuplicateAllocation } from "@/lib/alloc-dup";
+import {
+  scheduleInfluencerProfileFetch,
+} from "@/lib/influencer-profile-image";
+import {
+  isImportLogTableMissing,
+  updateBatchInfluencerProfileStatus,
+  type ImportProfileFetchStatus,
+} from "@/lib/import-batch-log";
+import { getAdminRole } from "@/lib/session";
 
 type ImportResult = {
   rowNumber: number;
@@ -22,17 +31,26 @@ type ImportResult = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AdminSupabase = SupabaseClient<any>;
 
+type InfluencerUpsert = {
+  id: string;
+  isNew: boolean;
+  needsProfile: boolean;
+  name: string;
+  handle: string;
+  snsUrl: string;
+};
+
 async function findOrCreateInfluencer(
   supabase: AdminSupabase,
   row: ParsedImportRow,
-  cache: Map<string, string>,
-) {
+  cache: Map<string, InfluencerUpsert>,
+): Promise<InfluencerUpsert> {
   const cached = cache.get(row.snsid);
   if (cached) return cached;
 
   const { data: existing } = await supabase
     .from("influencers")
-    .select("id, sns_url")
+    .select("id, sns_url, profile_image_path, name, instagram_handle")
     .eq("instagram_handle_normalized", row.snsid)
     .maybeSingle();
 
@@ -46,8 +64,16 @@ async function findOrCreateInfluencer(
         })
         .eq("id", existing.id);
     }
-    cache.set(row.snsid, existing.id);
-    return existing.id as string;
+    const ref: InfluencerUpsert = {
+      id: existing.id as string,
+      isNew: false,
+      needsProfile: !existing.profile_image_path,
+      name: row.name || existing.name || row.snsid,
+      handle: row.snsid,
+      snsUrl: row.snsurl || existing.sns_url || "",
+    };
+    cache.set(row.snsid, ref);
+    return ref;
   }
 
   const { data: created, error } = await supabase
@@ -61,8 +87,16 @@ async function findOrCreateInfluencer(
     .single();
 
   if (error || !created) throw new Error(error?.message || "인플루언서 생성 실패");
-  cache.set(row.snsid, created.id);
-  return created.id as string;
+  const ref: InfluencerUpsert = {
+    id: created.id as string,
+    isNew: true,
+    needsProfile: true,
+    name: row.name || row.snsid,
+    handle: row.snsid,
+    snsUrl: row.snsurl || "",
+  };
+  cache.set(row.snsid, ref);
+  return ref;
 }
 
 async function findOrCreateStore(
@@ -133,8 +167,9 @@ export async function POST(request: Request) {
   const auth = await requireAdminManager();
   if ("error" in auth) return auth.error;
 
-  const supabaseClient = await createAuthedDbClient();
-  if (!supabaseClient) return supabaseConfigError();
+  const db = await createAdminDbClient();
+  if ("error" in db) return db.error;
+  const supabaseClient = db.supabase;
 
   let body: { rows?: ImportRowInput[] };
   try {
@@ -174,7 +209,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const influencerCache = new Map<string, string>();
+  const influencerCache = new Map<string, InfluencerUpsert>();
   const storeCache = new Map<string, string>();
   const productCache = new Map<string, string>();
   const results: ImportResult[] = [];
@@ -182,6 +217,73 @@ export async function POST(request: Request) {
   let created = 0;
   let skipped = 0;
   let failed = 0;
+
+  const adminRole = await getAdminRole();
+  let batchId: string | null = null;
+  const batchInfluencerIds = new Map<string, string>();
+
+  const { data: batchRow, error: batchErr } = await supabase
+    .from("import_batches")
+    .insert({
+      uploaded_by: adminRole,
+      row_total: parsed.length,
+    })
+    .select("id")
+    .single();
+
+  if (batchErr) {
+    if (!isImportLogTableMissing(batchErr)) {
+      return NextResponse.json({ error: batchErr.message }, { status: 500 });
+    }
+  } else if (batchRow?.id) {
+    batchId = batchRow.id as string;
+  }
+
+  async function trackInfluencer(influencer: InfluencerUpsert) {
+    if (!batchId || batchInfluencerIds.has(influencer.id)) return;
+
+    let initialStatus: ImportProfileFetchStatus = "pending";
+    if (!influencer.needsProfile) initialStatus = "skipped";
+    else if (!process.env.APIFY_TOKEN?.trim()) {
+      initialStatus = "failed";
+    }
+
+    const { data: item, error } = await supabase
+      .from("import_batch_influencers")
+      .insert({
+        batch_id: batchId,
+        influencer_id: influencer.id,
+        name: influencer.name,
+        instagram_handle: influencer.handle,
+        is_new: influencer.isNew,
+        profile_fetch_status: initialStatus,
+        profile_fetch_error:
+          initialStatus === "failed" && !process.env.APIFY_TOKEN?.trim()
+            ? "APIFY_TOKEN 없음"
+            : null,
+      })
+      .select("id")
+      .single();
+
+    if (error || !item?.id) return;
+    batchInfluencerIds.set(influencer.id, item.id as string);
+
+    if (influencer.needsProfile && process.env.APIFY_TOKEN?.trim()) {
+      scheduleInfluencerProfileFetch(
+        supabase,
+        influencer.id,
+        { handle: influencer.handle, snsUrl: influencer.snsUrl },
+        (result) => {
+          void updateBatchInfluencerProfileStatus(
+            supabase,
+            item.id as string,
+            result.ok ? "ok" : "failed",
+            result.error,
+          );
+        },
+      );
+    }
+  }
 
   for (const row of parsed) {
     if (!row.ok) {
@@ -195,11 +297,13 @@ export async function POST(request: Request) {
     }
 
     try {
-      const influencerId = await findOrCreateInfluencer(
+      const influencer = await findOrCreateInfluencer(
         supabase,
         row,
         influencerCache,
       );
+      await trackInfluencer(influencer);
+
       const storeId = await findOrCreateStore(supabase, row.store, storeCache);
       const productId = await findOrCreateProduct(
         supabase,
@@ -212,7 +316,7 @@ export async function POST(request: Request) {
       }
 
       const dupId = await findDuplicateAllocation(supabase, {
-        influencerId,
+        influencerId: influencer.id,
         productId,
         storeId,
         visitDate: row.visit_date,
@@ -230,7 +334,7 @@ export async function POST(request: Request) {
       }
 
       const { error } = await supabase.from("allocations").insert({
-        influencer_id: influencerId,
+        influencer_id: influencer.id,
         product_id: productId,
         store_id: storeId,
         company_id: row.company_id,
@@ -257,9 +361,22 @@ export async function POST(request: Request) {
     }
   }
 
+  if (batchId) {
+    await supabase
+      .from("import_batches")
+      .update({
+        created_count: created,
+        skipped_count: skipped,
+        failed_count: failed,
+        row_total: parsed.length,
+      })
+      .eq("id", batchId);
+  }
+
   revalidatePath("/admin");
   revalidatePath("/com");
   return NextResponse.json({
+    batchId,
     summary: {
       total: parsed.length,
       created,

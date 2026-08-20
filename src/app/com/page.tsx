@@ -4,6 +4,7 @@ import { CompanyConsole } from "@/components/company-console";
 import { AppShell, Notice } from "@/components/ui";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import { isDemoCompany } from "@/lib/company";
+import { fetchInsights } from "@/app/api/com/insights/route";
 import { getCompanySessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -50,16 +51,16 @@ export default async function CompanyPage() {
   const initialAllocations = (allocations as AllocationWithRelations[]) || [];
   const liveCompany = company as Company;
   const fabricate = isDemoCompany(liveCompany);
-  const initialMonthInsights = buildMockContentInsights(
-    initialAllocations,
-    "month",
-    { fabricate },
-  );
-  const initialAllInsights = buildMockContentInsights(
-    initialAllocations,
-    "all",
-    { fabricate },
-  );
+  const initialMonthInsights = buildMockContentInsights(initialAllocations, "month", { fabricate });
+  const initialAllInsights = buildMockContentInsights(initialAllocations, "all", { fabricate });
+
+  // 실제 DB insights를 서버에서 미리 가져와 성과 탭에 전달 (클라이언트 fetch 불필요)
+  let initialPerformanceData = null as Awaited<ReturnType<typeof fetchInsights>> | null;
+  try {
+    initialPerformanceData = await fetchInsights(supabase, companyId);
+  } catch {
+    // 폴백: 클라이언트가 /api/com/insights 자동 요청
+  }
 
   return (
     <AppShell full fitViewport theme="owm" hideHeader>
@@ -68,6 +69,7 @@ export default async function CompanyPage() {
         initialAllocations={initialAllocations}
         initialMonthInsights={initialMonthInsights}
         initialAllInsights={initialAllInsights}
+        initialPerformanceData={initialPerformanceData}
         sidebarActions={
           <form action={signOut}>
             <input type="hidden" name="next" value="/com/login" />

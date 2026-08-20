@@ -70,7 +70,37 @@ function rollupStatus(item: AllocationWithRelations, links: CreatorLink[]): Kanb
   return "대기";
 }
 
-function toProgressLink(link: CreatorLink, influencerId: string): ProgressLink {
+function toProgressLink(
+  link: CreatorLink,
+  influencerId: string,
+  opts: { demoMetrics: boolean },
+): ProgressLink {
+  const { demoMetrics } = opts;
+
+  const normalized = (v: number | null | undefined): number | null => {
+    if (typeof v !== "number") return null;
+    if (!Number.isFinite(v)) return null;
+    // live 데이터에서 -1 같은 센티널 값이 섞일 수 있어 방어
+    if (v < 0) return null;
+    return v;
+  };
+
+  if (!demoMetrics) {
+    // ponytail: 진행현황은 live 수치가 있으면 그대로 표시
+    // - 폴백(creator-pool-mock) 없이 빈 값(null)으로 유지
+    return {
+      id: link.id,
+      status: link.content_status || link.status,
+      url: creatorLinkHref(link) || null,
+      hasFile: Boolean(link.submitted_file_path),
+      platform: CREATOR_PLATFORM_LABEL[link.platform] || link.platform,
+      submitted_at: link.submitted_at || null,
+      views: normalized(link.views),
+      likes: normalized(link.likes),
+      comments: normalized(link.comments),
+    };
+  }
+
   const creator = creators.get(influencerId);
   const polished = polishDemoMetrics({
     views: link.views ?? creator?.metrics.views,
@@ -79,6 +109,7 @@ function toProgressLink(link: CreatorLink, influencerId: string): ProgressLink {
     followers: creator?.followers,
     seed: link.id,
   });
+
   return {
     id: link.id,
     status: link.content_status || link.status,
@@ -105,7 +136,9 @@ function handleOf(item: AllocationWithRelations) {
 export function buildKanbanFromAllocations(
   items: AllocationWithRelations[],
   productFilter?: string,
+  opts?: { demoMetrics?: boolean },
 ): ProgressKanbanCard[] {
+  const demoMetrics = opts?.demoMetrics ?? false;
   const cards: ProgressKanbanCard[] = [];
 
   for (const item of items) {
@@ -114,7 +147,9 @@ export function buildKanbanFromAllocations(
     if (productFilter && productName !== productFilter) continue;
 
     const rawLinks = item.creator_links ?? [];
-    const links = rawLinks.map((l) => toProgressLink(l, item.influencer_id));
+    const links = rawLinks.map((l) =>
+      toProgressLink(l, item.influencer_id, { demoMetrics }),
+    );
     const publishedLinks = links.filter((_, i) => isPublishedLink(rawLinks[i]!));
     const submittedLinks = links.filter((_, i) => isSubmittedLink(rawLinks[i]!));
     const status = rollupStatus(item, rawLinks);

@@ -7,6 +7,8 @@
  * Docs: https://apify.com/clockworks/tiktok-scraper
  */
 
+import { apifyErrorMessage } from "@/lib/apify-errors";
+
 const ACTOR_ID = "GdWCkxBtKWOsKjdch";
 const APIFY_BASE = "https://api.apify.com/v2";
 
@@ -17,6 +19,10 @@ export interface TikTokScraperResult {
   coverUrl?: string;
   /** shouldDownloadCovers=true 시 Apify KV Store에 저장된 안정적인 URL 배열 */
   mediaUrls?: string[];
+  avatar?: string;
+  originalAvatarUrl?: string;
+  profileUrl?: string;
+  nickName?: string;
   videoMeta?: {
     coverUrl?: string;
     originalCoverUrl?: string;
@@ -26,7 +32,7 @@ export interface TikTokScraperResult {
   commentCount: number;
   shareCount: number;
   webVideoUrl: string;
-  authorMeta?: { name: string; id: string };
+  authorMeta?: { name: string; id: string; avatar?: string; originalAvatarUrl?: string };
 }
 
 /** 결과에서 가장 안정적인 썸네일 URL 추출 */
@@ -67,11 +73,50 @@ export async function scrapeTikTokPosts(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Apify error ${res.status}: ${text.slice(0, 200)}`);
+    throw new Error(await apifyErrorMessage(res.status, text));
   }
 
   const items = (await res.json()) as TikTokScraperResult[];
   return items;
+}
+
+/** @handle 또는 username → avatar URL (프로필 전용 — 동영상 0건 계정도 시도) */
+export async function scrapeTikTokProfile(
+  handle: string,
+  memoryMbytes = 1024,
+): Promise<string | null> {
+  const token = getApifyToken();
+  const username = handle.replace(/^@+/, "").trim();
+  if (!username) return null;
+
+  const res = await fetch(
+    `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profiles: [username],
+        resultsPerPage: 1,
+        shouldDownloadCovers: false,
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(await apifyErrorMessage(res.status, text));
+  }
+
+  const items = (await res.json()) as TikTokScraperResult[];
+  const item = items[0];
+  if (!item) return null;
+  return (
+    item.originalAvatarUrl ||
+    item.avatar ||
+    item.authorMeta?.originalAvatarUrl ||
+    item.authorMeta?.avatar ||
+    null
+  );
 }
 
 /** postURL 1개에 대응하는 결과를 찾아 반환. */

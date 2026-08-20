@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
 import { formatMetric } from "@/lib/content-insights";
+import { findPoolCreator, type PoolCreator } from "@/lib/creator-pool-mock";
 import type { ContentPeriod } from "@/lib/content-insights";
 import { addDaysYmd, formatMd, ymdKst } from "@/lib/types";
 
@@ -23,7 +25,7 @@ type LinkRow = {
       id: string;
       name: string;
       instagram_handle_normalized?: string;
-      followers?: number;
+      instagram_handle?: string;
     } | null;
     products: { id: string; name: string } | null;
   } | null;
@@ -74,6 +76,41 @@ function performanceMetaCopy(opts: {
   return [asOf, last, next].filter(Boolean).join(" · ");
 }
 
+function poolCreatorFromLink(row: LinkRow): PoolCreator {
+  const alloc = row.allocations;
+  const inf = alloc?.influencers;
+  const id = alloc?.influencer_id || inf?.id || row.id;
+  const raw =
+    inf?.instagram_handle_normalized ||
+    inf?.instagram_handle ||
+    inf?.name ||
+    "";
+  const bare = raw.replace(/^@+/, "").trim();
+  const handle = bare ? `@${bare}` : "—";
+  const fromPool = findPoolCreator({ id, handle, name: inf?.name || "—" });
+  if (fromPool) return fromPool;
+
+  const url = row.link_url || "";
+  const channel = /tiktok/i.test(url) ? ("tiktok" as const) : ("instagram" as const);
+  return {
+    id,
+    name: inf?.name || "—",
+    handle,
+    market: "jp",
+    channel,
+    profileUrl: null,
+    followers: 0,
+    priceKrw: 0,
+    overlap: null,
+    tier: "micro",
+    product: null,
+    posts: url ? [{ platform: channel, url }] : [],
+    uploadYmd: null,
+    metrics: { views: 0, likes: 0, comments: 0, saves: 0, shares: 0 },
+    category: null,
+  };
+}
+
 function platformLabel(url: string | null) {
   if (!url) return "기타";
   if (url.includes("tiktok")) return "TikTok";
@@ -120,6 +157,7 @@ function TopContentPanel({
                   <span className="w-5 shrink-0 text-[11px] font-semibold tabular-nums text-[var(--muted)]">
                     {idx + 1}
                   </span>
+                  <CreatorPhoto creator={poolCreatorFromLink(row)} size="thumb" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-[var(--ink)]">
                       {inf?.name || "—"}

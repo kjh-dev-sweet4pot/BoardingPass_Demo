@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   const snapshot = buildMockContentInsights(
     (data as AllocationWithRelations[]) || [],
     period,
-    { fabricate: isDemoCompany(company) },
+    { fabricate: isDemoCompany(company ?? {}) },
   );
   return NextResponse.json({ insights: snapshot });
 }

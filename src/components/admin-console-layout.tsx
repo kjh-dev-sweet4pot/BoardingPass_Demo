@@ -5,7 +5,7 @@ import { createManualAllocation } from "@/app/actions/admin";
 import { AdminCampaignCastingPanel } from "@/components/admin-campaign-casting-panel";
 import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
-import { AdminDashboard } from "@/components/admin-dashboard";
+import { AdminDashboard, type AdminQueueKey } from "@/components/admin-dashboard";
 import { AdminReviewQueue } from "@/components/admin-review-queue";
 import { AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
 import { AdminStoreOverview } from "@/components/admin-store-overview";
@@ -76,8 +76,22 @@ export function AdminConsoleLayout({
   sidebarActions?: ReactNode;
 }) {
   const [section, setSection] = useState<AdminSection>("dashboard");
+  const [reviewQueue, setReviewQueue] = useState<Exclude<AdminQueueKey, "castingStale">>(
+    "reviewPending",
+  );
+  const [castingStale, setCastingStale] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+
+  function openQueue(queue: AdminQueueKey) {
+    if (queue === "castingStale") {
+      setCastingStale(true);
+      setSection("campaigns");
+      return;
+    }
+    setReviewQueue(queue);
+    setSection("review");
+  }
 
   const filteredList = useMemo(() => {
     if (!selectedStoreId) return list;
@@ -93,7 +107,11 @@ export function AdminConsoleLayout({
   return (
     <AdminConsoleShell
       section={section}
-      onSectionChange={setSection}
+      onSectionChange={(next) => {
+        if (next !== "campaigns") setCastingStale(false);
+        if (next !== "review") setReviewQueue("reviewPending");
+        setSection(next);
+      }}
       sidebarActions={sidebarActions}
     >
       {error || message ? (
@@ -106,7 +124,7 @@ export function AdminConsoleLayout({
         <div className="min-h-0 flex-1 overflow-auto">
           <PageHeader section="dashboard" />
           <div className="space-y-6 px-4 pb-8 sm:px-7">
-            <AdminDashboard companies={companyList} />
+            <AdminDashboard companies={companyList} onOpenQueue={openQueue} />
             <div className="grid gap-4 lg:grid-cols-2">
               <AdminCompanyPanel companies={companyList} />
               <AdminImportPanel compact companies={companyList} />
@@ -124,6 +142,7 @@ export function AdminConsoleLayout({
               products={productList}
               stores={storeList}
               isManager={isManager}
+              staleCastings={castingStale}
             />
           </div>
         </div>
@@ -133,7 +152,7 @@ export function AdminConsoleLayout({
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PageHeader section="review" />
           <div className="min-h-0 flex-1 overflow-auto px-4 pb-8 sm:px-7">
-            <AdminReviewQueue />
+            <AdminReviewQueue queue={reviewQueue} />
           </div>
         </div>
       ) : null}

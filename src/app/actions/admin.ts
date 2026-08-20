@@ -7,6 +7,7 @@ import { isAdminManagerSession } from "@/lib/session";
 import { normalizeHandle } from "@/lib/auth";
 import { normalizeVisitDate, parseProductAndQty } from "@/lib/csv-import";
 import { findDuplicateAllocation } from "@/lib/alloc-dup";
+import { scheduleInfluencerProfileFetch } from "@/lib/influencer-profile-image";
 
 async function ensureAdminManager() {
   if (!(await isAdminManagerSession())) redirect("/admin/login");
@@ -83,6 +84,10 @@ export async function createManualAllocation(formData: FormData) {
       .single();
     if (error || !created) fail(error?.message || "인플루언서 생성 실패");
     influencerId = created.id;
+    scheduleInfluencerProfileFetch(supabase, influencerId, {
+      handle: snsid,
+      snsUrl: snsurl,
+    });
   }
 
   let storeId: string;
