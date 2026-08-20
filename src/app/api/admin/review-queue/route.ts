@@ -5,7 +5,7 @@ import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase
 const QUEUE_SELECT = `
   id, allocation_id, influencer_id, url, platform, status, content_status,
   publish_url, submitted_file_path, memo, submitted_at, updated_at,
-  verification_failed,
+  thumbnail_source_url, verification_failed,
   content_feedback ( id, body, created_at ),
   allocations (
     id, visit_date, rollup_status, campaign_id,

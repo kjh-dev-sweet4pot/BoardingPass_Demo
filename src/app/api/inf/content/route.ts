@@ -1,9 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { randomUUID } from "crypto";
 import {
   uploadContentFile,
   validateContentUpload,
 } from "@/lib/content-file-storage";
+import {
+  collectInstagramLinkThumbnail,
+  collectTikTokLinkThumbnail,
+} from "@/lib/collect-link-thumbnail";
+import { detectPlatform, validateCreatorUrl } from "@/lib/creator-link";
 import { getInfluencerSessionId } from "@/lib/session";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
@@ -13,7 +18,7 @@ async function getClient() {
   return createApiClientIfConfigured();
 }
 
-/** 콘텐츠 파일 업로드 → creator_links content_status `제출` */
+/** 콘텐츠 제출 → content_status `제출` (파일 및/또는 SNS URL) */
 export async function POST(request: Request) {
   const influencerId = await getInfluencerSessionId();
   if (!influencerId) {
@@ -31,17 +36,28 @@ export async function POST(request: Request) {
   }
 
   const allocationId = String(formData.get("allocation_id") || "").trim();
-  const file = formData.get("file");
+  const snsUrl = String(formData.get("url") || "").trim();
+  const fileRaw = formData.get("file");
+  const file = fileRaw instanceof File && fileRaw.size > 0 ? fileRaw : null;
+
   if (!allocationId) {
     return NextResponse.json({ error: "배정이 필요합니다." }, { status: 400 });
   }
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "파일을 선택하세요." }, { status: 400 });
+  if (!file && !snsUrl) {
+    return NextResponse.json(
+      { error: "파일 또는 SNS URL을 입력하세요." },
+      { status: 400 },
+    );
   }
 
-  const fileError = validateContentUpload(file);
-  if (fileError) {
-    return NextResponse.json({ error: fileError }, { status: 400 });
+  if (snsUrl) {
+    const urlError = validateCreatorUrl(snsUrl);
+    if (urlError) return NextResponse.json({ error: urlError }, { status: 400 });
+  }
+
+  if (file) {
+    const fileError = validateContentUpload(file);
+    if (fileError) return NextResponse.json({ error: fileError }, { status: 400 });
   }
 
   const { data: allocation, error: allocErr } = await supabase
@@ -65,9 +81,6 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (!allocation.company_id) {
-    return NextResponse.json({ error: "회원사 정보가 없습니다." }, { status: 400 });
-  }
 
   const { data: existing } = await supabase
     .from("creator_links")
@@ -83,46 +96,55 @@ export async function POST(request: Request) {
     );
   }
 
-  const fileId = randomUUID();
-  const bytes = Buffer.from(await file.arrayBuffer());
+  let objectPath: string | null = null;
+  let fileId: string = randomUUID();
 
-  let objectPath: string;
-  try {
+  if (file) {
+    if (!allocation.company_id) {
+      return NextResponse.json({ error: "회원사 정보가 없습니다." }, { status: 400 });
+    }
     if (!hasServiceRoleKey()) {
       return NextResponse.json(
         { error: "파일 업로드 설정(SERVICE_ROLE)이 필요합니다." },
         { status: 500 },
       );
     }
-    const uploaded = await uploadContentFile(createServiceClient(), {
-      companyId: allocation.company_id,
-      fileId,
-      filename: file.name || "content",
-      bytes,
-      contentType: file.type || "application/octet-stream",
-    });
-    objectPath = uploaded.path;
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "업로드 실패";
-    return NextResponse.json({ error: message }, { status: 500 });
+    try {
+      const uploaded = await uploadContentFile(createServiceClient(), {
+        companyId: allocation.company_id,
+        fileId,
+        filename: file.name || "content",
+        bytes: Buffer.from(await file.arrayBuffer()),
+        contentType: file.type || "application/octet-stream",
+      });
+      objectPath = uploaded.path;
+      fileId = uploaded.fileId;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "업로드 실패";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
   }
 
   const now = new Date().toISOString();
+  const url = snsUrl || `content://${fileId}`;
+  const platform = snsUrl ? detectPlatform(snsUrl) : "etc";
+
   const { data: created, error: insErr } = await supabase
     .from("creator_links")
     .insert({
       allocation_id: allocationId,
       influencer_id: influencerId,
-      url: `content://${fileId}`,
-      platform: "etc",
+      url,
+      platform,
       status: "submitted",
       content_status: "제출",
       submitted_file_path: objectPath,
+      thumbnail_status: snsUrl ? "pending" : undefined,
       submitted_at: now,
       updated_at: now,
     })
     .select(
-      "id, allocation_id, status, content_status, submitted_file_path, submitted_at",
+      "id, allocation_id, url, platform, status, content_status, submitted_file_path, submitted_at",
     )
     .single();
 
@@ -131,6 +153,17 @@ export async function POST(request: Request) {
       { error: insErr?.message || "제출 생성 실패" },
       { status: 500 },
     );
+  }
+
+  if (snsUrl && created.platform === "tiktok") {
+    after(async () => {
+      await collectTikTokLinkThumbnail(supabase, created.id, snsUrl);
+    });
+  }
+  if (snsUrl && created.platform === "instagram") {
+    after(async () => {
+      await collectInstagramLinkThumbnail(supabase, created.id, snsUrl);
+    });
   }
 
   return NextResponse.json({ link: created }, { status: 201 });

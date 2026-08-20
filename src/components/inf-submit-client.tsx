@@ -57,19 +57,36 @@ function InfSubmitClientInner({
   );
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [snsUrl, setSnsUrl] = useState("");
+  const [pickedName, setPickedName] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const pending = useMemo(() => items.filter(needsUpload), [items]);
   const submitted = useMemo(() => items.filter((i) => !needsUpload(i)), [items]);
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
-  async function upload(allocationId: string, file: File) {
+  function selectItem(id: string | null) {
+    setSelectedId(id);
+    setSnsUrl("");
+    setPickedName(null);
+    setError(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function submit(allocationId: string) {
+    const file = fileRef.current?.files?.[0] ?? null;
+    const url = snsUrl.trim();
+    if (!file && !url) {
+      setError(t.submitNeedFileOrUrl);
+      return;
+    }
     setUploadingId(allocationId);
     setError(null);
     try {
       const form = new FormData();
       form.set("allocation_id", allocationId);
-      form.set("file", file);
+      if (url) form.set("url", url);
+      if (file) form.set("file", file);
       const res = await fetch("/api/inf/content", { method: "POST", body: form });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -83,14 +100,13 @@ function InfSubmitClientInner({
             : row,
         ),
       );
-      setSelectedId(null);
+      selectItem(null);
     } catch (err) {
       setError(
         translateInfApiError(err instanceof Error ? err.message : "", t),
       );
     } finally {
       setUploadingId(null);
-      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
@@ -122,9 +138,9 @@ function InfSubmitClientInner({
             )}{" "}
             · {selected.stores?.name || t.storeFallback}
           </p>
-          <label className="mt-6 flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#d8c0ab] bg-[#faf7f2] px-4 py-8">
+          <label className="mt-6 flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#d8c0ab] bg-[#faf7f2] px-4 py-6">
             <span className="text-sm font-semibold text-[#6B3B1F]">
-              {t.submitFilePick}
+              {pickedName || t.submitFilePick}
             </span>
             <span className="mt-1 text-xs text-[#999]">{t.submitFileTypes}</span>
             <input
@@ -132,16 +148,22 @@ function InfSubmitClientInner({
               type="file"
               accept="image/*,video/*,application/pdf"
               className="sr-only"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void upload(selected.id, file);
-              }}
+              onChange={(e) => setPickedName(e.target.files?.[0]?.name || null)}
             />
           </label>
+          <p className="mt-4 text-xs font-semibold text-[#8a6a4a]">{t.submitUrlLabel}</p>
+          <input
+            className="mt-2 h-14 w-full rounded-2xl border border-[#e8e8e8] px-4 text-base"
+            type="url"
+            inputMode="url"
+            placeholder={t.submitUrlPlaceholder}
+            value={snsUrl}
+            onChange={(e) => setSnsUrl(e.target.value)}
+          />
           <button
             type="button"
             disabled={uploadingId === selected.id}
-            onClick={() => fileRef.current?.click()}
+            onClick={() => void submit(selected.id)}
             className="mt-4 w-full rounded-2xl bg-[#6B3B1F] py-4 text-base font-semibold text-white disabled:opacity-50"
           >
             {uploadingId === selected.id ? t.submitFileUploading : t.submitFileBtn}
@@ -149,7 +171,7 @@ function InfSubmitClientInner({
           <button
             type="button"
             className="mt-3 w-full rounded-2xl py-3 text-sm font-semibold text-[#999]"
-            onClick={() => setSelectedId(null)}
+            onClick={() => selectItem(null)}
           >
             {t.close}
           </button>
@@ -161,7 +183,7 @@ function InfSubmitClientInner({
             <button
               key={item.id}
               type="button"
-              onClick={() => setSelectedId(item.id)}
+              onClick={() => selectItem(item.id)}
               className="flex w-full items-center justify-between rounded-2xl border border-[#f0e6d8] bg-[#faf7f2] px-4 py-4 text-left"
             >
               <span>

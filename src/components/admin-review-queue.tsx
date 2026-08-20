@@ -8,8 +8,11 @@ type Feedback = { id: string; body: string; created_at: string };
 
 type QueueItem = {
   id: string;
+  url?: string | null;
+  platform?: string | null;
   submitted_at: string | null;
   submitted_file_path: string | null;
+  thumbnail_source_url?: string | null;
   verification_failed?: boolean;
   allocations?: {
     visit_date?: string | null;
@@ -45,9 +48,20 @@ function fileKind(path: string | null) {
   return "other";
 }
 
-function Preview({ linkId, path }: { linkId: string; path: string | null }) {
+function Preview({
+  linkId,
+  path,
+  snsUrl,
+  thumbUrl,
+}: {
+  linkId: string;
+  path: string | null;
+  snsUrl: string | null;
+  thumbUrl: string | null;
+}) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isHttpUrl = Boolean(snsUrl && /^https?:\/\//i.test(snsUrl));
 
   useEffect(() => {
     let cancelled = false;
@@ -68,43 +82,49 @@ function Preview({ linkId, path }: { linkId: string; path: string | null }) {
     };
   }, [linkId, path]);
 
-  if (!path) {
-    return (
-      <p className="rounded-2xl border border-[var(--line)] bg-[var(--surface-hover)] px-4 py-10 text-center text-sm text-[var(--muted)]">
-        제출 파일이 없습니다.
-      </p>
-    );
-  }
-  if (error) return <p className="text-sm text-[var(--danger)]">{error}</p>;
-  if (!src) {
-    return (
-      <p className="rounded-2xl border border-[var(--line)] px-4 py-10 text-center text-sm text-[var(--muted)]">
-        미리보기 준비 중…
-      </p>
-    );
-  }
-
-  const kind = fileKind(path);
-  if (kind === "image") {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={src} alt="제출 콘텐츠" className="max-h-[70vh] w-full rounded-2xl object-contain bg-black" />
-    );
-  }
-  if (kind === "video") {
-    return (
-      <video src={src} controls className="max-h-[70vh] w-full rounded-2xl bg-black" />
-    );
-  }
   return (
-    <a
-      href={src}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-block rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white"
-    >
-      제출 파일 열기 (단기 URL)
-    </a>
+    <div className="space-y-3">
+      {path ? (
+        error ? (
+          <p className="text-sm text-[var(--danger)]">{error}</p>
+        ) : !src ? (
+          <p className="rounded-2xl border border-[var(--line)] px-4 py-10 text-center text-sm text-[var(--muted)]">
+            미리보기 준비 중…
+          </p>
+        ) : fileKind(path) === "image" ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt="제출 콘텐츠" className="max-h-[70vh] w-full rounded-2xl object-contain bg-black" />
+        ) : fileKind(path) === "video" ? (
+          <video src={src} controls className="max-h-[70vh] w-full rounded-2xl bg-black" />
+        ) : (
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white"
+          >
+            제출 파일 열기 (단기 URL)
+          </a>
+        )
+      ) : thumbUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={thumbUrl} alt="SNS 미리보기" className="max-h-[70vh] w-full rounded-2xl object-contain bg-black" />
+      ) : !isHttpUrl ? (
+        <p className="rounded-2xl border border-[var(--line)] bg-[var(--surface-hover)] px-4 py-10 text-center text-sm text-[var(--muted)]">
+          제출 파일·URL이 없습니다.
+        </p>
+      ) : null}
+      {isHttpUrl ? (
+        <a
+          href={snsUrl!}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block break-all text-sm font-semibold text-[var(--accent)] underline"
+        >
+          {snsUrl}
+        </a>
+      ) : null}
+    </div>
   );
 }
 
@@ -228,7 +248,12 @@ export function AdminReviewQueue() {
         <section className="owm-panel flex min-w-0 flex-col gap-4 border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
           {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
 
-          <Preview linkId={current.id} path={current.submitted_file_path} />
+          <Preview
+            linkId={current.id}
+            path={current.submitted_file_path}
+            snsUrl={current.url ?? null}
+            thumbUrl={current.thumbnail_source_url ?? null}
+          />
 
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
             <div>
