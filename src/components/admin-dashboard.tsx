@@ -138,7 +138,7 @@ export function AdminDashboard({ companies }: { companies: Company[] }) {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               <QueueCard label="검수 대기" count={queues?.reviewPending ?? 0} />
               <QueueCard label="검증 실패" count={queues?.verifyFailed ?? 0} warn />
-              <QueueCard label="수집 실패" count={queues?.collectFailed ?? 0} warn />
+              <QueueCard label="수집 연속 실패" count={queues?.collectFailed ?? 0} warn />
               <QueueCard label="발행 미이행" count={queues?.publishStale ?? 0} />
               <QueueCard label="섭외 정체" count={queues?.castingStale ?? 0} />
             </div>

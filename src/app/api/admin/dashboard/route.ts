@@ -23,39 +23,49 @@ export async function GET(request: NextRequest) {
   const threeDaysAgo = new Date(now.getTime() - 3 * 86400000).toISOString();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
 
-  // ── 큐 1: 검수 대기 (status = '제출') ──────────────────────────────────
+  // ── 큐 3: 수집 3회 연속 실패 (운영자 알림 대상) ─────────────────────────
+  const { data: recentCollectJobs } = await supabase
+    .from("collection_jobs")
+    .select("creator_link_id, status")
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  const statusesByLink = new Map<string, string[]>();
+  for (const job of recentCollectJobs ?? []) {
+    const list = statusesByLink.get(job.creator_link_id) ?? [];
+    if (list.length < 3) list.push(job.status);
+    statusesByLink.set(job.creator_link_id, list);
+  }
+  let collectFailed = 0;
+  for (const statuses of statusesByLink.values()) {
+    if (statuses.length >= 3 && statuses.every((s) => s === "실패")) {
+      collectFailed += 1;
+    }
+  }
+
   const [
     { count: reviewPending },
     { count: verifyFailed },
-    { count: collectFailed },
     { count: publishStale },
     { count: castingStale },
   ] = await Promise.all([
     supabase
       .from("creator_links")
       .select("*", { count: "exact", head: true })
-      .eq("status", "제출"),
+      .eq("status", "submitted"),
 
-    // ── 큐 2: 검증 실패 ──────────────────────────────────────────────────
     supabase
       .from("creator_links")
       .select("*", { count: "exact", head: true })
       .eq("verification_failed", true),
 
-    // ── 큐 3: 수집 실패 ──────────────────────────────────────────────────
-    supabase
-      .from("collection_jobs")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "실패"),
-
-    // ── 큐 4: 발행 미이행 (승인 후 3일 경과, 미발행) ────────────────────
     supabase
       .from("creator_links")
       .select("*", { count: "exact", head: true })
-      .eq("status", "승인")
+      .eq("status", "approved")
+      .is("publish_url", null)
       .lt("updated_at", threeDaysAgo),
 
-    // ── 큐 5: 섭외 정체 (Pending 7일 이상) ──────────────────────────────
     supabase
       .from("castings")
       .select("*", { count: "exact", head: true })
@@ -74,7 +84,7 @@ export async function GET(request: NextRequest) {
         campaigns ( id, exposure_fee )
       )
     `)
-    .eq("status", "발행완료");
+    .eq("content_status", "발행완료");
 
   if (companyId) linkQuery = linkQuery.eq("allocations.company_id", companyId);
   if (from) linkQuery = linkQuery.gte("submitted_at", from);

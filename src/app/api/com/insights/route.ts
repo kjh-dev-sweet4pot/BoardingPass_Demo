@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
       )
     `)
     .eq("allocations.company_id", companyId)
-    .eq("status", "발행완료");
+    .eq("content_status", "발행완료");
 
   if (productId) {
     linkQuery = linkQuery.eq("allocations.products.id", productId);
