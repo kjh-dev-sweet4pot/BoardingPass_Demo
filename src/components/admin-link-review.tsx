@@ -9,8 +9,12 @@ import {
 import { type CreatorLink } from "@/lib/types";
 
 type ReviewRow = CreatorLink & {
+  content_status?: string | null;
+  submitted_file_path?: string | null;
+  publish_url?: string | null;
   allocations?: {
     visit_date?: string | null;
+    rollup_status?: string | null;
     products?: { name?: string | null } | null;
     stores?: { name?: string | null } | null;
     influencers?: {
@@ -134,8 +138,22 @@ export function AdminLinkReview() {
     );
   }
 
-  const submitted = links.filter((l) => l.status === "submitted");
-  const approved = links.filter((l) => l.status === "approved");
+  async function openFile(id: string) {
+    const res = await fetch(`/api/admin/links/${id}/file`);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(body.error || "파일 열기 실패");
+      return;
+    }
+    if (body.url) window.open(body.url, "_blank", "noopener,noreferrer");
+  }
+
+  const submitted = links.filter(
+    (l) => l.content_status === "제출" || l.status === "submitted",
+  );
+  const approved = links.filter(
+    (l) => l.content_status === "승인" || l.status === "approved",
+  );
   const visible = tab === "submitted" ? submitted : approved;
 
   return (
@@ -150,7 +168,7 @@ export function AdminLinkReview() {
           className="text-lg text-[var(--ink)]"
           style={{ fontFamily: "var(--font-display), serif" }}
         >
-          링크 검수
+          링크·콘텐츠 검수
           {submitted.length > 0 && (
             <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1.5 text-[11px] font-bold text-white">
               {submitted.length}
@@ -216,15 +234,28 @@ export function AdminLinkReview() {
                     <p className="mt-0.5 text-xs text-[var(--muted)]">
                       {alloc?.companies?.name || "회원사 미지정"} ·{" "}
                       {alloc?.stores?.name || "매장"} · {alloc?.visit_date || "미정"}
+                      {link.content_status ? ` · ${link.content_status}` : ""}
+                      {alloc?.rollup_status ? ` · 배정 ${alloc.rollup_status}` : ""}
                     </p>
-                    <a
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 block break-all text-[var(--accent)] underline"
-                    >
-                      {link.url}
-                    </a>
+                    {link.submitted_file_path ? (
+                      <button
+                        type="button"
+                        onClick={() => void openFile(link.id)}
+                        className="mt-2 text-sm font-semibold text-[var(--accent)] underline"
+                      >
+                        제출 파일 보기
+                      </button>
+                    ) : null}
+                    {link.publish_url || (link.url && !link.url.startsWith("content://")) ? (
+                      <a
+                        href={link.publish_url || link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 block break-all text-[var(--accent)] underline"
+                      >
+                        {link.publish_url || link.url}
+                      </a>
+                    ) : null}
                     <p className="mt-1 text-xs text-[var(--muted)]">
                       {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform] ||
                         link.platform}{" "}

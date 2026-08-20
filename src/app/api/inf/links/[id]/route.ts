@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { collectOnPublishUrl } from "@/lib/collect-content-metrics";
-import { validateCreatorUrl } from "@/lib/creator-link";
+import { validateCreatorUrl, detectPlatform } from "@/lib/creator-link";
 import { getInfluencerSessionId } from "@/lib/session";
 import { hasServiceRoleKey, createServiceClient } from "@/lib/supabase/service";
 
@@ -102,6 +102,8 @@ export async function PATCH(
     .from("creator_links")
     .update({
       publish_url: publishUrl,
+      url: publishUrl,
+      platform: detectPlatform(publishUrl),
       content_status: "발행완료",
       updated_at: now,
     })

@@ -38,6 +38,7 @@ export async function PATCH(
     .from("creator_links")
     .update({
       status,
+      content_status: status === "approved" ? "승인" : "반려",
       memo: status === "rejected" ? String(body.memo || "").trim() : null,
       updated_at: new Date().toISOString(),
     })

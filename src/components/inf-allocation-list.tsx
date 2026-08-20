@@ -98,8 +98,10 @@ function isPickedUp(item: AllocationWithRelations) {
   return item.status === "picked_up" || Boolean(item.picked_up_at);
 }
 
-function hasRegisteredLink(item: AllocationWithRelations) {
-  return (item.creator_links || []).length > 0;
+function hasSubmittedContent(item: AllocationWithRelations) {
+  return (item.creator_links || []).some(
+    (l) => l.status !== "rejected" && l.content_status,
+  );
 }
 
 function LinkRegisterAction({
@@ -115,10 +117,10 @@ function LinkRegisterAction({
   className?: string;
   onClick?: (e: React.MouseEvent) => void;
 }) {
-  const done = hasRegisteredLink(item);
+  const done = hasSubmittedContent(item);
   return (
     <Link
-      href="/inf/links"
+      href="/inf/submit"
       onClick={onClick}
       className={
         done

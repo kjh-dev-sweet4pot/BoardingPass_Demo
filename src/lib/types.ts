@@ -31,6 +31,7 @@ export type CreatorLink = {
   status: CreatorLinkStatus;
   content_status?: "제출" | "승인" | "발행완료" | "반려" | null;
   publish_url?: string | null;
+  submitted_file_path?: string | null;
   verification_failed?: boolean;
   memo: string | null;
   submitted_at: string;

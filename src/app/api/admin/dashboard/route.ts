@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     supabase
       .from("creator_links")
       .select("*", { count: "exact", head: true })
-      .eq("status", "submitted"),
+      .eq("content_status", "제출"),
 
     supabase
       .from("creator_links")
