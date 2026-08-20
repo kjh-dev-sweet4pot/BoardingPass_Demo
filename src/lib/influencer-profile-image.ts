@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { scrapeInstagramProfile, resolveInstagramProfileUrl, instagramHandleFromUrl } from "@/lib/apify-instagram";
-import { scrapeTikTokProfile } from "@/lib/apify-tiktok";
+import { normalizeTikTokUsername, scrapeTikTokProfile, tiktokHandleFromUrl } from "@/lib/apify-tiktok";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 export const INFLUENCER_AVATARS_BUCKET = "influencer-avatars";
@@ -57,7 +57,11 @@ function profileTarget(handle: string, snsUrl?: string | null) {
   const raw = (snsUrl || "").trim();
   if (raw && /^https?:\/\//i.test(raw)) {
     if (isTikTokUrl(raw)) {
-      const h = bareHandle(handle);
+      // SNS URL의 @username 우선 — DB handle은 표시명(예: 山口奈々美)인 경우가 많음
+      const h =
+        tiktokHandleFromUrl(raw) ||
+        normalizeTikTokUsername(handle) ||
+        bareHandle(handle);
       return { platform: "tiktok" as const, handle: h, url: raw };
     }
     const igHandle = bareHandle(instagramHandleFromUrl(raw) || handle);

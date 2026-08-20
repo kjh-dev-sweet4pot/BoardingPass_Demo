@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
 import { formatMetric } from "@/lib/content-insights";
@@ -119,20 +120,246 @@ function platformLabel(url: string | null) {
   return "기타";
 }
 
-function TopContentPanel({
+function er(views: number, likes: number, comments: number) {
+  return views > 0 ? ((likes + comments) / views) * 100 : 0;
+}
+
+function fmtPct(n: number) {
+  return n.toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+}
+
+/** 비율 순위: 조회수 극소 건이 1위를 차지하지 않도록 */
+const RATIO_MIN_VIEWS = 100;
+
+const METRIC_WHY = {
+  views:
+    "도달·바이럴 규모를 봅니다. 캠페인 인지도와 확산력 비교에 씁니다.",
+  likes:
+    "절대 반응량입니다. 노출이 큰 콘텐츠의 호감 반응을 확인할 때 씁니다.",
+  likeRate:
+    "좋아요 ÷ 조회수. 조회 대비 호감도를 비교해, 규모와 무관한 콘텐츠 퀄리티를 봅니다.",
+  commentRate:
+    "댓글 ÷ 조회수. 대화·질문·리뷰형 반응이 강한 콘텐츠를 고를 때 씁니다.",
+  er: "참여율(ER) = (좋아요 + 댓글) ÷ 조회수. 종합 반응 밀도이며, 재섭외·단가 판단의 기본 지표입니다.",
+  platformEr:
+    "플랫폼별로 합산한 뒤 ER을 계산합니다. Instagram·TikTok 등 채널 예산·포맷 배분에 씁니다.",
+  early:
+    "발행 후 D+1~D+2 구간의 조회 스냅샷입니다. 초반 반응이 강한 바이럴 후보를 조기에 잡습니다.",
+  product:
+    "상품 단위로 조회·좋아요·ER을 합산합니다. 상품별 캠페인 효율을 비교합니다.",
+  curve:
+    "발행일 기준 경과일에 따른 조회 누적입니다. 성장 속도와 롱테일을 봅니다.",
+  platformShare:
+    "플랫폼별 조회수 비중입니다. 채널 기여도를 한눈에 봅니다.",
+} as const;
+
+function InfoTip({ text }: { text: string }) {
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    place: "above" | "below";
+  } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  function show(el: HTMLElement) {
+    const r = el.getBoundingClientRect();
+    const tipW = 240;
+    const pad = 12;
+    let left = r.left + r.width / 2;
+    left = Math.max(pad + tipW / 2, Math.min(left, window.innerWidth - pad - tipW / 2));
+    const place = r.top > 120 ? "above" : "below";
+    setPos({
+      top: place === "above" ? r.top - 8 : r.bottom + 8,
+      left,
+      place,
+    });
+  }
+
+  return (
+    <span className="relative inline-flex shrink-0 align-middle">
+      <button
+        type="button"
+        className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[9px] font-semibold leading-none text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+        aria-label={text}
+        onMouseEnter={(e) => show(e.currentTarget)}
+        onMouseLeave={() => setPos(null)}
+        onFocus={(e) => show(e.currentTarget)}
+        onBlur={() => setPos(null)}
+      >
+        i
+      </button>
+      {mounted && pos
+        ? createPortal(
+            <span
+              role="tooltip"
+              className={`pointer-events-none fixed z-[200] w-[240px] -translate-x-1/2 rounded-xl border border-[var(--line)] bg-[var(--ink)] px-3 py-2 text-left text-[11px] font-normal leading-relaxed text-white shadow-lg ${
+                pos.place === "above" ? "-translate-y-full" : ""
+              }`}
+              style={{ top: pos.top, left: pos.left }}
+            >
+              {text}
+            </span>,
+            document.body,
+          )
+        : null}
+    </span>
+  );
+}
+
+function ContentMetricsTip({
+  views,
+  likes,
+  comments,
+  children,
+}: {
+  views: number;
+  likes: number;
+  comments: number;
+  children: ReactNode;
+}) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  function show(el: HTMLElement) {
+    const r = el.getBoundingClientRect();
+    setPos({
+      top: r.top - 8,
+      left: Math.min(
+        Math.max(12 + 110, r.left + r.width / 2),
+        window.innerWidth - 12 - 110,
+      ),
+    });
+  }
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={(e) => show(e.currentTarget)}
+      onMouseLeave={() => setPos(null)}
+    >
+      {children}
+      {mounted && pos
+        ? createPortal(
+            <div
+              role="tooltip"
+              className="pointer-events-none fixed z-[200] w-[220px] -translate-x-1/2 -translate-y-full rounded-xl border border-[var(--line)] bg-[var(--ink)] px-3 py-2.5 text-white shadow-lg"
+              style={{ top: pos.top, left: pos.left }}
+            >
+              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-white/60">
+                지표
+              </p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">
+                <dt className="text-white/65">조회수</dt>
+                <dd className="text-right tabular-nums font-semibold">
+                  {formatMetric(views)}
+                </dd>
+                <dt className="text-white/65">좋아요</dt>
+                <dd className="text-right tabular-nums font-semibold">
+                  {formatMetric(likes)}
+                </dd>
+                <dt className="text-white/65">댓글</dt>
+                <dd className="text-right tabular-nums font-semibold">
+                  {formatMetric(comments)}
+                </dd>
+              </dl>
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
+}
+
+function PanelTitle({
   title,
-  metricLabel,
-  items,
+  why,
+  aside,
 }: {
   title: string;
-  metricLabel: string;
-  items: LinkRow[];
+  why: string;
+  aside?: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
-      <div className="border-b border-[#f0e6d8] px-[18px] py-3.5 text-[13.5px] font-semibold">
-        {title}
+    <div className="flex items-start justify-between gap-2 border-b border-[#f0e6d8] px-[18px] py-3.5">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="text-[13.5px] font-semibold text-[var(--ink)]">{title}</span>
+        <InfoTip text={why} />
       </div>
+      {aside ? (
+        <span className="shrink-0 text-[11px] text-[var(--muted)]">{aside}</span>
+      ) : null}
+    </div>
+  );
+}
+
+type TopMetric =
+  | { kind: "views" }
+  | { kind: "likes" }
+  | { kind: "likeRate" }
+  | { kind: "commentRate" }
+  | { kind: "er" }
+  | { kind: "earlyViews" };
+
+function topMetricValue(row: LinkRow, metric: TopMetric): number {
+  const views = row.views ?? 0;
+  const likes = row.likes ?? 0;
+  const comments = row.comments ?? 0;
+  if (metric.kind === "views" || metric.kind === "earlyViews") return views;
+  if (metric.kind === "likes") return likes;
+  if (metric.kind === "likeRate") return views > 0 ? (likes / views) * 100 : 0;
+  if (metric.kind === "commentRate") {
+    return views > 0 ? (comments / views) * 100 : 0;
+  }
+  return er(views, likes, comments);
+}
+
+function formatTopMetric(value: number, metric: TopMetric) {
+  if (
+    metric.kind === "likeRate" ||
+    metric.kind === "commentRate" ||
+    metric.kind === "er"
+  ) {
+    return `${fmtPct(value)}%`;
+  }
+  return formatMetric(value);
+}
+
+function topMetricUnit(metric: TopMetric) {
+  if (metric.kind === "views" || metric.kind === "earlyViews") return "조회";
+  if (metric.kind === "likes") return "좋아요";
+  if (metric.kind === "likeRate") return "좋아요율";
+  if (metric.kind === "commentRate") return "댓글율";
+  return "ER";
+}
+
+function showsViewsSubline(metric: TopMetric) {
+  return (
+    metric.kind === "likeRate" ||
+    metric.kind === "commentRate" ||
+    metric.kind === "er"
+  );
+}
+
+function TopContentPanel({
+  title,
+  why,
+  metric,
+  items,
+  aside,
+}: {
+  title: string;
+  why: string;
+  metric: TopMetric;
+  items: Array<LinkRow & { earlyViews?: number }>;
+  aside?: string;
+}) {
+  return (
+    <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+      <PanelTitle title={title} why={why} aside={aside} />
       {items.length === 0 ? (
         <p className="px-[18px] py-6 text-sm text-[var(--muted)]">데이터 없음</p>
       ) : (
@@ -140,41 +367,48 @@ function TopContentPanel({
           {items.map((row, idx) => {
             const inf = row.allocations?.influencers;
             const product = row.allocations?.products?.name || "상품";
-            const metric =
-              metricLabel === "조회"
-                ? row.views ?? 0
-                : metricLabel === "좋아요"
-                  ? row.likes ?? 0
-                  : 0;
+            const value =
+              metric.kind === "earlyViews"
+                ? (row.earlyViews ?? 0)
+                : topMetricValue(row, metric);
             return (
               <li key={row.id}>
-                <a
-                  href={row.link_url || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-[18px] py-3 transition hover:bg-[var(--surface-hover)]"
+                <ContentMetricsTip
+                  views={row.views ?? 0}
+                  likes={row.likes ?? 0}
+                  comments={row.comments ?? 0}
                 >
-                  <span className="w-5 shrink-0 text-[11px] font-semibold tabular-nums text-[var(--muted)]">
-                    {idx + 1}
-                  </span>
-                  <CreatorPhoto creator={poolCreatorFromLink(row)} size="thumb" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold text-[var(--ink)]">
-                      {inf?.name || "—"}
+                  <a
+                    href={row.link_url || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 px-[18px] py-3 transition hover:bg-[var(--surface-hover)]"
+                  >
+                    <span className="w-5 shrink-0 text-[11px] font-semibold tabular-nums text-[var(--muted)]">
+                      {idx + 1}
                     </span>
-                    <span className="mt-0.5 block truncate text-[11.5px] text-[var(--muted)]">
-                      {product} · {platformLabel(row.link_url)}
+                    <CreatorPhoto creator={poolCreatorFromLink(row)} size="thumb" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-semibold text-[var(--ink)]">
+                        {inf?.name || "—"}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11.5px] text-[var(--muted)]">
+                        {product} · {platformLabel(row.link_url)}
+                        {showsViewsSubline(metric)
+                          ? ` · 조회 ${formatMetric(row.views ?? 0)}`
+                          : ""}
+                      </span>
                     </span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="block text-[13px] font-semibold tabular-nums text-[var(--accent)]">
-                      {formatMetric(metric)}
+                    <span className="shrink-0 text-right">
+                      <span className="block text-[13px] font-semibold tabular-nums text-[var(--accent)]">
+                        {formatTopMetric(value, metric)}
+                      </span>
+                      <span className="text-[10.5px] text-[var(--muted)]">
+                        {topMetricUnit(metric)}
+                      </span>
                     </span>
-                    <span className="text-[10.5px] text-[var(--muted)]">
-                      {metricLabel}
-                    </span>
-                  </span>
-                </a>
+                  </a>
+                </ContentMetricsTip>
               </li>
             );
           })}
@@ -184,12 +418,55 @@ function TopContentPanel({
   );
 }
 
-function er(views: number, likes: number, comments: number) {
-  return views > 0 ? ((likes + comments) / views) * 100 : 0;
-}
-
-function fmtPct(n: number) {
-  return n.toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+function PlatformErPanel({
+  rows,
+}: {
+  rows: { label: string; views: number; likes: number; comments: number; color: string }[];
+}) {
+  const maxEr = Math.max(...rows.map((r) => er(r.views, r.likes, r.comments)), 0.1);
+  return (
+    <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+      <PanelTitle title="플랫폼별 ER" why={METRIC_WHY.platformEr} />
+      {rows.length === 0 ? (
+        <p className="px-[18px] py-6 text-sm text-[var(--muted)]">데이터 없음</p>
+      ) : (
+        <ul className="space-y-3.5 px-[18px] py-4">
+          {rows.map((row) => {
+            const rate = er(row.views, row.likes, row.comments);
+            return (
+              <li key={row.label}>
+                <div className="mb-1.5 flex items-center justify-between gap-2 text-[12.5px]">
+                  <span className="flex items-center gap-2 font-medium text-[var(--ink)]">
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ background: row.color }}
+                    />
+                    {row.label}
+                  </span>
+                  <span className="tabular-nums font-semibold text-[var(--accent)]">
+                    {fmtPct(rate)}%
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-hover)]">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${Math.max(4, (rate / maxEr) * 100)}%`,
+                      background: row.color,
+                    }}
+                  />
+                </div>
+                <p className="mt-1 text-[10.5px] text-[var(--muted)]">
+                  조회 {formatMetric(row.views)} · 좋아요 {formatMetric(row.likes)} · 댓글{" "}
+                  {formatMetric(row.comments)}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function ViewsCurve({ points }: { points: { day: number; views: number }[] }) {
@@ -247,8 +524,6 @@ function PlatformDonut({
   const c = 2 * Math.PI * r;
   let offset = 0;
 
-  const views48h = Math.round(totals.views * 0.12);
-
   return (
     <div className="flex flex-col">
       <div className="mt-3 flex items-center gap-[18px]">
@@ -288,8 +563,8 @@ function PlatformDonut({
       </div>
       <div className="mt-auto flex justify-between border-t border-[#f0e6d8] pt-3 text-xs text-[var(--muted)]">
         <span>ER {fmtPct(er(totals.views, totals.likes, totals.comments))}%</span>
-        <span>CPV —</span>
-        <span>초기 48h {formatMetric(views48h)}</span>
+        <span>조회 {formatMetric(totals.views)}</span>
+        <span>좋아요 {formatMetric(totals.likes)}</span>
       </div>
     </div>
   );
@@ -444,6 +719,99 @@ export function CompanyPerformanceTab({
         .slice(0, 5),
     [links],
   );
+
+  const topByLikeRate = useMemo(
+    () =>
+      [...links]
+        .filter((l) => (l.views ?? 0) >= RATIO_MIN_VIEWS)
+        .sort(
+          (a, b) =>
+            topMetricValue(b, { kind: "likeRate" }) -
+            topMetricValue(a, { kind: "likeRate" }),
+        )
+        .slice(0, 5),
+    [links],
+  );
+
+  const topByCommentRate = useMemo(
+    () =>
+      [...links]
+        .filter((l) => (l.views ?? 0) >= RATIO_MIN_VIEWS)
+        .sort(
+          (a, b) =>
+            topMetricValue(b, { kind: "commentRate" }) -
+            topMetricValue(a, { kind: "commentRate" }),
+        )
+        .slice(0, 5),
+    [links],
+  );
+
+  const topByEr = useMemo(
+    () =>
+      [...links]
+        .filter((l) => (l.views ?? 0) >= RATIO_MIN_VIEWS)
+        .sort(
+          (a, b) =>
+            topMetricValue(b, { kind: "er" }) - topMetricValue(a, { kind: "er" }),
+        )
+        .slice(0, 5),
+    [links],
+  );
+
+  const topByEarly = useMemo(() => {
+    const publishedAtMap = new Map(links.map((l) => [l.id, l.published_at]));
+    // linkId → D+1~2 구간에서 가장 늦은(가까운) 스냅샷 조회수
+    const earlyViews = new Map<string, number>();
+    for (const m of metrics) {
+      const pub = publishedAtMap.get(m.creator_link_id);
+      if (!pub) continue;
+      const dayDiff = Math.floor(
+        (new Date(m.collected_at).getTime() - new Date(pub).getTime()) / 86400000,
+      );
+      if (dayDiff < 1 || dayDiff > 2) continue;
+      const prev = earlyViews.get(m.creator_link_id);
+      // 같은 구간이면 더 큰 조회(누적)를 채택
+      if (prev == null || m.views > prev) earlyViews.set(m.creator_link_id, m.views);
+    }
+    return links
+      .filter((l) => (earlyViews.get(l.id) ?? 0) > 0)
+      .map((l) => ({ ...l, earlyViews: earlyViews.get(l.id) ?? 0 }))
+      .sort((a, b) => b.earlyViews - a.earlyViews)
+      .slice(0, 5);
+  }, [links, metrics]);
+
+  const platformErRows = useMemo(() => {
+    const map = new Map<
+      string,
+      { label: string; views: number; likes: number; comments: number }
+    >();
+    for (const l of links) {
+      const label = platformLabel(l.link_url);
+      const row = map.get(label) || {
+        label,
+        views: 0,
+        likes: 0,
+        comments: 0,
+      };
+      row.views += l.views ?? 0;
+      row.likes += l.likes ?? 0;
+      row.comments += l.comments ?? 0;
+      map.set(label, row);
+    }
+    const colors: Record<string, string> = {
+      Instagram: "var(--accent)",
+      TikTok: "#c08b5c",
+      YouTube: "#a67c52",
+      기타: "#d9c3a5",
+    };
+    return [...map.values()]
+      .filter((r) => r.views > 0)
+      .sort(
+        (a, b) =>
+          er(b.views, b.likes, b.comments) - er(a.views, a.likes, a.comments),
+      )
+      .map((r) => ({ ...r, color: colors[r.label] || "#c08b5c" }));
+  }, [links]);
 
   const metaLine = performanceMetaCopy({
     asOfYmd,
@@ -617,78 +985,128 @@ export function CompanyPerformanceTab({
           </div>
 
           <div className="grid gap-3.5 lg:grid-cols-[1.35fr_1fr]">
-            <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-[18px]">
-              <div className="flex items-center justify-between">
-                <span className="text-[13.5px] font-semibold text-[var(--ink)]">
-                  조회수 곡선{" "}
-                  <span className="font-normal text-[var(--muted)]">발행 후 경과일</span>
-                </span>
+            <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+              <div className="flex items-center justify-between gap-2 px-[18px] py-3.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[13.5px] font-semibold text-[var(--ink)]">
+                    조회수 곡선{" "}
+                    <span className="font-normal text-[var(--muted)]">발행 후 경과일</span>
+                  </span>
+                  <InfoTip text={METRIC_WHY.curve} />
+                </div>
                 <span className="text-[11.5px] text-[var(--muted)]">D+0 ~ D+14</span>
               </div>
-              <ViewsCurve points={curvePoints} />
+              <div className="px-[18px] pb-[18px]">
+                <ViewsCurve points={curvePoints} />
+              </div>
             </div>
-            <div className="flex min-h-[220px] flex-col rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-[18px]">
-              <span className="text-[13.5px] font-semibold text-[var(--ink)]">플랫폼별 성과</span>
-              <PlatformDonut
-                segments={platformSegments}
-                totals={{ views: totals.views, likes: totals.likes, comments: totals.comments }}
-              />
+            <div className="flex min-h-[220px] flex-col rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+              <div className="flex items-center gap-1.5 px-[18px] py-3.5">
+                <span className="text-[13.5px] font-semibold text-[var(--ink)]">
+                  플랫폼별 성과
+                </span>
+                <InfoTip text={METRIC_WHY.platformShare} />
+              </div>
+              <div className="flex flex-1 flex-col px-[18px] pb-[18px]">
+                <PlatformDonut
+                  segments={platformSegments}
+                  totals={{ views: totals.views, likes: totals.likes, comments: totals.comments }}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-3.5 lg:grid-cols-2">
+          <div className="grid gap-3.5 lg:grid-cols-3">
             <TopContentPanel
               title="조회수 TOP"
-              metricLabel="조회"
+              why={METRIC_WHY.views}
+              metric={{ kind: "views" }}
               items={topByViews}
             />
             <TopContentPanel
               title="좋아요 TOP"
-              metricLabel="좋아요"
+              why={METRIC_WHY.likes}
+              metric={{ kind: "likes" }}
               items={topByLikes}
+            />
+            <TopContentPanel
+              title="조회수 대비 좋아요 TOP"
+              why={METRIC_WHY.likeRate}
+              metric={{ kind: "likeRate" }}
+              items={topByLikeRate}
+              aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
             />
           </div>
 
-          <div className="overflow-hidden rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
-            <div className="border-b border-[#f0e6d8] px-[18px] py-3.5 text-[13.5px] font-semibold">
-              상품별 성과
+          <div className="grid gap-3.5 lg:grid-cols-3">
+            <TopContentPanel
+              title="댓글 반응 TOP"
+              why={METRIC_WHY.commentRate}
+              metric={{ kind: "commentRate" }}
+              items={topByCommentRate}
+              aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
+            />
+            <TopContentPanel
+              title="참여율(ER) TOP"
+              why={METRIC_WHY.er}
+              metric={{ kind: "er" }}
+              items={topByEr}
+              aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
+            />
+            <TopContentPanel
+              title="초기 반응 (D+1~2)"
+              why={METRIC_WHY.early}
+              metric={{ kind: "earlyViews" }}
+              items={topByEarly}
+              aside="수집 스냅샷"
+            />
+          </div>
+
+          <div className="grid items-start gap-3.5 lg:grid-cols-2">
+            <PlatformErPanel rows={platformErRows} />
+            <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+              <PanelTitle title="상품별 성과" why={METRIC_WHY.product} />
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px] border-collapse text-left text-[12.5px]">
+                  <thead>
+                    <tr className="text-[var(--muted)]">
+                      <th className="px-[18px] py-2 font-medium">상품</th>
+                      <th className="w-[88px] px-3 py-2 font-medium">조회</th>
+                      <th className="w-[80px] px-3 py-2 font-medium">좋아요</th>
+                      <th className="w-[60px] px-3 py-2 font-medium">ER</th>
+                      <th className="w-[60px] px-[18px] py-2 font-medium">콘텐츠</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byProduct.map((row) => (
+                      <tr key={row.id} className="border-t border-[#f4ece2]">
+                        <td className="px-[18px] py-[11px]">
+                          <div className="mb-1.5">{row.name}</div>
+                          <div className="h-1 overflow-hidden rounded-full bg-[var(--surface-hover)]">
+                            <div
+                              className="h-full rounded-full bg-[var(--accent)]"
+                              style={{
+                                width: `${Math.max(4, (row.views / maxProductViews) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </td>
+                        <td className="px-3 py-[11px] font-semibold tabular-nums">
+                          {formatMetric(row.views)}
+                        </td>
+                        <td className="px-3 py-[11px] tabular-nums">
+                          {formatMetric(row.likes)}
+                        </td>
+                        <td className="px-3 py-[11px] tabular-nums">
+                          {fmtPct(er(row.views, row.likes, row.comments))}%
+                        </td>
+                        <td className="px-[18px] py-[11px] tabular-nums">{row.posts}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <table className="w-full min-w-[560px] border-collapse text-left text-[12.5px]">
-              <thead>
-                <tr className="text-[var(--muted)]">
-                  <th className="px-[18px] py-2 font-medium">상품</th>
-                  <th className="w-[88px] px-3 py-2 font-medium">조회</th>
-                  <th className="w-[80px] px-3 py-2 font-medium">좋아요</th>
-                  <th className="w-[60px] px-3 py-2 font-medium">ER</th>
-                  <th className="w-[60px] px-[18px] py-2 font-medium">콘텐츠</th>
-                </tr>
-              </thead>
-              <tbody>
-                {byProduct.map((row) => (
-                  <tr key={row.id} className="border-t border-[#f4ece2]">
-                    <td className="px-[18px] py-[11px]">
-                      <div className="mb-1.5">{row.name}</div>
-                      <div className="h-1 overflow-hidden rounded-full bg-[var(--surface-hover)]">
-                        <div
-                          className="h-full rounded-full bg-[var(--accent)]"
-                          style={{
-                            width: `${Math.max(4, (row.views / maxProductViews) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-3 py-[11px] font-semibold tabular-nums">
-                      {formatMetric(row.views)}
-                    </td>
-                    <td className="px-3 py-[11px] tabular-nums">{formatMetric(row.likes)}</td>
-                    <td className="px-3 py-[11px] tabular-nums">
-                      {fmtPct(er(row.views, row.likes, row.comments))}%
-                    </td>
-                    <td className="px-[18px] py-[11px] tabular-nums">{row.posts}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </>
       )}

@@ -52,6 +52,36 @@ function getApifyToken(): string {
   return token;
 }
 
+const TT_RESERVED = /^(?:foryou|following|live|search|music|tag|explore|upload|login|signup|about|discover|video|photo)$/i;
+/** TikTok unique id — 표시명(일본어 등)이 아니라 @username */
+const TT_USERNAME = /^[a-zA-Z0-9._]{2,24}$/;
+
+/** tiktok.com/@handle/… → handle (video·photo 하위 경로 무시) */
+export function tiktokHandleFromUrl(url: string): string | null {
+  try {
+    const u = new URL(url.trim());
+    const host = u.hostname.replace(/^www\./, "").toLowerCase();
+    if (!host.endsWith("tiktok.com")) return null;
+    const m = u.pathname.match(/^\/@([^/?#]+)/);
+    if (!m) return null;
+    const h = decodeURIComponent(m[1]).replace(/^@+/, "").trim();
+    if (!h || TT_RESERVED.test(h) || !TT_USERNAME.test(h)) return null;
+    return h;
+  } catch {
+    return null;
+  }
+}
+
+/** URL·@handle·username → Apify profiles용 username. 표시명이면 null */
+export function normalizeTikTokUsername(input: string): string | null {
+  const raw = input.trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return tiktokHandleFromUrl(raw);
+  const h = raw.replace(/^@+/, "").trim();
+  if (!TT_USERNAME.test(h)) return null;
+  return h;
+}
+
 /**
  * Apify Actor를 동기 실행(run-sync-get-dataset-items)해서 결과를 바로 반환.
  * 최대 ~60 s 소요. after() 안에서 호출하도록 설계됨.
@@ -80,14 +110,18 @@ export async function scrapeTikTokPosts(
   return items;
 }
 
-/** @handle 또는 username → avatar URL (프로필 전용 — 동영상 0건 계정도 시도) */
+/** @handle·username·프로필 URL → avatar URL (프로필 전용 — 동영상 0건 계정도 시도) */
 export async function scrapeTikTokProfile(
   handle: string,
   memoryMbytes = 1024,
 ): Promise<string | null> {
   const token = getApifyToken();
-  const username = handle.replace(/^@+/, "").trim();
-  if (!username) return null;
+  const username = normalizeTikTokUsername(handle);
+  if (!username) {
+    throw new Error(
+      `유효한 TikTok 핸들이 아닙니다: "${handle}". https://www.tiktok.com/@username 형태가 필요합니다.`,
+    );
+  }
 
   const res = await fetch(
     `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
