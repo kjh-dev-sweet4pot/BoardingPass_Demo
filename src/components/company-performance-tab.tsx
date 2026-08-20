@@ -310,26 +310,47 @@ export function CompanyPerformanceTab({
     initialData?.nextCollectAt ?? null,
   );
   const [source, setSource] = useState<"mock" | "apify">(
-    initialData?.source ?? "mock",
+    initialData?.source ?? "apify",
   );
   const [loading, setLoading] = useState(!initialData);
+  const [refreshing, setRefreshing] = useState(false);
   const [productId, setProductId] = useState("");
   const asOfYmd = ymdKst(new Date());
+
+  function applyPayload(data: {
+    links?: LinkRow[];
+    metrics?: MetricRow[];
+    collectedAt?: string | null;
+    nextCollectAt?: string | null;
+    source?: string;
+  }) {
+    setAllLinks(Array.isArray(data.links) ? data.links : []);
+    setAllMetrics(Array.isArray(data.metrics) ? data.metrics : []);
+    setCollectedAt(data.collectedAt ?? null);
+    setNextCollectAt(data.nextCollectAt ?? null);
+    setSource(data.source === "mock" ? "mock" : "apify");
+  }
+
+  async function reload() {
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/com/insights");
+      const data = await res.json();
+      applyPayload(data);
+    } catch {
+      /* keep last snapshot */
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (initialData) return;
     setLoading(true);
-    fetch("/api/com/insights")
-      .then((r) => r.json())
-      .then((data) => {
-        setAllLinks(Array.isArray(data.links) ? data.links : []);
-        setAllMetrics(Array.isArray(data.metrics) ? data.metrics : []);
-        setCollectedAt(data.collectedAt ?? null);
-        setNextCollectAt(data.nextCollectAt ?? null);
-        setSource(data.source === "apify" ? "apify" : "mock");
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    void reload();
+    // 첫 조회만. 이후는 「다시 조회」
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, initialData]);
 
   useEffect(() => {
@@ -498,6 +519,16 @@ export function CompanyPerformanceTab({
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
+          {initialData ? null : (
+            <button
+              type="button"
+              onClick={() => void reload()}
+              disabled={refreshing}
+              className="h-[38px] rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] font-semibold text-[var(--ink)] disabled:opacity-50"
+            >
+              {refreshing ? "조회 중…" : "다시 조회"}
+            </button>
+          )}
           <select
             className="h-[38px] rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] text-[#5b4130]"
             value={productId}
@@ -536,7 +567,7 @@ export function CompanyPerformanceTab({
       {links.length === 0 ? (
         <EmptyState
           title="발행된 콘텐츠가 없습니다"
-          message="해당 기간에 발행된 콘텐츠가 없습니다."
+          message="성과는 발행완료 건만 집계합니다. 승인된 콘텐츠는 진행현황의 검수중에 있습니다."
         />
       ) : (
         <>

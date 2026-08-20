@@ -46,7 +46,12 @@ export async function GET(request: NextRequest) {
   if (linksErr) return NextResponse.json({ error: linksErr.message }, { status: 500 });
 
   if (!links || links.length === 0) {
-    return NextResponse.json({ links: [], metrics: [], collectedAt: null });
+    return NextResponse.json({
+      links: [],
+      metrics: [],
+      collectedAt: null,
+      source: "apify",
+    });
   }
 
   const linkIds = links.map((l) => l.id);
@@ -65,5 +70,10 @@ export async function GET(request: NextRequest) {
     ? metrics[metrics.length - 1].collected_at
     : null;
 
-  return NextResponse.json({ links, metrics: metrics ?? [], collectedAt });
+  return NextResponse.json({
+    links,
+    metrics: metrics ?? [],
+    collectedAt,
+    source: "apify",
+  });
 }

@@ -3,7 +3,7 @@ import { signOut } from "@/app/actions/auth";
 import { AdminConsoleLayout } from "@/components/admin-console-layout";
 import { AppShell } from "@/components/ui";
 import { isAdminSession, getAdminRole } from "@/lib/session";
-import { createClient } from "@/lib/supabase/server";
+import { createAuthedDbClient } from "@/lib/supabase/api-client";
 import { type AllocationWithRelations, type Company, type Product, type Store } from "@/lib/types";
 
 export default async function AdminPage({
@@ -18,7 +18,8 @@ export default async function AdminPage({
 
   const params = await searchParams;
 
-  const supabase = await createClient();
+  const supabase = await createAuthedDbClient();
+  if (!supabase) redirect("/admin/login");
   const adminRole = await getAdminRole();
   const [{ data: stores }, { data: companies }, { data: products }, { data: allocations, error }] =
     await Promise.all([

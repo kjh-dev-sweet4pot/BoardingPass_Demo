@@ -6,7 +6,7 @@ import {
   stripPricingDeep,
 } from "@/lib/access";
 import { acceptCasting } from "@/lib/admin-casting-accept";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { type CastingStatus } from "@/lib/types";
 
 const CASTING_SELECT = `
@@ -39,7 +39,7 @@ export async function GET(
   if ("error" in auth) return auth.error;
 
   const { id } = await params;
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   const { data, error } = await supabase
@@ -65,7 +65,7 @@ export async function PATCH(
   if ("error" in auth) return auth.error;
 
   const { id } = await params;
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   let body: {

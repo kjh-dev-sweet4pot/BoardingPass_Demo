@@ -52,7 +52,9 @@ function inPeriod(
 export function buildMockContentInsights(
   items: AllocationWithRelations[],
   period: ContentPeriod,
+  opts?: { fabricate?: boolean },
 ) {
+  const fabricate = opts?.fabricate !== false;
   const monthKey = ymdKst(new Date()).slice(0, 7);
   const scoped = items.filter(
     (item) => item.status !== "cancelled" && inPeriod(item, period, monthKey),
@@ -75,7 +77,8 @@ export function buildMockContentInsights(
               asYmd(item.picked_up_at) ||
               asYmd(item.visit_date),
           }))
-        : item.status === "picked_up" || item.status === "visited"
+        : fabricate &&
+            (item.status === "picked_up" || item.status === "visited")
           ? [
               {
                 id: `mock-${item.id}`,
@@ -98,16 +101,22 @@ export function buildMockContentInsights(
         typeof liveLink?.comments === "number";
       const views = hasLiveMetrics
         ? Math.max(0, Number(liveLink?.views ?? 0))
-        : mockInt(`${seed.id}:views`, 2400, 186000);
+        : fabricate
+          ? mockInt(`${seed.id}:views`, 2400, 186000)
+          : 0;
       const likes = hasLiveMetrics
         ? Math.max(0, Number(liveLink?.likes ?? 0))
-        : Math.round(views * (mockInt(`${seed.id}:er`, 18, 72) / 1000));
+        : fabricate
+          ? Math.round(views * (mockInt(`${seed.id}:er`, 18, 72) / 1000))
+          : 0;
       const comments = hasLiveMetrics
         ? Math.max(0, Number(liveLink?.comments ?? 0))
-        : Math.max(
-            4,
-            Math.round(likes * (mockInt(`${seed.id}:cmt`, 4, 18) / 100)),
-          );
+        : fabricate
+          ? Math.max(
+              4,
+              Math.round(likes * (mockInt(`${seed.id}:cmt`, 4, 18) / 100)),
+            )
+          : 0;
       posts.push({
         id: seed.id,
         url: seed.url,
@@ -126,8 +135,8 @@ export function buildMockContentInsights(
         likes,
         comments,
         postedAt: seed.postedAt,
-        collectedAt: liveLink?.metrics_collected_at || new Date().toISOString(),
-        source: hasLiveMetrics ? "apify" : "mock",
+        collectedAt: liveLink?.metrics_collected_at || (fabricate ? new Date().toISOString() : null),
+        source: hasLiveMetrics || !fabricate ? "apify" : "mock",
       });
     }
   }

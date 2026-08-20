@@ -3,6 +3,7 @@ import { signOut } from "@/app/actions/auth";
 import { CompanyConsole } from "@/components/company-console";
 import { AppShell, Notice } from "@/components/ui";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
+import { isDemoCompany } from "@/lib/company";
 import { getCompanySessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -47,13 +48,23 @@ export default async function CompanyPage() {
   }
 
   const initialAllocations = (allocations as AllocationWithRelations[]) || [];
-  const initialMonthInsights = buildMockContentInsights(initialAllocations, "month");
-  const initialAllInsights = buildMockContentInsights(initialAllocations, "all");
+  const liveCompany = company as Company;
+  const fabricate = isDemoCompany(liveCompany);
+  const initialMonthInsights = buildMockContentInsights(
+    initialAllocations,
+    "month",
+    { fabricate },
+  );
+  const initialAllInsights = buildMockContentInsights(
+    initialAllocations,
+    "all",
+    { fabricate },
+  );
 
   return (
     <AppShell full fitViewport theme="owm" hideHeader>
       <CompanyConsole
-        company={company as Company}
+        company={liveCompany}
         initialAllocations={initialAllocations}
         initialMonthInsights={initialMonthInsights}
         initialAllInsights={initialAllInsights}

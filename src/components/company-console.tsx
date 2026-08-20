@@ -12,7 +12,9 @@ import {
   useBudgetGate,
 } from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
+import { EmptyState } from "@/components/empty-state";
 import { CompanyProgressTab } from "@/components/company-progress-tab";
+import { isDemoCompany } from "@/lib/company";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import {
   buildProgressPoolAllocations,
@@ -195,9 +197,10 @@ export function CompanyConsole({
   initialAllInsights: ReturnType<typeof buildMockContentInsights>;
   sidebarActions?: React.ReactNode;
 }) {
+  const isDemo = isDemoCompany(company);
   const gate = useBudgetGate(company.id);
   const [view, setView] = useState<"alloc" | "content" | "pool" | "publish">(
-    "pool",
+    isDemo ? "pool" : "publish",
   );
   const [period, setPeriod] = useState<"month" | "all">("all");
   const [searchQ, setSearchQ] = useState("");
@@ -221,17 +224,15 @@ export function CompanyConsole({
   const today = todayYmdKst();
   const monthKey = today.slice(0, 7);
 
-  const hasSeededAllocations = initialAllocations.length > 0;
-
-  // TS 시드가 있으면 DB 우선, 없으면 기존 JP 목업 유지
   const items = useMemo(
-    () =>
-      hasSeededAllocations ? initialAllocations : buildPublishDemoAllocations(),
-    [hasSeededAllocations, initialAllocations],
+    () => (isDemo ? buildPublishDemoAllocations() : initialAllocations),
+    [isDemo, initialAllocations],
   );
 
-  /** 진행현황 — 크리에이터 풀 전원, 상태별 분배 */
-  const progressItems = useMemo(() => buildProgressPoolAllocations(), []);
+  const progressItems = useMemo(
+    () => (isDemo ? buildProgressPoolAllocations() : initialAllocations),
+    [isDemo, initialAllocations],
+  );
 
   const scoped = useMemo(() => {
     return items.filter((item) => {
@@ -261,10 +262,10 @@ export function CompanyConsole({
   }, [scoped]);
 
   const insights = useMemo(() => {
-    if (!hasSeededAllocations) return buildPublishDemoInsights(period);
+    if (isDemo) return buildPublishDemoInsights(period);
     return period === "month" ? initialMonthInsights : initialAllInsights;
   }, [
-    hasSeededAllocations,
+    isDemo,
     initialAllInsights,
     initialMonthInsights,
     period,
@@ -275,9 +276,9 @@ export function CompanyConsole({
       string,
       { views: number; likes: number; comments: number }
     >();
-    const posts = hasSeededAllocations
-      ? initialAllInsights.posts
-      : buildPublishDemoInsights("all").posts;
+    const posts = isDemo
+      ? buildPublishDemoInsights("all").posts
+      : initialAllInsights.posts;
     for (const post of posts) {
       if (post.allocationId) {
         map.set(post.allocationId, {
@@ -288,7 +289,7 @@ export function CompanyConsole({
       }
     }
     return map;
-  }, [hasSeededAllocations, initialAllInsights.posts]);
+  }, [isDemo, initialAllInsights.posts]);
 
   function toggleAllocSort(key: AllocSortKey) {
     setAllocSort((prev) =>
@@ -399,7 +400,7 @@ export function CompanyConsole({
     setOpenId(opts.allocationId || null);
   }
 
-  if (!gate.ready) {
+  if (isDemo && !gate.ready) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--muted)]">
         불러오는 중…
@@ -407,7 +408,7 @@ export function CompanyConsole({
     );
   }
 
-  if (!gate.unlocked) {
+  if (isDemo && !gate.unlocked) {
     return (
       <CompanyBudgetGate
         companyName={company.name}
@@ -443,6 +444,7 @@ export function CompanyConsole({
           가이드 ↗
         </a>
       ) : null}
+      {isDemo ? (
       <button
         type="button"
         onClick={() => gate.lock()}
@@ -450,6 +452,7 @@ export function CompanyConsole({
       >
         게이트
       </button>
+      ) : null}
     </div>
   );
 
@@ -463,13 +466,28 @@ export function CompanyConsole({
       mobileActions={mobileActions}
     >
       {view === "pool" ? (
-        <CompanyCreatorPool companyId={company.id} />
+        isDemo ? (
+          <CompanyCreatorPool companyId={company.id} />
+        ) : (
+          <div className="min-h-0 flex-1 overflow-auto px-[28px] py-[26px]">
+            <EmptyState
+              title="크리에이터 풀이 없습니다"
+              message="배정·섭외는 운영팀이 등록한 데이터만 표시됩니다."
+            />
+          </div>
+        )
       ) : view === "publish" ? (
-        <CompanyProgressTab companyId={company.id} initialAllocations={progressItems} />
+        <CompanyProgressTab
+          companyId={company.id}
+          initialAllocations={progressItems}
+          live={!isDemo}
+        />
       ) : view === "content" ? (
         <CompanyPerformanceTab
           companyId={company.id}
-          initialData={buildPublishDemoPerformance() as never}
+          initialData={
+            isDemo ? (buildPublishDemoPerformance() as never) : undefined
+          }
           period={period}
           onPeriodChange={setPeriod}
           onMetaChange={setPerformanceMeta}

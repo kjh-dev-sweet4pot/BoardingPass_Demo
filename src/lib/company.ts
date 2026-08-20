@@ -19,6 +19,13 @@ export function normalizeLoginId(raw: string) {
   return raw.trim().toLowerCase();
 }
 
+/** /com 목업 UI 전용. DB 회원사 login_id = company (23yearsold). */
+export const DEMO_COMPANY_LOGIN_ID = "company";
+
+export function isDemoCompany(company: { login_id?: string | null }) {
+  return normalizeLoginId(company.login_id || "") === DEMO_COMPANY_LOGIN_ID;
+}
+
 export function matchCompany(
   raw: string,
   companies: CompanyMatchInput[],

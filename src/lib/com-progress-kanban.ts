@@ -18,6 +18,7 @@ export type ProgressLink = {
   id: string;
   status: string;
   url: string | null;
+  hasFile: boolean;
   platform: string;
   submitted_at: string | null;
   views: number | null;
@@ -43,34 +44,29 @@ export type ProgressKanbanCard = {
 
 const creators = new Map(buildCreatorPool().map((c) => [c.id, c]));
 
-function isKanbanColumn(v: string): v is KanbanColumn {
-  return (KANBAN_COLUMNS as readonly string[]).includes(v);
-}
-
 function isPublishedLink(link: CreatorLink) {
-  return link.content_status === "발행완료" || link.status === "approved";
+  return link.content_status === "발행완료";
 }
 
 function isSubmittedLink(link: CreatorLink) {
-  return link.content_status === "제출" || link.status === "submitted";
+  return (
+    link.content_status === "제출" ||
+    link.content_status === "승인" ||
+    (link.content_status == null && link.status === "submitted")
+  );
 }
 
 function rollupStatus(item: AllocationWithRelations, links: CreatorLink[]): KanbanColumn {
-  if (item.rollup_status && isKanbanColumn(item.rollup_status)) {
-    return item.rollup_status;
-  }
-
   const target = item.target_content_count ?? 1;
   const published = links.filter(isPublishedLink).length;
   const submitted = links.filter(
-    (l) => isSubmittedLink(l) || l.content_status === "승인",
+    (l) => isSubmittedLink(l) || l.content_status === "승인" || l.content_status === "발행완료",
   ).length;
 
   if (published >= target) return "발행완료";
   if (submitted > 0) return "검수중";
   if (item.status === "picked_up" || item.picked_up_at) return "제작중";
   if (item.status === "visited" || item.status === "ready") return "수령완료";
-  if (item.status === "pending") return "대기";
   return "대기";
 }
 
@@ -87,6 +83,7 @@ function toProgressLink(link: CreatorLink, influencerId: string): ProgressLink {
     id: link.id,
     status: link.content_status || link.status,
     url: creatorLinkHref(link) || null,
+    hasFile: Boolean(link.submitted_file_path),
     platform: CREATOR_PLATFORM_LABEL[link.platform] || link.platform,
     submitted_at: link.submitted_at || null,
     views: polished.views,

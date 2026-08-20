@@ -13,6 +13,7 @@ export function AdminCompanyPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [list, setList] = useState(companies);
+  const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -26,6 +27,27 @@ export function AdminCompanyPanel({
     () => list.find((c) => c.id === editingId) || null,
     [list, editingId],
   );
+
+  async function loadList() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/companies", { cache: "no-store" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "회원사 조회 실패");
+      setList(body.companies || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "회원사 조회 실패");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleOpen() {
+    const next = !open;
+    setOpen(next);
+    if (next) void loadList();
+  }
 
   function resetForm() {
     setEditingId(null);
@@ -113,7 +135,7 @@ export function AdminCompanyPanel({
       {compact ? (
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => toggleOpen()}
           className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
           aria-expanded={open}
         >
@@ -132,7 +154,12 @@ export function AdminCompanyPanel({
       {open ? (
         <div className="space-y-4 border-t border-[var(--line)] px-5 pb-5 pt-4">
           <ul className="max-h-48 space-y-2 overflow-auto">
-            {list.map((company) => (
+            {loading ? (
+              <li className="text-sm text-[var(--muted)]">불러오는 중…</li>
+            ) : list.length === 0 ? (
+              <li className="text-sm text-[var(--muted)]">등록된 회원사가 없습니다.</li>
+            ) : (
+              list.map((company) => (
               <li
                 key={company.id}
                 className="flex items-center justify-between gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
@@ -161,7 +188,8 @@ export function AdminCompanyPanel({
                   </button>
                 </div>
               </li>
-            ))}
+              ))
+            )}
           </ul>
 
           <form onSubmit={onSubmit} className="grid gap-2">

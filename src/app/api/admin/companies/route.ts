@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminManager, requireAnyAdmin } from "@/lib/access";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { hashPassword } from "@/lib/password";
 import { normalizeLoginId } from "@/lib/company";
 
@@ -11,7 +11,7 @@ export async function GET() {
   const auth = await requireAnyAdmin();
   if ("error" in auth) return auth.error;
 
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   const { data, error } = await supabase
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const auth = await requireAdminManager();
   if ("error" in auth) return auth.error;
 
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   let body: {

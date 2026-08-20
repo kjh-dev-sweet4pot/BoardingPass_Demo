@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAnyAdmin } from "@/lib/access";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 
 export async function PATCH(
   request: Request,
@@ -10,7 +10,7 @@ export async function PATCH(
   if ("error" in auth) return auth.error;
 
   const { id } = await context.params;
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   let body: { status?: string; memo?: string | null };

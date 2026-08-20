@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAnyAdmin } from "@/lib/access";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { getAdminRole } from "@/lib/session";
 
 const LOG_SELECT =
@@ -20,7 +20,7 @@ export async function GET(
   if ("error" in auth) return auth.error;
 
   const { id } = await params;
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   const { data, error } = await supabase
@@ -41,7 +41,7 @@ export async function POST(
   if ("error" in auth) return auth.error;
 
   const { id: castingId } = await params;
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   let body: { proposed_amount?: number | null; memo?: string };

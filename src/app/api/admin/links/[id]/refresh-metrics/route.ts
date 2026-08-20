@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAnyAdmin } from "@/lib/access";
 import { refreshLinkMetricsNow } from "@/lib/run-metrics-scheduler";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 
 export async function POST(
   _request: Request,
@@ -11,7 +11,7 @@ export async function POST(
   if ("error" in auth) return auth.error;
 
   const { id } = await context.params;
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   if (!process.env.APIFY_TOKEN?.trim()) {

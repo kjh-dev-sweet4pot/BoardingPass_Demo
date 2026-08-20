@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAnyAdmin, requireAdminManager } from "@/lib/access";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 
 const CAMPAIGN_SELECT = `
   id, name, status, company_id, product_id, created_at, updated_at,
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const auth = await requireAnyAdmin();
   if ("error" in auth) return auth.error;
 
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   const companyId = new URL(request.url).searchParams.get("company_id");
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireAdminManager();
   if ("error" in auth) return auth.error;
 
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   let body: { company_id?: string; product_id?: string; name?: string };

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAnyAdmin } from "@/lib/access";
 import { signedContentFileUrl } from "@/lib/content-file-storage";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { hasServiceRoleKey, createServiceClient } from "@/lib/supabase/service";
 
 /** 제출 파일 Presigned URL (운영자 검수용, S7) */
@@ -13,7 +13,7 @@ export async function GET(
   if ("error" in auth) return auth.error;
 
   const { id } = await context.params;
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   const { data: link, error } = await supabase

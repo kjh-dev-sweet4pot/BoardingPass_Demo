@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminManager } from "@/lib/access";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { hashPassword } from "@/lib/password";
 import { normalizeLoginId } from "@/lib/company";
 
@@ -14,7 +14,7 @@ export async function PATCH(
   const auth = await requireAdminManager();
   if ("error" in auth) return auth.error;
   const { id } = await context.params;
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
   let body: {

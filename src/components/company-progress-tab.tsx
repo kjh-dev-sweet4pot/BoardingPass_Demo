@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
 import { StateBadge } from "@/components/state-badge";
@@ -74,7 +74,21 @@ function KanbanCreatorPhoto({
 }
 
 function PublishedLinkChip({ link }: { link: ProgressLink }) {
-  if (!link.url) return null;
+  const label = link.url
+    ? `${link.platform} · 콘텐츠 열기 ↗`
+    : link.hasFile
+      ? "제출 파일"
+      : link.status === "승인"
+        ? "승인됨"
+        : "콘텐츠";
+  if (!link.url && !link.hasFile && link.status !== "승인") return null;
+  if (!link.url) {
+    return (
+      <span className="block truncate rounded-lg border border-[#f0e6d8] bg-[#faf4ec] px-2 py-1 text-[10px] font-semibold text-[var(--accent)]">
+        {label}
+      </span>
+    );
+  }
   return (
     <a
       href={link.url}
@@ -131,6 +145,12 @@ function KanbanCard({
             <PublishedLinkChip key={link.id} link={link} />
           ))}
         </div>
+      ) : card.submittedLinks.length > 0 ? (
+        <div className="space-y-1">
+          {card.submittedLinks.slice(0, 2).map((link) => (
+            <PublishedLinkChip key={link.id} link={link} />
+          ))}
+        </div>
       ) : null}
     </button>
   );
@@ -165,10 +185,12 @@ function FeedbackForm({ link }: { link: ProgressLink }) {
           >
             콘텐츠 링크
           </a>
+        ) : link.hasFile ? (
+          <span className="text-xs text-[var(--muted)]">제출 파일</span>
         ) : (
           <span className="text-xs text-[var(--muted)]">콘텐츠 링크 없음</span>
         )}
-        <StateBadge value="제출" />
+        <StateBadge value={link.status === "approved" ? "승인" : link.status} />
       </div>
       {sent ? (
         <p className="text-xs text-[var(--muted)]">의견이 제출되었습니다.</p>
@@ -299,21 +321,41 @@ function DetailPanel({
 export function CompanyProgressTab({
   companyId: _companyId,
   initialAllocations = [],
+  live = false,
 }: {
   companyId: string;
   initialAllocations?: AllocationWithRelations[];
+  live?: boolean;
 }) {
   const [productFilter, setProductFilter] = useState("");
   const [selected, setSelected] = useState<ProgressKanbanCard | null>(null);
+  const [allocations, setAllocations] = useState(initialAllocations);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    setAllocations(initialAllocations);
+  }, [initialAllocations]);
+
+  async function reload() {
+    if (!live) return;
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/company/allocations");
+      const json = await res.json();
+      if (Array.isArray(json.allocations)) setAllocations(json.allocations);
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   const products = useMemo(
-    () => productOptionsFromAllocations(initialAllocations),
-    [initialAllocations],
+    () => productOptionsFromAllocations(allocations),
+    [allocations],
   );
 
   const cards = useMemo(
-    () => buildKanbanFromAllocations(initialAllocations, productFilter || undefined),
-    [initialAllocations, productFilter],
+    () => buildKanbanFromAllocations(allocations, productFilter || undefined),
+    [allocations, productFilter],
   );
 
   const grouped = useMemo(() => {
@@ -343,6 +385,16 @@ export function CompanyProgressTab({
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {live ? (
+            <button
+              type="button"
+              onClick={() => void reload()}
+              disabled={refreshing}
+              className="h-[34px] rounded-[10px] border border-[var(--line)] bg-[var(--surface)] px-3 text-[12.5px] font-semibold text-[var(--ink)] disabled:opacity-50"
+            >
+              {refreshing ? "조회 중…" : "다시 조회"}
+            </button>
+          ) : null}
           <span className="text-[11.5px] text-[var(--muted)]">
             읽기 전용 · 상태는 운영자·매장 처리로 전이
           </span>
@@ -407,8 +459,10 @@ export function CompanyProgressTab({
 
           <div className="flex flex-wrap gap-6 rounded-[14px] border border-[var(--line)] bg-[var(--surface)] px-[18px] py-3.5 text-[11.5px] leading-relaxed text-[var(--muted)]">
             <span>
-              배정 상태는 콘텐츠 롤업 결과입니다 — 제출 0건{" "}
-              <b className="text-[var(--accent)]">제작중</b> · 제출 1건 이상{" "}
+              배정 상태는 롤업 결과입니다 — 등록만{" "}
+              <b className="text-[var(--accent)]">대기</b> · 방문{" "}
+              <b className="text-[var(--accent)]">수령완료</b> · 수령 후 제출 전{" "}
+              <b className="text-[var(--accent)]">제작중</b> · 제출 후{" "}
               <b className="text-[var(--accent)]">검수중</b> · 목표 도달{" "}
               <b className="text-[var(--accent)]">발행완료</b>.
             </span>

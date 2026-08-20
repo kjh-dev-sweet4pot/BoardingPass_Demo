@@ -62,18 +62,26 @@ begin
     return '취소';
   end if;
 
-  -- 롤업 규칙표 적용
-  if submitted_cnt = 0 then
-    return '제작중';
-  end if;
-
+  -- 콘텐츠 롤업 우선, 제출 전에는 방문·수령 상태
   if target_cnt is not null
     and target_cnt > 0
     and published_cnt >= target_cnt then
     return '발행완료';
   end if;
 
-  return '검수중';
+  if submitted_cnt > 0 then
+    return '검수중';
+  end if;
+
+  if a.status = 'picked_up' or a.picked_up_at is not null then
+    return '제작중';
+  end if;
+
+  if a.status in ('visited', 'ready') then
+    return '수령완료';
+  end if;
+
+  return '대기';
 end;
 $$;
 
