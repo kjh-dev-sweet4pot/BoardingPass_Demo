@@ -45,7 +45,14 @@ export default async function CompanyPage() {
     ]);
 
   if (companyError || !company || !company.is_active) {
-    redirect("/com/login");
+    const msg = !hasServiceRoleKey()
+      ? "회원사 데이터 조회에 SUPABASE_SERVICE_ROLE_KEY가 필요합니다. Vercel 환경변수를 확인해 주세요."
+      : companyError
+        ? "회원사 정보를 불러오지 못했습니다. 다시 로그인해 주세요."
+        : !company
+          ? "회원사 정보를 찾을 수 없습니다."
+          : "비활성화된 계정입니다. 운영자에게 문의해 주세요.";
+    redirect(`/com/login?error=${encodeURIComponent(msg)}`);
   }
 
   const initialAllocations = (allocations as AllocationWithRelations[]) || [];
