@@ -10,7 +10,7 @@ const CASTING_SELECT = `
   companies ( id, name ),
   influencers (
     id, name, instagram_handle, instagram_handle_normalized,
-    sns_url, phone, email, scale_band
+    sns_url, phone, email, scale_band, profile_image_path
   ),
   allocations (
     id, visit_date, target_content_count, rollup_status,
@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status") as CastingStatus | null;
   const campaignId = searchParams.get("campaign_id");
   const companyId = searchParams.get("company_id");
+  const staleDays = parseInt(searchParams.get("stale_days") || "", 10);
 
   let query = supabase
     .from("castings")
@@ -40,6 +41,10 @@ export async function GET(request: NextRequest) {
   if (status && STATUSES.includes(status)) query = query.eq("status", status);
   if (campaignId) query = query.eq("campaign_id", campaignId);
   if (companyId) query = query.eq("company_id", companyId);
+  if (Number.isFinite(staleDays) && staleDays > 0) {
+    const cutoff = new Date(Date.now() - staleDays * 86400000).toISOString();
+    query = query.lt("created_at", cutoff);
+  }
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

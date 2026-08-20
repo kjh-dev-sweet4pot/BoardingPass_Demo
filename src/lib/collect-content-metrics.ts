@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normalizeHandle } from "@/lib/auth";
 import {
   extractInstagramViews,
   findInstagramResultForUrl,
@@ -73,14 +72,6 @@ export async function scrapeLinkMetrics(
   throw new Error("TikTok/Instagram 링크만 지표 수집을 지원합니다.");
 }
 
-export function handlesMismatch(
-  expectedNormalized: string | null | undefined,
-  scrapedHandle: string | null,
-) {
-  if (!expectedNormalized || !scrapedHandle) return false;
-  return normalizeHandle(expectedNormalized) !== normalizeHandle(scrapedHandle);
-}
-
 async function markJob(
   supabase: SupabaseClient,
   jobId: string,
@@ -127,7 +118,7 @@ export async function countConsecutiveCollectFailures(
 export async function collectLinkMetrics(
   supabase: SupabaseClient,
   link: CollectLinkRow,
-  options: { verifyAuthor?: boolean; jobId?: string } = {},
+  options: { jobId?: string } = {},
 ) {
   const url = metricUrl(link);
   if (!url) throw new Error("수집할 URL이 없습니다.");
@@ -142,13 +133,6 @@ export async function collectLinkMetrics(
 
   try {
     const metrics = await scrapeLinkMetrics(url, link.platform);
-    const expected =
-      link.influencers?.instagram_handle_normalized ||
-      link.influencers?.instagram_handle ||
-      null;
-    const verifyFailed =
-      options.verifyAuthor && handlesMismatch(expected, metrics.authorHandle);
-
     const collectedAt = new Date().toISOString();
 
     const { error: metricErr } = await supabase.from("content_metrics").upsert(
@@ -163,20 +147,16 @@ export async function collectLinkMetrics(
     );
     if (metricErr) throw new Error(metricErr.message);
 
-    const linkPatch: Record<string, unknown> = {
-      views: metrics.views,
-      likes: metrics.likes,
-      comments: metrics.comments,
-      metrics_collected_at: collectedAt,
-      updated_at: collectedAt,
-    };
-    if (options.verifyAuthor) {
-      linkPatch.verification_failed = verifyFailed;
-    }
-
     const { error: linkErr } = await supabase
       .from("creator_links")
-      .update(linkPatch)
+      .update({
+        views: metrics.views,
+        likes: metrics.likes,
+        comments: metrics.comments,
+        metrics_collected_at: collectedAt,
+        verification_failed: false,
+        updated_at: collectedAt,
+      })
       .eq("id", link.id);
     if (linkErr) throw new Error(linkErr.message);
 
@@ -190,7 +170,7 @@ export async function collectLinkMetrics(
 
     return {
       metrics,
-      verificationFailed: verifyFailed,
+      verificationFailed: false,
       collectedAt,
     };
   } catch (err) {
@@ -231,7 +211,7 @@ export async function loadCollectLink(
   return data as CollectLinkRow;
 }
 
-/** 발행 URL 등록 직후 1회 — 핸들 대조 포함 */
+/** 발행 URL 등록 직후 1회 수집 */
 export async function collectOnPublishUrl(
   supabase: SupabaseClient,
   linkId: string,
@@ -248,10 +228,7 @@ export async function collectOnPublishUrl(
     .single();
   if (jobErr || !job) throw new Error(jobErr?.message || "collection_jobs 생성 실패");
 
-  return collectLinkMetrics(supabase, link, {
-    verifyAuthor: true,
-    jobId: job.id,
-  });
+  return collectLinkMetrics(supabase, link, { jobId: job.id });
 }
 
 export async function runCollectionJob(

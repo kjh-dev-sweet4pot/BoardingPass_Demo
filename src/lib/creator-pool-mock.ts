@@ -201,7 +201,12 @@ function avatarProvider(channel: string) {
   return "instagram";
 }
 
-/** 실제 SNS만: 1) 프로필 사진 2) 없으면 게시물 사진. 로컬 캐시 우선. */
+/** DB 실인플루언서 UUID — 목업 jp-001 등과 구분 */
+export function isLiveInfluencerId(id: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
+/** 실제 SNS만: 1) Storage(회원사 API) 2) 로컬 캐시 3) unavatar … */
 export function creatorAvatarCandidates(creator: PoolCreator): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -212,7 +217,11 @@ export function creatorAvatarCandidates(creator: PoolCreator): string[] {
     out.push(u);
   };
 
-  // manifest 여부와 무관하게 로컬 캐시 먼저 (public/creator-avatars)
+  if (isLiveInfluencerId(creator.id)) {
+    push(`/api/company/influencers/${creator.id}/avatar`);
+  }
+
+  // manifest 여부와 무관하게 로컬 캐시 (public/creator-avatars, JP 데모)
   push(`/creator-avatars/${creator.id}.jpg`);
 
   const handle = bestHandle(creator);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   applyCompanyMatch,
@@ -11,8 +11,34 @@ import {
   parseImportFile,
   type ParsedImportRow,
 } from "@/lib/csv-import";
+import {
+  effectiveProfileStatus,
+  type ImportBatchInfluencerRow,
+  type ImportBatchRow,
+  type ImportProfileFetchStatus,
+} from "@/lib/import-batch-log";
+import { InfluencerAvatar } from "@/components/influencer-avatar";
 import { primaryBtnClass, secondaryBtnClass } from "@/components/ui";
 import { type Company } from "@/lib/types";
+
+type BatchListItem = ImportBatchRow & {
+  uploaded_at_label: string;
+  influencer_count: number;
+};
+
+const PROFILE_STATUS_LABEL: Record<ImportProfileFetchStatus, string> = {
+  pending: "수집 중",
+  ok: "완료",
+  failed: "실패",
+  skipped: "기존 프로필",
+};
+
+function profileStatusClass(status: ImportProfileFetchStatus) {
+  if (status === "ok") return "text-[var(--accent)]";
+  if (status === "failed") return "text-[var(--danger)]";
+  if (status === "pending") return "text-[var(--muted)]";
+  return "text-[var(--muted)]";
+}
 
 export function AdminImportPanel({
   compact = false,
@@ -35,7 +61,51 @@ export function AdminImportPanel({
   const [resultError, setResultError] = useState<string | null>(null);
   const [companyList, setCompanyList] = useState(companies);
   const [aliasTarget, setAliasTarget] = useState<Record<number, string>>({});
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
+  const [batches, setBatches] = useState<BatchListItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyHint, setHistoryHint] = useState<string | null>(null);
+  const [refetchingId, setRefetchingId] = useState<string | null>(null);
+  const [avatarKeys, setAvatarKeys] = useState<Record<string, number>>({});
+  const [avatarBroken, setAvatarBroken] = useState<Record<string, boolean>>({});
   const hasCompanies = companyList.some((c) => c.is_active);
+
+  const loadBatches = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch("/api/admin/import/batches?limit=30");
+      const body = await res.json();
+      if (!res.ok) {
+        const msg = [body.error, body.hint].filter(Boolean).join(" — ");
+        throw new Error(msg || "업로드 이력 조회 실패");
+      }
+      setBatches((body.batches || []) as BatchListItem[]);
+      setHistoryHint(body.tableMissing ? body.hint || null : null);
+    } catch (err: unknown) {
+      setHistoryHint(
+        err instanceof Error ? err.message : "업로드 이력을 불러오지 못했습니다.",
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (historyOpen) void loadBatches();
+  }, [historyOpen, loadBatches]);
+
+  useEffect(() => {
+    if (!historyOpen) return;
+    const hasPending = batches.some((batch) =>
+      (batch.import_batch_influencers || []).some(
+        (item) => effectiveProfileStatus(item) === "pending",
+      ),
+    );
+    if (!hasPending) return;
+    const timer = window.setInterval(() => void loadBatches(), 5000);
+    return () => window.clearInterval(timer);
+  }, [historyOpen, batches, loadBatches]);
 
   useEffect(() => {
     setCompanyList(companies);
@@ -166,6 +236,8 @@ export function AdminImportPanel({
         `완료: ${s.total}행 중 생성 ${s.created} · 중복 건너뜀 ${s.skipped} · 실패 ${s.failed}`,
       );
       resetFileState();
+      setHistoryOpen(true);
+      void loadBatches();
       router.refresh();
     } catch (err: unknown) {
       setResultError(
@@ -195,6 +267,114 @@ export function AdminImportPanel({
     );
     setCompanyList(nextList);
     setRows((prev) => prev.map((r) => applyCompanyMatch(r, nextList)));
+  }
+
+  async function refreshProfile(item: ImportBatchInfluencerRow, refetchFromApify: boolean) {
+    setRefetchingId(item.id);
+    setAvatarBroken((prev) => {
+      const next = { ...prev };
+      delete next[item.influencer_id];
+      return next;
+    });
+
+    try {
+      if (refetchFromApify) {
+        const res = await fetch(`/api/admin/influencers/${item.influencer_id}/avatar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batchInfluencerId: item.id }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || "프로필 수집 실패");
+      }
+
+      setAvatarKeys((prev) => ({
+        ...prev,
+        [item.influencer_id]: (prev[item.influencer_id] || 0) + 1,
+      }));
+      await loadBatches();
+    } catch (err: unknown) {
+      setResultError(
+        err instanceof Error ? err.message : "프로필 조회 중 오류가 발생했습니다.",
+      );
+      await loadBatches();
+    } finally {
+      setRefetchingId(null);
+    }
+  }
+
+  function renderBatchInfluencer(item: ImportBatchInfluencerRow) {
+    const status = effectiveProfileStatus(item);
+    const cacheBust = avatarKeys[item.influencer_id] || 0;
+    const imageMissing = avatarBroken[item.influencer_id];
+    const busy = refetchingId === item.id;
+
+    return (
+      <li
+        key={item.id}
+        className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] px-4 py-3 text-sm"
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
+          <InfluencerAvatar
+            key={`${item.influencer_id}-${cacheBust}`}
+            influencerId={item.influencer_id}
+            name={item.name}
+            size="thumb"
+            cacheBust={cacheBust}
+            onLoadError={() =>
+              setAvatarBroken((prev) => ({ ...prev, [item.influencer_id]: true }))
+            }
+          />
+          <div className="min-w-0">
+            <p className="font-medium text-[var(--ink)]">{item.name || "—"}</p>
+            <p className="text-xs text-[var(--muted)]">
+              @{item.instagram_handle}
+              {item.is_new ? " · 신규" : " · 기존"}
+            </p>
+            {status === "ok" && imageMissing ? (
+              <p className="text-xs text-[var(--danger)]">
+                수집 완료로 표시됐지만 이미지가 보이지 않습니다.
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`text-xs font-medium ${profileStatusClass(status)}`}>
+            프로필 {PROFILE_STATUS_LABEL[status]}
+          </span>
+          {item.profile_fetch_error && status === "failed" ? (
+            <span
+              className="max-w-[220px] truncate text-xs text-[var(--danger)]"
+              title={item.profile_fetch_error}
+            >
+              {item.profile_fetch_error}
+            </span>
+          ) : null}
+          {status !== "skipped" ? (
+            <>
+              <button
+                type="button"
+                className={`${secondaryBtnClass} !px-2.5 !py-1 text-xs`}
+                disabled={busy}
+                onClick={() => void refreshProfile(item, false)}
+              >
+                {busy ? "조회 중…" : "다시 조회"}
+              </button>
+              {status !== "ok" || imageMissing ? (
+                <button
+                  type="button"
+                  className={`${secondaryBtnClass} !px-2.5 !py-1 text-xs`}
+                  disabled={busy}
+                  onClick={() => void refreshProfile(item, true)}
+                >
+                  {busy ? "수집 중…" : "Apify 재수집"}
+                </button>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      </li>
+    );
   }
 
   return (
@@ -336,6 +516,119 @@ export function AdminImportPanel({
         {resultError && (
           <p className="mt-3 text-sm text-[var(--danger)]">{resultError}</p>
         )}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
+        <button
+          type="button"
+          onClick={() => setHistoryOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+          aria-expanded={historyOpen}
+        >
+          <div>
+            <h2
+              className="text-lg text-[var(--ink)]"
+              style={{ fontFamily: "var(--font-display), serif" }}
+            >
+              업로드 이력
+            </h2>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              업로드 시각 · 인플루언서 수 · 프로필 수집 상태
+            </p>
+          </div>
+          <span className="shrink-0 text-xs font-medium text-[var(--muted)]">
+            {historyOpen ? "접기 ▲" : "펼치기 ▼"}
+          </span>
+        </button>
+
+        {historyOpen ? (
+          <div className="border-t border-[var(--line)] px-5 pb-5 pt-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-[var(--muted)]">
+                최근 {batches.length}건
+              </p>
+              <button
+                type="button"
+                className={`${secondaryBtnClass} !px-3 !py-1.5 text-xs`}
+                disabled={historyLoading}
+                onClick={() => void loadBatches()}
+              >
+                {historyLoading ? "조회 중…" : "다시 조회"}
+              </button>
+            </div>
+
+            {historyHint ? (
+              <p className="mb-3 text-sm text-[var(--danger)]">{historyHint}</p>
+            ) : null}
+
+            {batches.length === 0 && !historyLoading ? (
+              <p className="py-6 text-center text-sm text-[var(--muted)]">
+                업로드 이력이 없습니다.
+              </p>
+            ) : null}
+
+            <ul className="space-y-2">
+              {batches.map((batch) => {
+                const expanded = expandedBatchId === batch.id;
+                const profileFailed = (batch.import_batch_influencers || []).filter(
+                  (item) => effectiveProfileStatus(item) === "failed",
+                ).length;
+                const profilePending = (batch.import_batch_influencers || []).filter(
+                  (item) => effectiveProfileStatus(item) === "pending",
+                ).length;
+
+                return (
+                  <li
+                    key={batch.id}
+                    className="border border-[var(--line)] bg-white/40"
+                  >
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm"
+                      onClick={() =>
+                        setExpandedBatchId((prev) =>
+                          prev === batch.id ? null : batch.id,
+                        )
+                      }
+                    >
+                      <div>
+                        <p className="font-medium text-[var(--ink)]">
+                          {batch.uploaded_at_label}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[var(--muted)]">
+                          인플루언서 {batch.influencer_count}명 · 배정 생성{" "}
+                          {batch.created_count} · 중복 {batch.skipped_count} · 실패{" "}
+                          {batch.failed_count}
+                          {profileFailed > 0
+                            ? ` · 프로필 실패 ${profileFailed}`
+                            : ""}
+                          {profilePending > 0
+                            ? ` · 프로필 수집 중 ${profilePending}`
+                            : ""}
+                        </p>
+                      </div>
+                      <span className="text-xs text-[var(--muted)]">
+                        {expanded ? "▲" : "▼"}
+                      </span>
+                    </button>
+
+                    {expanded ? (
+                      <ul className="border-t border-[var(--line)] bg-[var(--surface)]">
+                        {(batch.import_batch_influencers || []).length === 0 ? (
+                          <li className="px-4 py-4 text-xs text-[var(--muted)]">
+                            이 배치에 기록된 인플루언서가 없습니다.
+                          </li>
+                        ) : (
+                          batch.import_batch_influencers.map(renderBatchInfluencer)
+                        )}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         ) : null}
       </section>

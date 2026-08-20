@@ -43,19 +43,30 @@ function fmtKrw(n: number) {
 }
 
 // ── 큐 카드 ──────────────────────────────────────────────────────────────
+export type AdminQueueKey =
+  | "reviewPending"
+  | "verifyFailed"
+  | "collectFailed"
+  | "publishStale"
+  | "castingStale";
+
 function QueueCard({
   label,
   count,
   warn,
+  onOpen,
 }: {
   label: string;
   count: number;
   warn?: boolean;
+  onOpen: () => void;
 }) {
   const isEmpty = count === 0;
   return (
-    <div
-      className={`rounded-2xl border px-4 py-3 ${
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`rounded-2xl border px-4 py-3 text-left transition hover:brightness-[0.98] ${
         isEmpty
           ? "border-[var(--line)] bg-white"
           : warn
@@ -72,9 +83,9 @@ function QueueCard({
         {isEmpty ? "—" : count}
       </p>
       <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-        {isEmpty ? "처리 대기 없음" : "건"}
+        {isEmpty ? "처리 대기 없음" : "건 · 열기"}
       </p>
-    </div>
+    </button>
   );
 }
 
@@ -90,7 +101,13 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
 }
 
 // ── 메인 ──────────────────────────────────────────────────────────────────
-export function AdminDashboard({ companies }: { companies: Company[] }) {
+export function AdminDashboard({
+  companies,
+  onOpenQueue,
+}: {
+  companies: Company[];
+  onOpenQueue: (queue: AdminQueueKey) => void;
+}) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState("");
@@ -126,11 +143,33 @@ export function AdminDashboard({ companies }: { companies: Company[] }) {
             <p className="text-sm text-[var(--muted)]">불러오는 중…</p>
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              <QueueCard label="검수 대기" count={queues?.reviewPending ?? 0} />
-              <QueueCard label="검증 실패" count={queues?.verifyFailed ?? 0} warn />
-              <QueueCard label="수집 연속 실패" count={queues?.collectFailed ?? 0} warn />
-              <QueueCard label="발행 미이행" count={queues?.publishStale ?? 0} />
-              <QueueCard label="섭외 정체" count={queues?.castingStale ?? 0} />
+              <QueueCard
+                label="검수 대기"
+                count={queues?.reviewPending ?? 0}
+                onOpen={() => onOpenQueue("reviewPending")}
+              />
+              <QueueCard
+                label="검증 실패"
+                count={queues?.verifyFailed ?? 0}
+                warn
+                onOpen={() => onOpenQueue("verifyFailed")}
+              />
+              <QueueCard
+                label="수집 연속 실패"
+                count={queues?.collectFailed ?? 0}
+                warn
+                onOpen={() => onOpenQueue("collectFailed")}
+              />
+              <QueueCard
+                label="발행 미이행"
+                count={queues?.publishStale ?? 0}
+                onOpen={() => onOpenQueue("publishStale")}
+              />
+              <QueueCard
+                label="섭외 정체"
+                count={queues?.castingStale ?? 0}
+                onOpen={() => onOpenQueue("castingStale")}
+              />
             </div>
           )}
         </div>

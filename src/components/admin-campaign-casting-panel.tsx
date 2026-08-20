@@ -8,6 +8,7 @@ import {
   primaryBtnClass,
   secondaryBtnClass,
 } from "@/components/ui";
+import { InfluencerAvatar } from "@/components/influencer-avatar";
 import {
   type CastingStatus,
   type Company,
@@ -40,6 +41,7 @@ type CastingRow = {
     id: string;
     name: string;
     instagram_handle: string;
+    profile_image_path?: string | null;
     phone?: string | null;
     email?: string | null;
   } | null;
@@ -85,18 +87,24 @@ export function AdminCampaignCastingPanel({
   products,
   stores,
   isManager,
+  staleCastings = false,
 }: {
   companies: Company[];
   products: Product[];
   stores: Store[];
   isManager: boolean;
+  staleCastings?: boolean;
 }) {
-  const [tab, setTab] = useState<"campaigns" | "castings">("campaigns");
+  const [tab, setTab] = useState<"campaigns" | "castings">(
+    staleCastings ? "castings" : "campaigns",
+  );
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [castings, setCastings] = useState<CastingRow[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [selectedCastingId, setSelectedCastingId] = useState<string | null>(null);
-  const [castingFilter, setCastingFilter] = useState<CastingStatus | "">("");
+  const [castingFilter, setCastingFilter] = useState<CastingStatus | "">(
+    staleCastings ? "Pending" : "",
+  );
   const [logs, setLogs] = useState<NegotiationLogRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -139,6 +147,7 @@ export function AdminCampaignCastingPanel({
   const loadCastings = useCallback(async () => {
     const qs = new URLSearchParams();
     if (castingFilter) qs.set("status", castingFilter);
+    if (staleCastings) qs.set("stale_days", "7");
     if (selectedCampaignId && tab === "castings") {
       qs.set("campaign_id", selectedCampaignId);
     }
@@ -146,7 +155,7 @@ export function AdminCampaignCastingPanel({
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || "섭외 조회 실패");
     setCastings(json.castings ?? []);
-  }, [castingFilter, selectedCampaignId, tab]);
+  }, [castingFilter, selectedCampaignId, tab, staleCastings]);
 
   const loadLogs = useCallback(async (castingId: string) => {
     const res = await fetch(`/api/admin/castings/${castingId}/negotiation-logs`);
@@ -154,6 +163,12 @@ export function AdminCampaignCastingPanel({
     if (!res.ok) throw new Error(json.error || "협상 이력 조회 실패");
     setLogs(json.logs ?? []);
   }, []);
+
+  useEffect(() => {
+    if (!staleCastings) return;
+    setTab("castings");
+    setCastingFilter("Pending");
+  }, [staleCastings]);
 
   useEffect(() => {
     loadCampaigns().catch((e) => setError(e.message));
@@ -319,6 +334,11 @@ export function AdminCampaignCastingPanel({
           </button>
         ))}
       </div>
+      {staleCastings && tab === "castings" ? (
+        <p className="text-xs text-[var(--muted)]">
+          대시보드 · 섭외 정체 (Pending 7일 이상)
+        </p>
+      ) : null}
 
       {tab === "campaigns" ? (
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -524,10 +544,21 @@ export function AdminCampaignCastingPanel({
                       }`}
                     >
                       <td className="px-5 py-3">
-                        {c.influencers?.name ?? "—"}
-                        <span className="ml-1 text-xs text-[var(--muted)]">
-                          @{c.influencers?.instagram_handle}
-                        </span>
+                        <div className="flex items-center gap-2.5">
+                          {c.influencers?.id ? (
+                            <InfluencerAvatar
+                              influencerId={c.influencers.id}
+                              name={c.influencers.name}
+                              size="thumb"
+                            />
+                          ) : null}
+                          <div className="min-w-0">
+                            {c.influencers?.name ?? "—"}
+                            <span className="ml-1 text-xs text-[var(--muted)]">
+                              @{c.influencers?.instagram_handle}
+                            </span>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-3 py-3">{c.campaigns?.name || "(이름 없음)"}</td>
                       <td className="px-3 py-3">{c.companies?.name ?? "—"}</td>
@@ -554,9 +585,18 @@ export function AdminCampaignCastingPanel({
                   <dl className="mt-3 space-y-2 text-sm">
                     <div>
                       <dt className="text-[var(--muted)]">인플루언서</dt>
-                      <dd>
-                        {selectedCasting.influencers?.name} (@
-                        {selectedCasting.influencers?.instagram_handle})
+                      <dd className="flex items-center gap-2.5">
+                        {selectedCasting.influencers?.id ? (
+                          <InfluencerAvatar
+                            influencerId={selectedCasting.influencers.id}
+                            name={selectedCasting.influencers.name}
+                            size="md"
+                          />
+                        ) : null}
+                        <span>
+                          {selectedCasting.influencers?.name} (@
+                          {selectedCasting.influencers?.instagram_handle})
+                        </span>
                       </dd>
                     </div>
                     <div>

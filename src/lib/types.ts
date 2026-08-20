@@ -60,6 +60,8 @@ export type Influencer = {
   instagram_handle_normalized: string;
   /** SNS 프로필 URL */
   sns_url: string | null;
+  /** Storage influencer-avatars/{id}.jpg */
+  profile_image_path: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
