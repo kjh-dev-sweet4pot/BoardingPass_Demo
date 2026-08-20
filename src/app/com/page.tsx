@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
 import { CompanyConsole } from "@/components/company-console";
-import { AppShell, Notice, secondaryBtnClass } from "@/components/ui";
+import { AppShell, Notice } from "@/components/ui";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
+import { isDemoCompany } from "@/lib/company";
 import { getCompanySessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -47,30 +48,37 @@ export default async function CompanyPage() {
   }
 
   const initialAllocations = (allocations as AllocationWithRelations[]) || [];
-  const initialMonthInsights = buildMockContentInsights(initialAllocations, "month");
-  const initialAllInsights = buildMockContentInsights(initialAllocations, "all");
+  const liveCompany = company as Company;
+  const fabricate = isDemoCompany(liveCompany);
+  const initialMonthInsights = buildMockContentInsights(
+    initialAllocations,
+    "month",
+    { fabricate },
+  );
+  const initialAllInsights = buildMockContentInsights(
+    initialAllocations,
+    "all",
+    { fabricate },
+  );
 
   return (
-    <AppShell
-      full
-      fitViewport
-      theme="owm"
-      eyebrow="Company"
-      title={company.name}
-      actions={
-        <form action={signOut}>
-          <input type="hidden" name="next" value="/com/login" />
-          <button className={secondaryBtnClass} type="submit">
-            로그아웃
-          </button>
-        </form>
-      }
-    >
+    <AppShell full fitViewport theme="owm" hideHeader>
       <CompanyConsole
-        company={company as Company}
+        company={liveCompany}
         initialAllocations={initialAllocations}
         initialMonthInsights={initialMonthInsights}
         initialAllInsights={initialAllInsights}
+        sidebarActions={
+          <form action={signOut}>
+            <input type="hidden" name="next" value="/com/login" />
+            <button
+              className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--muted)] transition hover:bg-[var(--surface-hover)]"
+              type="submit"
+            >
+              로그아웃
+            </button>
+          </form>
+        }
       />
     </AppShell>
   );

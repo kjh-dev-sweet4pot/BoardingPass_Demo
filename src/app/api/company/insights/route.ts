@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
+import { isDemoCompany } from "@/lib/company";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import { getCompanySessionId } from "@/lib/session";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { type AllocationWithRelations } from "@/lib/types";
+
+async function getClient() {
+  if (hasServiceRoleKey()) return createServiceClient();
+  return createApiClientIfConfigured();
+}
 
 /**
  * 회원사 콘텐츠 성과 스냅샷.
- * 현재는 mock. Apify 수집분이 생기면 이 핸들러만 live 조회로 교체하면
- * /com 대시보드가 그대로 따라갑니다.
+ * login_id=company 만 지표를 목업하고, 그 외는 배정·링크에 있는 값만 쓴다.
  */
 export async function GET(request: Request) {
   const companyId = await getCompanySessionId();
@@ -18,8 +24,18 @@ export async function GET(request: Request) {
   const period =
     new URL(request.url).searchParams.get("period") === "all" ? "all" : "month";
 
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await getClient();
   if (!supabase) return supabaseConfigError();
+
+  const { data: company, error: companyError } = await supabase
+    .from("companies")
+    .select("login_id")
+    .eq("id", companyId)
+    .maybeSingle();
+  if (companyError) {
+    return NextResponse.json({ error: companyError.message }, { status: 500 });
+  }
+
   const { data, error } = await supabase
     .from("allocations")
     .select(
@@ -32,11 +48,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // TODO(apify): content_metrics 테이블이 있으면 source:"apify" 스냅샷으로 교체
   const snapshot = buildMockContentInsights(
     (data as AllocationWithRelations[]) || [],
     period,
+    { fabricate: isDemoCompany(company) },
   );
-
   return NextResponse.json({ insights: snapshot });
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { getCompanySessionId } from "@/lib/session";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 export async function GET() {
   const companyId = await getCompanySessionId();
@@ -8,7 +9,9 @@ export async function GET() {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const supabase = await createApiClientIfConfigured();
+  const supabase = hasServiceRoleKey()
+    ? createServiceClient()
+    : await createApiClientIfConfigured();
   if (!supabase) return supabaseConfigError();
   const { data, error } = await supabase
     .from("allocations")

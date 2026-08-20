@@ -31,6 +31,7 @@ export type CreatorLink = {
   status: CreatorLinkStatus;
   content_status?: "제출" | "승인" | "발행완료" | "반려" | null;
   publish_url?: string | null;
+  submitted_file_path?: string | null;
   verification_failed?: boolean;
   memo: string | null;
   submitted_at: string;
@@ -70,6 +71,48 @@ export type Product = {
   sku: string | null;
   description: string | null;
   created_at: string;
+};
+
+export type CampaignStatus = "견적수립" | "시행" | "결과" | "보류" | "취소";
+
+export type Campaign = {
+  id: string;
+  company_id: string;
+  product_id: string;
+  status: CampaignStatus;
+  name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CastingStatus = "Pending" | "Nego" | "Accept" | "결렬";
+
+export type Casting = {
+  id: string;
+  campaign_id: string;
+  company_id: string;
+  influencer_id: string;
+  status: CastingStatus;
+  allocation_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NegotiationLog = {
+  id: string;
+  casting_id: string;
+  proposed_amount: number | null;
+  memo: string | null;
+  proposer: "company" | "operator";
+  operator_label: string | null;
+  created_at: string;
+};
+
+export const CASTING_STATUS_LABEL: Record<CastingStatus, string> = {
+  Pending: "Pending",
+  Nego: "Nego",
+  Accept: "Accept",
+  결렬: "결렬",
 };
 
 export type Allocation = {

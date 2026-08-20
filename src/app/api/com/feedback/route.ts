@@ -13,9 +13,10 @@ export async function POST(request: NextRequest) {
   const companyId = await getCompanySessionId();
   if (!companyId) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
 
-  const { creator_link_id, comment } = await request.json();
-  if (!creator_link_id || !comment?.trim())
-    return NextResponse.json({ error: "creator_link_id, comment 필요" }, { status: 400 });
+  const { creator_link_id, comment, body: bodyText } = await request.json();
+  const text = String(bodyText || comment || "").trim();
+  if (!creator_link_id || !text)
+    return NextResponse.json({ error: "creator_link_id, body 필요" }, { status: 400 });
 
   const supabase = await getClient();
   if (!supabase) return supabaseConfigError();
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("content_feedback")
-    .insert({ creator_link_id, company_id: companyId, comment: comment.trim() })
+    .insert({ creator_link_id, company_id: companyId, body: text })
     .select()
     .single();
 

@@ -106,6 +106,59 @@ export function buildCreatorPool(): PoolCreator[] {
   return rows.sort((a, b) => Number(!!has[b.id]) - Number(!!has[a.id]));
 }
 
+let poolById: Map<string, PoolCreator> | null = null;
+let poolByHandle: Map<string, PoolCreator> | null = null;
+
+function normalizeHandle(raw: string) {
+  return raw.replace(/^@+/, "").trim().toLowerCase();
+}
+
+function ensurePoolIndexes() {
+  if (!poolById) {
+    poolById = new Map(buildCreatorPool().map((c) => [c.id, c]));
+  }
+  if (!poolByHandle) {
+    poolByHandle = new Map();
+    for (const c of poolById.values()) {
+      poolByHandle.set(normalizeHandle(c.handle), c);
+      if (c.profileUrl) {
+        const h = extractHandleFromUrl(c.profileUrl, c.channel);
+        if (h) poolByHandle.set(h.toLowerCase(), c);
+      }
+    }
+  }
+}
+
+export function getPoolCreator(id: string): PoolCreator | undefined {
+  ensurePoolIndexes();
+  return poolById!.get(id);
+}
+
+/** DB UUID 등 id 불일치 시 핸들·이름으로 JP 풀 크리에이터 매칭 */
+export function findPoolCreator(opts: {
+  id?: string | null;
+  handle?: string | null;
+  name?: string | null;
+}): PoolCreator | undefined {
+  ensurePoolIndexes();
+  if (opts.id) {
+    const byId = poolById!.get(opts.id);
+    if (byId) return byId;
+  }
+  const handle = normalizeHandle(opts.handle || "");
+  if (handle && handle !== "—") {
+    const byHandle = poolByHandle!.get(handle);
+    if (byHandle) return byHandle;
+  }
+  const name = (opts.name || "").trim();
+  if (name) {
+    for (const c of poolById!.values()) {
+      if (c.name === name) return c;
+    }
+  }
+  return undefined;
+}
+
 function extractHandleFromUrl(url: string, channel: string) {
   const u = url.trim();
   if (!u) return "";
@@ -159,8 +212,8 @@ export function creatorAvatarCandidates(creator: PoolCreator): string[] {
     out.push(u);
   };
 
-  const cached = (avatarManifest as Record<string, string>)[creator.id];
-  if (cached) push(`/creator-avatars/${creator.id}.jpg`);
+  // manifest 여부와 무관하게 로컬 캐시 먼저 (public/creator-avatars)
+  push(`/creator-avatars/${creator.id}.jpg`);
 
   const handle = bestHandle(creator);
   if (handle) {

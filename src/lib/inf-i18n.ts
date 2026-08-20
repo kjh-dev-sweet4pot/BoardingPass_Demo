@@ -68,6 +68,28 @@ export type InfMessages = {
   visitScheduled: string;
   allocationsTab: string;
   contentLinks: string;
+  contentSubmitTab: string;
+  contentPublishTab: string;
+  submitFileHint: string;
+  submitFilePick: string;
+  submitFileTypes: string;
+  submitFileBtn: string;
+  submitFileUploading: string;
+  submitUrlLabel: string;
+  submitUrlPlaceholder: string;
+  submitNeedFileOrUrl: string;
+  submitNeedSection: string;
+  submitDoneSection: string;
+  submitAllDone: string;
+  contentReviewing: string;
+  contentApproved: string;
+  contentPublished: string;
+  publishUrlHint: string;
+  publishUrlSubmit: string;
+  publishUrlSaving: string;
+  publishNeedSection: string;
+  publishDoneSection: string;
+  publishAllDone: string;
   registerLink: string;
   registerLinkCta: string;
   linkRegistered: string;
@@ -273,6 +295,29 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     visitScheduled: "방문 예정",
     allocationsTab: "배정 목록",
     contentLinks: "콘텐츠 링크",
+    contentSubmitTab: "콘텐츠 제출",
+    contentPublishTab: "발행 URL",
+    submitFileHint:
+      "수령한 상품 콘텐츠를 파일로 올리거나, SNS 게시물 URL을 입력하세요. 둘 다 넣어도 됩니다.",
+    submitFilePick: "탭하여 파일 선택",
+    submitFileTypes: "이미지 · 동영상 · PDF (80MB 이하)",
+    submitFileBtn: "제출하기",
+    submitFileUploading: "업로드 중…",
+    submitUrlLabel: "SNS URL (선택 · 파일 없이 URL만도 가능)",
+    submitUrlPlaceholder: "https://www.instagram.com/... 또는 TikTok URL",
+    submitNeedFileOrUrl: "파일 또는 SNS URL을 입력하세요.",
+    submitNeedSection: "제출 필요",
+    submitDoneSection: "제출 완료 · 검수 중",
+    submitAllDone: "제출할 콘텐츠가 없어요.",
+    contentReviewing: "검수중",
+    contentApproved: "승인됨 · 발행 URL 등록 대기",
+    contentPublished: "발행완료",
+    publishUrlHint: "승인된 콘텐츠의 SNS 게시물 URL을 등록하세요.",
+    publishUrlSubmit: "발행 URL 등록",
+    publishUrlSaving: "등록 중…",
+    publishNeedSection: "발행 URL 등록 필요",
+    publishDoneSection: "발행 완료",
+    publishAllDone: "등록할 발행 URL이 없어요.",
     registerLink: "링크 등록",
     registerLinkCta: "링크 등록하기",
     linkRegistered: "링크 등록이 완료되었습니다 !",
@@ -369,6 +414,28 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     visitScheduled: "Scheduled",
     allocationsTab: "Allocations",
     contentLinks: "Content links",
+    contentSubmitTab: "Submit content",
+    contentPublishTab: "Publish URL",
+    submitFileHint: "Upload a file and/or paste the SNS post URL for each picked-up product.",
+    submitFilePick: "Tap to choose a file",
+    submitFileTypes: "Image · Video · PDF (max 80MB)",
+    submitFileBtn: "Submit",
+    submitFileUploading: "Uploading…",
+    submitUrlLabel: "SNS URL (optional — URL only is OK)",
+    submitUrlPlaceholder: "https://www.instagram.com/... or TikTok URL",
+    submitNeedFileOrUrl: "Add a file or an SNS URL.",
+    submitNeedSection: "Needs submission",
+    submitDoneSection: "Submitted · In review",
+    submitAllDone: "Nothing to submit.",
+    contentReviewing: "In review",
+    contentApproved: "Approved · Awaiting publish URL",
+    contentPublished: "Published",
+    publishUrlHint: "Register the live SNS post URL for approved content.",
+    publishUrlSubmit: "Register publish URL",
+    publishUrlSaving: "Saving…",
+    publishNeedSection: "Publish URL needed",
+    publishDoneSection: "Published",
+    publishAllDone: "No publish URLs to register.",
     registerLink: "Add link",
     registerLinkCta: "Submit a link",
     linkRegistered: "Link submitted!",
@@ -479,6 +546,28 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     visitScheduled: "来店予定",
     allocationsTab: "割当一覧",
     contentLinks: "コンテンツリンク",
+    contentSubmitTab: "コンテンツ提出",
+    contentPublishTab: "公開URL",
+    submitFileHint: "受取商品のコンテンツをファイルでアップロードするか、SNS投稿URLを入力してください。両方でも構いません。",
+    submitFilePick: "タップしてファイルを選択",
+    submitFileTypes: "画像 · 動画 · PDF（80MB以下）",
+    submitFileBtn: "提出する",
+    submitFileUploading: "アップロード中…",
+    submitUrlLabel: "SNS URL（任意 · URLのみでも可）",
+    submitUrlPlaceholder: "https://www.instagram.com/... または TikTok URL",
+    submitNeedFileOrUrl: "ファイルまたはSNS URLを入力してください。",
+    submitNeedSection: "提出が必要",
+    submitDoneSection: "提出済み · 審査中",
+    submitAllDone: "提出するコンテンツがありません。",
+    contentReviewing: "審査中",
+    contentApproved: "承認済み · 公開URL待ち",
+    contentPublished: "公開完了",
+    publishUrlHint: "承認されたコンテンツのSNS投稿URLを登録してください。",
+    publishUrlSubmit: "公開URL登録",
+    publishUrlSaving: "登録中…",
+    publishNeedSection: "公開URL登録が必要",
+    publishDoneSection: "公開完了",
+    publishAllDone: "登録する公開URLがありません。",
     registerLink: "リンク登録",
     registerLinkCta: "リンクを登録する",
     linkRegistered: "リンク登録が完了しました！",
@@ -587,6 +676,28 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     visitScheduled: "到访预定",
     allocationsTab: "分配列表",
     contentLinks: "内容链接",
+    contentSubmitTab: "内容提交",
+    contentPublishTab: "发布链接",
+    submitFileHint: "已领取商品的内容可上传文件，或填写 SNS 帖子链接，也可两者都提交。",
+    submitFilePick: "点击选择文件",
+    submitFileTypes: "图片 · 视频 · PDF（80MB以内）",
+    submitFileBtn: "提交",
+    submitFileUploading: "上传中…",
+    submitUrlLabel: "SNS 链接（可选 · 仅链接也可以）",
+    submitUrlPlaceholder: "https://www.instagram.com/... 或 TikTok 链接",
+    submitNeedFileOrUrl: "请上传文件或填写 SNS 链接。",
+    submitNeedSection: "待提交",
+    submitDoneSection: "已提交 · 审核中",
+    submitAllDone: "没有待提交的内容。",
+    contentReviewing: "审核中",
+    contentApproved: "已通过 · 待登记发布链接",
+    contentPublished: "已发布",
+    publishUrlHint: "请登记已通过内容的 SNS 帖子链接。",
+    publishUrlSubmit: "登记发布链接",
+    publishUrlSaving: "登记中…",
+    publishNeedSection: "待登记发布链接",
+    publishDoneSection: "已发布",
+    publishAllDone: "没有待登记的发布链接。",
     registerLink: "登记链接",
     registerLinkCta: "去登记链接",
     linkRegistered: "链接登记已完成！",

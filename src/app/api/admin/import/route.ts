@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { requireAdminManager } from "@/lib/access";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import {
   applyCompanyMatch,
   validateImportRow,
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
   const auth = await requireAdminManager();
   if ("error" in auth) return auth.error;
 
-  const supabaseClient = await createApiClientIfConfigured();
+  const supabaseClient = await createAuthedDbClient();
   if (!supabaseClient) return supabaseConfigError();
 
   let body: { rows?: ImportRowInput[] };

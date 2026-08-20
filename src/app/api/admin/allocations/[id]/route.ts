@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAnyAdmin } from "@/lib/access";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { normalizeVisitDate } from "@/lib/csv-import";
 import { type AllocationStatus } from "@/lib/types";
 import { findDuplicateAllocation } from "@/lib/alloc-dup";
@@ -48,7 +48,7 @@ export async function PATCH(
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const supabase = await createApiClientIfConfigured();
+  const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
   const { data: current, error: fetchError } = await supabase
     .from("allocations")

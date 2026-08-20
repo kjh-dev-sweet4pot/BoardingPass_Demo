@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAuthedDbClient } from "@/lib/supabase/api-client";
 import { isAdminManagerSession } from "@/lib/session";
 import { normalizeHandle } from "@/lib/auth";
 import { normalizeVisitDate, parseProductAndQty } from "@/lib/csv-import";
@@ -18,7 +18,8 @@ function fail(message: string): never {
 
 export async function createManualAllocation(formData: FormData) {
   await ensureAdminManager();
-  const supabase = await createClient();
+  const supabase = await createAuthedDbClient();
+  if (!supabase) fail("Supabase 환경변수가 없습니다.");
 
   const name = String(formData.get("name") || "").trim();
   const snsid = normalizeHandle(
