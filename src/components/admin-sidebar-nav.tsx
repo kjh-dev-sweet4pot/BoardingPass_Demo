@@ -1,10 +1,11 @@
 "use client";
 
-export type AdminSection = "dashboard" | "campaigns" | "allocations";
+export type AdminSection = "dashboard" | "campaigns" | "review" | "allocations";
 
 const SECTIONS: { id: AdminSection; label: string }[] = [
   { id: "dashboard", label: "대시보드" },
   { id: "campaigns", label: "캠페인·섭외" },
+  { id: "review", label: "검수" },
   { id: "allocations", label: "배정·매장" },
 ];
 

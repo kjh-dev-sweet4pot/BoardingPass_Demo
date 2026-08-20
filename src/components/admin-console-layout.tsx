@@ -7,6 +7,7 @@ import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
 import { AdminLinkReview } from "@/components/admin-link-review";
 import { AdminDashboard } from "@/components/admin-dashboard";
+import { AdminReviewQueue } from "@/components/admin-review-queue";
 import { AdminSidebarNav, type AdminSection } from "@/components/admin-sidebar-nav";
 import { AdminStoreOverview } from "@/components/admin-store-overview";
 import { PharListWithModal } from "@/components/phar-list-with-modal";
@@ -105,6 +106,8 @@ export function AdminConsoleLayout({
               isManager={isManager}
             />
           ) : null}
+
+          {section === "review" ? <AdminReviewQueue /> : null}
 
           {section === "allocations" ? (
             <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
