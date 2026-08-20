@@ -2,8 +2,11 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { CompanyPerformanceTab } from "@/components/company-performance-tab";
+import {
+  CompanyConsoleShell,
+  type CompanyConsoleView,
+} from "@/components/company-console-shell";
 import type { ContentFocus } from "@/components/company-content-dashboard";
-import { DEMO_CAMPAIGNS_23YO, buildDemo23YoPerformance } from "@/lib/demo-23yo";
 import {
   CompanyBudgetGate,
   useBudgetGate,
@@ -12,8 +15,10 @@ import { CompanyCreatorPool } from "@/components/company-creator-pool";
 import { CompanyProgressTab } from "@/components/company-progress-tab";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import {
+  buildProgressPoolAllocations,
   buildPublishDemoAllocations,
   buildPublishDemoInsights,
+  buildPublishDemoPerformance,
 } from "@/lib/publish-demo-data";
 import { formatMetric } from "@/lib/content-insights";
 import {
@@ -33,6 +38,19 @@ import {
 
 const contentGuideLinkClass =
   "inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-2 text-xs font-bold text-[var(--accent)] shadow-sm transition hover:bg-[var(--accent)] hover:!text-white";
+
+function fmtCollectedKst(iso: string) {
+  const d = new Date(iso);
+  const ymd = d.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+  const [y, m, day] = ymd.split("-");
+  const hm = d.toLocaleTimeString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `${y}. ${m}. ${day}. ${hm}`;
+}
 
 function visitKey(item: AllocationWithRelations) {
   return item.visit_date ? String(item.visit_date).slice(0, 10) : "";
@@ -169,11 +187,13 @@ export function CompanyConsole({
   initialAllocations,
   initialMonthInsights,
   initialAllInsights,
+  sidebarActions,
 }: {
   company: Company;
   initialAllocations: AllocationWithRelations[];
   initialMonthInsights: ReturnType<typeof buildMockContentInsights>;
   initialAllInsights: ReturnType<typeof buildMockContentInsights>;
+  sidebarActions?: React.ReactNode;
 }) {
   const gate = useBudgetGate(company.id);
   const [view, setView] = useState<"alloc" | "content" | "pool" | "publish">(
@@ -192,6 +212,11 @@ export function CompanyConsole({
     key: AllocSortKey;
     dir: SortDir;
   }>({ key: "visit", dir: "desc" });
+  const [performanceMeta, setPerformanceMeta] = useState<{
+    asOf: string;
+    lastCollected: string | null;
+    nextCollectAt: string | null;
+  } | null>(null);
   const deferredQ = useDeferredValue(searchQ.trim().toLowerCase());
   const today = todayYmdKst();
   const monthKey = today.slice(0, 7);
@@ -204,6 +229,9 @@ export function CompanyConsole({
       hasSeededAllocations ? initialAllocations : buildPublishDemoAllocations(),
     [hasSeededAllocations, initialAllocations],
   );
+
+  /** 진행현황 — 크리에이터 풀 전원, 상태별 분배 */
+  const progressItems = useMemo(() => buildProgressPoolAllocations(), []);
 
   const scoped = useMemo(() => {
     return items.filter((item) => {
@@ -388,134 +416,66 @@ export function CompanyConsole({
     );
   }
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div
-          className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
-          role="tablist"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "pool"}
-            onClick={() => setView("pool")}
-            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-              view === "pool"
-                ? "bg-[var(--accent)] !text-white"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            크리에이터
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "publish"}
-            onClick={() => setView("publish")}
-            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-              view === "publish"
-                ? "bg-[var(--accent)] !text-white"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            진행 현황
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "content"}
-            onClick={() => setView("content")}
-            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-              view === "content"
-                ? "bg-[var(--accent)] !text-white"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            성과
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === "alloc"}
-            onClick={() => setView("alloc")}
-            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-              view === "alloc"
-                ? "bg-[var(--accent)] !text-white"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            배정 현황
-          </button>
-        </div>
-        {view !== "pool" && view !== "publish" ? (
-        <div
-          className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
-          role="group"
-        >
-          <button
-            type="button"
-            aria-pressed={period === "month"}
-            onClick={() => setPeriod("month")}
-            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-              period === "month"
-                ? "bg-[var(--accent)] !text-white"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            이번달
-          </button>
-          <button
-            type="button"
-            aria-pressed={period === "all"}
-            onClick={() => setPeriod("all")}
-            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-              period === "all"
-                ? "bg-[var(--accent)] !text-white"
-                : "text-[var(--muted)]"
-            }`}
-          >
-            전체
-          </button>
-        </div>
+  const sidebarFooter =
+    view === "content" && performanceMeta ? (
+      <>
+        <p>{performanceMeta.asOf} 조회 시점 기준</p>
+        {performanceMeta.lastCollected ? (
+          <p>최종 수집 {fmtCollectedKst(performanceMeta.lastCollected)}</p>
         ) : null}
-        <div className="flex flex-wrap items-center gap-2">
-          {view === "pool" || view === "alloc" ? (
-            <a
-              href={VISIT_CONTENT_GUIDE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={contentGuideLinkClass}
-            >
-              컨텐츠 가이드라인 보기
-              <span aria-hidden>↗</span>
-            </a>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => gate.lock()}
-            className="rounded-full border border-[var(--line)] bg-white px-3.5 py-2 text-xs font-semibold text-[var(--muted)]"
-            title="데모: 입금 게이트 화면으로 돌아가기"
-          >
-            게이트 다시 보기
-          </button>
-        </div>
-      </div>
+        {performanceMeta.nextCollectAt ? (
+          <p>
+            갱신 예정 {formatMd(performanceMeta.nextCollectAt.slice(0, 10))} 00:00
+          </p>
+        ) : null}
+      </>
+    ) : null;
 
+  const mobileActions = (
+    <div className="flex flex-wrap items-center gap-2">
+      {view === "pool" || view === "alloc" ? (
+        <a
+          href={VISIT_CONTENT_GUIDE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={contentGuideLinkClass}
+        >
+          가이드 ↗
+        </a>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => gate.lock()}
+        className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)]"
+      >
+        게이트
+      </button>
+    </div>
+  );
+
+  return (
+    <CompanyConsoleShell
+      companyName={company.name}
+      view={view as CompanyConsoleView}
+      onViewChange={setView}
+      sidebarActions={sidebarActions}
+      sidebarFooter={sidebarFooter}
+      mobileActions={mobileActions}
+    >
       {view === "pool" ? (
         <CompanyCreatorPool companyId={company.id} />
       ) : view === "publish" ? (
-        <CompanyProgressTab
-          companyId={company.id}
-          initialCampaigns={DEMO_CAMPAIGNS_23YO as any}
-        />
+        <CompanyProgressTab companyId={company.id} initialAllocations={progressItems} />
       ) : view === "content" ? (
         <CompanyPerformanceTab
           companyId={company.id}
-          initialData={buildDemo23YoPerformance() as any}
+          initialData={buildPublishDemoPerformance() as never}
+          period={period}
+          onPeriodChange={setPeriod}
+          onMetaChange={setPerformanceMeta}
         />
       ) : (
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.7fr)]">
+      <div className="grid min-h-0 flex-1 gap-3 overflow-auto px-[28px] py-[26px] lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.7fr)]">
         <div className="flex min-h-0 flex-col gap-3">
       <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
         {(
@@ -771,7 +731,7 @@ export function CompanyConsole({
         </aside>
       </div>
       )}
-    </div>
+    </CompanyConsoleShell>
   );
 }
 

@@ -311,3 +311,112 @@ export function buildDemo23YoPerformance() {
   const collectedAt = "2026-08-18T09:00:00+09:00";
   return { links, metrics, collectedAt };
 }
+
+export type DemoKanbanCard = {
+  id: string;
+  campaignId: string;
+  campaignName: string;
+  status: "대기" | "수령완료" | "제작중" | "검수중" | "발행완료";
+  influencerId: string;
+  name: string;
+  handle: string;
+  productName: string;
+  publishedCount: number;
+  targetCount: number;
+  updatedAt: string;
+  submittedLinks: DemoCreatorLink[];
+};
+
+const KANBAN_STATUSES = ["대기", "수령완료", "제작중", "검수중", "발행완료"] as const;
+
+/** 진행 현황 칸반용 — 캠페인 배정 flatten + 추가 데모 행 */
+export function buildDemo23YoKanban(campaignFilter?: string): DemoKanbanCard[] {
+  const extra: DemoKanbanCard[] = [
+    {
+      id: "demo-alloc-w1",
+      campaignId: "demo-camp-a",
+      campaignName: "23YO 비타민C 세럼 JP 시딩",
+      status: "대기",
+      influencerId: "jp-010",
+      name: "宗﨑今日子",
+      handle: "@kyochi.o",
+      productName: "23YO 비타민C 세럼",
+      publishedCount: 0,
+      targetCount: 1,
+      updatedAt: "2026-08-01",
+      submittedLinks: [],
+    },
+    {
+      id: "demo-alloc-w2",
+      campaignId: "demo-camp-a",
+      campaignName: "23YO 비타민C 세럼 JP 시딩",
+      status: "대기",
+      influencerId: "jp-011",
+      name: "高橋ひとみ",
+      handle: "@shizuku_1813",
+      productName: "23YO 비타민C 세럼",
+      publishedCount: 0,
+      targetCount: 1,
+      updatedAt: "2026-08-02",
+      submittedLinks: [],
+    },
+    {
+      id: "demo-alloc-p1",
+      campaignId: "demo-camp-a",
+      campaignName: "23YO 비타민C 세럼 JP 시딩",
+      status: "수령완료",
+      influencerId: "jp-012",
+      name: "戸叶杏奈",
+      handle: "@api_chan_tokyo",
+      productName: "23YO 비타민C 세럼",
+      publishedCount: 0,
+      targetCount: 1,
+      updatedAt: "2026-08-05",
+      submittedLinks: [],
+    },
+    {
+      id: "demo-alloc-p2",
+      campaignId: "demo-camp-b",
+      campaignName: "23YO 글로우 앰플 인스타 협업",
+      status: "수령완료",
+      influencerId: "jp-016",
+      name: "大橋まゆみ",
+      handle: "@a__ai__i",
+      productName: "23YO 글로우 앰플",
+      publishedCount: 0,
+      targetCount: 1,
+      updatedAt: "2026-04-01",
+      submittedLinks: [],
+    },
+  ];
+
+  const fromCampaigns: DemoKanbanCard[] = [];
+  for (const camp of DEMO_CAMPAIGNS_23YO) {
+    if (campaignFilter && camp.id !== campaignFilter) continue;
+    for (const alloc of camp.allocations) {
+      const status = alloc.status as DemoKanbanCard["status"];
+      if (!KANBAN_STATUSES.includes(status)) continue;
+      const pub = alloc.creator_links.filter((l) => l.status === "발행완료").length;
+      fromCampaigns.push({
+        id: alloc.id,
+        campaignId: camp.id,
+        campaignName: camp.name,
+        status,
+        influencerId: alloc.influencer_id,
+        name: alloc.influencers.name,
+        handle: `@${alloc.influencers.instagram_handle_normalized}`,
+        productName: alloc.product.name,
+        publishedCount: pub,
+        targetCount: alloc.target_content_count,
+        updatedAt: alloc.creator_links[0]?.submitted_at?.slice(0, 10) ?? "2026-08-10",
+        submittedLinks: alloc.creator_links.filter((l) => l.status === "제출"),
+      });
+    }
+  }
+
+  const cards = [...fromCampaigns, ...(campaignFilter ? [] : extra)];
+  if (campaignFilter) {
+    return cards.filter((c) => c.campaignId === campaignFilter);
+  }
+  return cards;
+}

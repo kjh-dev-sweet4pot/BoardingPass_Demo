@@ -9,10 +9,11 @@ export function AppShell({
   full = false,
   fitViewport = false,
   compactHeader = false,
+  hideHeader = false,
   theme = "default",
 }: {
-  eyebrow: string;
-  title: string;
+  eyebrow?: string;
+  title?: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
   wide?: boolean;
@@ -22,6 +23,8 @@ export function AppShell({
   fitViewport?: boolean;
   /** 약사 카운터와 같은 컴팩트 헤더 (스크롤은 유지) */
   compactHeader?: boolean;
+  /** 상단 헤더 숨김 — 좌측 사이드바 등이 헤더 역할 */
+  hideHeader?: boolean;
   /** 홈·인플루언서와 맞춘 OWM 톤 */
   theme?: "default" | "owm";
 }) {
@@ -32,16 +35,17 @@ export function AppShell({
     <main
       className={`w-full ${
         fitViewport
-          ? "flex h-dvh flex-col overflow-hidden py-2.5"
+          ? `flex h-dvh flex-col overflow-hidden ${hideHeader ? "py-0" : "py-2.5"}`
           : denseHeader
             ? "min-h-screen py-4"
             : "min-h-screen py-10"
       } ${
         full
-          ? "mx-0 max-w-none px-4 sm:px-6 lg:px-8"
+          ? `mx-0 max-w-none ${hideHeader ? "px-0" : "px-4 sm:px-6 lg:px-8"}`
           : `mx-auto px-6 ${wide ? "max-w-6xl" : "max-w-5xl"}`
       }`}
     >
+      {hideHeader ? null : (
       <div
         className={`flex flex-wrap items-end justify-between gap-3 border-b ${
           owm ? "border-[var(--line)]/80" : "border-[var(--line)]"
@@ -123,6 +127,7 @@ export function AppShell({
         </div>
         {actions}
       </div>
+      )}
       {fitViewport ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
       ) : (
