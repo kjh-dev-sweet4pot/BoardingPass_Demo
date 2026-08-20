@@ -40,9 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# supabase local folder (schema lives in git history / remote project)
+# supabase local folder only (do NOT ignore src/lib/supabase/*)
 /supabase
-supabase/
 
 # cursor
 /.cursor/
