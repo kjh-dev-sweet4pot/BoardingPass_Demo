@@ -80,7 +80,7 @@ export async function runMetricsScheduler(
           campaigns ( status )
         )
       `)
-      .or("content_status.eq.발행완료,publish_url.not.is.null");
+      .or("content_status.eq.발행완료,publish_url.not.is.null,and(content_status.is.null,status.eq.approved)");
 
     for (const row of links ?? []) {
       if (jobQueue.length >= maxJobs) break;

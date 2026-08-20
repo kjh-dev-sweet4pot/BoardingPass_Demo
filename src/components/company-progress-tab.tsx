@@ -156,6 +156,13 @@ function KanbanCard({
   );
 }
 
+function linkStatusBadge(status: string): "승인" | "제출" | "발행완료" | "반려" {
+  if (status === "approved" || status === "승인") return "승인";
+  if (status === "발행완료") return "발행완료";
+  if (status === "반려") return "반려";
+  return "제출";
+}
+
 function FeedbackForm({ link }: { link: ProgressLink }) {
   const [comment, setComment] = useState("");
   const [sent, setSent] = useState(false);
@@ -190,7 +197,7 @@ function FeedbackForm({ link }: { link: ProgressLink }) {
         ) : (
           <span className="text-xs text-[var(--muted)]">콘텐츠 링크 없음</span>
         )}
-        <StateBadge value={link.status === "approved" ? "승인" : link.status} />
+        <StateBadge value={linkStatusBadge(link.status)} />
       </div>
       {sent ? (
         <p className="text-xs text-[var(--muted)]">의견이 제출되었습니다.</p>
@@ -354,8 +361,11 @@ export function CompanyProgressTab({
   );
 
   const cards = useMemo(
-    () => buildKanbanFromAllocations(allocations, productFilter || undefined),
-    [allocations, productFilter],
+    () =>
+      buildKanbanFromAllocations(allocations, productFilter || undefined, {
+        demoMetrics: !live,
+      }),
+    [allocations, productFilter, live],
   );
 
   const grouped = useMemo(() => {

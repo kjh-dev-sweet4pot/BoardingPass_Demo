@@ -189,12 +189,19 @@ export function CompanyConsole({
   initialAllocations,
   initialMonthInsights,
   initialAllInsights,
+  initialPerformanceData,
   sidebarActions,
 }: {
   company: Company;
   initialAllocations: AllocationWithRelations[];
   initialMonthInsights: ReturnType<typeof buildMockContentInsights>;
   initialAllInsights: ReturnType<typeof buildMockContentInsights>;
+  initialPerformanceData?: {
+    links: unknown[];
+    metrics: unknown[];
+    collectedAt: string | null;
+    source: "apify";
+  } | null;
   sidebarActions?: React.ReactNode;
 }) {
   const isDemo = isDemoCompany(company);
@@ -486,7 +493,11 @@ export function CompanyConsole({
         <CompanyPerformanceTab
           companyId={company.id}
           initialData={
-            isDemo ? (buildPublishDemoPerformance() as never) : undefined
+            isDemo
+              ? (buildPublishDemoPerformance() as never)
+              : initialPerformanceData
+                ? (initialPerformanceData as never)
+                : undefined
           }
           period={period}
           onPeriodChange={setPeriod}
