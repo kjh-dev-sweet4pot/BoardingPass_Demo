@@ -17,8 +17,9 @@ import {
 } from "@/lib/session";
 import { normalizeLoginId } from "@/lib/company";
 import { verifyPassword } from "@/lib/password";
-import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
+import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { type Store } from "@/lib/types";
 
 export async function signInAdmin(formData: FormData) {
@@ -87,16 +88,41 @@ export async function signInCompany(formData: FormData) {
     );
   }
 
-  const supabase = hasServiceRoleKey()
-    ? createServiceClient()
-    : await createClient();
+  if (!getSupabaseEnv().configured) {
+    redirect(
+      `/com/login?error=${encodeURIComponent("서버 Supabase 설정이 없습니다. NEXT_PUBLIC_SUPABASE_URL·ANON_KEY를 확인해 주세요.")}`,
+    );
+  }
+
+  // RLS: companies.password_hash는 anon/authenticated 조회 불가 → 로그인 검증은 service_role 전용
+  if (!hasServiceRoleKey()) {
+    redirect(
+      `/com/login?error=${encodeURIComponent("회원사 로그인에 SUPABASE_SERVICE_ROLE_KEY가 필요합니다. Vercel 환경변수를 확인해 주세요.")}`,
+    );
+  }
+
+  let supabase;
+  try {
+    supabase = createServiceClient();
+  } catch {
+    redirect(
+      `/com/login?error=${encodeURIComponent("서버 DB 연결 설정(SUPABASE_SERVICE_ROLE_KEY)을 확인해 주세요.")}`,
+    );
+  }
+
   const { data: company, error } = await supabase
     .from("companies")
     .select("id, login_id, password_hash, is_active")
     .eq("login_id", loginId)
     .maybeSingle();
 
-  if (error || !company || !verifyPassword(password, company.password_hash)) {
+  if (error) {
+    redirect(
+      `/com/login?error=${encodeURIComponent("로그인 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.")}`,
+    );
+  }
+
+  if (!company || !verifyPassword(password, company.password_hash)) {
     redirect(
       `/com/login?error=${encodeURIComponent("아이디 또는 비밀번호가 올바르지 않습니다.")}`,
     );
