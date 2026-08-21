@@ -47,8 +47,6 @@ export function CompanyCreatorPool({
   );
   const [poolLoading, setPoolLoading] = useState(!isDemo);
   const [poolError, setPoolError] = useState<string | null>(null);
-  const [refreshingProfiles, setRefreshingProfiles] = useState(false);
-  const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
   const [visible, setVisible] = useState(POOL_PAGE);
   const [market, setMarket] = useState<CreatorMarket | "">(isDemo ? "jp" : "");
   const [channel, setChannel] = useState<CreatorChannel | "">("");
@@ -104,43 +102,6 @@ export function CompanyCreatorPool({
       cancelled = true;
     };
   }, [companyId, isDemo]);
-
-  async function reloadPool() {
-    if (isDemo) return;
-    setPoolLoading(true);
-    setPoolError(null);
-    try {
-      const res = await fetch("/api/com/creator-pool");
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || "크리에이터 풀을 불러오지 못했습니다.");
-      setPool(Array.isArray(body.creators) ? body.creators : []);
-      setPoolSource("allocations");
-    } catch (e) {
-      setPoolError(
-        e instanceof Error ? e.message : "크리에이터 풀을 불러오지 못했습니다.",
-      );
-    } finally {
-      setPoolLoading(false);
-    }
-  }
-
-  async function refreshProfiles() {
-    if (isDemo || refreshingProfiles) return;
-    setRefreshingProfiles(true);
-    setRefreshMsg(null);
-    try {
-      const res = await fetch("/api/com/creator-pool/refresh", { method: "POST" });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || "프로필 갱신 실패");
-      setRefreshMsg(
-        `프로필·팔로워 수집 ${body.queued ?? 0}명 시작 (최대 ${body.max ?? 8}명). 잠시 후 다시 조회하세요.`,
-      );
-    } catch (e) {
-      setRefreshMsg(e instanceof Error ? e.message : "프로필 갱신 실패");
-    } finally {
-      setRefreshingProfiles(false);
-    }
-  }
 
   // 기존 castings 로드 (handle 기준 매핑)
   useEffect(() => {
@@ -310,30 +271,6 @@ export function CompanyCreatorPool({
             </p>
           ) : null}
         </div>
-
-        {poolSource === "allocations" ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void reloadPool()}
-              disabled={poolLoading || refreshingProfiles}
-              className="h-9 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-[12.5px] font-semibold disabled:opacity-50"
-            >
-              {poolLoading ? "조회 중…" : "다시 조회"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void refreshProfiles()}
-              disabled={poolLoading || refreshingProfiles}
-              className="h-9 rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3 text-[12.5px] font-semibold text-[var(--accent)] disabled:opacity-50"
-            >
-              {refreshingProfiles ? "수집 시작 중…" : "프로필·팔로워 수집"}
-            </button>
-            {refreshMsg ? (
-              <span className="text-[12px] text-[var(--muted)]">{refreshMsg}</span>
-            ) : null}
-          </div>
-        ) : null}
 
         {poolError ? (
           <p className="rounded-xl border border-[var(--danger)]/30 bg-[#fff5f2] px-4 py-2.5 text-sm text-[var(--danger)]">
