@@ -12,7 +12,6 @@ import {
   useBudgetGate,
 } from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
-import { EmptyState } from "@/components/empty-state";
 import { CompanyProgressTab } from "@/components/company-progress-tab";
 import { isDemoCompany } from "@/lib/company";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
@@ -505,16 +504,7 @@ export function CompanyConsole({
       mobileActions={mobileActions}
     >
       {view === "pool" ? (
-        isDemo ? (
-          <CompanyCreatorPool companyId={company.id} />
-        ) : (
-          <div className="min-h-0 flex-1 overflow-auto px-[28px] py-[26px]">
-            <EmptyState
-              title="크리에이터 풀이 없습니다"
-              message="배정·섭외는 운영팀이 등록한 데이터만 표시됩니다."
-            />
-          </div>
-        )
+        <CompanyCreatorPool companyId={company.id} loginId={company.login_id} />
       ) : view === "publish" ? (
         <CompanyProgressTab
           companyId={company.id}

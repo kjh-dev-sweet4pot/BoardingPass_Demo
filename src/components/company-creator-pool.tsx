@@ -23,17 +23,31 @@ import {
 const contentGuideLinkClass =
   "inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-2 text-xs font-bold text-[var(--accent)] shadow-sm transition hover:bg-[var(--accent)] hover:!text-white";
 import { polishDemoMetrics } from "@/lib/demo-metrics";
-
-const POOL = buildCreatorPool();
+import { isDemoCompany } from "@/lib/company";
 
 type PickMap = Record<string, "selected" | "excluded">;
 
 // castingId로 관리 — key: pool creator id, value: castingId(담긴 경우) | "excluded"
 type CastingMap = Record<string, { castingId: string } | "excluded">;
 
-export function CompanyCreatorPool({ companyId }: { companyId: string }) {
+export function CompanyCreatorPool({
+  companyId,
+  loginId,
+}: {
+  companyId: string;
+  loginId?: string | null;
+}) {
+  const isDemo = isDemoCompany({ login_id: loginId });
+  const [pool, setPool] = useState<PoolCreator[]>(() =>
+    isDemo ? buildCreatorPool() : [],
+  );
+  const [poolSource, setPoolSource] = useState<"allocations" | "mock" | null>(
+    isDemo ? "mock" : null,
+  );
+  const [poolLoading, setPoolLoading] = useState(!isDemo);
+  const [poolError, setPoolError] = useState<string | null>(null);
   const [visible, setVisible] = useState(POOL_PAGE);
-  const [market, setMarket] = useState<CreatorMarket | "">("jp");
+  const [market, setMarket] = useState<CreatorMarket | "">(isDemo ? "jp" : "");
   const [channel, setChannel] = useState<CreatorChannel | "">("");
   const [q, setQ] = useState("");
   const [hideOverlap, setHideOverlap] = useState(false);
@@ -46,36 +60,80 @@ export function CompanyCreatorPool({ companyId }: { companyId: string }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // 데모(company)만 목업. 그 외(aaa 포함)는 배정 DB → 크리에이터 풀.
+  useEffect(() => {
+    if (isDemo) {
+      setPool(buildCreatorPool());
+      setPoolSource("mock");
+      setMarket("jp");
+      setPoolLoading(false);
+      setPoolError(null);
+      return;
+    }
+    let cancelled = false;
+    setPoolLoading(true);
+    setPoolError(null);
+    fetch("/api/com/creator-pool")
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          throw new Error(body.error || "크리에이터 풀을 불러오지 못했습니다.");
+        }
+        return body as { creators?: PoolCreator[] };
+      })
+      .then((body) => {
+        if (cancelled) return;
+        setPool(Array.isArray(body.creators) ? body.creators : []);
+        setPoolSource("allocations");
+        setMarket("");
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setPool([]);
+        setPoolSource("allocations");
+        setMarket("");
+        setPoolError(e instanceof Error ? e.message : "크리에이터 풀을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!cancelled) setPoolLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, isDemo]);
+
   // 기존 castings 로드 (handle 기준 매핑)
   useEffect(() => {
+    if (pool.length === 0) return;
     fetch("/api/com/castings")
       .then((r) => r.json())
       .then((rows: Array<{ id: string; status: string; influencers?: { instagram_handle_normalized?: string; instagram_handle?: string } }>) => {
+        if (!Array.isArray(rows)) return;
         const map: CastingMap = {};
+        const nextPicks: PickMap = {};
         for (const row of rows) {
           const handle = (
             row.influencers?.instagram_handle_normalized ||
             row.influencers?.instagram_handle ||
             ""
           ).replace(/^@+/, "").toLowerCase();
-          const poolRow = POOL.find(
+          const poolRow = pool.find(
             (p) => p.handle.replace(/^@+/, "").toLowerCase() === handle,
           );
-          if (poolRow) {
-            if (row.status !== "결렬") {
-              map[poolRow.id] = { castingId: row.id };
-              setPicks((prev) => ({ ...prev, [poolRow.id]: "selected" }));
-            }
+          if (poolRow && row.status !== "결렬") {
+            map[poolRow.id] = { castingId: row.id };
+            nextPicks[poolRow.id] = "selected";
           }
         }
         setCastings(map);
+        setPicks((prev) => ({ ...prev, ...nextPicks }));
       })
       .catch(() => {});
-  }, [companyId]);
+  }, [companyId, pool]);
 
   // 담기 → API POST (campaign_id는 임시로 null 허용 시까지 skip, 추후 T10에서 연결)
   async function addCasting(poolId: string) {
-    const row = POOL.find((r) => r.id === poolId);
+    const row = pool.find((r) => r.id === poolId);
     if (!row) return;
     // castings에는 campaign_id 필수이므로, 없으면 낙관적 UI만 업데이트
     setPicks((prev) => ({ ...prev, [poolId]: "selected" }));
@@ -97,7 +155,7 @@ export function CompanyCreatorPool({ companyId }: { companyId: string }) {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return POOL.filter((row) => {
+    return pool.filter((row) => {
       if (hideOverlap && row.overlap) return false;
       if (postedOnly && row.posts.length === 0) return false;
       if (market && row.market !== market) return false;
@@ -109,7 +167,7 @@ export function CompanyCreatorPool({ companyId }: { companyId: string }) {
         (row.product || "").toLowerCase().includes(needle)
       );
     });
-  }, [market, channel, q, hideOverlap, postedOnly]);
+  }, [pool, market, channel, q, hideOverlap, postedOnly]);
 
   const available = useMemo(
     () => filtered.filter((row) => picks[row.id] !== "selected"),
@@ -118,12 +176,12 @@ export function CompanyCreatorPool({ companyId }: { companyId: string }) {
   const shown = available.slice(0, visible);
   const hasMore = visible < available.length;
   const selected = openId
-    ? (POOL.find((r) => r.id === openId) ?? null)
+    ? (pool.find((r) => r.id === openId) ?? null)
     : null;
 
   const selectedRows = useMemo(
-    () => POOL.filter((r) => picks[r.id] === "selected"),
-    [picks],
+    () => pool.filter((r) => picks[r.id] === "selected"),
+    [pool, picks],
   );
   const excludedCount = useMemo(
     () => Object.values(picks).filter((v) => v === "excluded").length,
@@ -199,12 +257,25 @@ export function CompanyCreatorPool({ companyId }: { companyId: string }) {
             className="mt-1.5 text-[28px] font-semibold leading-tight text-[var(--ink)]"
             style={{ fontFamily: "var(--font-display), serif" }}
           >
-            후보 크리에이터{" "}
+            {poolSource === "allocations" ? "협업 크리에이터" : "후보 크리에이터"}{" "}
             <span className="text-[15px] font-normal text-[var(--muted)]">
-              {filtered.length.toLocaleString("ko-KR")}명
+              {poolLoading
+                ? "…"
+                : `${filtered.length.toLocaleString("ko-KR")}명`}
             </span>
           </h2>
+          {poolSource === "allocations" ? (
+            <p className="mt-1.5 text-[12.5px] text-[var(--muted)]">
+              CSV·배정으로 등록된 협업 인플루언서입니다.
+            </p>
+          ) : null}
         </div>
+
+        {poolError ? (
+          <p className="rounded-xl border border-[var(--danger)]/30 bg-[#fff5f2] px-4 py-2.5 text-sm text-[var(--danger)]">
+            {poolError}
+          </p>
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <input
@@ -240,9 +311,15 @@ export function CompanyCreatorPool({ companyId }: { companyId: string }) {
         ) : null}
 
             <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3">
-              {shown.length === 0 ? (
+              {poolLoading ? (
                 <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
-                  조건에 맞는 크리에이터가 없습니다.
+                  크리에이터를 불러오는 중…
+                </p>
+              ) : shown.length === 0 ? (
+                <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
+                  {poolSource === "allocations" && pool.length === 0
+                    ? "등록된 협업 인플루언서가 없습니다. 운영 콘솔에서 CSV를 업로드하면 여기에 표시됩니다."
+                    : "조건에 맞는 크리에이터가 없습니다."}
                 </p>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

@@ -4,12 +4,18 @@ import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-cl
 import { type CampaignStatus } from "@/lib/types";
 
 const CAMPAIGN_SELECT = `
-  id, name, status, company_id, product_id, created_at, updated_at,
+  id, name, status, company_id, product_id, budget_amount, created_at, updated_at,
   companies ( id, name ),
   products ( id, name, sku )
 `;
 
 const HOLD_CANCEL: CampaignStatus[] = ["보류", "취소"];
+
+function parseBudget(v: unknown) {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+}
 
 export async function GET(
   _request: NextRequest,
@@ -44,24 +50,37 @@ export async function PATCH(
   const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
-  let body: { status?: string };
+  let body: { status?: string; budget_amount?: number | string | null };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const status = body.status as CampaignStatus | undefined;
-  if (!status || !HOLD_CANCEL.includes(status)) {
-    return NextResponse.json(
-      { error: "보류 또는 취소만 지정할 수 있습니다." },
-      { status: 400 },
-    );
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+  if (body.status != null) {
+    const status = body.status as CampaignStatus;
+    if (!HOLD_CANCEL.includes(status)) {
+      return NextResponse.json(
+        { error: "보류 또는 취소만 지정할 수 있습니다." },
+        { status: 400 },
+      );
+    }
+    patch.status = status;
+  }
+
+  if ("budget_amount" in body) {
+    patch.budget_amount = parseBudget(body.budget_amount);
+  }
+
+  if (Object.keys(patch).length <= 1) {
+    return NextResponse.json({ error: "변경할 항목이 없습니다." }, { status: 400 });
   }
 
   const { data, error } = await supabase
     .from("campaigns")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq("id", id)
     .select(CAMPAIGN_SELECT)
     .single();

@@ -22,6 +22,9 @@ type CampaignRow = {
   status: string;
   company_id: string;
   product_id: string;
+  budget_amount?: number | null;
+  spent_amount?: number;
+  spend_pct?: number | null;
   created_at: string;
   companies?: { id: string; name: string } | null;
   products?: { id: string; name: string; sku?: string | null } | null;
@@ -113,6 +116,12 @@ export function AdminCampaignCastingPanel({
   const [createCompanyId, setCreateCompanyId] = useState("");
   const [createProductId, setCreateProductId] = useState("");
   const [createName, setCreateName] = useState("");
+  const [createBudget, setCreateBudget] = useState("");
+
+  const [addHandle, setAddHandle] = useState("");
+  const [addName, setAddName] = useState("");
+  const [addSnsUrl, setAddSnsUrl] = useState("");
+  const [addCampaignId, setAddCampaignId] = useState("");
 
   const [logAmount, setLogAmount] = useState("");
   const [logMemo, setLogMemo] = useState("");
@@ -219,14 +228,47 @@ export function AdminCampaignCastingPanel({
           company_id: createCompanyId,
           product_id: createProductId,
           name: createName || null,
+          budget_amount: createBudget ? Number(createBudget) : null,
         }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "캠페인 생성 실패");
       setMessage("캠페인을 생성했습니다.");
       setCreateName("");
+      setCreateBudget("");
       await loadCampaigns();
       if (json.campaign?.id) setSelectedCampaignId(json.campaign.id);
+    });
+  }
+
+  async function addCasting(e: React.FormEvent) {
+    e.preventDefault();
+    const campaign_id = addCampaignId || selectedCampaignId;
+    if (!campaign_id) {
+      setError("섭외를 추가할 캠페인을 선택하세요.");
+      return;
+    }
+    await run(async () => {
+      const res = await fetch("/api/admin/castings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaign_id,
+          handle: addHandle,
+          name: addName || null,
+          sns_url: addSnsUrl || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "섭외 추가 실패");
+      setMessage("섭외를 추가했습니다. 협상 금액을 입력하세요.");
+      setAddHandle("");
+      setAddName("");
+      setAddSnsUrl("");
+      setTab("castings");
+      setSelectedCampaignId(campaign_id);
+      await loadCastings();
+      if (json.casting?.id) setSelectedCastingId(json.casting.id);
     });
   }
 
@@ -358,6 +400,8 @@ export function AdminCampaignCastingPanel({
                     <th className="px-5 py-2 font-medium">캠페인</th>
                     <th className="px-3 py-2 font-medium">회원사</th>
                     <th className="px-3 py-2 font-medium">상품</th>
+                    <th className="px-3 py-2 font-medium">예산</th>
+                    <th className="px-3 py-2 font-medium">집행%</th>
                     <th className="px-3 py-2 font-medium">상태</th>
                   </tr>
                 </thead>
@@ -373,12 +417,16 @@ export function AdminCampaignCastingPanel({
                       <td className="px-5 py-3">{c.name || "(이름 없음)"}</td>
                       <td className="px-3 py-3">{c.companies?.name ?? "—"}</td>
                       <td className="px-3 py-3">{c.products?.name ?? "—"}</td>
+                      <td className="px-3 py-3 tabular-nums">{fmtKrw(c.budget_amount)}</td>
+                      <td className="px-3 py-3 tabular-nums">
+                        {c.spend_pct != null ? `${c.spend_pct}%` : "—"}
+                      </td>
                       <td className="px-3 py-3">{c.status}</td>
                     </tr>
                   ))}
                   {campaigns.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-5 py-8 text-center text-[var(--muted)]">
+                      <td colSpan={6} className="px-5 py-8 text-center text-[var(--muted)]">
                         등록된 캠페인이 없습니다.
                       </td>
                     </tr>
@@ -431,6 +479,16 @@ export function AdminCampaignCastingPanel({
                       placeholder="예: 2026 가을 런칭"
                     />
                   </Field>
+                  <Field label="예산 (원)">
+                    <input
+                      className={fieldClass}
+                      type="number"
+                      min={0}
+                      value={createBudget}
+                      onChange={(e) => setCreateBudget(e.target.value)}
+                      placeholder="노출가 기준 예산"
+                    />
+                  </Field>
                   <button className={primaryBtnClass} type="submit" disabled={busy}>
                     생성
                   </button>
@@ -462,6 +520,19 @@ export function AdminCampaignCastingPanel({
                     <dt className="text-[var(--muted)]">상품</dt>
                     <dd>{selectedCampaign.products?.name ?? "—"}</dd>
                   </div>
+                  <div>
+                    <dt className="text-[var(--muted)]">예산</dt>
+                    <dd className="tabular-nums">{fmtKrw(selectedCampaign.budget_amount)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--muted)]">집행 (노출가 합)</dt>
+                    <dd className="tabular-nums">
+                      {fmtKrw(selectedCampaign.spent_amount ?? 0)}
+                      {selectedCampaign.spend_pct != null
+                        ? ` · ${selectedCampaign.spend_pct}%`
+                        : ""}
+                    </dd>
+                  </div>
                 </dl>
                 {isManager && selectedCampaign.status !== "보류" && selectedCampaign.status !== "취소" ? (
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -489,9 +560,10 @@ export function AdminCampaignCastingPanel({
                   onClick={() => {
                     setTab("castings");
                     setSelectedCampaignId(selectedCampaign.id);
+                    setAddCampaignId(selectedCampaign.id);
                   }}
                 >
-                  이 캠페인 섭외 보기
+                  이 캠페인 섭외 보기·추가
                 </button>
               </section>
             ) : null}
@@ -578,6 +650,70 @@ export function AdminCampaignCastingPanel({
           </section>
 
           <aside className="flex flex-col gap-4">
+            {isManager ? (
+              <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
+                <h3 className="text-base font-semibold text-[var(--ink)]">섭외 추가</h3>
+                <p className="mt-1 text-[12px] leading-relaxed text-[var(--muted)]">
+                  인플루언서를 캠페인에 등록한 뒤, 협상 이력으로 금액을 남깁니다.
+                </p>
+                <form onSubmit={addCasting} className="mt-3 grid gap-3">
+                  <Field label="캠페인">
+                    <select
+                      className={fieldClass}
+                      required
+                      value={addCampaignId || selectedCampaignId || ""}
+                      onChange={(e) => {
+                        setAddCampaignId(e.target.value);
+                        setSelectedCampaignId(e.target.value || null);
+                      }}
+                    >
+                      <option value="">선택</option>
+                      {campaigns
+                        .filter((c) => c.status !== "취소" && c.status !== "보류")
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {(c.name || c.products?.name || "캠페인") +
+                              ` · ${c.companies?.name ?? ""}`}
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+                  <Field label="SNS 핸들">
+                    <input
+                      className={fieldClass}
+                      required
+                      value={addHandle}
+                      onChange={(e) => setAddHandle(e.target.value)}
+                      placeholder="@username"
+                    />
+                  </Field>
+                  <Field label="이름 (선택)">
+                    <input
+                      className={fieldClass}
+                      value={addName}
+                      onChange={(e) => setAddName(e.target.value)}
+                      placeholder="표시 이름"
+                    />
+                  </Field>
+                  <Field label="프로필 URL (선택)">
+                    <input
+                      className={fieldClass}
+                      value={addSnsUrl}
+                      onChange={(e) => setAddSnsUrl(e.target.value)}
+                      placeholder="https://..."
+                    />
+                  </Field>
+                  <button className={primaryBtnClass} type="submit" disabled={busy}>
+                    섭외 추가
+                  </button>
+                </form>
+              </section>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">
+                섭외 추가는 운영관리자만 가능합니다.
+              </p>
+            )}
+
             {selectedCasting ? (
               <>
                 <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">

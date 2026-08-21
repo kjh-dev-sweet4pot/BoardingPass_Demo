@@ -86,6 +86,8 @@ export type Campaign = {
   product_id: string;
   status: CampaignStatus;
   name: string | null;
+  /** 캠페인 예산(원). 집행% = Accept 노출가 합 / budget_amount */
+  budget_amount?: number | null;
   created_at: string;
   updated_at: string;
 };
