@@ -65,6 +65,8 @@ export type Influencer = {
   sns_url: string | null;
   /** Storage influencer-avatars/{id}.jpg */
   profile_image_path: string | null;
+  /** SNS 팔로워 수 (프로필 수집) */
+  followers?: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

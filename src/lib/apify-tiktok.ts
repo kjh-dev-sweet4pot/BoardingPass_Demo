@@ -34,7 +34,15 @@ export interface TikTokScraperResult {
   /** 저장(북마크) */
   collectCount?: number;
   webVideoUrl: string;
-  authorMeta?: { name: string; id: string; avatar?: string; originalAvatarUrl?: string };
+  authorMeta?: {
+    name: string;
+    id: string;
+    avatar?: string;
+    originalAvatarUrl?: string;
+    fans?: number;
+    followers?: number;
+    following?: number;
+  };
 }
 
 /** 결과에서 가장 안정적인 썸네일 URL 추출 */
@@ -112,11 +120,11 @@ export async function scrapeTikTokPosts(
   return items;
 }
 
-/** @handle·username·프로필 URL → avatar URL (프로필 전용 — 동영상 0건 계정도 시도) */
+/** @handle·username·프로필 URL → 아바타 URL + 팔로워 */
 export async function scrapeTikTokProfile(
   handle: string,
   memoryMbytes = 1024,
-): Promise<string | null> {
+): Promise<{ imageUrl: string | null; followers: number | null }> {
   const token = getApifyToken();
   const username = normalizeTikTokUsername(handle);
   if (!username) {
@@ -145,14 +153,21 @@ export async function scrapeTikTokProfile(
 
   const items = (await res.json()) as TikTokScraperResult[];
   const item = items[0];
-  if (!item) return null;
-  return (
-    item.originalAvatarUrl ||
-    item.avatar ||
-    item.authorMeta?.originalAvatarUrl ||
-    item.authorMeta?.avatar ||
-    null
-  );
+  if (!item) return { imageUrl: null, followers: null };
+  const fans = item.authorMeta?.fans ?? item.authorMeta?.followers;
+  const followers =
+    typeof fans === "number" && Number.isFinite(fans) && fans >= 0
+      ? Math.round(fans)
+      : null;
+  return {
+    imageUrl:
+      item.originalAvatarUrl ||
+      item.avatar ||
+      item.authorMeta?.originalAvatarUrl ||
+      item.authorMeta?.avatar ||
+      null,
+    followers,
+  };
 }
 
 /** postURL 1개에 대응하는 결과를 찾아 반환. */

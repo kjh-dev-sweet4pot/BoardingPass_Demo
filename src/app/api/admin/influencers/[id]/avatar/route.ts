@@ -129,11 +129,11 @@ export async function POST(
   const storage = storageClientForAvatars(db.supabase);
 
   try {
-    const path = await fetchAndStoreInfluencerProfile(storage, id, {
+    const result = await fetchAndStoreInfluencerProfile(storage, id, {
       handle: data.instagram_handle_normalized || data.instagram_handle,
       snsUrl: data.sns_url,
     });
-    if (!path) {
+    if (!result?.path) {
       if (batchInfluencerId) {
         await updateBatchInfluencerProfileStatus(
           db.supabase,
@@ -147,7 +147,11 @@ export async function POST(
     if (batchInfluencerId) {
       await updateBatchInfluencerProfileStatus(db.supabase, batchInfluencerId, "ok", null);
     }
-    return NextResponse.json({ ok: true, profile_image_path: path });
+    return NextResponse.json({
+      ok: true,
+      profile_image_path: result.path,
+      followers: result.followers,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "프로필 수집 실패";
     if (batchInfluencerId) {

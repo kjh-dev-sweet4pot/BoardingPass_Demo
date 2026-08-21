@@ -21,6 +21,8 @@ export interface InstagramScraperResult {
   username?: string;
   profilePicUrl?: string;
   profilePicUrlHD?: string;
+  followersCount?: number;
+  followsCount?: number;
   videoViewCount?: number;
   videoPlayCount?: number;
   viewCount?: number;
@@ -248,11 +250,11 @@ export async function scrapeInstagramPosts(
     .filter((item): item is InstagramScraperResult => item != null);
 }
 
-/** 프로필 URL → profilePicUrl(HD). sns_url이 게시물 URL이면 handle로 프로필 URL 생성 */
+/** 프로필 URL → 아바타 URL + 팔로워 */
 export async function scrapeInstagramProfile(
   profileUrlOrHandle: string,
   memoryMbytes = 1024,
-): Promise<string | null> {
+): Promise<{ imageUrl: string | null; followers: number | null }> {
   const token = getApifyToken();
   const profileUrl = profileUrlOrHandle.includes("instagram.com")
     ? profileUrlOrHandle
@@ -275,10 +277,19 @@ export async function scrapeInstagramProfile(
     const text = await res.text().catch(() => "");
     throw new Error(await apifyErrorMessage(res.status, text));
   }
-  const items = (await res.json()) as InstagramScraperResult[];
+  const items = (await res.json()) as Array<
+    InstagramScraperResult & { followersCount?: number; followers?: number }
+  >;
   const item = items[0];
-  if (!item) return null;
-  return item.profilePicUrlHD || item.profilePicUrl || null;
+  if (!item) return { imageUrl: null, followers: null };
+  const followers =
+    numOrNull(item.followersCount) ??
+    numOrNull(item.followers) ??
+    null;
+  return {
+    imageUrl: item.profilePicUrlHD || item.profilePicUrl || null,
+    followers,
+  };
 }
 
 export function findInstagramResultForUrl(

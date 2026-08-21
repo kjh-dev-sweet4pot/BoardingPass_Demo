@@ -26,7 +26,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("allocations")
     .select(
-      "id, product_id, created_at, products(name), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url)",
+      "id, product_id, created_at, products(name), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url, followers)",
     )
     .eq("company_id", companyId)
     .order("created_at", { ascending: false });
