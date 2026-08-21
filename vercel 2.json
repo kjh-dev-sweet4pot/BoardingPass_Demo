@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/collect-metrics",
-      "schedule": "0 15 * * *"
-    }
-  ]
-}

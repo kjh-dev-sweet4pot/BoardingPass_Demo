@@ -134,7 +134,8 @@ export function getPoolCreator(id: string): PoolCreator | undefined {
   return poolById!.get(id);
 }
 
-/** DB UUID 등 id 불일치 시 핸들·이름으로 JP 풀 크리에이터 매칭 */
+/** DB UUID 등 id 불일치 시 핸들·이름으로 JP 풀 크리에이터 매칭.
+ * 실배정 UUID는 이름·핸들 폴백 금지 — 목업 카드로 섞이지 않게. */
 export function findPoolCreator(opts: {
   id?: string | null;
   handle?: string | null;
@@ -144,6 +145,7 @@ export function findPoolCreator(opts: {
   if (opts.id) {
     const byId = poolById!.get(opts.id);
     if (byId) return byId;
+    if (isLiveInfluencerId(opts.id)) return undefined;
   }
   const handle = normalizeHandle(opts.handle || "");
   if (handle && handle !== "—") {
@@ -206,8 +208,12 @@ export function isLiveInfluencerId(id: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
 
-/** 실제 SNS만: 1) Storage(회원사 API) 2) 로컬 캐시 3) unavatar … */
+/** 아바타 후보. 실배정(UUID)은 Storage만 — JP 목업·unavatar 폴백 없음. */
 export function creatorAvatarCandidates(creator: PoolCreator): string[] {
+  if (isLiveInfluencerId(creator.id)) {
+    return [`/api/company/influencers/${creator.id}/avatar`];
+  }
+
   const seen = new Set<string>();
   const out: string[] = [];
   const push = (url: string | null | undefined) => {
@@ -217,11 +223,6 @@ export function creatorAvatarCandidates(creator: PoolCreator): string[] {
     out.push(u);
   };
 
-  if (isLiveInfluencerId(creator.id)) {
-    push(`/api/company/influencers/${creator.id}/avatar`);
-  }
-
-  // manifest 여부와 무관하게 로컬 캐시 (public/creator-avatars, JP 데모)
   push(`/creator-avatars/${creator.id}.jpg`);
 
   const handle = bestHandle(creator);
@@ -238,7 +239,6 @@ export function creatorAvatarCandidates(creator: PoolCreator): string[] {
     if (igCode) {
       push(`https://www.instagram.com/p/${igCode}/media/?size=l`);
     }
-    // TikTok/X 등: 게시물 OG 이미지 (실제 SNS 미디어)
     push(
       `https://api.microlink.io/?url=${encodeURIComponent(post.url)}&embed=image.url`,
     );

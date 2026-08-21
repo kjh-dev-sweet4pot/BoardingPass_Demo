@@ -9,6 +9,7 @@ import {
   formatKrw,
   formatMetric,
   getCreatorBrief,
+  isLiveInfluencerId,
   MARKET_LABEL,
   OVERLAP_LABEL,
   POOL_PAGE,
@@ -444,7 +445,7 @@ export function CompanyCreatorPool({
                 key={row.id}
                 className="flex items-center gap-2 rounded-xl border border-[#f0e6d8] p-2.5"
               >
-                <CreatorMiniAvatar creator={row} />
+                <CreatorPhoto creator={row} size="avatar" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[12.5px] font-semibold">{row.name}</p>
                   <p className="truncate text-[10.5px] text-[var(--muted)]">
@@ -520,20 +521,6 @@ function tierBandLabel(followers: number) {
   if (followers < 10000) return "나노";
   if (followers <= 100000) return "마이크로";
   return "매크로";
-}
-
-function CreatorMiniAvatar({ creator }: { creator: PoolCreator }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`/creator-avatars/${creator.id}.jpg`}
-      alt=""
-      className="h-7 w-7 shrink-0 rounded-full object-cover bg-[var(--surface-hover)]"
-      onError={(e) => {
-        (e.target as HTMLImageElement).src = "/owm-logo.webp";
-      }}
-    />
-  );
 }
 
 function CreatorCard({
@@ -711,13 +698,19 @@ function CreatorDetail({
   onReplace: () => void;
 }) {
   const brief = getCreatorBrief(creator);
-  const metrics = polishDemoMetrics({
-    views: creator.metrics.views,
-    likes: creator.metrics.likes,
-    comments: creator.metrics.comments,
-    followers: creator.followers,
-    seed: creator.id,
-  });
+  const metrics = isLiveInfluencerId(creator.id)
+    ? {
+        views: creator.metrics.views ?? 0,
+        likes: creator.metrics.likes ?? 0,
+        comments: creator.metrics.comments ?? 0,
+      }
+    : polishDemoMetrics({
+        views: creator.metrics.views,
+        likes: creator.metrics.likes,
+        comments: creator.metrics.comments,
+        followers: creator.followers,
+        seed: creator.id,
+      });
 
   return (
     <div>
