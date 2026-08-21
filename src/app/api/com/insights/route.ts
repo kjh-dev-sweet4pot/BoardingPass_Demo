@@ -18,15 +18,17 @@ async function getClient() {
 
 export async function fetchInsights(
   supabase: SupabaseClient,
-  companyId: string,
+  companyId: string | null,
   { productId = null, days = 90 }: { productId?: string | null; days?: number } = {},
 ): Promise<InsightsPayload> {
-  // 1단계: 회원사 소속 allocation ids
+  // 1단계: allocation ids (companyId null = 전체 회원사)
   let allocQuery = supabase
     .from("allocations")
-    .select("id, influencer_id, target_content_count, influencers(id, name, instagram_handle_normalized, instagram_handle), products(id, name)")
-    .eq("company_id", companyId);
+    .select(
+      "id, company_id, influencer_id, target_content_count, influencers(id, name, instagram_handle_normalized, instagram_handle), products(id, name), companies(id, name)",
+    );
 
+  if (companyId) allocQuery = allocQuery.eq("company_id", companyId);
   if (productId) allocQuery = allocQuery.eq("product_id", productId);
 
   const { data: allocs, error: allocErr } = await allocQuery;

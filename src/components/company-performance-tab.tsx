@@ -23,7 +23,7 @@ type LinkRow = {
   metrics_collected_at: string | null;
   allocations: {
     id: string;
-    company_id: string;
+    company_id?: string;
     influencer_id: string;
     influencers: {
       id: string;
@@ -32,6 +32,7 @@ type LinkRow = {
       instagram_handle?: string;
     } | null;
     products: { id: string; name: string } | null;
+    companies?: { id: string; name: string } | null;
   } | null;
 };
 
@@ -160,6 +161,8 @@ const METRIC_WHY = {
     "필터된 콘텐츠 중 가장 먼저 업로드된 시점을 D+0으로 잡고, 이후 경과일별 조회 합(콘텐츠당 당일 최대값)입니다.",
   platformShare:
     "플랫폼별 조회수 비중입니다. 채널 기여도를 한눈에 봅니다.",
+  company:
+    "회원사 단위로 조회·좋아요·ER을 합산합니다. 전체 회원사 비교에 씁니다.",
 } as const;
 
 function InfoTip({ text }: { text: string }) {
@@ -394,6 +397,7 @@ function TopContentPanel({
           {items.map((row, idx) => {
             const inf = row.allocations?.influencers;
             const product = row.allocations?.products?.name || "상품";
+            const company = row.allocations?.companies?.name;
             const value =
               metric.kind === "earlyViews"
                 ? (row.earlyViews ?? 0)
@@ -423,7 +427,9 @@ function TopContentPanel({
                         {inf?.name || "—"}
                       </span>
                       <span className="mt-0.5 block truncate text-[11.5px] text-[var(--muted)]">
-                        {product} · {platformLabel(row.link_url)}
+                        {[company, product, platformLabel(row.link_url)]
+                          .filter(Boolean)
+                          .join(" · ")}
                         {showsViewsSubline(metric)
                           ? ` · 조회 ${formatMetric(row.views ?? 0)}`
                           : ""}
@@ -646,6 +652,9 @@ export function CompanyPerformanceTab({
   period = "all",
   onPeriodChange,
   onMetaChange,
+  insightsUrl = "/api/com/insights",
+  enableRecollect = true,
+  embedded = false,
 }: {
   companyId: string;
   initialData?: InitialPerformanceData;
@@ -656,6 +665,11 @@ export function CompanyPerformanceTab({
     lastCollected: string | null;
     nextCollectAt: string | null;
   }) => void;
+  /** 기본: 회원사 세션 API. admin은 /api/admin/insights */
+  insightsUrl?: string;
+  enableRecollect?: boolean;
+  /** admin 등 상위 헤더가 있을 때 타이틀 숨김 */
+  embedded?: boolean;
 }) {
   const [allLinks, setAllLinks] = useState<LinkRow[]>(initialData?.links ?? []);
   const [allMetrics, setAllMetrics] = useState<MetricRow[]>(initialData?.metrics ?? []);
@@ -674,7 +688,7 @@ export function CompanyPerformanceTab({
   const [recollectMsg, setRecollectMsg] = useState<string | null>(null);
   const [productId, setProductId] = useState("");
   const asOfYmd = ymdKst(new Date());
-  const canRecollect = source !== "mock";
+  const canRecollect = enableRecollect && source !== "mock";
 
   function applyPayload(data: {
     links?: LinkRow[];
@@ -693,7 +707,7 @@ export function CompanyPerformanceTab({
   async function reload() {
     setRefreshing(true);
     try {
-      const res = await fetch("/api/com/insights");
+      const res = await fetch(insightsUrl);
       const data = await res.json();
       if (!res.ok) return; // 실패 시 빈 화면으로 덮지 않음
       applyPayload(data);
@@ -741,7 +755,7 @@ export function CompanyPerformanceTab({
     void reload();
     // 첫 조회만. 이후는 「다시 조회」
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, initialData]);
+  }, [companyId, initialData, insightsUrl]);
 
   useEffect(() => {
     onMetaChange?.({
@@ -1033,7 +1047,34 @@ export function CompanyPerformanceTab({
     return [...map.values()].sort((a, b) => b.views - a.views);
   }, [links]);
 
+  const byCompany = useMemo(() => {
+    const map = new Map<
+      string,
+      { id: string; name: string; views: number; likes: number; comments: number; posts: number }
+    >();
+    for (const l of links) {
+      const c = l.allocations?.companies;
+      const key = c?.id || l.allocations?.company_id || "unknown";
+      const row = map.get(key) || {
+        id: key,
+        name: c?.name || "회원사",
+        views: 0,
+        likes: 0,
+        comments: 0,
+        posts: 0,
+      };
+      row.views += l.views ?? 0;
+      row.likes += l.likes ?? 0;
+      row.comments += l.comments ?? 0;
+      row.posts += 1;
+      map.set(key, row);
+    }
+    return [...map.values()].sort((a, b) => b.views - a.views);
+  }, [links]);
+
   const maxProductViews = byProduct[0]?.views || 1;
+  const maxCompanyViews = byCompany[0]?.views || 1;
+  const showCompanyBreakdown = byCompany.length > 1;
 
   const platformSegments = useMemo(() => {
     const map = new Map<string, number>();
@@ -1070,19 +1111,29 @@ export function CompanyPerformanceTab({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-auto px-[28px] py-[26px]">
+    <div
+      className={
+        embedded
+          ? "flex min-h-0 flex-1 flex-col gap-[18px] overflow-auto px-1 py-2"
+          : "flex min-h-0 flex-1 flex-col gap-[18px] overflow-auto px-[28px] py-[26px]"
+      }
+    >
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
-            Performance
-          </p>
-          <h2
-            className="mt-2 text-[30px] font-semibold leading-tight text-[var(--ink)]"
-            style={{ fontFamily: "var(--font-display), serif" }}
-          >
-            성과
-          </h2>
-        </div>
+        {embedded ? (
+          <div />
+        ) : (
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
+              Performance
+            </p>
+            <h2
+              className="mt-2 text-[30px] font-semibold leading-tight text-[var(--ink)]"
+              style={{ fontFamily: "var(--font-display), serif" }}
+            >
+              성과
+            </h2>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
@@ -1153,6 +1204,52 @@ export function CompanyPerformanceTab({
             <StatCard label="콘텐츠" value={`${totals.posts}`} unit="건" />
             <StatCard label="인플루언서" value={`${totals.influencers}`} unit="명" />
           </div>
+
+          {showCompanyBreakdown ? (
+            <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+              <PanelTitle title="회원사별 성과" why={METRIC_WHY.company} />
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px] border-collapse text-left text-[12.5px]">
+                  <thead>
+                    <tr className="text-[var(--muted)]">
+                      <th className="px-[18px] py-2 font-medium">회원사</th>
+                      <th className="w-[88px] px-3 py-2 font-medium">조회</th>
+                      <th className="w-[80px] px-3 py-2 font-medium">좋아요</th>
+                      <th className="w-[60px] px-3 py-2 font-medium">ER</th>
+                      <th className="w-[60px] px-[18px] py-2 font-medium">콘텐츠</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byCompany.map((row) => (
+                      <tr key={row.id} className="border-t border-[#f4ece2]">
+                        <td className="px-[18px] py-[11px]">
+                          <div className="mb-1.5">{row.name}</div>
+                          <div className="h-1 overflow-hidden rounded-full bg-[var(--surface-hover)]">
+                            <div
+                              className="h-full rounded-full bg-[var(--accent)]"
+                              style={{
+                                width: `${Math.max(4, (row.views / maxCompanyViews) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </td>
+                        <td className="px-3 py-[11px] font-semibold tabular-nums">
+                          {formatMetric(row.views)}
+                        </td>
+                        <td className="px-3 py-[11px] tabular-nums">
+                          {formatMetric(row.likes)}
+                        </td>
+                        <td className="px-3 py-[11px] tabular-nums">
+                          {fmtPct(er(row.views, row.likes, row.comments))}%
+                        </td>
+                        <td className="px-[18px] py-[11px] tabular-nums">{row.posts}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid gap-3.5 lg:grid-cols-[1.35fr_1fr]">
             <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">

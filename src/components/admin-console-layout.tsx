@@ -6,6 +6,7 @@ import { AdminCampaignCastingPanel } from "@/components/admin-campaign-casting-p
 import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
 import { AdminDashboard, type AdminQueueKey } from "@/components/admin-dashboard";
+import { AdminPerformanceTab } from "@/components/admin-performance-tab";
 import { AdminReviewQueue } from "@/components/admin-review-queue";
 import { AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
 import { AdminStoreOverview } from "@/components/admin-store-overview";
@@ -25,6 +26,7 @@ import {
 
 const PAGE: Record<AdminSection, { eyebrow: string; title: string }> = {
   dashboard: { eyebrow: "Overview", title: "대시보드" },
+  performance: { eyebrow: "Performance", title: "성과" },
   campaigns: { eyebrow: "Campaigns", title: "캠페인·섭외" },
   review: { eyebrow: "Review", title: "검수" },
   allocations: { eyebrow: "Allocations", title: "배정·매장" },
@@ -129,6 +131,15 @@ export function AdminConsoleLayout({
               <AdminCompanyPanel companies={companyList} />
               <AdminImportPanel compact companies={companyList} />
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {section === "performance" ? (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <PageHeader section="performance" />
+          <div className="px-4 pb-8 sm:px-7">
+            <AdminPerformanceTab companies={companyList} />
           </div>
         </div>
       ) : null}
