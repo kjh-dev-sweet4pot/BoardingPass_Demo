@@ -6,6 +6,7 @@ import { InfServerMessage } from "@/components/inf-server-message";
 import { getInfluencerSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { type AllocationWithRelations } from "@/lib/types";
 
 export default async function InfSubmitPage() {
@@ -21,7 +22,9 @@ export default async function InfSubmitPage() {
     );
   }
 
-  const supabase = await createClient();
+  const supabase = hasServiceRoleKey()
+    ? createServiceClient()
+    : await createClient();
   const { data: rows, error } = await supabase
     .from("allocations")
     .select(
