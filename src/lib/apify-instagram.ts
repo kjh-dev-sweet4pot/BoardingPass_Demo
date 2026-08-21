@@ -1,6 +1,9 @@
 import { apifyErrorMessage } from "@/lib/apify-errors";
 
-const ACTOR_ID = "shu8hvrXbJbY3Eb9W";
+/** 게시물 지표: patient_discovery (저장·공유·리포스트 포함) */
+const POST_ACTOR_ID = "oi5NGnwthRXoqEux1"; // patient_discovery/instagram-reel-analytics-by-url
+/** 프로필 아바타: 공식 Instagram Scraper */
+const PROFILE_ACTOR_ID = "shu8hvrXbJbY3Eb9W";
 const APIFY_BASE = "https://api.apify.com/v2";
 
 export interface InstagramScraperResult {
@@ -22,12 +25,107 @@ export interface InstagramScraperResult {
   videoPlayCount?: number;
   viewCount?: number;
   playCount?: number;
+  /** 저장(북마크). 소스 미제공 시 undefined */
+  savesCount?: number | null;
+  /** 공유(DM 등). 소스 미제공 시 undefined */
+  sharesCount?: number | null;
+  /** 리포스트. 소스 미제공 시 undefined */
+  repostsCount?: number | null;
 }
+
+type PatientDiscoveryItem = {
+  id?: string | number;
+  code?: string;
+  shortcode?: string;
+  media_name?: string;
+  media_format?: string;
+  is_video?: boolean;
+  thumbnail_url?: string;
+  video_url?: string;
+  taken_at_date?: string;
+  metrics?: {
+    like_count?: number | null;
+    comment_count?: number | null;
+    play_count?: number | null;
+    ig_play_count?: number | null;
+    view_count?: number | null;
+    share_count?: number | null;
+    save_count?: number | null;
+    repost_count?: number | null;
+  };
+  metrics_availability?: {
+    share_count?: string;
+    save_count?: string;
+  };
+  user?: {
+    username?: string;
+    full_name?: string;
+    is_verified?: boolean;
+  };
+  caption?: { text?: string } | string;
+  image_versions?: { items?: Array<{ url?: string }> };
+};
 
 function getApifyToken(): string {
   const token = process.env.APIFY_TOKEN;
   if (!token) throw new Error("APIFY_TOKEN 환경변수가 없습니다.");
   return token;
+}
+
+function numOrNull(v: unknown): number | null {
+  if (typeof v !== "number" || !Number.isFinite(v) || v < 0) return null;
+  return Math.round(v);
+}
+
+function availableCount(
+  value: number | null | undefined,
+  availability?: string,
+): number | null {
+  if (availability === "unavailable_from_source") return null;
+  return numOrNull(value);
+}
+
+function mapPatientDiscoveryItem(
+  item: PatientDiscoveryItem,
+  inputUrl?: string,
+): InstagramScraperResult {
+  const code = (item.code || item.shortcode || "").trim();
+  const metrics = item.metrics || {};
+  const avail = item.metrics_availability || {};
+  const user = item.user || {};
+  const play =
+    numOrNull(metrics.ig_play_count) ??
+    numOrNull(metrics.play_count) ??
+    numOrNull(metrics.view_count);
+  const thumb =
+    item.thumbnail_url ||
+    item.image_versions?.items?.[0]?.url ||
+    undefined;
+  const url =
+    inputUrl ||
+    (code ? `https://www.instagram.com/p/${code}/` : undefined);
+
+  return {
+    id: String(item.id ?? code),
+    inputUrl: inputUrl,
+    url,
+    shortCode: code || undefined,
+    type: item.media_name || item.media_format,
+    displayUrl: thumb,
+    images: thumb ? [thumb] : undefined,
+    likesCount: numOrNull(metrics.like_count) ?? undefined,
+    commentsCount: numOrNull(metrics.comment_count) ?? undefined,
+    ownerFullName: user.full_name,
+    ownerUsername: user.username,
+    username: user.username,
+    videoPlayCount: play ?? undefined,
+    videoViewCount: play ?? undefined,
+    playCount: play ?? undefined,
+    viewCount: play ?? undefined,
+    savesCount: availableCount(metrics.save_count, avail.save_count),
+    sharesCount: availableCount(metrics.share_count, avail.share_count),
+    repostsCount: numOrNull(metrics.repost_count),
+  };
 }
 
 const IG_RESERVED_SEGMENTS = /^(?:p|reel|reels|stories|explore|tv|accounts|direct)$/i;
@@ -105,21 +203,18 @@ export function getInstagramResultsType(url: string): "posts" | "reels" {
 
 export async function scrapeInstagramPosts(
   postUrls: string[],
-  memoryMbytes = 512,
+  memoryMbytes = 1024,
 ): Promise<InstagramScraperResult[]> {
   const token = getApifyToken();
-  const resultsType = getInstagramResultsType(postUrls[0] || "");
+  const urls = postUrls.map((u) => u.trim()).filter(Boolean);
+  if (urls.length === 0) return [];
+
   const res = await fetch(
-    `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=120`,
+    `${APIFY_BASE}/acts/${POST_ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        resultsType,
-        directUrls: postUrls,
-        resultsLimit: postUrls.length,
-        addParentData: false,
-      }),
+      body: JSON.stringify({ postUrls: urls }),
     },
   );
 
@@ -128,7 +223,29 @@ export async function scrapeInstagramPosts(
     throw new Error(await apifyErrorMessage(res.status, text));
   }
 
-  return (await res.json()) as InstagramScraperResult[];
+  const raw = (await res.json()) as PatientDiscoveryItem[];
+  if (!Array.isArray(raw)) return [];
+
+  // Actor가 예시/중복 항목을 섞을 수 있어 shortcode 기준 매칭
+  const byCode = new Map<string, InstagramScraperResult>();
+  for (const item of raw) {
+    const mapped = mapPatientDiscoveryItem(item);
+    const code = mapped.shortCode?.toLowerCase();
+    if (code && !byCode.has(code)) byCode.set(code, mapped);
+  }
+
+  return urls
+    .map((url) => {
+      const code = extractInstagramShortCode(url);
+      const hit = code ? byCode.get(code) : undefined;
+      if (hit) return { ...hit, inputUrl: url, url: hit.url || url };
+      if (urls.length === 1 && byCode.size === 1) {
+        const only = [...byCode.values()][0]!;
+        return { ...only, inputUrl: url, url: only.url || url };
+      }
+      return null;
+    })
+    .filter((item): item is InstagramScraperResult => item != null);
 }
 
 /** 프로필 URL → profilePicUrl(HD). sns_url이 게시물 URL이면 handle로 프로필 URL 생성 */
@@ -142,7 +259,7 @@ export async function scrapeInstagramProfile(
     : instagramProfileUrlFromHandle(profileUrlOrHandle);
 
   const res = await fetch(
-    `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
+    `${APIFY_BASE}/acts/${PROFILE_ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

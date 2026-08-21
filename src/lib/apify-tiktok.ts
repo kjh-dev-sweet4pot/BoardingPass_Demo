@@ -31,6 +31,8 @@ export interface TikTokScraperResult {
   diggCount: number;         // likes
   commentCount: number;
   shareCount: number;
+  /** 저장(북마크) */
+  collectCount?: number;
   webVideoUrl: string;
   authorMeta?: { name: string; id: string; avatar?: string; originalAvatarUrl?: string };
 }

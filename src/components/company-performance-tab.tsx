@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, Fragment, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
@@ -17,6 +17,9 @@ type LinkRow = {
   views: number | null;
   likes: number | null;
   comments: number | null;
+  saves?: number | null;
+  shares?: number | null;
+  reposts?: number | null;
   metrics_collected_at: string | null;
   allocations: {
     id: string;
@@ -141,14 +144,20 @@ const METRIC_WHY = {
   commentRate:
     "댓글 ÷ 조회수. 대화·질문·리뷰형 반응이 강한 콘텐츠를 고를 때 씁니다.",
   er: "참여율(ER) = (좋아요 + 댓글) ÷ 조회수. 종합 반응 밀도이며, 재섭외·단가 판단의 기본 지표입니다.",
+  saves:
+    "저장(북마크) 합계. 다시 보고 싶은 콘텐츠 신호로, 구매·탐색 의도와 가깝습니다.",
+  shares:
+    "공유 합계(TikTok 공유 · Instagram DM/공유). 확산·바이럴 지표입니다.",
+  reposts:
+    "리포스트 합계(주로 Instagram). 타인 프로필로 다시 게시된 횟수입니다.",
   platformEr:
     "플랫폼별로 합산한 뒤 ER을 계산합니다. Instagram·TikTok 등 채널 예산·포맷 배분에 씁니다.",
   early:
-    "발행 후 D+1~D+2 구간의 조회 스냅샷입니다. 초반 반응이 강한 바이럴 후보를 조기에 잡습니다.",
+    "각 게시물 제출 기준 D+1~D+2 조회 스냅샷입니다. 그 구간 수집이 없으면 첫·둘째 수집 사이 조회 증가로 대체합니다.",
   product:
     "상품 단위로 조회·좋아요·ER을 합산합니다. 상품별 캠페인 효율을 비교합니다.",
   curve:
-    "발행일 기준 경과일에 따른 조회 누적입니다. 성장 속도와 롱테일을 봅니다.",
+    "필터된 콘텐츠 중 가장 먼저 업로드된 시점을 D+0으로 잡고, 이후 경과일별 조회 합(콘텐츠당 당일 최대값)입니다.",
   platformShare:
     "플랫폼별 조회수 비중입니다. 채널 기여도를 한눈에 봅니다.",
 } as const;
@@ -212,11 +221,17 @@ function ContentMetricsTip({
   views,
   likes,
   comments,
+  saves,
+  shares,
+  reposts,
   children,
 }: {
   views: number;
   likes: number;
   comments: number;
+  saves?: number | null;
+  shares?: number | null;
+  reposts?: number | null;
   children: ReactNode;
 }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -234,6 +249,15 @@ function ContentMetricsTip({
       ),
     });
   }
+
+  const rows: { label: string; value: string }[] = [
+    { label: "조회수", value: formatMetric(views) },
+    { label: "좋아요", value: formatMetric(likes) },
+    { label: "댓글", value: formatMetric(comments) },
+  ];
+  if (saves != null) rows.push({ label: "저장", value: formatMetric(saves) });
+  if (shares != null) rows.push({ label: "공유", value: formatMetric(shares) });
+  if (reposts != null) rows.push({ label: "리포스트", value: formatMetric(reposts) });
 
   return (
     <div
@@ -253,18 +277,12 @@ function ContentMetricsTip({
                 지표
               </p>
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">
-                <dt className="text-white/65">조회수</dt>
-                <dd className="text-right tabular-nums font-semibold">
-                  {formatMetric(views)}
-                </dd>
-                <dt className="text-white/65">좋아요</dt>
-                <dd className="text-right tabular-nums font-semibold">
-                  {formatMetric(likes)}
-                </dd>
-                <dt className="text-white/65">댓글</dt>
-                <dd className="text-right tabular-nums font-semibold">
-                  {formatMetric(comments)}
-                </dd>
+                {rows.map((row) => (
+                  <Fragment key={row.label}>
+                    <dt className="text-white/65">{row.label}</dt>
+                    <dd className="text-right tabular-nums font-semibold">{row.value}</dd>
+                  </Fragment>
+                ))}
               </dl>
             </div>,
             document.body,
@@ -302,7 +320,10 @@ type TopMetric =
   | { kind: "likeRate" }
   | { kind: "commentRate" }
   | { kind: "er" }
-  | { kind: "earlyViews" };
+  | { kind: "earlyViews" }
+  | { kind: "saves" }
+  | { kind: "shares" }
+  | { kind: "reposts" };
 
 function topMetricValue(row: LinkRow, metric: TopMetric): number {
   const views = row.views ?? 0;
@@ -310,6 +331,9 @@ function topMetricValue(row: LinkRow, metric: TopMetric): number {
   const comments = row.comments ?? 0;
   if (metric.kind === "views" || metric.kind === "earlyViews") return views;
   if (metric.kind === "likes") return likes;
+  if (metric.kind === "saves") return row.saves ?? 0;
+  if (metric.kind === "shares") return row.shares ?? 0;
+  if (metric.kind === "reposts") return row.reposts ?? 0;
   if (metric.kind === "likeRate") return views > 0 ? (likes / views) * 100 : 0;
   if (metric.kind === "commentRate") {
     return views > 0 ? (comments / views) * 100 : 0;
@@ -333,6 +357,9 @@ function topMetricUnit(metric: TopMetric) {
   if (metric.kind === "likes") return "좋아요";
   if (metric.kind === "likeRate") return "좋아요율";
   if (metric.kind === "commentRate") return "댓글율";
+  if (metric.kind === "saves") return "저장";
+  if (metric.kind === "shares") return "공유";
+  if (metric.kind === "reposts") return "리포스트";
   return "ER";
 }
 
@@ -377,6 +404,9 @@ function TopContentPanel({
                   views={row.views ?? 0}
                   likes={row.likes ?? 0}
                   comments={row.comments ?? 0}
+                  saves={row.saves}
+                  shares={row.shares}
+                  reposts={row.reposts}
                 >
                   <a
                     href={row.link_url || "#"}
@@ -469,20 +499,33 @@ function PlatformErPanel({
   );
 }
 
+function formatCurveAxis(day: number, useHours: boolean) {
+  if (useHours) {
+    const h = Math.max(0, Math.round(day * 24));
+    return `${h}시간`;
+  }
+  return `D+${Math.max(0, Math.floor(day))}`;
+}
+
 function ViewsCurve({ points }: { points: { day: number; views: number }[] }) {
-  if (points.length < 2) return null;
+  if (points.length < 2) {
+    return (
+      <p className="mt-6 py-8 text-center text-sm text-[var(--muted)]">
+        첫 업로드 이후 수집 시각이 2회 이상이면 곡선이 표시됩니다.
+      </p>
+    );
+  }
   const maxViews = Math.max(...points.map((p) => p.views), 1);
+  const maxDay = Math.max(points[points.length - 1]?.day ?? 0, 1e-9);
+  const useHours = maxDay < 1;
   const W = 520;
   const H = 170;
   const pad = { l: 34, r: 10, t: 20, b: 30 };
 
-  const pts = points.map((p, i, arr) => {
-    const maxDay = arr[arr.length - 1]?.day || 1;
-    return {
-      x: pad.l + (p.day / maxDay) * (W - pad.l - pad.r),
-      y: pad.t + (1 - p.views / maxViews) * (H - pad.t - pad.b),
-    };
-  });
+  const pts = points.map((p) => ({
+    x: pad.l + (p.day / maxDay) * (W - pad.l - pad.r),
+    y: pad.t + (1 - p.views / maxViews) * (H - pad.t - pad.b),
+  }));
 
   const line = pts
     .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
@@ -500,13 +543,13 @@ function ViewsCurve({ points }: { points: { day: number; views: number }[] }) {
         {formatMetric(maxViews)}
       </text>
       <text x={pad.l} y={H - 6} fill="var(--muted)" fontSize={9.5}>
-        D+0
+        {formatCurveAxis(0, useHours)}
       </text>
-      <text x={W / 2} y={H - 6} fill="var(--muted)" fontSize={9.5}>
-        D+{Math.floor((points[points.length - 1]?.day ?? 0) / 2)}
+      <text x={W / 2 - 12} y={H - 6} fill="var(--muted)" fontSize={9.5}>
+        {formatCurveAxis(maxDay / 2, useHours)}
       </text>
-      <text x={W - 40} y={H - 6} fill="var(--muted)" fontSize={9.5}>
-        D+{points[points.length - 1]?.day ?? 0}
+      <text x={W - 48} y={H - 6} fill="var(--muted)" fontSize={9.5}>
+        {formatCurveAxis(maxDay, useHours)}
       </text>
     </svg>
   );
@@ -627,8 +670,11 @@ export function CompanyPerformanceTab({
   );
   const [loading, setLoading] = useState(!initialData);
   const [refreshing, setRefreshing] = useState(false);
+  const [recollecting, setRecollecting] = useState(false);
+  const [recollectMsg, setRecollectMsg] = useState<string | null>(null);
   const [productId, setProductId] = useState("");
   const asOfYmd = ymdKst(new Date());
+  const canRecollect = source !== "mock";
 
   function applyPayload(data: {
     links?: LinkRow[];
@@ -649,12 +695,43 @@ export function CompanyPerformanceTab({
     try {
       const res = await fetch("/api/com/insights");
       const data = await res.json();
+      if (!res.ok) return; // 실패 시 빈 화면으로 덮지 않음
       applyPayload(data);
     } catch {
       /* keep last snapshot */
     } finally {
       setRefreshing(false);
       setLoading(false);
+    }
+  }
+
+  async function recollectMetrics() {
+    if (!canRecollect || recollecting) return;
+    setRecollecting(true);
+    setRecollectMsg(null);
+    try {
+      const res = await fetch("/api/com/insights/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: productId || undefined }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || "재수집 실패");
+      }
+      const parts = [
+        `완료 ${body.ok ?? 0}`,
+        `실패 ${body.failed ?? 0}`,
+        body.truncated ? `최근 ${body.max}건만` : null,
+      ].filter(Boolean);
+      setRecollectMsg(parts.join(" · "));
+      await reload();
+    } catch (err) {
+      setRecollectMsg(
+        err instanceof Error ? err.message : "재수집 중 오류가 발생했습니다.",
+      );
+    } finally {
+      setRecollecting(false);
     }
   }
 
@@ -688,11 +765,8 @@ export function CompanyPerformanceTab({
     [periodFilteredLinks, productId],
   );
   const metrics = useMemo(
-    () =>
-      productId
-        ? allMetrics.filter((m) => links.some((l) => l.id === m.creator_link_id))
-        : allMetrics,
-    [allMetrics, links, productId],
+    () => allMetrics.filter((m) => links.some((l) => l.id === m.creator_link_id)),
+    [allMetrics, links],
   );
 
   const products = useMemo(() => {
@@ -758,9 +832,47 @@ export function CompanyPerformanceTab({
     [links],
   );
 
-  const topByEarly = useMemo(() => {
+  const topBySaves = useMemo(
+    () =>
+      [...links]
+        .filter((l) => l.saves != null && (l.saves ?? 0) > 0)
+        .sort((a, b) => (b.saves ?? 0) - (a.saves ?? 0))
+        .slice(0, 5),
+    [links],
+  );
+
+  const topByShares = useMemo(
+    () =>
+      [...links]
+        .filter((l) => l.shares != null && (l.shares ?? 0) > 0)
+        .sort((a, b) => (b.shares ?? 0) - (a.shares ?? 0))
+        .slice(0, 5),
+    [links],
+  );
+
+  const topByReposts = useMemo(
+    () =>
+      [...links]
+        .filter((l) => l.reposts != null && (l.reposts ?? 0) > 0)
+        .sort((a, b) => (b.reposts ?? 0) - (a.reposts ?? 0))
+        .slice(0, 5),
+    [links],
+  );
+
+  const timelineStartIso = useMemo(() => {
+    let minTs: number | null = null;
+    for (const l of links) {
+      if (!l.published_at) continue;
+      const ts = new Date(l.published_at).getTime();
+      if (!Number.isFinite(ts)) continue;
+      if (minTs == null || ts < minTs) minTs = ts;
+    }
+    return minTs == null ? null : new Date(minTs).toISOString();
+  }, [links]);
+
+  /** D+1~2 스냅샷 우선, 없으면 첫·둘째 수집 조회 증가분 */
+  const { topByEarly, earlyAside } = useMemo(() => {
     const publishedAtMap = new Map(links.map((l) => [l.id, l.published_at]));
-    // linkId → D+1~2 구간에서 가장 늦은(가까운) 스냅샷 조회수
     const earlyViews = new Map<string, number>();
     for (const m of metrics) {
       const pub = publishedAtMap.get(m.creator_link_id);
@@ -770,16 +882,74 @@ export function CompanyPerformanceTab({
       );
       if (dayDiff < 1 || dayDiff > 2) continue;
       const prev = earlyViews.get(m.creator_link_id);
-      // 같은 구간이면 더 큰 조회(누적)를 채택
       if (prev == null || m.views > prev) earlyViews.set(m.creator_link_id, m.views);
     }
-    return links
-      .filter((l) => (earlyViews.get(l.id) ?? 0) > 0)
-      .map((l) => ({ ...l, earlyViews: earlyViews.get(l.id) ?? 0 }))
-      .sort((a, b) => b.earlyViews - a.earlyViews)
-      .slice(0, 5);
+    if (earlyViews.size > 0) {
+      return {
+        topByEarly: links
+          .filter((l) => (earlyViews.get(l.id) ?? 0) > 0)
+          .map((l) => ({ ...l, earlyViews: earlyViews.get(l.id) ?? 0 }))
+          .sort((a, b) => b.earlyViews - a.earlyViews)
+          .slice(0, 5),
+        earlyAside: "D+1~2 스냅샷",
+      };
+    }
+
+    // 발행 직후 수집 이력이 없을 때: 첫·둘째 수집 사이 증가
+    const byLink = new Map<string, MetricRow[]>();
+    for (const m of metrics) {
+      const arr = byLink.get(m.creator_link_id) || [];
+      arr.push(m);
+      byLink.set(m.creator_link_id, arr);
+    }
+    const growth = new Map<string, number>();
+    for (const [id, rows] of byLink) {
+      if (rows.length < 2) continue;
+      const sorted = [...rows].sort(
+        (a, b) =>
+          new Date(a.collected_at).getTime() - new Date(b.collected_at).getTime(),
+      );
+      const delta = sorted[1].views - sorted[0].views;
+      if (delta > 0) growth.set(id, delta);
+    }
+    return {
+      topByEarly: links
+        .filter((l) => (growth.get(l.id) ?? 0) > 0)
+        .map((l) => ({ ...l, earlyViews: growth.get(l.id) ?? 0 }))
+        .sort((a, b) => b.earlyViews - a.earlyViews)
+        .slice(0, 5),
+      earlyAside: "첫·둘째 수집 증가",
+    };
   }, [links, metrics]);
 
+  const curvePoints = useMemo(() => {
+    if (!timelineStartIso || metrics.length === 0) return [];
+    const startTs = new Date(timelineStartIso).getTime();
+    // 수집 시각마다: 그 시점까지 각 콘텐츠의 최신 조회를 합산 (같은 날 재수집도 곡선에 반영)
+    const times = [
+      ...new Set(
+        metrics
+          .map((m) => m.collected_at)
+          .filter((t) => new Date(t).getTime() >= startTs),
+      ),
+    ].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    if (times.length < 2) return [];
+
+    return times.map((t) => {
+      const tMs = new Date(t).getTime();
+      const latest = new Map<string, number>();
+      for (const m of metrics) {
+        const cMs = new Date(m.collected_at).getTime();
+        if (cMs > tMs) continue;
+        const prev = latest.get(m.creator_link_id);
+        if (prev == null || m.views > prev) latest.set(m.creator_link_id, m.views);
+      }
+      return {
+        day: Math.max(0, (tMs - startTs) / 86400000),
+        views: [...latest.values()].reduce((sum, v) => sum + v, 0),
+      };
+    });
+  }, [metrics, timelineStartIso]);
   const platformErRows = useMemo(() => {
     const map = new Map<
       string,
@@ -829,7 +999,13 @@ export function CompanyPerformanceTab({
     const influencerIds = new Set(
       links.map((l) => l.allocations?.influencer_id).filter(Boolean),
     );
-    return { views, likes, comments, posts: links.length, influencers: influencerIds.size };
+    return {
+      views,
+      likes,
+      comments,
+      posts: links.length,
+      influencers: influencerIds.size,
+    };
   }, [links]);
 
   const byProduct = useMemo(() => {
@@ -858,23 +1034,6 @@ export function CompanyPerformanceTab({
   }, [links]);
 
   const maxProductViews = byProduct[0]?.views || 1;
-
-  const curvePoints = useMemo(() => {
-    const publishedAtMap = new Map(links.map((l) => [l.id, l.published_at]));
-    const dayMap = new Map<number, number>();
-    for (const m of metrics) {
-      const pub = publishedAtMap.get(m.creator_link_id);
-      if (!pub) continue;
-      const dayDiff = Math.floor(
-        (new Date(m.collected_at).getTime() - new Date(pub).getTime()) / 86400000,
-      );
-      if (dayDiff < 0 || dayDiff > 14) continue;
-      dayMap.set(dayDiff, (dayMap.get(dayDiff) ?? 0) + m.views);
-    }
-    return [...dayMap.entries()]
-      .sort(([a], [b]) => a - b)
-      .map(([day, views]) => ({ day, views }));
-  }, [metrics, links]);
 
   const platformSegments = useMemo(() => {
     const map = new Map<string, number>();
@@ -925,16 +1084,24 @@ export function CompanyPerformanceTab({
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          {initialData ? null : (
+          <button
+            type="button"
+            onClick={() => void reload()}
+            disabled={refreshing || recollecting}
+            className="h-[38px] rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] font-semibold text-[var(--ink)] disabled:opacity-50"
+          >
+            {refreshing ? "조회 중…" : "다시 조회"}
+          </button>
+          {canRecollect ? (
             <button
               type="button"
-              onClick={() => void reload()}
-              disabled={refreshing}
-              className="h-[38px] rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] font-semibold text-[var(--ink)] disabled:opacity-50"
+              onClick={() => void recollectMetrics()}
+              disabled={recollecting || refreshing}
+              className="h-[38px] rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3.5 text-[13px] font-semibold text-[var(--accent)] disabled:opacity-50"
             >
-              {refreshing ? "조회 중…" : "다시 조회"}
+              {recollecting ? "재수집 중…" : "지표 재수집"}
             </button>
-          )}
+          ) : null}
           <select
             className="h-[38px] rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] text-[#5b4130]"
             value={productId}
@@ -969,6 +1136,9 @@ export function CompanyPerformanceTab({
       </div>
 
       <p className="text-[11.5px] leading-relaxed text-[var(--muted)]">{metaLine}</p>
+      {recollectMsg ? (
+        <p className="text-[12px] text-[var(--accent)]">{recollectMsg}</p>
+      ) : null}
 
       {links.length === 0 ? (
         <EmptyState
@@ -990,11 +1160,18 @@ export function CompanyPerformanceTab({
                 <div className="flex items-center gap-1.5">
                   <span className="text-[13.5px] font-semibold text-[var(--ink)]">
                     조회수 곡선{" "}
-                    <span className="font-normal text-[var(--muted)]">발행 후 경과일</span>
+                    <span className="font-normal text-[var(--muted)]">캠페인 개시 이후 성과</span>
                   </span>
                   <InfoTip text={METRIC_WHY.curve} />
                 </div>
-                <span className="text-[11.5px] text-[var(--muted)]">D+0 ~ D+14</span>
+                <span className="text-[11.5px] text-[var(--muted)]">
+                  {(() => {
+                    const maxDay = curvePoints[curvePoints.length - 1]?.day ?? 0;
+                    if (curvePoints.length === 0) return "첫 업로드 기준";
+                    if (maxDay < 1) return `0시간 ~ ${Math.round(maxDay * 24)}시간`;
+                    return `D+0 ~ D+${Math.floor(maxDay)}`;
+                  })()}
+                </span>
               </div>
               <div className="px-[18px] pb-[18px]">
                 <ViewsCurve points={curvePoints} />
@@ -1040,6 +1217,27 @@ export function CompanyPerformanceTab({
 
           <div className="grid gap-3.5 lg:grid-cols-3">
             <TopContentPanel
+              title="저장 TOP"
+              why={METRIC_WHY.saves}
+              metric={{ kind: "saves" }}
+              items={topBySaves}
+            />
+            <TopContentPanel
+              title="공유 TOP"
+              why={METRIC_WHY.shares}
+              metric={{ kind: "shares" }}
+              items={topByShares}
+            />
+            <TopContentPanel
+              title="리포스트 TOP"
+              why={METRIC_WHY.reposts}
+              metric={{ kind: "reposts" }}
+              items={topByReposts}
+            />
+          </div>
+
+          <div className="grid gap-3.5 lg:grid-cols-3">
+            <TopContentPanel
               title="댓글 반응 TOP"
               why={METRIC_WHY.commentRate}
               metric={{ kind: "commentRate" }}
@@ -1054,11 +1252,11 @@ export function CompanyPerformanceTab({
               aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
             />
             <TopContentPanel
-              title="초기 반응 (D+1~2)"
+              title="초기 반응"
               why={METRIC_WHY.early}
               metric={{ kind: "earlyViews" }}
               items={topByEarly}
-              aside="수집 스냅샷"
+              aside={earlyAside}
             />
           </div>
 

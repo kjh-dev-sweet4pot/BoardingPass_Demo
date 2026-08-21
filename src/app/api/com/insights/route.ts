@@ -38,9 +38,12 @@ export async function fetchInsights(
 
   // 2단계: 발행완료 creator_links
   // legacy: T3 이전 데이터는 status=approved, content_status=null 인 공개 게시물 URL만 남아있다.
+  // published_at 컬럼은 스키마에 없음 — 타임라인 앵커는 submitted_at만 사용 (updated_at 금지)
   const { data: rawLinks, error: linksErr } = await supabase
     .from("creator_links")
-    .select("id, url, publish_url, status, updated_at, submitted_at, views, likes, comments, metrics_collected_at, allocation_id")
+    .select(
+      "id, url, publish_url, status, submitted_at, views, likes, comments, saves, shares, reposts, metrics_collected_at, allocation_id",
+    )
     .in("allocation_id", allocIds)
     .or("content_status.eq.발행완료,publish_url.not.is.null,and(content_status.is.null,status.eq.approved)");
 
@@ -52,10 +55,13 @@ export async function fetchInsights(
     id: l.id,
     link_url: (l.publish_url || l.url || "").trim() || null,
     status: l.status,
-    published_at: l.updated_at || l.submitted_at || null,
+    published_at: l.submitted_at || null,
     views: l.views,
     likes: l.likes,
     comments: l.comments,
+    saves: l.saves,
+    shares: l.shares,
+    reposts: l.reposts,
     metrics_collected_at: l.metrics_collected_at,
     allocation_id: l.allocation_id,
     allocations: allocMap.get(l.allocation_id) ?? null,
@@ -66,7 +72,7 @@ export async function fetchInsights(
 
   const { data: metrics, error: metricsErr } = await supabase
     .from("content_metrics")
-    .select("creator_link_id, collected_at, views, likes, comments")
+    .select("creator_link_id, collected_at, views, likes, comments, saves, shares, reposts")
     .in("creator_link_id", linkIds)
     .gte("collected_at", since)
     .order("collected_at", { ascending: true });

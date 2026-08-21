@@ -43,7 +43,13 @@ function MetricsBadge({ link, onRefresh }: { link: ReviewRow; onRefresh: (id: st
     setRefreshing(false);
   }
 
-  const hasMetrics = link.views != null || link.likes != null || link.comments != null;
+  const hasMetrics =
+    link.views != null ||
+    link.likes != null ||
+    link.comments != null ||
+    link.saves != null ||
+    link.shares != null ||
+    link.reposts != null;
   const collectedAt = link.metrics_collected_at
     ? new Date(link.metrics_collected_at).toLocaleString("ko-KR", {
         month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
@@ -52,10 +58,15 @@ function MetricsBadge({ link, onRefresh }: { link: ReviewRow; onRefresh: (id: st
 
   return (
     <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)] px-3 py-2">
-      <div className="flex items-center gap-3 text-xs text-[var(--ink)]">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--ink)]">
         <span title="조회수">👁 {fmt(link.views)}</span>
         <span title="좋아요">♥ {fmt(link.likes)}</span>
         <span title="댓글">💬 {fmt(link.comments)}</span>
+        {link.saves != null ? <span title="저장">저장 {fmt(link.saves)}</span> : null}
+        {link.shares != null ? <span title="공유">공유 {fmt(link.shares)}</span> : null}
+        {link.reposts != null ? (
+          <span title="리포스트">리포스트 {fmt(link.reposts)}</span>
+        ) : null}
         {collectedAt && !hasMetrics && (
           <span className="text-[var(--muted)]">미수집</span>
         )}
@@ -128,11 +139,30 @@ export function AdminLinkReview() {
       setError(body.error || "지표 조회 실패");
       return;
     }
-    const m = body.metrics as { views?: number; likes?: number; comments?: number; metrics_collected_at?: string };
+    const m = body.metrics as {
+      views?: number;
+      likes?: number;
+      comments?: number;
+      saves?: number | null;
+      shares?: number | null;
+      reposts?: number | null;
+      collected_at?: string;
+      metrics_collected_at?: string;
+    };
     setLinks((prev) =>
       prev.map((l) =>
         l.id === id
-          ? { ...l, views: m.views ?? l.views, likes: m.likes ?? l.likes, comments: m.comments ?? l.comments, metrics_collected_at: m.metrics_collected_at ?? l.metrics_collected_at }
+          ? {
+              ...l,
+              views: m.views ?? l.views,
+              likes: m.likes ?? l.likes,
+              comments: m.comments ?? l.comments,
+              saves: m.saves ?? l.saves,
+              shares: m.shares ?? l.shares,
+              reposts: m.reposts ?? l.reposts,
+              metrics_collected_at:
+                m.collected_at ?? m.metrics_collected_at ?? l.metrics_collected_at,
+            }
           : l,
       ),
     );

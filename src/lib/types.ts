@@ -43,6 +43,9 @@ export type CreatorLink = {
   views?: number | null;
   likes?: number | null;
   comments?: number | null;
+  saves?: number | null;
+  shares?: number | null;
+  reposts?: number | null;
   metrics_collected_at?: string | null;
 };
 
