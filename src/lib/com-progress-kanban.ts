@@ -19,6 +19,7 @@ export type ProgressLink = {
   status: string;
   url: string | null;
   hasFile: boolean;
+  fileKind: "video" | "image" | "other";
   platform: string;
   submitted_at: string | null;
   /** 반려 시 운영자 사유 (creator_links.memo) */
@@ -76,6 +77,13 @@ function rollupStatus(item: AllocationWithRelations, links: CreatorLink[]): Kanb
   return "대기";
 }
 
+function fileKindFromPath(path: string | null | undefined): ProgressLink["fileKind"] {
+  const p = (path || "").toLowerCase();
+  if (/\.(png|jpe?g|gif|webp|heic)$/.test(p)) return "image";
+  if (/\.(mp4|webm|mov|m4v)$/.test(p)) return "video";
+  return "other";
+}
+
 function toProgressLink(
   link: CreatorLink,
   influencerId: string,
@@ -99,6 +107,7 @@ function toProgressLink(
       status: link.content_status || link.status,
       url: creatorLinkHref(link) || null,
       hasFile: Boolean(link.submitted_file_path),
+      fileKind: fileKindFromPath(link.submitted_file_path),
       platform: CREATOR_PLATFORM_LABEL[link.platform] || link.platform,
       submitted_at: link.submitted_at || null,
       reviewMemo: link.memo?.trim() || null,
@@ -122,6 +131,7 @@ function toProgressLink(
     status: link.content_status || link.status,
     url: creatorLinkHref(link) || null,
     hasFile: Boolean(link.submitted_file_path),
+    fileKind: fileKindFromPath(link.submitted_file_path),
     platform: CREATOR_PLATFORM_LABEL[link.platform] || link.platform,
     submitted_at: link.submitted_at || null,
     reviewMemo: link.memo?.trim() || null,
