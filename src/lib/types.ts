@@ -43,6 +43,9 @@ export type CreatorLink = {
   views?: number | null;
   likes?: number | null;
   comments?: number | null;
+  saves?: number | null;
+  shares?: number | null;
+  reposts?: number | null;
   metrics_collected_at?: string | null;
 };
 
@@ -62,6 +65,8 @@ export type Influencer = {
   sns_url: string | null;
   /** Storage influencer-avatars/{id}.jpg */
   profile_image_path: string | null;
+  /** SNS 팔로워 수 (프로필 수집) */
+  followers?: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -83,6 +88,8 @@ export type Campaign = {
   product_id: string;
   status: CampaignStatus;
   name: string | null;
+  /** 캠페인 예산(원). 집행% = Accept 노출가 합 / budget_amount */
+  budget_amount?: number | null;
   created_at: string;
   updated_at: string;
 };

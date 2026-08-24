@@ -50,7 +50,7 @@ async function findOrCreateInfluencer(
 
   const { data: existing } = await supabase
     .from("influencers")
-    .select("id, sns_url, profile_image_path, name, instagram_handle")
+    .select("id, sns_url, profile_image_path, name, instagram_handle, followers")
     .eq("instagram_handle_normalized", row.snsid)
     .maybeSingle();
 
@@ -67,7 +67,8 @@ async function findOrCreateInfluencer(
     const ref: InfluencerUpsert = {
       id: existing.id as string,
       isNew: false,
-      needsProfile: !existing.profile_image_path,
+      // 아바타 없거나 팔로워 미수집이면 프로필 재수집
+      needsProfile: !existing.profile_image_path || existing.followers == null,
       name: row.name || existing.name || row.snsid,
       handle: row.snsid,
       snsUrl: row.snsurl || existing.sns_url || "",

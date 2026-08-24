@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { scrapeInstagramProfile, resolveInstagramProfileUrl, instagramHandleFromUrl } from "@/lib/apify-instagram";
-import { scrapeTikTokProfile } from "@/lib/apify-tiktok";
+import { normalizeTikTokUsername, scrapeTikTokProfile, tiktokHandleFromUrl } from "@/lib/apify-tiktok";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 export const INFLUENCER_AVATARS_BUCKET = "influencer-avatars";
@@ -57,7 +57,11 @@ function profileTarget(handle: string, snsUrl?: string | null) {
   const raw = (snsUrl || "").trim();
   if (raw && /^https?:\/\//i.test(raw)) {
     if (isTikTokUrl(raw)) {
-      const h = bareHandle(handle);
+      // SNS URL의 @username 우선 — DB handle은 표시명(예: 山口奈々美)인 경우가 많음
+      const h =
+        tiktokHandleFromUrl(raw) ||
+        normalizeTikTokUsername(handle) ||
+        bareHandle(handle);
       return { platform: "tiktok" as const, handle: h, url: raw };
     }
     const igHandle = bareHandle(instagramHandleFromUrl(raw) || handle);
@@ -92,16 +96,25 @@ async function downloadImageBytes(imageUrl: string) {
   return { bytes, contentType };
 }
 
-export async function scrapeProfileImageUrl(handle: string, snsUrl?: string | null) {
+export async function scrapeProfileDetails(
+  handle: string,
+  snsUrl?: string | null,
+): Promise<{ imageUrl: string | null; followers: number | null }> {
   const target = profileTarget(handle, snsUrl);
-  if (!target) return null;
+  if (!target) return { imageUrl: null, followers: null };
   if (target.platform === "tiktok") {
     return scrapeTikTokProfile(target.handle);
   }
   return scrapeInstagramProfile(target.url);
 }
 
-/** Apify → Storage → influencers.profile_image_path */
+/** @deprecated scrapeProfileDetails 사용 */
+export async function scrapeProfileImageUrl(handle: string, snsUrl?: string | null) {
+  const r = await scrapeProfileDetails(handle, snsUrl);
+  return r.imageUrl;
+}
+
+/** Apify → Storage 아바타 + influencers.followers */
 export async function fetchAndStoreInfluencerProfile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
@@ -110,26 +123,35 @@ export async function fetchAndStoreInfluencerProfile(
 ) {
   if (!process.env.APIFY_TOKEN?.trim()) return null;
 
-  const imageUrl = await scrapeProfileImageUrl(input.handle, input.snsUrl);
-  if (!imageUrl) return null;
+  const profile = await scrapeProfileDetails(input.handle, input.snsUrl);
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
 
-  const { bytes, contentType } = await downloadImageBytes(imageUrl);
-  const path = influencerAvatarObjectPath(influencerId);
-  const { error: uploadErr } = await supabase.storage
-    .from(INFLUENCER_AVATARS_BUCKET)
-    .upload(path, bytes, { contentType, upsert: true });
-  if (uploadErr) throw new Error(uploadErr.message);
+  if (profile.followers != null) {
+    patch.followers = profile.followers;
+  }
+
+  let path: string | null = null;
+  if (profile.imageUrl) {
+    const { bytes, contentType } = await downloadImageBytes(profile.imageUrl);
+    path = influencerAvatarObjectPath(influencerId);
+    const { error: uploadErr } = await supabase.storage
+      .from(INFLUENCER_AVATARS_BUCKET)
+      .upload(path, bytes, { contentType, upsert: true });
+    if (uploadErr) throw new Error(uploadErr.message);
+    patch.profile_image_path = path;
+  }
+
+  if (Object.keys(patch).length <= 1) return null;
 
   const { error: updateErr } = await supabase
     .from("influencers")
-    .update({
-      profile_image_path: path,
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", influencerId);
   if (updateErr) throw new Error(updateErr.message);
 
-  return path;
+  return { path, followers: profile.followers };
 }
 
 /** 등록 직후 백그라운드 수집 — 실패해도 본 흐름은 유지 */
@@ -145,9 +167,12 @@ export function scheduleInfluencerProfileFetch(
     return;
   }
   void fetchAndStoreInfluencerProfile(supabase, influencerId, input)
-    .then((path) => {
-      if (path) onComplete?.({ ok: true });
-      else onComplete?.({ ok: false, error: "프로필 이미지를 찾지 못했습니다." });
+    .then((result) => {
+      if (result && (result.path || result.followers != null)) {
+        onComplete?.({ ok: true });
+      } else {
+        onComplete?.({ ok: false, error: "프로필·팔로워를 찾지 못했습니다." });
+      }
     })
     .catch((err: unknown) => {
       onComplete?.({

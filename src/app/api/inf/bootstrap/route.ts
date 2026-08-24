@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createApiClientIfConfigured } from "@/lib/supabase/api-client";
 import { getInfluencerSessionId } from "@/lib/session";
 import { applyInfluencerStoreVisit } from "@/lib/inf-visit";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 /**
  * 세션 확인 후 방문 반영(pending→visited / 미수령 재방문일 갱신) + 배정 로드.
  * 로그인 UI에서 환영 애니메이션과 병렬로 호출.
+ * verify 와 같이 service_role 우선 (RLS 우회) — anon만 쓰면 influencers 조회가 비어 404 난다.
  */
 export async function POST() {
   const influencerId = await getInfluencerSessionId();
@@ -13,7 +15,9 @@ export async function POST() {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const supabase = await createApiClientIfConfigured();
+  const supabase = hasServiceRoleKey()
+    ? createServiceClient()
+    : await createApiClientIfConfigured();
   if (!supabase) {
     return NextResponse.json(
       { error: "Supabase 환경변수가 설정되지 않았습니다." },

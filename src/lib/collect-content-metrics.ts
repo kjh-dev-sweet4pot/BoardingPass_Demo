@@ -11,6 +11,12 @@ export type ScrapedMetrics = {
   views: number;
   likes: number;
   comments: number;
+  /** 저장. 소스 미제공이면 null */
+  saves: number | null;
+  /** 공유. 소스 미제공이면 null */
+  shares: number | null;
+  /** 리포스트(주로 IG). 없으면 null */
+  reposts: number | null;
   authorHandle: string | null;
 };
 
@@ -53,6 +59,9 @@ export async function scrapeLinkMetrics(
       views: result.playCount ?? 0,
       likes: result.diggCount ?? 0,
       comments: result.commentCount ?? 0,
+      saves: typeof result.collectCount === "number" ? result.collectCount : null,
+      shares: typeof result.shareCount === "number" ? result.shareCount : null,
+      reposts: null,
       authorHandle,
     };
   }
@@ -65,6 +74,9 @@ export async function scrapeLinkMetrics(
       views: extractInstagramViews(result) ?? 0,
       likes: result.likesCount ?? 0,
       comments: result.commentsCount ?? 0,
+      saves: result.savesCount ?? null,
+      shares: result.sharesCount ?? null,
+      reposts: result.repostsCount ?? null,
       authorHandle: result.ownerUsername?.replace(/^@+/, "").trim() || null,
     };
   }
@@ -142,6 +154,9 @@ export async function collectLinkMetrics(
         views: metrics.views,
         likes: metrics.likes,
         comments: metrics.comments,
+        saves: metrics.saves,
+        shares: metrics.shares,
+        reposts: metrics.reposts,
       },
       { onConflict: "creator_link_id,collected_at" },
     );
@@ -153,6 +168,9 @@ export async function collectLinkMetrics(
         views: metrics.views,
         likes: metrics.likes,
         comments: metrics.comments,
+        saves: metrics.saves,
+        shares: metrics.shares,
+        reposts: metrics.reposts,
         metrics_collected_at: collectedAt,
         verification_failed: false,
         updated_at: collectedAt,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAnyAdmin } from "@/lib/access";
+import { adminReviewerFields, contentReviewLogsClient } from "@/lib/content-review-log";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 
 export async function PATCH(
@@ -52,5 +53,30 @@ export async function PATCH(
   if (!data) {
     return NextResponse.json({ error: "링크를 찾을 수 없습니다." }, { status: 404 });
   }
+
+  const reviewer = await adminReviewerFields();
+  const decision = status === "approved" ? "승인" : "반려";
+  const logMemo =
+    status === "rejected"
+      ? String(body.memo || "").trim()
+      : String(body.memo || "").trim() || null;
+
+  const { error: logErr } = await contentReviewLogsClient(supabase)
+    .from("content_review_logs")
+    .insert({
+      creator_link_id: id,
+      decision,
+      memo: logMemo,
+      operator_label: reviewer.operator_label,
+      operator_id: reviewer.operator_id,
+    });
+
+  if (logErr) {
+    return NextResponse.json(
+      { error: `검수는 반영됐으나 기록 저장 실패: ${logErr.message}` },
+      { status: 500 },
+    );
+  }
+
   return NextResponse.json({ link: data });
 }

@@ -6,7 +6,8 @@ import { AdminCampaignCastingPanel } from "@/components/admin-campaign-casting-p
 import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
 import { AdminDashboard, type AdminQueueKey } from "@/components/admin-dashboard";
-import { AdminReviewQueue } from "@/components/admin-review-queue";
+import { AdminPerformanceTab } from "@/components/admin-performance-tab";
+import { AdminReviewQueue, type AdminReviewTab } from "@/components/admin-review-queue";
 import { AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
 import { AdminStoreOverview } from "@/components/admin-store-overview";
 import { PharListWithModal } from "@/components/phar-list-with-modal";
@@ -25,6 +26,7 @@ import {
 
 const PAGE: Record<AdminSection, { eyebrow: string; title: string }> = {
   dashboard: { eyebrow: "Overview", title: "대시보드" },
+  performance: { eyebrow: "Performance", title: "성과" },
   campaigns: { eyebrow: "Campaigns", title: "캠페인·섭외" },
   review: { eyebrow: "Review", title: "검수" },
   allocations: { eyebrow: "Allocations", title: "배정·매장" },
@@ -76,9 +78,7 @@ export function AdminConsoleLayout({
   sidebarActions?: ReactNode;
 }) {
   const [section, setSection] = useState<AdminSection>("dashboard");
-  const [reviewQueue, setReviewQueue] = useState<Exclude<AdminQueueKey, "castingStale">>(
-    "reviewPending",
-  );
+  const [reviewQueue, setReviewQueue] = useState<AdminReviewTab>("reviewPending");
   const [castingStale, setCastingStale] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
@@ -133,6 +133,15 @@ export function AdminConsoleLayout({
         </div>
       ) : null}
 
+      {section === "performance" ? (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <PageHeader section="performance" />
+          <div className="px-4 pb-8 sm:px-7">
+            <AdminPerformanceTab companies={companyList} />
+          </div>
+        </div>
+      ) : null}
+
       {section === "campaigns" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PageHeader section="campaigns" />
@@ -152,7 +161,10 @@ export function AdminConsoleLayout({
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PageHeader section="review" />
           <div className="min-h-0 flex-1 overflow-auto px-4 pb-8 sm:px-7">
-            <AdminReviewQueue queue={reviewQueue} />
+            <AdminReviewQueue
+              queue={reviewQueue}
+              onQueueChange={setReviewQueue}
+            />
           </div>
         </div>
       ) : null}

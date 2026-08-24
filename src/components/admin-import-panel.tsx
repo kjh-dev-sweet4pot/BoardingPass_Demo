@@ -27,7 +27,7 @@ type BatchListItem = ImportBatchRow & {
 };
 
 const PROFILE_STATUS_LABEL: Record<ImportProfileFetchStatus, string> = {
-  pending: "수집 중",
+  pending: "진행중…",
   ok: "완료",
   failed: "실패",
   skipped: "기존 프로필",
@@ -97,15 +97,17 @@ export function AdminImportPanel({
 
   useEffect(() => {
     if (!historyOpen) return;
-    const hasPending = batches.some((batch) =>
-      (batch.import_batch_influencers || []).some(
-        (item) => effectiveProfileStatus(item) === "pending",
-      ),
-    );
+    const hasPending =
+      importing ||
+      batches.some((batch) =>
+        (batch.import_batch_influencers || []).some(
+          (item) => effectiveProfileStatus(item) === "pending",
+        ),
+      );
     if (!hasPending) return;
     const timer = window.setInterval(() => void loadBatches(), 5000);
     return () => window.clearInterval(timer);
-  }, [historyOpen, batches, loadBatches]);
+  }, [historyOpen, batches, loadBatches, importing]);
 
   useEffect(() => {
     setCompanyList(companies);
@@ -198,28 +200,33 @@ export function AdminImportPanel({
 
   async function commitImport() {
     const valid = rows.filter((r) => r.ok);
-    if (valid.length === 0 || !confirmed) return;
+    if (valid.length === 0 || !confirmed || importing) return;
 
+    const payload = {
+      rows: valid.map((r) => ({
+        company: r.company_raw,
+        snsid: r.snsid,
+        snsurl: r.snsurl || "",
+        name: r.name,
+        visit_date: r.visit_date,
+        store: r.store,
+        product: r.product,
+        quantity: r.quantity,
+      })),
+    };
+
+    setReviewOpen(false);
+    resetFileState();
+    setHistoryOpen(true);
     setImporting(true);
-    setResultMessage(null);
+    setResultMessage(`DB 반영 진행중… (${valid.length}건)`);
     setResultError(null);
 
     try {
       const res = await fetch("/api/admin/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rows: valid.map((r) => ({
-            company: r.company_raw,
-            snsid: r.snsid,
-            snsurl: r.snsurl || "",
-            name: r.name,
-            visit_date: r.visit_date,
-            store: r.store,
-            product: r.product,
-            quantity: r.quantity,
-          })),
-        }),
+        body: JSON.stringify(payload),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -235,14 +242,13 @@ export function AdminImportPanel({
       setResultMessage(
         `완료: ${s.total}행 중 생성 ${s.created} · 중복 건너뜀 ${s.skipped} · 실패 ${s.failed}`,
       );
-      resetFileState();
-      setHistoryOpen(true);
       void loadBatches();
       router.refresh();
     } catch (err: unknown) {
       setResultError(
         err instanceof Error ? err.message : "가져오기 중 오류가 발생했습니다.",
       );
+      setResultMessage(null);
     } finally {
       setImporting(false);
     }
@@ -605,7 +611,7 @@ export function AdminImportPanel({
                             ? ` · 프로필 실패 ${profileFailed}`
                             : ""}
                           {profilePending > 0
-                            ? ` · 프로필 수집 중 ${profilePending}`
+                            ? ` · 프로필 진행중 ${profilePending}`
                             : ""}
                         </p>
                       </div>

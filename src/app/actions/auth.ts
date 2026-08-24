@@ -36,7 +36,7 @@ export async function signInAdmin(formData: FormData) {
   }
 
   const role = isManager ? "admin_manager" : "admin_operator";
-  await setAdminSession(role);
+  await setAdminSession(role, username);
   await mintAndSetAuthToken({ role });
   redirect("/admin");
 }

@@ -21,6 +21,8 @@ export type ProgressLink = {
   hasFile: boolean;
   platform: string;
   submitted_at: string | null;
+  /** 반려 시 운영자 사유 (creator_links.memo) */
+  reviewMemo: string | null;
   views: number | null;
   likes: number | null;
   comments: number | null;
@@ -34,11 +36,15 @@ export type ProgressKanbanCard = {
   influencerId: string;
   name: string;
   handle: string;
+  /** SNS 프로필 URL (없으면 프로필 링크 숨김) */
+  profileUrl: string | null;
   publishedCount: number;
   targetCount: number;
   updatedAt: string;
   links: ProgressLink[];
   submittedLinks: ProgressLink[];
+  approvedLinks: ProgressLink[];
+  rejectedLinks: ProgressLink[];
   publishedLinks: ProgressLink[];
 };
 
@@ -95,6 +101,7 @@ function toProgressLink(
       hasFile: Boolean(link.submitted_file_path),
       platform: CREATOR_PLATFORM_LABEL[link.platform] || link.platform,
       submitted_at: link.submitted_at || null,
+      reviewMemo: link.memo?.trim() || null,
       views: normalized(link.views),
       likes: normalized(link.likes),
       comments: normalized(link.comments),
@@ -117,6 +124,7 @@ function toProgressLink(
     hasFile: Boolean(link.submitted_file_path),
     platform: CREATOR_PLATFORM_LABEL[link.platform] || link.platform,
     submitted_at: link.submitted_at || null,
+    reviewMemo: link.memo?.trim() || null,
     views: polished.views,
     likes: polished.likes,
     comments: polished.comments,
@@ -151,7 +159,9 @@ export function buildKanbanFromAllocations(
       toProgressLink(l, item.influencer_id, { demoMetrics }),
     );
     const publishedLinks = links.filter((_, i) => isPublishedLink(rawLinks[i]!));
-    const submittedLinks = links.filter((_, i) => isSubmittedLink(rawLinks[i]!));
+    const submittedLinks = links.filter((_, i) => rawLinks[i]!.content_status === "제출");
+    const approvedLinks = links.filter((_, i) => rawLinks[i]!.content_status === "승인");
+    const rejectedLinks = links.filter((_, i) => rawLinks[i]!.content_status === "반려");
     const status = rollupStatus(item, rawLinks);
     const target = item.target_content_count ?? Math.max(1, rawLinks.length || 1);
     const publishedCount = publishedLinks.length;
@@ -171,11 +181,14 @@ export function buildKanbanFromAllocations(
       influencerId: item.influencer_id,
       name: item.influencers?.name || handleOf(item),
       handle: handleOf(item),
+      profileUrl: (item.influencers?.sns_url || "").trim() || null,
       publishedCount,
       targetCount: target,
       updatedAt,
       links,
       submittedLinks,
+      approvedLinks,
+      rejectedLinks,
       publishedLinks,
     });
   }

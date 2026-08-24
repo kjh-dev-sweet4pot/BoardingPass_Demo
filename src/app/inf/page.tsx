@@ -8,6 +8,7 @@ import { type AllocationWithRelations, type Influencer } from "@/lib/types";
 import { getInfluencerSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 export default async function InfPage({
   searchParams,
@@ -32,7 +33,10 @@ export default async function InfPage({
     return <InfLoginClient initialError={params.error} />;
   }
 
-  const supabase = await createClient();
+  // verify/bootstrap 과 동일: service_role 없으면 RLS에 influencers 조회가 막힘
+  const supabase = hasServiceRoleKey()
+    ? createServiceClient()
+    : await createClient();
 
   // 세션으로 재진입해도 오늘 방문 / 미수령 재방문일 반영
   await applyInfluencerStoreVisit(supabase, influencerId);

@@ -3,10 +3,16 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-export type AdminSection = "dashboard" | "campaigns" | "review" | "allocations";
+export type AdminSection =
+  | "dashboard"
+  | "performance"
+  | "campaigns"
+  | "review"
+  | "allocations";
 
 const SECTIONS: { id: AdminSection; label: string }[] = [
   { id: "dashboard", label: "대시보드" },
+  { id: "performance", label: "성과" },
   { id: "campaigns", label: "캠페인·섭외" },
   { id: "review", label: "검수" },
   { id: "allocations", label: "배정·매장" },

@@ -40,6 +40,9 @@ export async function collectTikTokLinkThumbnail(
         views: result.playCount ?? null,
         likes: result.diggCount ?? null,
         comments: result.commentCount ?? null,
+        saves: typeof result.collectCount === "number" ? result.collectCount : null,
+        shares: typeof result.shareCount === "number" ? result.shareCount : null,
+        reposts: null,
         metrics_collected_at: now,
         updated_at: now,
       })
@@ -81,6 +84,9 @@ export async function collectInstagramLinkThumbnail(
         views: extractInstagramViews(result),
         likes: result.likesCount ?? null,
         comments: result.commentsCount ?? null,
+        saves: result.savesCount ?? null,
+        shares: result.sharesCount ?? null,
+        reposts: result.repostsCount ?? null,
         metrics_collected_at: now,
         updated_at: now,
       })
@@ -101,4 +107,4 @@ export async function collectInstagramLinkThumbnail(
 
 /** API 응답용 — thumbnail_bytes 제외 */
 export const CREATOR_LINK_PUBLIC_COLUMNS =
-  "id, allocation_id, influencer_id, url, platform, status, memo, submitted_at, updated_at, thumbnail_status, thumbnail_source_url, thumbnail_fetched_at, tiktok_video_id, views, likes, comments, metrics_collected_at";
+  "id, allocation_id, influencer_id, url, platform, status, memo, submitted_at, updated_at, thumbnail_status, thumbnail_source_url, thumbnail_fetched_at, tiktok_video_id, views, likes, comments, saves, shares, reposts, metrics_collected_at";

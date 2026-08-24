@@ -12,7 +12,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("creator_links")
     .select(
-      "id, allocation_id, influencer_id, url, platform, status, content_status, publish_url, submitted_file_path, memo, submitted_at, updated_at, thumbnail_status, thumbnail_source_url, tiktok_video_id, views, likes, comments, metrics_collected_at, verification_failed, allocations(id, visit_date, quantity, status, rollup_status, products(name), stores(name), influencers(name, instagram_handle, instagram_handle_normalized), companies(id, name))",
+      "id, allocation_id, influencer_id, url, platform, status, content_status, publish_url, submitted_file_path, memo, submitted_at, updated_at, thumbnail_status, thumbnail_source_url, tiktok_video_id, views, likes, comments, saves, shares, reposts, metrics_collected_at, verification_failed, allocations(id, visit_date, quantity, status, rollup_status, products(name), stores(name), influencers(name, instagram_handle, instagram_handle_normalized), companies(id, name))",
     )
     .in("status", ["submitted", "approved"])
     .order("submitted_at", { ascending: true });

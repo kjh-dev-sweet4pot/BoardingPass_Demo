@@ -3,14 +3,13 @@ import { signOut } from "@/app/actions/auth";
 import { CompanyConsole } from "@/components/company-console";
 import { AppShell, Notice } from "@/components/ui";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
-import { isDemoCompany } from "@/lib/company";
-import { fetchInsights } from "@/app/api/com/insights/route";
 import { getCompanySessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
-import { type AllocationWithRelations, type Company } from "@/lib/types";
+import { type Company } from "@/lib/types";
 
+/** 로그인 체감: 서버는 회원사만 확인. 배정·성과는 탭에서 지연 로드. */
 export default async function CompanyPage() {
   const companyId = await getCompanySessionId();
   if (!companyId) redirect("/com/login");
@@ -25,24 +24,13 @@ export default async function CompanyPage() {
   }
 
   const supabase = hasServiceRoleKey() ? createServiceClient() : await createClient();
-  const [{ data: company, error: companyError }, { data: allocations, error: allocError }] =
-    await Promise.all([
-      supabase
-        .from("companies")
-        .select(
-          "id, name, login_id, aliases, contact, is_active, created_at, updated_at",
-        )
-        .eq("id", companyId)
-        .maybeSingle(),
-      supabase
-        .from("allocations")
-        .select(
-          "*, products(*), stores(*), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url), creator_links(*)",
-        )
-        .eq("company_id", companyId)
-        .order("visit_date", { ascending: false })
-        .order("created_at", { ascending: false }),
-    ]);
+  const { data: company, error: companyError } = await supabase
+    .from("companies")
+    .select(
+      "id, name, login_id, aliases, contact, is_active, created_at, updated_at",
+    )
+    .eq("id", companyId)
+    .maybeSingle();
 
   if (companyError || !company || !company.is_active) {
     const msg = !hasServiceRoleKey()
@@ -55,28 +43,16 @@ export default async function CompanyPage() {
     redirect(`/com/login?error=${encodeURIComponent(msg)}`);
   }
 
-  const initialAllocations = (allocations as AllocationWithRelations[]) || [];
   const liveCompany = company as Company;
-  const fabricate = isDemoCompany(liveCompany);
-  const initialMonthInsights = buildMockContentInsights(initialAllocations, "month", { fabricate });
-  const initialAllInsights = buildMockContentInsights(initialAllocations, "all", { fabricate });
-
-  // 실제 DB insights를 서버에서 미리 가져와 성과 탭에 전달 (클라이언트 fetch 불필요)
-  let initialPerformanceData = null as Awaited<ReturnType<typeof fetchInsights>> | null;
-  try {
-    initialPerformanceData = await fetchInsights(supabase, companyId);
-  } catch {
-    // 폴백: 클라이언트가 /api/com/insights 자동 요청
-  }
+  const emptyInsights = buildMockContentInsights([], "all", { fabricate: false });
 
   return (
     <AppShell full fitViewport theme="owm" hideHeader>
       <CompanyConsole
         company={liveCompany}
-        initialAllocations={initialAllocations}
-        initialMonthInsights={initialMonthInsights}
-        initialAllInsights={initialAllInsights}
-        initialPerformanceData={initialPerformanceData}
+        initialAllocations={[]}
+        initialMonthInsights={emptyInsights}
+        initialAllInsights={emptyInsights}
         sidebarActions={
           <form action={signOut}>
             <input type="hidden" name="next" value="/com/login" />
