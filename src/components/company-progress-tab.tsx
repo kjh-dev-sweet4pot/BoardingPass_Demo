@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
-import { StateBadge } from "@/components/state-badge";
+import { StateBadge, type StateBadgeValue } from "@/components/state-badge";
 import { formatMetric } from "@/lib/content-insights";
 import {
   buildKanbanFromAllocations,
@@ -71,6 +71,40 @@ function KanbanCreatorPhoto({
     [card.id, card.influencerId, card.handle, card.name, card.links.length],
   );
   return <CreatorPhoto creator={creator} size={size} />;
+}
+
+function linkReviewBadge(status: string): StateBadgeValue {
+  if (status === "발행완료") return "발행완료";
+  if (status === "승인" || status === "approved") return "승인";
+  if (status === "반려" || status === "rejected") return "반려";
+  return "검수중";
+}
+
+function ReviewLinkChip({ link }: { link: ProgressLink }) {
+  const href = link.url;
+  return (
+    <div
+      className="flex items-center gap-1.5 rounded-lg border border-[#f0e6d8] bg-[#faf4ec] px-2 py-1"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <StateBadge value={linkReviewBadge(link.status)} className="shrink-0" />
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="min-w-0 truncate text-[10px] font-semibold text-[var(--accent)]"
+          title={href}
+        >
+          {link.platform} ↗
+        </a>
+      ) : (
+        <span className="truncate text-[10px] font-semibold text-[var(--accent)]">
+          {link.hasFile ? "제출 파일" : link.platform}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function PublishedLinkChip({ link }: { link: ProgressLink }) {
@@ -145,22 +179,52 @@ function KanbanCard({
             <PublishedLinkChip key={link.id} link={link} />
           ))}
         </div>
-      ) : card.submittedLinks.length > 0 ? (
+      ) : card.submittedLinks.length > 0 ||
+        card.approvedLinks.length > 0 ||
+        card.rejectedLinks.length > 0 ? (
         <div className="space-y-1">
-          {card.submittedLinks.slice(0, 2).map((link) => (
-            <PublishedLinkChip key={link.id} link={link} />
-          ))}
+          {[...card.submittedLinks, ...card.approvedLinks, ...card.rejectedLinks]
+            .slice(0, 2)
+            .map((link) => (
+              <ReviewLinkChip key={link.id} link={link} />
+            ))}
         </div>
       ) : null}
     </button>
   );
 }
 
-function linkStatusBadge(status: string): "승인" | "제출" | "발행완료" | "반려" {
-  if (status === "approved" || status === "승인") return "승인";
-  if (status === "발행완료") return "발행완료";
-  if (status === "반려") return "반려";
-  return "제출";
+function ContentReviewRow({ link }: { link: ProgressLink }) {
+  return (
+    <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <StateBadge value={linkReviewBadge(link.status)} />
+        <span className="text-xs text-[var(--muted)]">{link.platform}</span>
+        {link.submitted_at ? (
+          <span className="text-[10px] text-[var(--muted)]">
+            {link.submitted_at.slice(0, 10)}
+          </span>
+        ) : null}
+      </div>
+      {link.url ? (
+        <a
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex text-xs font-medium text-[var(--accent)] underline"
+        >
+          콘텐츠 링크 ↗
+        </a>
+      ) : link.hasFile ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">제출 파일</p>
+      ) : null}
+      {link.status === "반려" && link.reviewMemo ? (
+        <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-2 text-xs text-red-800">
+          <span className="font-semibold">반려 사유</span> · {link.reviewMemo}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function FeedbackForm({ link }: { link: ProgressLink }) {
@@ -197,7 +261,7 @@ function FeedbackForm({ link }: { link: ProgressLink }) {
         ) : (
           <span className="text-xs text-[var(--muted)]">콘텐츠 링크 없음</span>
         )}
-        <StateBadge value={linkStatusBadge(link.status)} />
+        <StateBadge value="검수중" />
       </div>
       {sent ? (
         <p className="text-xs text-[var(--muted)]">의견이 제출되었습니다.</p>
@@ -318,16 +382,40 @@ function DetailPanel({
           </div>
         ) : null}
 
+        {card.rejectedLinks.length > 0 ? (
+          <div className="mb-4 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              반려된 콘텐츠
+            </p>
+            {card.rejectedLinks.map((link) => (
+              <ContentReviewRow key={link.id} link={link} />
+            ))}
+          </div>
+        ) : null}
+
+        {card.approvedLinks.length > 0 ? (
+          <div className="mb-4 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              승인된 콘텐츠
+            </p>
+            {card.approvedLinks.map((link) => (
+              <ContentReviewRow key={link.id} link={link} />
+            ))}
+          </div>
+        ) : null}
+
         {card.submittedLinks.length > 0 ? (
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-              검토 대기 콘텐츠
+              검수 중 콘텐츠
             </p>
             {card.submittedLinks.map((link) => (
               <FeedbackForm key={link.id} link={link} />
             ))}
           </div>
-        ) : card.publishedLinks.length === 0 ? (
+        ) : card.publishedLinks.length === 0 &&
+          card.rejectedLinks.length === 0 &&
+          card.approvedLinks.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">등록된 콘텐츠가 없습니다.</p>
         ) : null}
       </div>
