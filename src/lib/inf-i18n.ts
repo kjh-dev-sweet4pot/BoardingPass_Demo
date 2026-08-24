@@ -80,10 +80,13 @@ export type InfMessages = {
   submitNeedFileOrUrl: string;
   submitNeedSection: string;
   submitDoneSection: string;
+  submitHistoryFile: string;
+  submitRejectedReason: string;
   submitAllDone: string;
   contentReviewing: string;
   contentApproved: string;
   contentPublished: string;
+  contentRejected: string;
   publishUrlHint: string;
   publishUrlSubmit: string;
   publishUrlSaving: string;
@@ -307,11 +310,14 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     submitUrlPlaceholder: "https://www.instagram.com/... 또는 TikTok URL",
     submitNeedFileOrUrl: "파일 또는 SNS URL을 입력하세요.",
     submitNeedSection: "제출 필요",
-    submitDoneSection: "제출 완료 · 검수 중",
+    submitDoneSection: "제출 내역",
+    submitHistoryFile: "파일 제출",
+    submitRejectedReason: "반려 사유",
     submitAllDone: "제출할 콘텐츠가 없어요.",
     contentReviewing: "검수중",
     contentApproved: "승인됨 · 발행 URL 등록 대기",
     contentPublished: "발행완료",
+    contentRejected: "반려됨 · 다시 제출해 주세요",
     publishUrlHint: "승인된 콘텐츠의 SNS 게시물 URL을 등록하세요.",
     publishUrlSubmit: "발행 URL 등록",
     publishUrlSaving: "등록 중…",
@@ -425,11 +431,14 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     submitUrlPlaceholder: "https://www.instagram.com/... or TikTok URL",
     submitNeedFileOrUrl: "Add a file or an SNS URL.",
     submitNeedSection: "Needs submission",
-    submitDoneSection: "Submitted · In review",
+    submitDoneSection: "Submission history",
+    submitHistoryFile: "File upload",
+    submitRejectedReason: "Rejection reason",
     submitAllDone: "Nothing to submit.",
     contentReviewing: "In review",
     contentApproved: "Approved · Awaiting publish URL",
     contentPublished: "Published",
+    contentRejected: "Rejected · please resubmit",
     publishUrlHint: "Register the live SNS post URL for approved content.",
     publishUrlSubmit: "Register publish URL",
     publishUrlSaving: "Saving…",
@@ -557,11 +566,14 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     submitUrlPlaceholder: "https://www.instagram.com/... または TikTok URL",
     submitNeedFileOrUrl: "ファイルまたはSNS URLを入力してください。",
     submitNeedSection: "提出が必要",
-    submitDoneSection: "提出済み · 審査中",
+    submitDoneSection: "提出履歴",
+    submitHistoryFile: "ファイル提出",
+    submitRejectedReason: "差し戻し理由",
     submitAllDone: "提出するコンテンツがありません。",
     contentReviewing: "審査中",
     contentApproved: "承認済み · 公開URL待ち",
     contentPublished: "公開完了",
+    contentRejected: "差し戻し · 再提出してください",
     publishUrlHint: "承認されたコンテンツのSNS投稿URLを登録してください。",
     publishUrlSubmit: "公開URL登録",
     publishUrlSaving: "登録中…",
@@ -687,11 +699,14 @@ export const INF_MESSAGES: Record<InfLocale, InfMessages> = {
     submitUrlPlaceholder: "https://www.instagram.com/... 或 TikTok 链接",
     submitNeedFileOrUrl: "请上传文件或填写 SNS 链接。",
     submitNeedSection: "待提交",
-    submitDoneSection: "已提交 · 审核中",
+    submitDoneSection: "提交记录",
+    submitHistoryFile: "文件提交",
+    submitRejectedReason: "驳回原因",
     submitAllDone: "没有待提交的内容。",
     contentReviewing: "审核中",
     contentApproved: "已通过 · 待登记发布链接",
     contentPublished: "已发布",
+    contentRejected: "已驳回 · 请重新提交",
     publishUrlHint: "请登记已通过内容的 SNS 帖子链接。",
     publishUrlSubmit: "登记发布链接",
     publishUrlSaving: "登记中…",
