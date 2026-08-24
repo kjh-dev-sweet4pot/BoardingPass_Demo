@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { findDuplicateAllocation } from "@/lib/alloc-dup";
+import { recomputeCampaignStatus } from "@/lib/campaign-rollup";
 
 export type AcceptCastingInput = {
   castingId: string;
@@ -103,6 +104,17 @@ export async function acceptCasting(
     })
     .eq("id", casting.id);
   if (updErr) throw new Error(updErr.message);
+
+  // 보류·취소가 아니면 배정 추가로 캠페인 상태 롤업
+  if (campaign.status !== "보류" && campaign.status !== "취소") {
+    const next = await recomputeCampaignStatus(supabase, casting.campaign_id);
+    if (next !== campaign.status) {
+      await supabase
+        .from("campaigns")
+        .update({ status: next, updated_at: now })
+        .eq("id", casting.campaign_id);
+    }
+  }
 
   return { allocationId: allocation.id as string };
 }
