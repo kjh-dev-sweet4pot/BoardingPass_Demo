@@ -7,7 +7,7 @@ import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
 import { AdminDashboard, type AdminQueueKey } from "@/components/admin-dashboard";
 import { AdminPerformanceTab } from "@/components/admin-performance-tab";
-import { AdminReviewQueue } from "@/components/admin-review-queue";
+import { AdminReviewQueue, type AdminReviewTab } from "@/components/admin-review-queue";
 import { AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
 import { AdminStoreOverview } from "@/components/admin-store-overview";
 import { PharListWithModal } from "@/components/phar-list-with-modal";
@@ -78,9 +78,7 @@ export function AdminConsoleLayout({
   sidebarActions?: ReactNode;
 }) {
   const [section, setSection] = useState<AdminSection>("dashboard");
-  const [reviewQueue, setReviewQueue] = useState<Exclude<AdminQueueKey, "castingStale">>(
-    "reviewPending",
-  );
+  const [reviewQueue, setReviewQueue] = useState<AdminReviewTab>("reviewPending");
   const [castingStale, setCastingStale] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);

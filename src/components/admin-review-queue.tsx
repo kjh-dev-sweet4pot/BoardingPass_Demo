@@ -7,6 +7,22 @@ import { parseTikTokVideoId } from "@/lib/tiktok-oembed";
 type Guideline = { id: string; title: string | null; body: string | null; file_path: string | null };
 type Feedback = { id: string; body: string; created_at: string };
 
+type ReviewLog = {
+  id: string;
+  creator_link_id: string;
+  decision: "승인" | "반려";
+  memo: string | null;
+  operator_label: string;
+  operator_id: string;
+  created_at: string;
+  creator_links?: {
+    allocations?: {
+      influencers?: { name?: string | null } | null;
+      products?: { name?: string | null } | null;
+    } | null;
+  } | null;
+};
+
 type QueueItem = {
   id: string;
   url?: string | null;
@@ -204,6 +220,50 @@ function Preview({
   return null;
 }
 
+function ReviewLogList({
+  logs,
+  loading,
+  emptyLabel,
+}: {
+  logs: ReviewLog[];
+  loading: boolean;
+  emptyLabel: string;
+}) {
+  if (loading) {
+    return <p className="text-sm text-[var(--muted)]">검수 기록 불러오는 중…</p>;
+  }
+  if (logs.length === 0) {
+    return <p className="text-sm text-[var(--muted)]">{emptyLabel}</p>;
+  }
+  return (
+    <ul className="max-h-[70vh] space-y-2 overflow-auto">
+      {logs.map((log) => {
+        const alloc = log.creator_links?.allocations;
+        const ctx = alloc
+          ? `${alloc.influencers?.name || "인플루언서"} · ${alloc.products?.name || "상품"} · `
+          : "";
+        return (
+          <li
+            key={log.id}
+            className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
+          >
+            <p className="text-[var(--ink)]">
+              {ctx}
+              <span className="font-semibold">{log.decision}</span>
+              {" · "}
+              {log.operator_label} ({log.operator_id})
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">{fmtDt(log.created_at)}</p>
+            {log.memo ? (
+              <p className="mt-1 whitespace-pre-wrap text-xs text-[var(--muted)]">{log.memo}</p>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 const QUEUE_KEYS = [
   "reviewPending",
   "verifyFailed",
@@ -212,6 +272,11 @@ const QUEUE_KEYS = [
 ] as const;
 
 type ReviewQueueKey = (typeof QUEUE_KEYS)[number];
+
+export type AdminReviewTab = ReviewQueueKey | "reviewLogs";
+
+const REVIEW_LOGS_BLURB =
+  "승인·반려 처리 이력입니다. 운영자 등급·ID·사유·시각을 확인합니다.";
 
 const QUEUE_COPY: Record<
   ReviewQueueKey,
@@ -247,8 +312,8 @@ export function AdminReviewQueue({
   queue = "reviewPending",
   onQueueChange,
 }: {
-  queue?: ReviewQueueKey;
-  onQueueChange?: (queue: ReviewQueueKey) => void;
+  queue?: AdminReviewTab;
+  onQueueChange?: (queue: AdminReviewTab) => void;
 }) {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [index, setIndex] = useState(0);
@@ -257,8 +322,25 @@ export function AdminReviewQueue({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [collectMsg, setCollectMsg] = useState<string | null>(null);
+  const [logs, setLogs] = useState<ReviewLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+
+  const loadLogs = useCallback(async () => {
+    setLogsLoading(true);
+    try {
+      const res = await fetch("/api/admin/review-logs?limit=30", { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "검수 기록 조회 실패");
+      setLogs(json.logs ?? []);
+    } catch {
+      setLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
+    if (queue === "reviewLogs") return;
     setLoading(true);
     setError(null);
     try {
@@ -308,8 +390,12 @@ export function AdminReviewQueue({
   }
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (queue === "reviewLogs") {
+      void loadLogs();
+    } else {
+      void load();
+    }
+  }, [queue, load, loadLogs]);
 
   const current = items[index] ?? null;
   const alloc = current?.allocations;
@@ -371,12 +457,49 @@ export function AdminReviewQueue({
             ) : null}
           </button>
         ))}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={queue === "reviewLogs"}
+          onClick={() => onQueueChange?.("reviewLogs")}
+          className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
+            queue === "reviewLogs"
+              ? "bg-[var(--accent)] !text-white"
+              : "text-[var(--muted)]"
+          }`}
+        >
+          검수 기록
+          {queue === "reviewLogs" && !logsLoading ? (
+            <span className="ml-1 tabular-nums opacity-80">{logs.length}</span>
+          ) : null}
+        </button>
       </div>
       <p className="text-[12.5px] leading-relaxed text-[var(--muted)]">
-        {QUEUE_COPY[queue].blurb}
+        {queue === "reviewLogs" ? REVIEW_LOGS_BLURB : QUEUE_COPY[queue].blurb}
       </p>
     </>
   );
+
+  if (queue === "reviewLogs") {
+    return (
+      <div className="flex flex-col gap-4">
+        {tabs}
+        <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[var(--ink)]">최근 검수 기록</h2>
+            <button
+              type="button"
+              className="text-xs text-[var(--accent)]"
+              onClick={() => void loadLogs()}
+            >
+              새로고침
+            </button>
+          </div>
+          <ReviewLogList logs={logs} loading={logsLoading} emptyLabel="검수 기록이 없습니다." />
+        </section>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

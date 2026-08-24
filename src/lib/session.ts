@@ -7,6 +7,7 @@ import {
 export const INF_COOKIE = "bp_influencer_id";
 export const ADMIN_COOKIE = "bp_admin";
 export const ADMIN_ROLE_COOKIE = "bp_admin_role";
+export const ADMIN_LOGIN_COOKIE = "bp_admin_login";
 export const STORE_COOKIE = "bp_store_id";
 export const COMPANY_COOKIE = "bp_company_id";
 export const AUTH_TOKEN_COOKIE = "bp_auth_token";
@@ -53,7 +54,16 @@ export async function isAdminManagerSession() {
   return (await getAdminRole()) === "admin_manager";
 }
 
-export async function setAdminSession(role: AdminRole = "admin_manager") {
+export async function getAdminLoginId() {
+  if (!(await isAdminSession())) return null;
+  const jar = await cookies();
+  return jar.get(ADMIN_LOGIN_COOKIE)?.value ?? null;
+}
+
+export async function setAdminSession(
+  role: AdminRole = "admin_manager",
+  loginId?: string,
+) {
   const jar = await cookies();
   jar.set(ADMIN_COOKIE, "1", {
     httpOnly: true,
@@ -67,12 +77,21 @@ export async function setAdminSession(role: AdminRole = "admin_manager") {
     path: "/",
     maxAge: ADMIN_MAX_AGE,
   });
+  if (loginId?.trim()) {
+    jar.set(ADMIN_LOGIN_COOKIE, loginId.trim().toLowerCase(), {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: ADMIN_MAX_AGE,
+    });
+  }
 }
 
 export async function clearAdminSession() {
   const jar = await cookies();
   jar.delete(ADMIN_COOKIE);
   jar.delete(ADMIN_ROLE_COOKIE);
+  jar.delete(ADMIN_LOGIN_COOKIE);
 }
 
 export async function getStoreSessionId() {
