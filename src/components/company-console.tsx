@@ -504,7 +504,11 @@ export function CompanyConsole({
       mobileActions={mobileActions}
     >
       {view === "pool" ? (
-        <CompanyCreatorPool companyId={company.id} loginId={company.login_id} />
+        <CompanyCreatorPool
+          companyId={company.id}
+          companyName={company.name}
+          loginId={company.login_id}
+        />
       ) : view === "publish" ? (
         <CompanyProgressTab
           companyId={company.id}

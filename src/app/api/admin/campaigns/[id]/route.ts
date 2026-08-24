@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAnyAdmin, requireAdminManager } from "@/lib/access";
+import { recomputeCampaignStatus } from "@/lib/campaign-rollup";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { type CampaignStatus } from "@/lib/types";
 
@@ -50,7 +51,13 @@ export async function PATCH(
   const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
-  let body: { status?: string; budget_amount?: number | string | null };
+  let body: {
+    status?: string;
+    /** 보류·취소 해제 후 롤업 재적용, 또는 롤업 상태 재계산 */
+    recompute?: boolean;
+    budget_amount?: number | string | null;
+    name?: string | null;
+  };
   try {
     body = await request.json();
   } catch {
@@ -63,15 +70,29 @@ export async function PATCH(
     const status = body.status as CampaignStatus;
     if (!HOLD_CANCEL.includes(status)) {
       return NextResponse.json(
-        { error: "보류 또는 취소만 지정할 수 있습니다." },
+        { error: "상태는 보류·취소만 직접 지정할 수 있습니다. 그 외는 롤업으로 산정됩니다." },
         { status: 400 },
       );
     }
     patch.status = status;
+  } else if (body.recompute) {
+    try {
+      patch.status = await recomputeCampaignStatus(supabase, id);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "상태 재계산 실패" },
+        { status: 500 },
+      );
+    }
   }
 
   if ("budget_amount" in body) {
     patch.budget_amount = parseBudget(body.budget_amount);
+  }
+
+  if ("name" in body) {
+    const name = String(body.name ?? "").trim();
+    patch.name = name || null;
   }
 
   if (Object.keys(patch).length <= 1) {

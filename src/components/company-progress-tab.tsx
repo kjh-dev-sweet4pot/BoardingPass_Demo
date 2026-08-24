@@ -19,11 +19,12 @@ function postsFromLinks(card: ProgressKanbanCard): CreatorPost[] {
   const seen = new Set<string>();
   const out: CreatorPost[] = [];
   for (const link of [...card.publishedLinks, ...card.submittedLinks, ...card.links]) {
-    if (!link.url || seen.has(link.url)) continue;
-    seen.add(link.url);
+    const http = linkHttpUrl(link.url);
+    if (!http || seen.has(http)) continue;
+    seen.add(http);
     out.push({
       platform: /tiktok/i.test(link.platform) ? "tiktok" : "instagram",
-      url: link.url,
+      url: http,
     });
   }
   return out;
@@ -80,8 +81,94 @@ function linkReviewBadge(status: string): StateBadgeValue {
   return "검수중";
 }
 
+function linkHttpUrl(url: string | null) {
+  const u = url?.trim();
+  if (!u || !/^https?:\/\//i.test(u) || u.startsWith("content://")) return null;
+  return u;
+}
+
+function LinkFilePreview({ link }: { link: ProgressLink }) {
+  const httpUrl = linkHttpUrl(link.url);
+  const [started, setStarted] = useState(false);
+  const [src, setSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!started || !link.hasFile) return;
+    let cancelled = false;
+    setLoading(true);
+    setSrc(null);
+    setError(null);
+    fetch(`/api/com/links/${link.id}/file`)
+      .then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || "미리보기 URL 생성 실패");
+        if (!cancelled) setSrc(json.url);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "미리보기 실패");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [started, link.id, link.hasFile]);
+
+  if (!link.hasFile && !httpUrl) return null;
+
+  if (httpUrl && !link.hasFile) {
+    return (
+      <a
+        href={httpUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 inline-flex text-xs font-medium text-[var(--accent)] underline"
+      >
+        콘텐츠 링크 ↗
+      </a>
+    );
+  }
+
+  if (!started) {
+    return (
+      <button
+        type="button"
+        className="mt-2 rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)]"
+        onClick={() => setStarted(true)}
+      >
+        미리보기
+      </button>
+    );
+  }
+
+  if (error) return <p className="mt-2 text-xs text-[var(--danger)]">{error}</p>;
+  if (loading || !src) {
+    return <p className="mt-2 text-xs text-[var(--muted)]">불러오는 중…</p>;
+  }
+  if (link.fileKind === "image") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt="제출 콘텐츠"
+        className="mt-2 max-h-[240px] w-full rounded-lg border border-[var(--line)] object-contain"
+      />
+    );
+  }
+  return (
+    <video
+      src={src}
+      controls
+      className="mt-2 aspect-video max-h-[240px] w-full rounded-lg border border-[var(--line)] bg-black object-contain"
+    />
+  );
+}
+
 function ReviewLinkChip({ link }: { link: ProgressLink }) {
-  const href = link.url;
+  const href = linkHttpUrl(link.url);
   return (
     <div
       className="flex items-center gap-1.5 rounded-lg border border-[#f0e6d8] bg-[#faf4ec] px-2 py-1"
@@ -108,15 +195,16 @@ function ReviewLinkChip({ link }: { link: ProgressLink }) {
 }
 
 function PublishedLinkChip({ link }: { link: ProgressLink }) {
-  const label = link.url
+  const href = linkHttpUrl(link.url);
+  const label = href
     ? `${link.platform} · 콘텐츠 열기 ↗`
     : link.hasFile
       ? "제출 파일"
       : link.status === "승인"
         ? "승인됨"
         : "콘텐츠";
-  if (!link.url && !link.hasFile && link.status !== "승인") return null;
-  if (!link.url) {
+  if (!href && !link.hasFile && link.status !== "승인") return null;
+  if (!href) {
     return (
       <span className="block truncate rounded-lg border border-[#f0e6d8] bg-[#faf4ec] px-2 py-1 text-[10px] font-semibold text-[var(--accent)]">
         {label}
@@ -125,12 +213,12 @@ function PublishedLinkChip({ link }: { link: ProgressLink }) {
   }
   return (
     <a
-      href={link.url}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
       className="block truncate rounded-lg border border-[#f0e6d8] bg-[#faf4ec] px-2 py-1 text-[10px] font-semibold text-[var(--accent)] hover:bg-[var(--surface-hover)]"
-      title={link.url}
+      title={href}
     >
       {link.platform} · 콘텐츠 열기 ↗
     </a>
@@ -195,6 +283,7 @@ function KanbanCard({
 }
 
 function ContentReviewRow({ link }: { link: ProgressLink }) {
+  const href = linkHttpUrl(link.url);
   return (
     <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -206,18 +295,18 @@ function ContentReviewRow({ link }: { link: ProgressLink }) {
           </span>
         ) : null}
       </div>
-      {link.url ? (
+      {href ? (
         <a
-          href={link.url}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-2 inline-flex text-xs font-medium text-[var(--accent)] underline"
         >
           콘텐츠 링크 ↗
         </a>
-      ) : link.hasFile ? (
-        <p className="mt-2 text-xs text-[var(--muted)]">제출 파일</p>
-      ) : null}
+      ) : (
+        <LinkFilePreview link={link} />
+      )}
       {link.status === "반려" && link.reviewMemo ? (
         <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-2 text-xs text-red-800">
           <span className="font-semibold">반려 사유</span> · {link.reviewMemo}
@@ -247,22 +336,10 @@ function FeedbackForm({ link }: { link: ProgressLink }) {
   return (
     <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3">
       <div className="mb-2 flex items-center gap-2">
-        {link.url ? (
-          <a
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-medium text-[var(--accent)] underline"
-          >
-            콘텐츠 링크
-          </a>
-        ) : link.hasFile ? (
-          <span className="text-xs text-[var(--muted)]">제출 파일</span>
-        ) : (
-          <span className="text-xs text-[var(--muted)]">콘텐츠 링크 없음</span>
-        )}
+        <span className="text-xs text-[var(--muted)]">{link.platform}</span>
         <StateBadge value="검수중" />
       </div>
+      <LinkFilePreview link={link} />
       {sent ? (
         <p className="text-xs text-[var(--muted)]">의견이 제출되었습니다.</p>
       ) : (
@@ -294,6 +371,7 @@ function FeedbackForm({ link }: { link: ProgressLink }) {
 }
 
 function PublishedLinkRow({ link }: { link: ProgressLink }) {
+  const href = linkHttpUrl(link.url);
   return (
     <div className="rounded-xl border border-[#f0e6d8] bg-[#faf4ec] p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -305,17 +383,19 @@ function PublishedLinkRow({ link }: { link: ProgressLink }) {
           </span>
         ) : null}
       </div>
-      {link.url ? (
+      {href ? (
         <a
-          href={link.url}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-2 inline-flex items-center gap-1 truncate text-sm font-medium text-[var(--accent)] underline"
-          title={link.url}
+          title={href}
         >
           {link.platform} · 콘텐츠 열기 ↗
         </a>
-      ) : null}
+      ) : (
+        <LinkFilePreview link={link} />
+      )}
       <div className="mt-2 flex flex-wrap gap-3 text-xs text-[var(--muted)]">
         {link.views != null ? <span>조회 {formatMetric(link.views)}</span> : null}
         {link.likes != null ? <span>좋아요 {formatMetric(link.likes)}</span> : null}

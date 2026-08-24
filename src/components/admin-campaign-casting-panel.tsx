@@ -85,6 +85,14 @@ function fmtDt(iso: string) {
   return new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
+function spendPreviewPct(spent: number, budgetRaw: string) {
+  const budget = budgetRaw === "" ? null : Number(budgetRaw);
+  if (budget == null || !Number.isFinite(budget) || budget <= 0) {
+    return " · 예산 입력 시 % 미리보기";
+  }
+  return ` · 미리보기 ${Math.round((spent / budget) * 1000) / 10}%`;
+}
+
 export function AdminCampaignCastingPanel({
   companies,
   products,
@@ -117,6 +125,8 @@ export function AdminCampaignCastingPanel({
   const [createProductId, setCreateProductId] = useState("");
   const [createName, setCreateName] = useState("");
   const [createBudget, setCreateBudget] = useState("");
+  const [campaignQuery, setCampaignQuery] = useState("");
+  const [editBudgetDraft, setEditBudgetDraft] = useState<string | null>(null);
 
   const [addHandle, setAddHandle] = useState("");
   const [addName, setAddName] = useState("");
@@ -145,6 +155,19 @@ export function AdminCampaignCastingPanel({
     () => castings.find((c) => c.id === selectedCastingId) ?? null,
     [castings, selectedCastingId],
   );
+
+  const campaignQ = campaignQuery.trim().toLowerCase();
+  const visibleCampaigns = campaignQ
+    ? campaigns.filter((c) =>
+        [c.name, c.companies?.name, c.products?.name, c.status]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(campaignQ)),
+      )
+    : campaigns;
+
+  useEffect(() => {
+    setEditBudgetDraft(null);
+  }, [selectedCampaignId]);
 
   const loadCampaigns = useCallback(async () => {
     const res = await fetch("/api/admin/campaigns");
@@ -272,17 +295,20 @@ export function AdminCampaignCastingPanel({
     });
   }
 
-  async function patchCampaignStatus(status: "보류" | "취소") {
+  async function patchCampaign(
+    body: Record<string, unknown>,
+    okMessage: string | ((json: { campaign?: { status?: string } }) => string),
+  ) {
     if (!selectedCampaignId) return;
     await run(async () => {
       const res = await fetch(`/api/admin/campaigns/${selectedCampaignId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "상태 변경 실패");
-      setMessage(`캠페인을 ${status}(으)로 지정했습니다.`);
+      if (!res.ok) throw new Error(json.error || "요청 실패");
+      setMessage(typeof okMessage === "function" ? okMessage(json) : okMessage);
       await loadCampaigns();
     });
   }
@@ -385,13 +411,19 @@ export function AdminCampaignCastingPanel({
       {tab === "campaigns" ? (
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="owm-panel flex min-h-[420px] flex-col border border-[var(--line)] bg-[var(--surface)] shadow-sm">
-            <div className="border-b border-[var(--line)] px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
               <h2
                 className="text-lg text-[var(--ink)]"
                 style={{ fontFamily: "var(--font-display), serif" }}
               >
                 캠페인 목록
               </h2>
+              <input
+                className={`${fieldClass} h-9 w-full max-w-[220px] text-sm`}
+                value={campaignQuery}
+                onChange={(e) => setCampaignQuery(e.target.value)}
+                placeholder="이름 · 회원사 · 상품 검색"
+              />
             </div>
             <div className="min-h-0 flex-1 overflow-auto">
               <table className="w-full text-sm">
@@ -406,7 +438,7 @@ export function AdminCampaignCastingPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {campaigns.map((c) => (
+                  {visibleCampaigns.map((c) => (
                     <tr
                       key={c.id}
                       onClick={() => setSelectedCampaignId(c.id)}
@@ -424,10 +456,12 @@ export function AdminCampaignCastingPanel({
                       <td className="px-3 py-3">{c.status}</td>
                     </tr>
                   ))}
-                  {campaigns.length === 0 && (
+                  {visibleCampaigns.length === 0 && (
                     <tr>
                       <td colSpan={6} className="px-5 py-8 text-center text-[var(--muted)]">
-                        등록된 캠페인이 없습니다.
+                        {campaigns.length === 0
+                          ? "등록된 캠페인이 없습니다."
+                          : "검색 결과가 없습니다."}
                       </td>
                     </tr>
                   )}
@@ -505,10 +539,6 @@ export function AdminCampaignCastingPanel({
                 <h3 className="text-base font-semibold text-[var(--ink)]">캠페인 상세</h3>
                 <dl className="mt-3 space-y-2 text-sm">
                   <div>
-                    <dt className="text-[var(--muted)]">이름</dt>
-                    <dd>{selectedCampaign.name || "(이름 없음)"}</dd>
-                  </div>
-                  <div>
                     <dt className="text-[var(--muted)]">상태</dt>
                     <dd>{selectedCampaign.status}</dd>
                   </div>
@@ -521,10 +551,6 @@ export function AdminCampaignCastingPanel({
                     <dd>{selectedCampaign.products?.name ?? "—"}</dd>
                   </div>
                   <div>
-                    <dt className="text-[var(--muted)]">예산</dt>
-                    <dd className="tabular-nums">{fmtKrw(selectedCampaign.budget_amount)}</dd>
-                  </div>
-                  <div>
                     <dt className="text-[var(--muted)]">집행 (노출가 합)</dt>
                     <dd className="tabular-nums">
                       {fmtKrw(selectedCampaign.spent_amount ?? 0)}
@@ -533,27 +559,126 @@ export function AdminCampaignCastingPanel({
                         : ""}
                     </dd>
                   </div>
+                  {!isManager ? (
+                    <>
+                      <div>
+                        <dt className="text-[var(--muted)]">이름</dt>
+                        <dd>{selectedCampaign.name || "(이름 없음)"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[var(--muted)]">예산</dt>
+                        <dd className="tabular-nums">{fmtKrw(selectedCampaign.budget_amount)}</dd>
+                      </div>
+                    </>
+                  ) : null}
                 </dl>
-                {isManager && selectedCampaign.status !== "보류" && selectedCampaign.status !== "취소" ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className={secondaryBtnClass}
-                      disabled={busy}
-                      onClick={() => patchCampaignStatus("보류")}
-                    >
-                      보류
+                {isManager ? (
+                  <form
+                    key={selectedCampaign.id}
+                    className="mt-4 grid gap-3"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const fd = new FormData(e.currentTarget);
+                      const budgetRaw = String(fd.get("budget") ?? "");
+                      void patchCampaign(
+                        {
+                          name: String(fd.get("name") ?? "").trim() || null,
+                          budget_amount: budgetRaw === "" ? null : Number(budgetRaw),
+                        },
+                        "캠페인을 저장했습니다.",
+                      );
+                    }}
+                  >
+                    <Field label="캠페인명">
+                      <input
+                        className={fieldClass}
+                        name="name"
+                        defaultValue={selectedCampaign.name || ""}
+                        placeholder="캠페인명"
+                      />
+                    </Field>
+                    <Field label="예산 (원)">
+                      <input
+                        className={fieldClass}
+                        type="number"
+                        min={0}
+                        name="budget"
+                        defaultValue={
+                          selectedCampaign.budget_amount != null
+                            ? String(selectedCampaign.budget_amount)
+                            : ""
+                        }
+                        onChange={(e) => setEditBudgetDraft(e.target.value)}
+                        placeholder="노출가 기준 예산"
+                      />
+                    </Field>
+                    <p className="text-xs text-[var(--muted)]">
+                      집행% = Accept 노출가 합 ÷ 예산
+                      {spendPreviewPct(
+                        selectedCampaign.spent_amount ?? 0,
+                        editBudgetDraft ??
+                          (selectedCampaign.budget_amount != null
+                            ? String(selectedCampaign.budget_amount)
+                            : ""),
+                      )}
+                    </p>
+                    <button className={primaryBtnClass} type="submit" disabled={busy}>
+                      저장
                     </button>
+                  </form>
+                ) : null}
+                {isManager ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {selectedCampaign.status !== "보류" &&
+                    selectedCampaign.status !== "취소" ? (
+                      <>
+                        <button
+                          type="button"
+                          className={secondaryBtnClass}
+                          disabled={busy}
+                          onClick={() =>
+                            void patchCampaign({ status: "보류" }, "캠페인을 보류로 지정했습니다.")
+                          }
+                        >
+                          보류
+                        </button>
+                        <button
+                          type="button"
+                          className={secondaryBtnClass}
+                          disabled={busy}
+                          onClick={() =>
+                            void patchCampaign({ status: "취소" }, "캠페인을 취소로 지정했습니다.")
+                          }
+                        >
+                          취소
+                        </button>
+                      </>
+                    ) : null}
                     <button
                       type="button"
-                      className={secondaryBtnClass}
+                      className={
+                        selectedCampaign.status === "보류" ||
+                        selectedCampaign.status === "취소"
+                          ? primaryBtnClass
+                          : secondaryBtnClass
+                      }
                       disabled={busy}
-                      onClick={() => patchCampaignStatus("취소")}
+                      onClick={() =>
+                        void patchCampaign({ recompute: true }, (json) =>
+                          `롤업 상태: ${json.campaign?.status ?? "—"}`,
+                        )
+                      }
                     >
-                      취소
+                      {selectedCampaign.status === "보류" ||
+                      selectedCampaign.status === "취소"
+                        ? "롤업으로 복원"
+                        : "상태 재계산"}
                     </button>
                   </div>
                 ) : null}
+                <p className="mt-2 text-[11px] text-[var(--muted)]">
+                  견적수립·시행·결과는 롤업 전용 · 보류·취소만 직접 지정
+                </p>
                 <button
                   type="button"
                   className={`${secondaryBtnClass} mt-4 w-full`}
@@ -579,21 +704,36 @@ export function AdminCampaignCastingPanel({
               >
                 섭외 목록
               </h2>
-              <div className="flex flex-wrap gap-1">
-                {CASTING_FILTERS.map((f) => (
-                  <button
-                    key={f.id || "all"}
-                    type="button"
-                    onClick={() => setCastingFilter(f.id)}
-                    className={`rounded-full px-3 py-1 text-xs ${
-                      castingFilter === f.id
-                        ? "bg-[var(--accent)] text-[var(--surface)]"
-                        : "border border-[var(--line)] text-[var(--muted)]"
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className={`${fieldClass} h-8 max-w-[200px] text-xs`}
+                  value={selectedCampaignId || ""}
+                  onChange={(e) => setSelectedCampaignId(e.target.value || null)}
+                >
+                  <option value="">캠페인 전체</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {(c.name || c.products?.name || "캠페인") +
+                        ` · ${c.companies?.name ?? ""}`}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex flex-wrap gap-1">
+                  {CASTING_FILTERS.map((f) => (
+                    <button
+                      key={f.id || "all"}
+                      type="button"
+                      onClick={() => setCastingFilter(f.id)}
+                      className={`rounded-full px-3 py-1 text-xs ${
+                        castingFilter === f.id
+                          ? "bg-[var(--accent)] text-[var(--surface)]"
+                          : "border border-[var(--line)] text-[var(--muted)]"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-auto">

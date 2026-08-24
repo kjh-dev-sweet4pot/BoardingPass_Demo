@@ -76,3 +76,22 @@ export const ALLOCATION_LINK_LABEL_ADMIN: Record<AllocationLinkSummary, string> 
     approved: "승인",
     rejected: "반려",
   };
+
+/** admin 검수 큐·링크 상세 Supabase select (한 곳) */
+export const ADMIN_LINK_REVIEW_SELECT = `
+  id, allocation_id, influencer_id, url, platform, status, content_status,
+  publish_url, submitted_file_path, memo, submitted_at, updated_at,
+  thumbnail_source_url, verification_failed,
+  content_feedback ( id, body, created_at ),
+  allocations (
+    id, visit_date, rollup_status, campaign_id,
+    products ( name ),
+    stores ( name ),
+    influencers ( name, instagram_handle, instagram_handle_normalized ),
+    companies ( id, name ),
+    campaigns (
+      id, name, status,
+      guidelines ( id, title, body, file_path )
+    )
+  )
+`;

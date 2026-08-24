@@ -1,26 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAnyAdmin } from "@/lib/access";
+import { ADMIN_LINK_REVIEW_SELECT } from "@/lib/creator-link";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 
-const QUEUE_SELECT = `
-  id, allocation_id, influencer_id, url, platform, status, content_status,
-  publish_url, submitted_file_path, memo, submitted_at, updated_at,
-  thumbnail_source_url, verification_failed,
-  content_feedback ( id, body, created_at ),
-  allocations (
-    id, visit_date, rollup_status, campaign_id,
-    products ( name ),
-    stores ( name ),
-    influencers ( name, instagram_handle, instagram_handle_normalized ),
-    companies ( id, name ),
-    campaigns (
-      id, name, status,
-      guidelines ( id, title, body, file_path )
-    )
-  )
-`;
-
-const QUEUES = ["reviewPending", "verifyFailed", "collectFailed", "publishStale"] as const;
+const QUEUES = ["reviewPending", "publishStale", "collectResults"] as const;
 type LinkQueue = (typeof QUEUES)[number];
 
 async function collectFailedLinkIds(
@@ -53,16 +36,42 @@ export async function GET(request: NextRequest) {
   if (!supabase) return supabaseConfigError();
 
   const raw = request.nextUrl.searchParams.get("queue") || "reviewPending";
-  const queue: LinkQueue = QUEUES.includes(raw as LinkQueue)
-    ? (raw as LinkQueue)
+  const queueNorm =
+    raw === "verifyFailed" || raw === "collectFailed" ? "collectResults" : raw;
+  const queue: LinkQueue = QUEUES.includes(queueNorm as LinkQueue)
+    ? (queueNorm as LinkQueue)
     : "reviewPending";
 
-  let query = supabase.from("creator_links").select(QUEUE_SELECT);
+  if (queue === "collectResults") {
+    const failedIds = await collectFailedLinkIds(supabase);
+    const { data: verifyRows, error: verifyErr } = await supabase
+      .from("creator_links")
+      .select(ADMIN_LINK_REVIEW_SELECT)
+      .eq("verification_failed", true);
+    if (verifyErr) return NextResponse.json({ error: verifyErr.message }, { status: 500 });
+
+    let collectRows: typeof verifyRows = [];
+    if (failedIds.length > 0) {
+      const { data, error: collectErr } = await supabase
+        .from("creator_links")
+        .select(ADMIN_LINK_REVIEW_SELECT)
+        .in("id", failedIds);
+      if (collectErr) return NextResponse.json({ error: collectErr.message }, { status: 500 });
+      collectRows = data ?? [];
+    }
+
+    const byId = new Map<string, NonNullable<typeof verifyRows>[number]>();
+    for (const row of [...(verifyRows ?? []), ...collectRows]) byId.set(row.id, row);
+    const items = [...byId.values()].sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    );
+    return NextResponse.json({ items, queue });
+  }
+
+  let query = supabase.from("creator_links").select(ADMIN_LINK_REVIEW_SELECT);
 
   if (queue === "reviewPending") {
     query = query.eq("content_status", "제출").order("submitted_at", { ascending: true });
-  } else if (queue === "verifyFailed") {
-    query = query.eq("verification_failed", true).order("updated_at", { ascending: false });
   } else if (queue === "publishStale") {
     const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
     query = query
@@ -71,9 +80,7 @@ export async function GET(request: NextRequest) {
       .lt("updated_at", threeDaysAgo)
       .order("updated_at", { ascending: true });
   } else {
-    const ids = await collectFailedLinkIds(supabase);
-    if (ids.length === 0) return NextResponse.json({ items: [], queue });
-    query = query.in("id", ids).order("updated_at", { ascending: false });
+    return NextResponse.json({ items: [], queue });
   }
 
   const { data, error } = await query;

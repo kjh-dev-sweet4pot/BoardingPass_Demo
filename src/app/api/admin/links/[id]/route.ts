@@ -1,7 +1,30 @@
 import { NextResponse } from "next/server";
 import { requireAnyAdmin } from "@/lib/access";
 import { adminReviewerFields, contentReviewLogsClient } from "@/lib/content-review-log";
+import { ADMIN_LINK_REVIEW_SELECT } from "@/lib/creator-link";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
+
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const auth = await requireAnyAdmin();
+  if ("error" in auth) return auth.error;
+
+  const { id } = await context.params;
+  const supabase = await createAuthedDbClient();
+  if (!supabase) return supabaseConfigError();
+
+  const { data, error } = await supabase
+    .from("creator_links")
+    .select(ADMIN_LINK_REVIEW_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "링크를 찾을 수 없습니다." }, { status: 404 });
+  return NextResponse.json({ link: data });
+}
 
 export async function PATCH(
   request: Request,

@@ -33,9 +33,11 @@ type CastingMap = Record<string, { castingId: string } | "excluded">;
 
 export function CompanyCreatorPool({
   companyId,
+  companyName,
   loginId,
 }: {
   companyId: string;
+  companyName: string;
   loginId?: string | null;
 }) {
   const isDemo = isDemoCompany({ login_id: loginId });
@@ -267,7 +269,7 @@ export function CompanyCreatorPool({
           </h2>
           {poolSource === "allocations" ? (
             <p className="mt-1.5 text-[12.5px] text-[var(--muted)]">
-              CSV·배정으로 등록된 협업 인플루언서입니다.
+              {companyName}와 협업중인 인플루언서입니다.
             </p>
           ) : null}
         </div>
