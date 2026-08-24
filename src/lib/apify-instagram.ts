@@ -236,18 +236,21 @@ export async function scrapeInstagramPosts(
     if (code && !byCode.has(code)) byCode.set(code, mapped);
   }
 
-  return urls
-    .map((url) => {
-      const code = extractInstagramShortCode(url);
-      const hit = code ? byCode.get(code) : undefined;
-      if (hit) return { ...hit, inputUrl: url, url: hit.url || url };
-      if (urls.length === 1 && byCode.size === 1) {
-        const only = [...byCode.values()][0]!;
-        return { ...only, inputUrl: url, url: only.url || url };
-      }
-      return null;
-    })
-    .filter((item): item is InstagramScraperResult => item != null);
+  const results: InstagramScraperResult[] = [];
+  for (const url of urls) {
+    const code = extractInstagramShortCode(url);
+    const hit = code ? byCode.get(code) : undefined;
+    if (hit) {
+      results.push({ ...hit, inputUrl: url, url: hit.url || url });
+      continue;
+    }
+    // 단일 URL 요청이면 shortcode 불일치여도 유일한 결과를 매칭
+    if (urls.length === 1 && byCode.size === 1) {
+      const only = [...byCode.values()][0]!;
+      results.push({ ...only, inputUrl: url, url: only.url || url });
+    }
+  }
+  return results;
 }
 
 /** 프로필 URL → 아바타 URL + 팔로워 */
