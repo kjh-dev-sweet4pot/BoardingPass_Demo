@@ -46,7 +46,7 @@ function poolCreatorForCard(card: ProgressKanbanCard): PoolCreator {
     handle: card.handle,
     market: "jp",
     channel,
-    profileUrl: null,
+    profileUrl: card.profileUrl,
     followers: 0,
     priceKrw: 0,
     overlap: null,
@@ -286,6 +286,16 @@ function DetailPanel({
                 {card.publishedCount} / {card.targetCount} 발행 ·{" "}
                 <StateBadge value={card.status} />
               </p>
+              {card.profileUrl ? (
+                <a
+                  href={card.profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex text-sm font-semibold text-[var(--accent)] underline"
+                >
+                  SNS 프로필 열기 ↗
+                </a>
+              ) : null}
             </div>
           </div>
           <button

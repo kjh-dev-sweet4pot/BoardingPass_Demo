@@ -34,6 +34,8 @@ export type ProgressKanbanCard = {
   influencerId: string;
   name: string;
   handle: string;
+  /** SNS 프로필 URL (없으면 프로필 링크 숨김) */
+  profileUrl: string | null;
   publishedCount: number;
   targetCount: number;
   updatedAt: string;
@@ -171,6 +173,7 @@ export function buildKanbanFromAllocations(
       influencerId: item.influencer_id,
       name: item.influencers?.name || handleOf(item),
       handle: handleOf(item),
+      profileUrl: (item.influencers?.sns_url || "").trim() || null,
       publishedCount,
       targetCount: target,
       updatedAt,
