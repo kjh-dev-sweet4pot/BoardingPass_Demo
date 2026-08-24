@@ -1,24 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAnyAdmin } from "@/lib/access";
+import { ADMIN_LINK_REVIEW_SELECT } from "@/lib/creator-link";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
-
-const QUEUE_SELECT = `
-  id, allocation_id, influencer_id, url, platform, status, content_status,
-  publish_url, submitted_file_path, memo, submitted_at, updated_at,
-  thumbnail_source_url, verification_failed,
-  content_feedback ( id, body, created_at ),
-  allocations (
-    id, visit_date, rollup_status, campaign_id,
-    products ( name ),
-    stores ( name ),
-    influencers ( name, instagram_handle, instagram_handle_normalized ),
-    companies ( id, name ),
-    campaigns (
-      id, name, status,
-      guidelines ( id, title, body, file_path )
-    )
-  )
-`;
 
 const QUEUES = ["reviewPending", "verifyFailed", "collectFailed", "publishStale"] as const;
 type LinkQueue = (typeof QUEUES)[number];
@@ -57,7 +40,7 @@ export async function GET(request: NextRequest) {
     ? (raw as LinkQueue)
     : "reviewPending";
 
-  let query = supabase.from("creator_links").select(QUEUE_SELECT);
+  let query = supabase.from("creator_links").select(ADMIN_LINK_REVIEW_SELECT);
 
   if (queue === "reviewPending") {
     query = query.eq("content_status", "제출").order("submitted_at", { ascending: true });
