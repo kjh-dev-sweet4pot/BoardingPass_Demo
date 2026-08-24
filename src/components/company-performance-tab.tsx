@@ -687,6 +687,7 @@ export function CompanyPerformanceTab({
   const [recollecting, setRecollecting] = useState(false);
   const [recollectMsg, setRecollectMsg] = useState<string | null>(null);
   const [productId, setProductId] = useState("");
+  const [productExpanded, setProductExpanded] = useState(false);
   const asOfYmd = ymdKst(new Date());
   const canRecollect = enableRecollect && source !== "mock";
 
@@ -707,6 +708,10 @@ export function CompanyPerformanceTab({
   async function reload() {
     setRefreshing(true);
     try {
+    if (initialData?.source === "mock") {
+      applyPayload(initialData);
+      return;
+    }
       const res = await fetch(insightsUrl);
       const data = await res.json();
       if (!res.ok) return; // 실패 시 빈 화면으로 덮지 않음
@@ -1072,6 +1077,11 @@ export function CompanyPerformanceTab({
     return [...map.values()].sort((a, b) => b.views - a.views);
   }, [links]);
 
+  const PRODUCT_HEAD = 5;
+  const visibleProducts =
+    productExpanded || byProduct.length <= PRODUCT_HEAD
+      ? byProduct
+      : byProduct.slice(0, PRODUCT_HEAD);
   const maxProductViews = byProduct[0]?.views || 1;
   const maxCompanyViews = byCompany[0]?.views || 1;
   const showCompanyBreakdown = byCompany.length > 1;
@@ -1373,7 +1383,7 @@ export function CompanyPerformanceTab({
                     </tr>
                   </thead>
                   <tbody>
-                    {byProduct.map((row) => (
+                    {visibleProducts.map((row) => (
                       <tr key={row.id} className="border-t border-[#f4ece2]">
                         <td className="px-[18px] py-[11px]">
                           <div className="mb-1.5">{row.name}</div>
@@ -1401,6 +1411,17 @@ export function CompanyPerformanceTab({
                   </tbody>
                 </table>
               </div>
+              {byProduct.length > PRODUCT_HEAD ? (
+                <button
+                  type="button"
+                  onClick={() => setProductExpanded((v) => !v)}
+                  className="w-full border-t border-[#f4ece2] px-[18px] py-2.5 text-[12px] font-semibold text-[var(--accent)]"
+                >
+                  {productExpanded
+                    ? "접기"
+                    : `나머지 ${byProduct.length - PRODUCT_HEAD}개 보기`}
+                </button>
+              ) : null}
             </div>
           </div>
         </>

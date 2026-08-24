@@ -10,7 +10,7 @@ import {
   buildCreatorPool,
   type PoolCreator,
 } from "@/lib/creator-pool-mock";
-import { polishDemoMetrics, hash32 } from "@/lib/demo-metrics";
+import { polishDemoMetrics, hash32, mockInt } from "@/lib/demo-metrics";
 import { buildPublishFeed } from "@/lib/publish-feed-mock";
 import {
   addDaysYmd,
@@ -421,6 +421,9 @@ export function buildPublishDemoPerformance() {
     views: number | null;
     likes: number | null;
     comments: number | null;
+    saves: number | null;
+    shares: number | null;
+    reposts: number | null;
     metrics_collected_at: string | null;
     allocations: {
       id: string;
@@ -453,6 +456,28 @@ export function buildPublishDemoPerformance() {
       followers: creator?.followers,
       seed: item.id,
     });
+    const likeRate = mockInt(`${item.id}:like-rate`, 32, 78) / 1000;
+    const likes = Math.min(
+      Math.round(polished.views * 0.1),
+      Math.max(24, Math.round(polished.views * likeRate)),
+    );
+    const comments = Math.max(
+      3,
+      Math.min(polished.comments, Math.round(likes * (mockInt(`${item.id}:comment-rate`, 3, 10) / 100))),
+    );
+    // ponytail: 데모 천장. 저장·공유·리포스트는 login_id=company 성과 탭에서만 씀
+    const saves = Math.max(
+      12,
+      Math.round(likes * (mockInt(`${item.id}:sv`, 12, 48) / 100)),
+    );
+    const shares = Math.max(
+      4,
+      Math.round(likes * (mockInt(`${item.id}:sh`, 2, 14) / 100)),
+    );
+    const reposts = Math.max(
+      2,
+      Math.round(likes * (mockInt(`${item.id}:rp`, 1, 7) / 100)),
+    );
     const publishedAt = `${item.publishedYmd}T12:00:00+09:00`;
     const handle = item.handle.replace(/^@+/, "").toLowerCase();
 
@@ -462,8 +487,11 @@ export function buildPublishDemoPerformance() {
       status: "발행완료",
       published_at: publishedAt,
       views: polished.views,
-      likes: polished.likes,
-      comments: polished.comments,
+      likes,
+      comments,
+      saves,
+      shares,
+      reposts,
       metrics_collected_at: collectedAt,
       allocations: {
         id: item.id,
