@@ -129,17 +129,51 @@ function Preview({
   );
 }
 
-const QUEUE_COPY = {
-  reviewPending: { title: "검수 대기", list: "제출 대기" },
-  verifyFailed: { title: "검증 실패", list: "검증 실패" },
-  collectFailed: { title: "수집 연속 실패", list: "수집 실패" },
-  publishStale: { title: "발행 미이행", list: "발행 미이행" },
-} as const;
+const QUEUE_KEYS = [
+  "reviewPending",
+  "verifyFailed",
+  "collectFailed",
+  "publishStale",
+] as const;
+
+type ReviewQueueKey = (typeof QUEUE_KEYS)[number];
+
+const QUEUE_COPY: Record<
+  ReviewQueueKey,
+  { title: string; list: string; blurb: string }
+> = {
+  reviewPending: {
+    title: "검수 대기",
+    list: "제출 대기",
+    blurb:
+      "콘텐츠「제출」건. 가이드라인·회원사 의견을 보고 승인/반려합니다. 0건이면 정상입니다.",
+  },
+  verifyFailed: {
+    title: "검증 실패",
+    list: "검증 실패",
+    blurb:
+      "검증실패 플래그가 켜진 콘텐츠입니다. 상태와 함께 표시될 수 있으며 수동 수집으로 재시도할 수 있습니다.",
+  },
+  collectFailed: {
+    title: "수집 연속 실패",
+    list: "수집 실패",
+    blurb:
+      "최근 수집이 3회 연속「실패」인 건입니다. URL·권한을 점검하고 수동 수집하세요. 0건이면 정상입니다.",
+  },
+  publishStale: {
+    title: "발행 미이행",
+    list: "발행 미이행",
+    blurb:
+      "승인 후 발행 URL이 없고 마지막 갱신이 3일을 넘긴 건입니다. 발행 독촉·확인이 필요합니다.",
+  },
+};
 
 export function AdminReviewQueue({
   queue = "reviewPending",
+  onQueueChange,
 }: {
-  queue?: keyof typeof QUEUE_COPY;
+  queue?: ReviewQueueKey;
+  onQueueChange?: (queue: ReviewQueueKey) => void;
 }) {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [index, setIndex] = useState(0);
@@ -236,25 +270,68 @@ export function AdminReviewQueue({
     }
   }
 
+  const tabs = (
+    <>
+      <div
+        className="flex flex-wrap gap-1 rounded-full border border-[var(--line)] bg-white p-0.5"
+        role="tablist"
+        aria-label="검수 큐"
+      >
+        {QUEUE_KEYS.map((key) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={key === queue}
+            onClick={() => onQueueChange?.(key)}
+            className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
+              key === queue
+                ? "bg-[var(--accent)] !text-white"
+                : "text-[var(--muted)]"
+            }`}
+          >
+            {QUEUE_COPY[key].title}
+            {key === queue && !loading ? (
+              <span className="ml-1 tabular-nums opacity-80">{items.length}</span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+      <p className="text-[12.5px] leading-relaxed text-[var(--muted)]">
+        {QUEUE_COPY[queue].blurb}
+      </p>
+    </>
+  );
+
   if (loading) {
-    return <p className="text-sm text-[var(--muted)]">검수 큐를 불러오는 중…</p>;
+    return (
+      <div className="flex flex-col gap-4">
+        {tabs}
+        <p className="text-sm text-[var(--muted)]">검수 큐를 불러오는 중…</p>
+      </div>
+    );
   }
 
   if (items.length === 0) {
     return (
-      <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-8 shadow-sm">
-        <h2
-          className="text-lg text-[var(--ink)]"
-          style={{ fontFamily: "var(--font-display), serif" }}
-        >
-          {QUEUE_COPY[queue].title}
-        </h2>
-        <p className="mt-4 text-sm text-[var(--muted)]">처리 대기 없음</p>
-      </section>
+      <div className="flex flex-col gap-4">
+        {tabs}
+        <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-8 shadow-sm">
+          <h2
+            className="text-lg text-[var(--ink)]"
+            style={{ fontFamily: "var(--font-display), serif" }}
+          >
+            {QUEUE_COPY[queue].title}
+          </h2>
+          <p className="mt-4 text-sm text-[var(--muted)]">처리 대기 없음</p>
+        </section>
+      </div>
     );
   }
 
   return (
+    <div className="flex flex-col gap-4">
+      {tabs}
     <div className="grid min-h-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
         <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
@@ -409,6 +486,7 @@ export function AdminReviewQueue({
           ) : null}
         </section>
       ) : null}
+    </div>
     </div>
   );
 }

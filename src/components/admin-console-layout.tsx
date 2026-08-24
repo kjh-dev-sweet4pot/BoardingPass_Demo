@@ -163,7 +163,10 @@ export function AdminConsoleLayout({
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PageHeader section="review" />
           <div className="min-h-0 flex-1 overflow-auto px-4 pb-8 sm:px-7">
-            <AdminReviewQueue queue={reviewQueue} />
+            <AdminReviewQueue
+              queue={reviewQueue}
+              onQueueChange={setReviewQueue}
+            />
           </div>
         </div>
       ) : null}
