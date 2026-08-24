@@ -258,7 +258,7 @@ export function CompanyCreatorPool({
             className="mt-1.5 text-[28px] font-semibold leading-tight text-[var(--ink)]"
             style={{ fontFamily: "var(--font-display), serif" }}
           >
-            {poolSource === "allocations" ? "협업 크리에이터" : "후보 크리에이터"}{" "}
+            {poolSource === "mock" ? "후보 크리에이터" : "협업 크리에이터"}{" "}
             <span className="text-[15px] font-normal text-[var(--muted)]">
               {poolLoading
                 ? "…"
