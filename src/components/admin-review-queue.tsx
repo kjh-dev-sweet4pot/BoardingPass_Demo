@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { primaryBtnClass, secondaryBtnClass } from "@/components/ui";
+import { parseTikTokVideoId } from "@/lib/tiktok-oembed";
 
 type Guideline = { id: string; title: string | null; body: string | null; file_path: string | null };
 type Feedback = { id: string; body: string; created_at: string };
@@ -49,6 +50,21 @@ function fileKind(path: string | null) {
   return "other";
 }
 
+function snsEmbedSrc(raw: string | null): string | null {
+  const u = raw?.trim();
+  if (!u || !/^https?:\/\//i.test(u) || u.startsWith("content://")) return null;
+  const ttId = parseTikTokVideoId(u);
+  if (ttId) return `https://www.tiktok.com/embed/v2/${ttId}`;
+  try {
+    const m = new URL(u).pathname.match(/\/(p|reel|reels|tv)\/([^/?#]+)/i);
+    if (!m?.[2]) return null;
+    const kind = m[1].toLowerCase() === "p" || m[1].toLowerCase() === "tv" ? "p" : "reel";
+    return `https://www.instagram.com/${kind}/${m[2]}/embed/`;
+  } catch {
+    return null;
+  }
+}
+
 function Preview({
   linkId,
   path,
@@ -60,15 +76,24 @@ function Preview({
   snsUrl: string | null;
   thumbUrl: string | null;
 }) {
+  const [started, setStarted] = useState(false);
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const isHttpUrl = Boolean(snsUrl && /^https?:\/\//i.test(snsUrl));
+  const [loading, setLoading] = useState(false);
+  const embedSrc = snsEmbedSrc(snsUrl);
+  const rawHttp =
+    snsUrl?.trim() && /^https?:\/\//i.test(snsUrl.trim()) && !snsUrl.startsWith("content://")
+      ? snsUrl.trim()
+      : null;
+  const httpUrl = rawHttp && !embedSrc ? rawHttp : null;
+  const canPreview = Boolean(path || embedSrc || httpUrl || thumbUrl);
 
   useEffect(() => {
+    if (!started || !path) return;
     let cancelled = false;
+    setLoading(true);
     setSrc(null);
     setError(null);
-    if (!path) return;
     fetch(`/api/admin/links/${linkId}/file`)
       .then(async (res) => {
         const json = await res.json().catch(() => ({}));
@@ -77,56 +102,106 @@ function Preview({
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "미리보기 실패");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [linkId, path]);
+  }, [started, linkId, path]);
 
-  return (
-    <div className="space-y-3">
-      {path ? (
-        error ? (
-          <p className="text-sm text-[var(--danger)]">{error}</p>
-        ) : !src ? (
-          <p className="rounded-2xl border border-[var(--line)] px-4 py-10 text-center text-sm text-[var(--muted)]">
-            미리보기 준비 중…
-          </p>
-        ) : fileKind(path) === "image" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt="제출 콘텐츠" className="max-h-[70vh] w-full rounded-2xl object-contain bg-black" />
-        ) : fileKind(path) === "video" ? (
-          <video src={src} controls className="max-h-[70vh] w-full rounded-2xl bg-black" />
-        ) : (
-          <a
-            href={src}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white"
-          >
-            제출 파일 열기 (단기 URL)
-          </a>
-        )
-      ) : thumbUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={thumbUrl} alt="SNS 미리보기" className="max-h-[70vh] w-full rounded-2xl object-contain bg-black" />
-      ) : !isHttpUrl ? (
-        <p className="rounded-2xl border border-[var(--line)] bg-[var(--surface-hover)] px-4 py-10 text-center text-sm text-[var(--muted)]">
-          제출 파일·URL이 없습니다.
+  const shellClass =
+    "flex min-h-[360px] items-center justify-center overflow-hidden rounded-2xl border border-[var(--line)] bg-black";
+
+  if (!canPreview) {
+    return (
+      <p className={`${shellClass} bg-[var(--surface-hover)] px-4 text-center text-sm text-[var(--muted)]`}>
+        제출 파일·URL이 없습니다.
+      </p>
+    );
+  }
+
+  if (!started) {
+    return (
+      <div className={`${shellClass} bg-[var(--surface-hover)] px-4`}>
+        <button
+          type="button"
+          className={primaryBtnClass}
+          onClick={() => setStarted(true)}
+        >
+          미리보기 재생
+        </button>
+      </div>
+    );
+  }
+
+  if (path) {
+    if (error) return <p className="text-sm text-[var(--danger)]">{error}</p>;
+    if (loading || !src) {
+      return (
+        <p className={`${shellClass} px-4 text-center text-sm text-[var(--muted)]`}>
+          불러오는 중…
         </p>
-      ) : null}
-      {isHttpUrl ? (
+      );
+    }
+    if (fileKind(path) === "image") {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="제출 콘텐츠" className={`${shellClass} max-h-[70vh] w-full object-contain`} />
+      );
+    }
+    if (fileKind(path) === "video") {
+      return <video src={src} controls className={`${shellClass} max-h-[70vh] w-full`} />;
+    }
+    return (
+      <a
+        href={src}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-block rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white"
+      >
+        제출 파일 열기 (단기 URL)
+      </a>
+    );
+  }
+
+  if (embedSrc) {
+    return (
+      <iframe
+        src={embedSrc}
+        title="콘텐츠 미리보기"
+        className={`${shellClass} aspect-[9/16] max-h-[70vh] w-full border-0`}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+      />
+    );
+  }
+
+  if (thumbUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={thumbUrl} alt="SNS 미리보기" className={`${shellClass} max-h-[70vh] w-full object-contain`} />
+    );
+  }
+
+  if (httpUrl) {
+    return (
+      <div className={`${shellClass} flex-col gap-3 bg-[var(--surface-hover)] px-4 text-center`}>
+        <p className="text-sm text-[var(--muted)]">임베드 미지원 URL입니다.</p>
         <a
-          href={snsUrl!}
+          href={httpUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="block break-all text-sm font-semibold text-[var(--accent)] underline"
+          className="break-all text-sm font-semibold text-[var(--accent)] underline"
         >
-          {snsUrl}
+          원본 열기 ↗
         </a>
-      ) : null}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  return null;
 }
 
 const QUEUE_KEYS = [
@@ -332,7 +407,7 @@ export function AdminReviewQueue({
   return (
     <div className="flex flex-col gap-4">
       {tabs}
-    <div className="grid min-h-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+    <div className="grid min-h-0 gap-4 lg:grid-cols-[220px_minmax(280px,400px)_minmax(0,1fr)]">
       <aside className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
         <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
           <h2 className="text-sm font-semibold">
@@ -370,15 +445,19 @@ export function AdminReviewQueue({
       </aside>
 
       {current ? (
-        <section className="owm-panel flex min-w-0 flex-col gap-4 border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
-          {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
+        <>
+          <div className="owm-panel sticky top-4 self-start border border-[var(--line)] bg-[var(--surface)] p-3 shadow-sm">
+            <Preview
+              key={current.id}
+              linkId={current.id}
+              path={current.submitted_file_path}
+              snsUrl={current.url ?? null}
+              thumbUrl={current.thumbnail_source_url ?? null}
+            />
+          </div>
 
-          <Preview
-            linkId={current.id}
-            path={current.submitted_file_path}
-            snsUrl={current.url ?? null}
-            thumbUrl={current.thumbnail_source_url ?? null}
-          />
+          <section className="owm-panel flex min-w-0 flex-col gap-4 border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
+          {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
 
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
             <div>
@@ -484,7 +563,8 @@ export function AdminReviewQueue({
             </div>
           </div>
           ) : null}
-        </section>
+          </section>
+        </>
       ) : null}
     </div>
     </div>
