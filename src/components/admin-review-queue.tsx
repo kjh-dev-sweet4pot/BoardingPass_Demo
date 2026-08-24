@@ -429,47 +429,45 @@ function ReviewLogList({
   );
 }
 
-const QUEUE_KEYS = [
+const REVIEW_TABS = [
   "reviewPending",
-  "verifyFailed",
-  "collectFailed",
+  "reviewLogs",
   "publishStale",
+  "collectResults",
 ] as const;
 
-type ReviewQueueKey = (typeof QUEUE_KEYS)[number];
+type ReviewQueueKey = "reviewPending" | "publishStale" | "collectResults";
 
 export type AdminReviewTab = ReviewQueueKey | "reviewLogs";
 
 const REVIEW_LOGS_BLURB =
   "승인·반려 처리 이력입니다. 기록을 클릭하면 콘텐츠 요약을 볼 수 있습니다.";
 
+const TAB_TITLE: Record<AdminReviewTab, string> = {
+  reviewPending: "검수 대기",
+  reviewLogs: "검수 기록",
+  publishStale: "발행 미이행",
+  collectResults: "성과자료 수집 결과",
+};
+
 const QUEUE_COPY: Record<
   ReviewQueueKey,
-  { title: string; list: string; blurb: string }
+  { list: string; blurb: string }
 > = {
   reviewPending: {
-    title: "검수 대기",
     list: "제출 대기",
     blurb:
       "콘텐츠「제출」건. 가이드라인·회원사 의견을 보고 승인/반려합니다. 0건이면 정상입니다.",
   },
-  verifyFailed: {
-    title: "검증 실패",
-    list: "검증 실패",
-    blurb:
-      "검증실패 플래그가 켜진 콘텐츠입니다. 상태와 함께 표시될 수 있으며 수동 수집으로 재시도할 수 있습니다.",
-  },
-  collectFailed: {
-    title: "수집 연속 실패",
-    list: "수집 실패",
-    blurb:
-      "최근 수집이 3회 연속「실패」인 건입니다. URL·권한을 점검하고 수동 수집하세요. 0건이면 정상입니다.",
-  },
   publishStale: {
-    title: "발행 미이행",
     list: "발행 미이행",
     blurb:
       "승인 후 발행 URL이 없고 마지막 갱신이 3일을 넘긴 건입니다. 발행 독촉·확인이 필요합니다.",
+  },
+  collectResults: {
+    list: "수집 결과",
+    blurb:
+      "검증실패·수집 연속 실패(3회) 건입니다. URL·권한을 점검하고 수동 수집하세요. 0건이면 정상입니다.",
   },
 };
 
@@ -633,7 +631,7 @@ export function AdminReviewQueue({
         role="tablist"
         aria-label="검수 큐"
       >
-        {QUEUE_KEYS.map((key) => (
+        {REVIEW_TABS.map((key) => (
           <button
             key={key}
             type="button"
@@ -646,28 +644,15 @@ export function AdminReviewQueue({
                 : "text-[var(--muted)]"
             }`}
           >
-            {QUEUE_COPY[key].title}
-            {key === queue && !loading ? (
-              <span className="ml-1 tabular-nums opacity-80">{items.length}</span>
+            {TAB_TITLE[key]}
+            {key === queue &&
+            (key === "reviewLogs" ? !logsLoading : !loading) ? (
+              <span className="ml-1 tabular-nums opacity-80">
+                {key === "reviewLogs" ? logs.length : items.length}
+              </span>
             ) : null}
           </button>
         ))}
-        <button
-          type="button"
-          role="tab"
-          aria-selected={queue === "reviewLogs"}
-          onClick={() => onQueueChange?.("reviewLogs")}
-          className={`rounded-full px-3.5 py-2 text-xs font-semibold ${
-            queue === "reviewLogs"
-              ? "bg-[var(--accent)] !text-white"
-              : "text-[var(--muted)]"
-          }`}
-        >
-          검수 기록
-          {queue === "reviewLogs" && !logsLoading ? (
-            <span className="ml-1 tabular-nums opacity-80">{logs.length}</span>
-          ) : null}
-        </button>
       </div>
       <p className="text-[12.5px] leading-relaxed text-[var(--muted)]">
         {queue === "reviewLogs" ? REVIEW_LOGS_BLURB : QUEUE_COPY[queue].blurb}
@@ -723,7 +708,7 @@ export function AdminReviewQueue({
             className="text-lg text-[var(--ink)]"
             style={{ fontFamily: "var(--font-display), serif" }}
           >
-            {QUEUE_COPY[queue].title}
+            {TAB_TITLE[queue]}
           </h2>
           <p className="mt-4 text-sm text-[var(--muted)]">처리 대기 없음</p>
         </section>

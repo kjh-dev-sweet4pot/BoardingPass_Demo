@@ -89,7 +89,11 @@ export function AdminConsoleLayout({
       setSection("campaigns");
       return;
     }
-    setReviewQueue(queue);
+    const tab: AdminReviewTab =
+      queue === "verifyFailed" || queue === "collectFailed"
+        ? "collectResults"
+        : queue;
+    setReviewQueue(tab);
     setSection("review");
   }
 
