@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { signInCompany } from "@/app/actions/auth";
-import { Notice, fieldClass, primaryBtnClass } from "@/components/ui";
+import { CompanyLoginForm } from "@/components/company-login-form";
+import { Notice } from "@/components/ui";
 import { getCompanySessionId } from "@/lib/session";
 
 export default async function CompanyLoginPage({
@@ -43,33 +43,7 @@ export default async function CompanyLoginPage({
           </div>
         ) : null}
 
-        <form
-          action={signInCompany}
-          className="owm-login-form w-full max-w-[360px] space-y-3"
-        >
-          <input
-            className={`${fieldClass} h-auto w-full rounded-2xl border-[#E8D5BE] px-5 py-4 text-sm text-[#3D1F0A] placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10`}
-            name="login_id"
-            type="text"
-            autoComplete="username"
-            placeholder="아이디"
-            required
-          />
-          <input
-            className={`${fieldClass} h-auto w-full rounded-2xl border-[#E8D5BE] px-5 py-4 text-sm text-[#3D1F0A] placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10`}
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            placeholder="비밀번호"
-            required
-          />
-          <button
-            className={`${primaryBtnClass} h-auto w-full rounded-2xl bg-[#6B3B1F] py-4 text-sm font-semibold tracking-wide hover:bg-[#7D4726]`}
-            type="submit"
-          >
-            로그인
-          </button>
-        </form>
+        <CompanyLoginForm />
 
         <p className="mt-6 text-xs text-[#B09070]">
           <Link className="underline underline-offset-2" href="/">
