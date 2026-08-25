@@ -1172,7 +1172,12 @@ export function PharListWithModal({
         const res = await fetch("/api/phar/allocations", {
           cache: "no-store",
         });
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        if (res.status === 401) {
+          window.location.href = "/phar/login";
+          return;
+        }
+        if (!res.ok) return;
         const data = (await res.json()) as {
           allocations?: AllocationWithRelations[];
         };

@@ -154,7 +154,7 @@ export function AdminConsoleLayout({
       ) : null}
 
       {section === "allocations" ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-5">
+        <div className="min-h-0 flex-1 overflow-auto pt-5">
           <AdminAllocSchedule
             list={list}
             storeList={storeList}

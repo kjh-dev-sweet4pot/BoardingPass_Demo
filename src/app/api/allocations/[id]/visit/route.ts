@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import {
+  createApiClientIfConfigured,
+  supabaseConfigError,
+} from "@/lib/supabase/api-client";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { getStoreSessionId, isAdminSession } from "@/lib/session";
 
 export async function POST(
@@ -25,7 +29,9 @@ export async function POST(
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const supabase = await createApiClientIfConfigured();
+  const supabase = hasServiceRoleKey()
+    ? createServiceClient()
+    : await createApiClientIfConfigured();
   if (!supabase) return supabaseConfigError();
   const { data: current, error: fetchError } = await supabase
     .from("allocations")
