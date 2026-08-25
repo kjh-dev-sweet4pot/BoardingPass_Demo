@@ -4,15 +4,16 @@ import {
   storageClientForAvatars,
 } from "@/lib/influencer-profile-image";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
-import { getCompanySessionId } from "@/lib/session";
+import { getCompanySessionId, isAdminSession } from "@/lib/session";
 
-/** 회원사 세션 — 자사 배정 인플루언서 프로필 (Storage) */
+/** 회원사(자사 배정) 또는 운영자 — Storage 프로필 */
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const companyId = await getCompanySessionId();
-  if (!companyId) {
+  const admin = !companyId && (await isAdminSession());
+  if (!companyId && !admin) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
@@ -20,17 +21,22 @@ export async function GET(
   const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
-  const { data: allocation, error: allocErr } = await supabase
-    .from("allocations")
-    .select("id")
-    .eq("company_id", companyId)
-    .eq("influencer_id", id)
-    .limit(1)
-    .maybeSingle();
+  if (companyId) {
+    const { data: allocation, error: allocErr } = await supabase
+      .from("allocations")
+      .select("id")
+      .eq("company_id", companyId)
+      .eq("influencer_id", id)
+      .limit(1)
+      .maybeSingle();
 
-  if (allocErr) return NextResponse.json({ error: allocErr.message }, { status: 500 });
-  if (!allocation) {
-    return NextResponse.json({ error: "해당 인플루언서의 자사 배정이 없습니다." }, { status: 403 });
+    if (allocErr) return NextResponse.json({ error: allocErr.message }, { status: 500 });
+    if (!allocation) {
+      return NextResponse.json(
+        { error: "해당 인플루언서의 자사 배정이 없습니다." },
+        { status: 403 },
+      );
+    }
   }
 
   const { data, error } = await supabase
