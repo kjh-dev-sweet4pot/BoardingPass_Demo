@@ -180,7 +180,7 @@ function Preview({
 
   const frameClass = compact
     ? "aspect-[9/16] w-full overflow-hidden rounded-[6px] border border-[var(--line)]"
-    : "aspect-video w-full max-h-[70vh] overflow-hidden rounded-[6px] border border-[var(--line)]";
+    : "aspect-[9/16] w-full max-h-[70vh] overflow-hidden rounded-[6px] border border-[var(--line)]";
   const embedClass = compact
     ? frameClass
     : "aspect-[9/16] w-full max-h-[70vh] overflow-hidden rounded-[6px] border border-[var(--line)] bg-black";
