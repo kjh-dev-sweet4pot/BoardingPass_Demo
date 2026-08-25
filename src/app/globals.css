@@ -68,6 +68,7 @@ button {
   --danger: #9b2c2c;
   color: var(--foreground);
   background: #f1ece4;
+  font-family: var(--font-sans-kr), var(--font-display), sans-serif;
 }
 
 .owm-theme input,

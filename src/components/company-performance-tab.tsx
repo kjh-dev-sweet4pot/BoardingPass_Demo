@@ -655,6 +655,7 @@ export function CompanyPerformanceTab({
   insightsUrl = "/api/com/insights",
   enableRecollect = true,
   embedded = false,
+  toolbarExtra,
 }: {
   companyId: string;
   initialData?: InitialPerformanceData;
@@ -670,6 +671,7 @@ export function CompanyPerformanceTab({
   enableRecollect?: boolean;
   /** admin 등 상위 헤더가 있을 때 타이틀 숨김 */
   embedded?: boolean;
+  toolbarExtra?: ReactNode;
 }) {
   const [allLinks, setAllLinks] = useState<LinkRow[]>(initialData?.links ?? []);
   const [allMetrics, setAllMetrics] = useState<MetricRow[]>(initialData?.metrics ?? []);
@@ -1157,6 +1159,7 @@ export function CompanyPerformanceTab({
               {recollecting ? "재수집 중…" : "지표 재수집"}
             </button>
           ) : null}
+          {toolbarExtra}
           <select
             className="h-[38px] rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] text-[#5b4130]"
             value={productId}

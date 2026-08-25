@@ -77,7 +77,6 @@ function KpiCell({
       </div>
       <p
         className={`text-[26px] font-bold leading-tight ${valueClass}`}
-        style={{ fontFamily: "var(--font-display), serif" }}
       >
         {value}
       </p>
@@ -249,7 +248,6 @@ export function AdminAllocSchedule({
           <div className="mt-1 flex flex-wrap items-baseline gap-3">
             <h1
               className="text-[28px] font-semibold leading-tight text-[var(--ink)] sm:text-[30px]"
-              style={{ fontFamily: "var(--font-display), serif" }}
             >
               배정·매장
             </h1>
@@ -260,7 +258,7 @@ export function AdminAllocSchedule({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--ink)] outline-none"
+            className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--ink)] outline-none"
             value={storeId || "__all"}
             onChange={(e) =>
               setStoreId(e.target.value === "__all" ? null : e.target.value)
@@ -273,7 +271,7 @@ export function AdminAllocSchedule({
               </option>
             ))}
           </select>
-          <div className="flex items-center gap-0.5 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-1.5 py-1">
+          <div className="flex items-center gap-0.5 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-1.5 py-1">
             <button
               type="button"
               className="px-2.5 py-1.5 text-xs text-[var(--accent)]"
@@ -304,14 +302,14 @@ export function AdminAllocSchedule({
               setMonthYm(today.slice(0, 7));
               setDay(today);
             }}
-            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 text-sm font-bold text-[var(--accent)]"
+            className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 text-sm font-bold text-[var(--accent)]"
           >
             오늘
           </button>
         </div>
       </header>
 
-      <section className="flex overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
+      <section className="flex overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
         <div className="flex min-w-0 flex-[1.3] flex-col gap-2 border-r border-[var(--line)] px-5 py-4">
           <p className="text-[11px] font-bold text-[var(--muted)]">
             {monthLabel(monthYm)} 배정 인원
@@ -319,7 +317,6 @@ export function AdminAllocSchedule({
           <p className="flex items-baseline gap-1.5">
             <span
               className="text-3xl font-bold text-[var(--ink)]"
-              style={{ fontFamily: "var(--font-display), serif" }}
             >
               {monthStats.kpi.total}
             </span>
@@ -351,7 +348,6 @@ export function AdminAllocSchedule({
           </div>
           <p
             className="text-[26px] font-bold leading-tight text-[#8d3f2c]"
-            style={{ fontFamily: "var(--font-display), serif" }}
           >
             {monthStats.imminent.today}
           </p>
@@ -362,11 +358,10 @@ export function AdminAllocSchedule({
       </section>
 
       <section className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,1fr)]">
-        <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
+        <div className="flex flex-col gap-2.5 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-4">
           <div className="flex items-center justify-between gap-3">
             <h2
               className="text-base font-bold text-[var(--ink)]"
-              style={{ fontFamily: "var(--font-display), serif" }}
             >
               방문 캘린더
             </h2>
@@ -412,7 +407,7 @@ export function AdminAllocSchedule({
                   type="button"
                   disabled={t === 0}
                   onClick={() => setDay(c.ymd)}
-                  className={`flex min-h-[76px] min-w-0 flex-col gap-1.5 overflow-hidden rounded-lg border p-2 text-left transition ${
+                  className={`flex min-h-[76px] min-w-0 flex-col gap-1.5 overflow-hidden rounded-[6px] border p-2 text-left transition ${
                     selected
                       ? "border-[#b8905f] bg-[#f6ecda]"
                       : isToday
@@ -455,11 +450,10 @@ export function AdminAllocSchedule({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
+        <div className="overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
           <div className="flex items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-3">
             <h2
               className="text-[15px] font-bold text-[var(--ink)]"
-              style={{ fontFamily: "var(--font-display), serif" }}
             >
               매장별 현황
             </h2>
@@ -512,11 +506,10 @@ export function AdminAllocSchedule({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
+      <section className="overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
         <div className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] px-4 py-3">
           <h2
             className="text-base font-bold text-[var(--ink)]"
-            style={{ fontFamily: "var(--font-display), serif" }}
           >
             {listTitle}
           </h2>
@@ -531,7 +524,7 @@ export function AdminAllocSchedule({
                   key={t.id}
                   type="button"
                   onClick={() => setStatus(t.id)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                  className={`rounded-[6px] border px-3 py-1.5 text-xs font-bold ${
                     on
                       ? "border-[var(--accent)] bg-[var(--accent)] text-white"
                       : "border-[var(--line)] bg-[var(--surface)] text-[var(--muted)]"
@@ -545,7 +538,7 @@ export function AdminAllocSchedule({
           <button
             type="button"
             onClick={() => setDay(null)}
-            className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-bold text-[var(--muted)]"
+            className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-bold text-[var(--muted)]"
           >
             {day ? "해당 월 전체 보기" : "월 전체 표시중"}
           </button>
@@ -553,7 +546,7 @@ export function AdminAllocSchedule({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="계정 · 상품 · 회원사 검색"
-            className="ml-auto w-full max-w-[230px] rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] outline-none"
+            className="ml-auto w-full max-w-[230px] rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] outline-none"
           />
         </div>
 
@@ -624,7 +617,7 @@ export function AdminAllocSchedule({
                   </div>
                   <div className="py-2.5 pl-0 md:pl-3.5">
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${badge.bg} ${badge.fg}`}
+                      className={`inline-flex items-center gap-1.5 rounded-[6px] px-2.5 py-1 text-[11px] font-bold ${badge.bg} ${badge.fg}`}
                     >
                       <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`} />
                       {VISIT_BUCKET_LABEL[b]}
@@ -666,7 +659,7 @@ export function AdminAllocSchedule({
               <button
                 type="button"
                 onClick={() => setOpenId(null)}
-                className="rounded-full px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--accent-soft)]"
+                className="rounded-[6px] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--accent-soft)]"
               >
                 닫기
               </button>

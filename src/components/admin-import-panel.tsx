@@ -395,7 +395,6 @@ export function AdminImportPanel({
           >
             <h2
               className="text-lg text-[var(--ink)]"
-              style={{ fontFamily: "var(--font-display), serif" }}
             >
               Excel / CSV 업로드
             </h2>
@@ -407,7 +406,6 @@ export function AdminImportPanel({
           <div className="px-5 pt-5">
             <h2
               className="text-lg"
-              style={{ fontFamily: "var(--font-display), serif" }}
             >
               Excel / CSV 업로드
             </h2>
@@ -472,7 +470,7 @@ export function AdminImportPanel({
           className={`mt-4 flex ${compact ? "min-h-32" : "min-h-40"} cursor-pointer flex-col items-center justify-center border border-dashed px-4 py-8 text-center transition ${
             dragging
               ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-              : "border-[var(--line)] bg-white/50 hover:border-[var(--accent)]"
+              : "border-[var(--line)] bg-[var(--surface)]/50 hover:border-[var(--accent)]"
           } ${!hasCompanies ? "pointer-events-none opacity-40" : ""}`}
         >
           <input
@@ -536,7 +534,6 @@ export function AdminImportPanel({
           <div>
             <h2
               className="text-lg text-[var(--ink)]"
-              style={{ fontFamily: "var(--font-display), serif" }}
             >
               업로드 이력
             </h2>
@@ -588,7 +585,7 @@ export function AdminImportPanel({
                 return (
                   <li
                     key={batch.id}
-                    className="border border-[var(--line)] bg-white/40"
+                    className="border border-[var(--line)] bg-[var(--surface)]/40"
                   >
                     <button
                       type="button"
@@ -658,7 +655,6 @@ export function AdminImportPanel({
                 </p>
                 <h3
                   className="mt-1 text-2xl text-[var(--ink)]"
-                  style={{ fontFamily: "var(--font-display), serif" }}
                 >
                   업로드 내용 확인
                 </h3>

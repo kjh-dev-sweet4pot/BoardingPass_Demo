@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { type Company } from "@/lib/types";
 
 type Queues = {
@@ -27,6 +27,7 @@ type Budget = {
 
 type DashboardData = {
   queues: Queues;
+  publishedCount: number;
   performance: Performance;
   budget: Budget;
 };
@@ -42,13 +43,13 @@ function fmtKrw(n: number) {
   return n.toLocaleString("ko-KR");
 }
 
-// ── 큐 카드 ──────────────────────────────────────────────────────────────
 export type AdminQueueKey =
   | "reviewPending"
   | "verifyFailed"
   | "collectFailed"
   | "publishStale"
-  | "castingStale";
+  | "castingStale"
+  | "published";
 
 function QueueCard({
   label,
@@ -66,9 +67,9 @@ function QueueCard({
     <button
       type="button"
       onClick={onOpen}
-      className={`rounded-2xl border px-4 py-3 text-left transition hover:brightness-[0.98] ${
+      className={`rounded-[6px] border px-4 py-3 text-left transition hover:brightness-[0.98] ${
         isEmpty
-          ? "border-[var(--line)] bg-white"
+          ? "border-[var(--line)] bg-[var(--surface)]"
           : warn
             ? "border-red-200 bg-red-50"
             : "border-amber-200 bg-amber-50"
@@ -89,10 +90,9 @@ function QueueCard({
   );
 }
 
-// ── KPI 카드 ──────────────────────────────────────────────────────────────
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3">
+    <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
       <p className="text-xs text-[var(--muted)]">{label}</p>
       <p className="mt-1 text-xl font-bold tabular-nums text-[var(--ink)]">{value}</p>
       {sub && <p className="mt-0.5 text-[11px] text-[var(--muted)]">{sub}</p>}
@@ -100,7 +100,6 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
   );
 }
 
-// ── 메인 ──────────────────────────────────────────────────────────────────
 export function AdminDashboard({
   companies,
   onOpenQueue,
@@ -123,139 +122,162 @@ export function AdminDashboard({
     if (to) qs.set("to", to);
     fetch(`/api/admin/dashboard${qs.size ? `?${qs}` : ""}`)
       .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); })
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, [companyId, from, to]);
 
   const queues = data?.queues;
+  const publishedCount = data?.publishedCount ?? 0;
   const perf = data?.performance;
   const budget = data?.budget;
   const hasMargin = budget && "margin" in budget;
 
   return (
     <div className="space-y-5">
-        {/* 처리 대기 큐 */}
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            처리 대기
-          </p>
-          {loading ? (
-            <p className="text-sm text-[var(--muted)]">불러오는 중…</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              <QueueCard
-                label="검수 대기"
-                count={queues?.reviewPending ?? 0}
-                onOpen={() => onOpenQueue("reviewPending")}
-              />
-              <QueueCard
-                label="검증 실패"
-                count={queues?.verifyFailed ?? 0}
-                warn
-                onOpen={() => onOpenQueue("verifyFailed")}
-              />
-              <QueueCard
-                label="수집 연속 실패"
-                count={queues?.collectFailed ?? 0}
-                warn
-                onOpen={() => onOpenQueue("collectFailed")}
-              />
-              <QueueCard
-                label="발행 미이행"
-                count={queues?.publishStale ?? 0}
-                onOpen={() => onOpenQueue("publishStale")}
-              />
-              <QueueCard
-                label="섭외 정체"
-                count={queues?.castingStale ?? 0}
-                onOpen={() => onOpenQueue("castingStale")}
-              />
-            </div>
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+          현황 · 처리 대기
+        </p>
+        {loading ? (
+          <p className="text-sm text-[var(--muted)]">불러오는 중…</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <QueueCard
+              label="검수 대기"
+              count={queues?.reviewPending ?? 0}
+              onOpen={() => onOpenQueue("reviewPending")}
+            />
+            <QueueCard
+              label="검증 실패"
+              count={queues?.verifyFailed ?? 0}
+              warn
+              onOpen={() => onOpenQueue("verifyFailed")}
+            />
+            <QueueCard
+              label="수집 연속 실패"
+              count={queues?.collectFailed ?? 0}
+              warn
+              onOpen={() => onOpenQueue("collectFailed")}
+            />
+            <QueueCard
+              label="발행 미이행"
+              count={queues?.publishStale ?? 0}
+              onOpen={() => onOpenQueue("publishStale")}
+            />
+            <QueueCard
+              label="섭외 정체"
+              count={queues?.castingStale ?? 0}
+              onOpen={() => onOpenQueue("castingStale")}
+            />
+            <button
+              type="button"
+              onClick={() => onOpenQueue("published")}
+              className="rounded-[6px] border border-[var(--badge-ok-fg)]/25 bg-[var(--badge-ok-bg)] px-4 py-3 text-left transition hover:brightness-[0.98]"
+            >
+              <p className="text-xs text-[var(--badge-ok-fg)]">발행 완료</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--badge-ok-fg)]">
+                {publishedCount.toLocaleString("ko-KR")}
+              </p>
+              <p className="mt-0.5 text-[11px] text-[var(--badge-ok-fg)]/70">건 · 열기</p>
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+          성과 조회
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <select
+            className="h-9 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
+            value={companyId}
+            onChange={(e) => setCompanyId(e.target.value)}
+          >
+            <option value="">회원사 전체</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            className="h-9 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
+            value={from}
+            max={to || today}
+            onChange={(e) => setFrom(e.target.value)}
+          />
+          <span className="self-center text-xs text-[var(--muted)]">~</span>
+          <input
+            type="date"
+            className="h-9 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
+            value={to}
+            min={from}
+            max={today}
+            onChange={(e) => setTo(e.target.value)}
+          />
+          {(companyId || from || to) && (
+            <button
+              type="button"
+              className="h-9 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-xs text-[var(--muted)] hover:bg-[var(--surface-hover)]"
+              onClick={() => {
+                setCompanyId("");
+                setFrom("");
+                setTo("");
+              }}
+            >
+              초기화
+            </button>
           )}
         </div>
+      </div>
 
-        {/* 필터 */}
+      {loading ? (
+        <p className="text-sm text-[var(--muted)]">불러오는 중…</p>
+      ) : perf ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <Kpi
+            label="발행 콘텐츠"
+            value={`${perf.posts}건`}
+            sub={from || to ? "선택 기간" : "전체 기간"}
+          />
+          <Kpi label="조회수" value={fmt(perf.views)} />
+          <Kpi label="좋아요" value={fmt(perf.likes)} />
+          <Kpi label="댓글" value={fmt(perf.comments)} />
+          <Kpi label="참여율 (ER)" value={`${perf.er.toFixed(2)}%`} />
+        </div>
+      ) : (
+        <p className="text-sm text-[var(--muted)]">—</p>
+      )}
+
+      {budget && (budget.exposureFee > 0 || hasMargin) && (
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            성과 조회
+            예산 (섭외 확정일 기준)
           </p>
-          <div className="flex flex-wrap gap-2">
-            <select
-              className="h-9 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
-              value={companyId}
-              onChange={(e) => setCompanyId(e.target.value)}
-            >
-              <option value="">회원사 전체</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <input
-              type="date"
-              className="h-9 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
-              value={from}
-              max={to || today}
-              onChange={(e) => setFrom(e.target.value)}
-            />
-            <span className="self-center text-xs text-[var(--muted)]">~</span>
-            <input
-              type="date"
-              className="h-9 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
-              value={to}
-              min={from}
-              max={today}
-              onChange={(e) => setTo(e.target.value)}
-            />
-            {(companyId || from || to) && (
-              <button
-                type="button"
-                className="h-9 rounded-xl border border-[var(--line)] bg-white px-3 text-xs text-[var(--muted)] hover:bg-[var(--surface)]"
-                onClick={() => { setCompanyId(""); setFrom(""); setTo(""); }}
-              >
-                초기화
-              </button>
+          <div className={`grid gap-2 ${hasMargin ? "grid-cols-3" : "grid-cols-1"}`}>
+            <Kpi label="노출가 합계" value={`${fmtKrw(budget.exposureFee)}원`} />
+            {hasMargin && (
+              <>
+                <Kpi label="원가 합계" value={`${fmtKrw(budget.costFee ?? 0)}원`} />
+                <Kpi
+                  label="마진"
+                  value={`${fmtKrw(budget.margin ?? 0)}원`}
+                  sub={
+                    budget.exposureFee > 0
+                      ? `${(((budget.margin ?? 0) / budget.exposureFee) * 100).toFixed(1)}%`
+                      : undefined
+                  }
+                />
+              </>
             )}
           </div>
         </div>
-
-        {/* 성과 KPI */}
-        {loading ? (
-          <p className="text-sm text-[var(--muted)]">불러오는 중…</p>
-        ) : perf && perf.posts > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            <Kpi label="발행 콘텐츠" value={`${perf.posts}건`} />
-            <Kpi label="조회수" value={fmt(perf.views)} />
-            <Kpi label="좋아요" value={fmt(perf.likes)} />
-            <Kpi label="댓글" value={fmt(perf.comments)} />
-            <Kpi label="참여율 (ER)" value={`${perf.er.toFixed(2)}%`} />
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--muted)]">
-            {perf ? "해당 기간에 발행된 콘텐츠가 없습니다." : "—"}
-          </p>
-        )}
-
-        {/* 예산 */}
-        {budget && (budget.exposureFee > 0 || hasMargin) && (
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-              예산 (섭외 확정일 기준)
-            </p>
-            <div className={`grid gap-2 ${hasMargin ? "grid-cols-3" : "grid-cols-1"}`}>
-              <Kpi label="노출가 합계" value={`${fmtKrw(budget.exposureFee)}원`} />
-              {hasMargin && (
-                <>
-                  <Kpi label="원가 합계" value={`${fmtKrw(budget.costFee ?? 0)}원`} />
-                  <Kpi
-                    label="마진"
-                    value={`${fmtKrw(budget.margin ?? 0)}원`}
-                    sub={budget.exposureFee > 0 ? `${(((budget.margin ?? 0) / budget.exposureFee) * 100).toFixed(1)}%` : undefined}
-                  />
-                </>
-              )}
-            </div>
-          </div>
-        )}
+      )}
     </div>
   );
 }

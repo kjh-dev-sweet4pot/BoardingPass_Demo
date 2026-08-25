@@ -11,6 +11,7 @@ import { AdminReviewQueue, type AdminReviewTab } from "@/components/admin-review
 import { AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
 import { Notice } from "@/components/ui";
 import {
+  formatMd,
   type AllocationWithRelations,
   type Company,
   type Product,
@@ -24,6 +25,17 @@ const PAGE: Record<AdminSection, { eyebrow: string; title: string }> = {
   review: { eyebrow: "Review", title: "검수" },
   allocations: { eyebrow: "Allocations", title: "배정·매장" },
 };
+
+function fmtCollectedKst(iso: string) {
+  return new Date(iso).toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 function PageHeader({
   section,
@@ -39,10 +51,7 @@ function PageHeader({
         <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
           {meta.eyebrow}
         </p>
-        <h1
-          className="mt-1 text-[28px] font-semibold leading-tight text-[var(--ink)] sm:text-[30px]"
-          style={{ fontFamily: "var(--font-display), serif" }}
-        >
+        <h1 className="mt-1 text-[28px] font-semibold leading-tight text-[var(--ink)] sm:text-[30px]">
           {meta.title}
         </h1>
       </div>
@@ -73,11 +82,20 @@ export function AdminConsoleLayout({
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [reviewQueue, setReviewQueue] = useState<AdminReviewTab>("reviewPending");
   const [castingStale, setCastingStale] = useState(false);
+  const [performanceMeta, setPerformanceMeta] = useState<{
+    asOf: string;
+    lastCollected: string | null;
+    nextCollectAt: string | null;
+  } | null>(null);
 
   function openQueue(queue: AdminQueueKey) {
     if (queue === "castingStale") {
       setCastingStale(true);
       setSection("campaigns");
+      return;
+    }
+    if (queue === "published") {
+      setSection("performance");
       return;
     }
     const tab: AdminReviewTab =
@@ -88,15 +106,34 @@ export function AdminConsoleLayout({
     setSection("review");
   }
 
+  const headerFooter =
+    section === "performance" && performanceMeta ? (
+      <>
+        <p>
+          {performanceMeta.asOf} 조회 시점 기준
+          {performanceMeta.lastCollected
+            ? ` / 최종 수집: ${fmtCollectedKst(performanceMeta.lastCollected)}`
+            : ""}
+        </p>
+        {performanceMeta.nextCollectAt ? (
+          <p>
+            갱신 예정 {formatMd(performanceMeta.nextCollectAt.slice(0, 10))} 00:00
+          </p>
+        ) : null}
+      </>
+    ) : null;
+
   return (
     <AdminConsoleShell
       section={section}
       onSectionChange={(next) => {
         if (next !== "campaigns") setCastingStale(false);
         if (next !== "review") setReviewQueue("reviewPending");
+        if (next !== "performance") setPerformanceMeta(null);
         setSection(next);
       }}
       sidebarActions={sidebarActions}
+      headerFooter={headerFooter}
     >
       {error || message ? (
         <div className="shrink-0 px-4 pt-4 sm:px-7">
@@ -118,11 +155,11 @@ export function AdminConsoleLayout({
       ) : null}
 
       {section === "performance" ? (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <PageHeader section="performance" />
-          <div className="px-4 pb-8 sm:px-7">
-            <AdminPerformanceTab companies={companyList} />
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <AdminPerformanceTab
+            companies={companyList}
+            onMetaChange={setPerformanceMeta}
+          />
         </div>
       ) : null}
 
