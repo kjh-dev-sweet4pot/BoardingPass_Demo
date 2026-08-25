@@ -206,7 +206,7 @@ function InfoTip({ text }: { text: string }) {
         ? createPortal(
             <span
               role="tooltip"
-              className={`pointer-events-none fixed z-[200] w-[240px] -translate-x-1/2 rounded-xl border border-[var(--line)] bg-[var(--ink)] px-3 py-2 text-left text-[11px] font-normal leading-relaxed text-white shadow-lg ${
+              className={`pointer-events-none fixed z-[200] w-[240px] -translate-x-1/2 rounded-[6px] border border-[var(--line)] bg-[var(--ink)] px-3 py-2 text-left text-[11px] font-normal leading-relaxed text-white shadow-lg ${
                 pos.place === "above" ? "-translate-y-full" : ""
               }`}
               style={{ top: pos.top, left: pos.left }}
@@ -273,7 +273,7 @@ function ContentMetricsTip({
         ? createPortal(
             <div
               role="tooltip"
-              className="pointer-events-none fixed z-[200] w-[220px] -translate-x-1/2 -translate-y-full rounded-xl border border-[var(--line)] bg-[var(--ink)] px-3 py-2.5 text-white shadow-lg"
+              className="pointer-events-none fixed z-[200] w-[220px] -translate-x-1/2 -translate-y-full rounded-[6px] border border-[var(--line)] bg-[var(--ink)] px-3 py-2.5 text-white shadow-lg"
               style={{ top: pos.top, left: pos.left }}
             >
               <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-white/60">
@@ -388,7 +388,7 @@ function TopContentPanel({
   aside?: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+    <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
       <PanelTitle title={title} why={why} aside={aside} />
       {items.length === 0 ? (
         <p className="px-[18px] py-6 text-sm text-[var(--muted)]">데이터 없음</p>
@@ -461,7 +461,7 @@ function PlatformErPanel({
 }) {
   const maxEr = Math.max(...rows.map((r) => er(r.views, r.likes, r.comments)), 0.1);
   return (
-    <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+    <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
       <PanelTitle title="플랫폼별 ER" why={METRIC_WHY.platformEr} />
       {rows.length === 0 ? (
         <p className="px-[18px] py-6 text-sm text-[var(--muted)]">데이터 없음</p>
@@ -631,12 +631,12 @@ function StatCard({
   delta?: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)] px-[18px] py-4">
+    <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-5 py-4">
       <div className="flex items-start justify-between">
-        <span className="text-[12.5px] text-[var(--muted)]">{label}</span>
+        <span className="text-[15px] font-bold text-[var(--muted)]">{label}</span>
         {delta ? <span className="text-[11px] text-[var(--accent)]">{delta}</span> : null}
       </div>
-      <p className="mt-2.5 text-[27px] font-semibold leading-tight tracking-[-0.02em] text-[var(--ink)]">
+      <p className="mt-2 text-[28px] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)]">
         {value}
         {unit ? (
           <span className="ml-1 text-[13px] font-normal text-[var(--muted)]">{unit}</span>
@@ -1110,10 +1110,10 @@ export function CompanyPerformanceTab({
   if (loading) {
     return (
       <div className="space-y-3 px-[28px] py-[26px]">
-        <div className="h-10 animate-pulse rounded-xl bg-[var(--surface-hover)]" />
+        <div className="h-10 animate-pulse rounded-[6px] bg-[var(--surface-hover)]" />
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-[18px] bg-[var(--surface-hover)]" />
+            <div key={i} className="h-24 animate-pulse rounded-[6px] bg-[var(--surface-hover)]" />
           ))}
         </div>
       </div>
@@ -1124,8 +1124,8 @@ export function CompanyPerformanceTab({
     <div
       className={
         embedded
-          ? "flex min-h-0 flex-1 flex-col gap-[18px] overflow-auto px-1 py-2"
-          : "flex min-h-0 flex-1 flex-col gap-[18px] overflow-auto px-[28px] py-[26px]"
+          ? "flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-1 py-2"
+          : "flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-[28px] py-[26px]"
       }
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -1133,13 +1133,7 @@ export function CompanyPerformanceTab({
           <div />
         ) : (
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
-              Performance
-            </p>
-            <h2
-              className="mt-2 text-[30px] font-semibold leading-tight text-[var(--ink)]"
-              style={{ fontFamily: "var(--font-display), serif" }}
-            >
+            <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
               성과
             </h2>
           </div>
@@ -1149,7 +1143,7 @@ export function CompanyPerformanceTab({
             type="button"
             onClick={() => void reload()}
             disabled={refreshing || recollecting}
-            className="h-[38px] rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] font-semibold text-[var(--ink)] disabled:opacity-50"
+            className="h-[38px] rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] font-semibold text-[var(--ink)] disabled:opacity-50"
           >
             {refreshing ? "조회 중…" : "다시 조회"}
           </button>
@@ -1158,13 +1152,13 @@ export function CompanyPerformanceTab({
               type="button"
               onClick={() => void recollectMetrics()}
               disabled={recollecting || refreshing}
-              className="h-[38px] rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3.5 text-[13px] font-semibold text-[var(--accent)] disabled:opacity-50"
+              className="h-[38px] rounded-[6px] border border-[var(--accent)] bg-[var(--accent-soft)] px-3.5 text-[13px] font-semibold text-[var(--accent)] disabled:opacity-50"
             >
               {recollecting ? "재수집 중…" : "지표 재수집"}
             </button>
           ) : null}
           <select
-            className="h-[38px] rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] text-[#5b4130]"
+            className="h-[38px] rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 text-[13px] text-[#5b4130]"
             value={productId}
             onChange={(e) => setProductId(e.target.value)}
           >
@@ -1208,15 +1202,15 @@ export function CompanyPerformanceTab({
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-            <StatCard label="조회수" value={formatMetric(totals.views)} />
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard label="총 조회수" value={formatMetric(totals.views)} />
             <StatCard label="좋아요" value={formatMetric(totals.likes)} />
             <StatCard label="콘텐츠" value={`${totals.posts}`} unit="건" />
             <StatCard label="인플루언서" value={`${totals.influencers}`} unit="명" />
           </div>
 
           {showCompanyBreakdown ? (
-            <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+            <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
               <PanelTitle title="회원사별 성과" why={METRIC_WHY.company} />
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[480px] border-collapse text-left text-[12.5px]">
@@ -1261,13 +1255,13 @@ export function CompanyPerformanceTab({
             </div>
           ) : null}
 
-          <div className="grid gap-3.5 lg:grid-cols-[1.35fr_1fr]">
-            <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+          <div className="grid gap-3 lg:grid-cols-[1.35fr_1fr]">
+            <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
               <div className="flex items-center justify-between gap-2 px-[18px] py-3.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[13.5px] font-semibold text-[var(--ink)]">
-                    조회수 곡선{" "}
-                    <span className="font-normal text-[var(--muted)]">캠페인 개시 이후 성과</span>
+                    조회수 추이{" "}
+                    <span className="font-normal text-[var(--muted)]">캠페인 개시 이후</span>
                   </span>
                   <InfoTip text={METRIC_WHY.curve} />
                 </div>
@@ -1284,7 +1278,7 @@ export function CompanyPerformanceTab({
                 <ViewsCurve points={curvePoints} />
               </div>
             </div>
-            <div className="flex min-h-[220px] flex-col rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+            <div className="flex min-h-[220px] flex-col rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
               <div className="flex items-center gap-1.5 px-[18px] py-3.5">
                 <span className="text-[13.5px] font-semibold text-[var(--ink)]">
                   플랫폼별 성과
@@ -1300,76 +1294,81 @@ export function CompanyPerformanceTab({
             </div>
           </div>
 
-          <div className="grid gap-3.5 lg:grid-cols-3">
-            <TopContentPanel
-              title="조회수 TOP"
-              why={METRIC_WHY.views}
-              metric={{ kind: "views" }}
-              items={topByViews}
-            />
-            <TopContentPanel
-              title="좋아요 TOP"
-              why={METRIC_WHY.likes}
-              metric={{ kind: "likes" }}
-              items={topByLikes}
-            />
-            <TopContentPanel
-              title="조회수 대비 좋아요 TOP"
-              why={METRIC_WHY.likeRate}
-              metric={{ kind: "likeRate" }}
-              items={topByLikeRate}
-              aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
-            />
+          <div className="flex flex-col gap-3">
+            <h3 className="text-[13.5px] font-semibold text-[var(--ink)]">
+              콘텐츠 성과 TOP
+            </h3>
+            <div className="grid gap-3 lg:grid-cols-3">
+              <TopContentPanel
+                title="조회수 TOP"
+                why={METRIC_WHY.views}
+                metric={{ kind: "views" }}
+                items={topByViews}
+              />
+              <TopContentPanel
+                title="좋아요 TOP"
+                why={METRIC_WHY.likes}
+                metric={{ kind: "likes" }}
+                items={topByLikes}
+              />
+              <TopContentPanel
+                title="조회수 대비 좋아요 TOP"
+                why={METRIC_WHY.likeRate}
+                metric={{ kind: "likeRate" }}
+                items={topByLikeRate}
+                aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
+              />
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-3">
+              <TopContentPanel
+                title="저장 TOP"
+                why={METRIC_WHY.saves}
+                metric={{ kind: "saves" }}
+                items={topBySaves}
+              />
+              <TopContentPanel
+                title="공유 TOP"
+                why={METRIC_WHY.shares}
+                metric={{ kind: "shares" }}
+                items={topByShares}
+              />
+              <TopContentPanel
+                title="리포스트 TOP"
+                why={METRIC_WHY.reposts}
+                metric={{ kind: "reposts" }}
+                items={topByReposts}
+              />
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-3">
+              <TopContentPanel
+                title="댓글 반응 TOP"
+                why={METRIC_WHY.commentRate}
+                metric={{ kind: "commentRate" }}
+                items={topByCommentRate}
+                aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
+              />
+              <TopContentPanel
+                title="참여율(ER) TOP"
+                why={METRIC_WHY.er}
+                metric={{ kind: "er" }}
+                items={topByEr}
+                aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
+              />
+              <TopContentPanel
+                title="초기 반응"
+                why={METRIC_WHY.early}
+                metric={{ kind: "earlyViews" }}
+                items={topByEarly}
+                aside={earlyAside}
+              />
+            </div>
           </div>
 
-          <div className="grid gap-3.5 lg:grid-cols-3">
-            <TopContentPanel
-              title="저장 TOP"
-              why={METRIC_WHY.saves}
-              metric={{ kind: "saves" }}
-              items={topBySaves}
-            />
-            <TopContentPanel
-              title="공유 TOP"
-              why={METRIC_WHY.shares}
-              metric={{ kind: "shares" }}
-              items={topByShares}
-            />
-            <TopContentPanel
-              title="리포스트 TOP"
-              why={METRIC_WHY.reposts}
-              metric={{ kind: "reposts" }}
-              items={topByReposts}
-            />
-          </div>
-
-          <div className="grid gap-3.5 lg:grid-cols-3">
-            <TopContentPanel
-              title="댓글 반응 TOP"
-              why={METRIC_WHY.commentRate}
-              metric={{ kind: "commentRate" }}
-              items={topByCommentRate}
-              aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
-            />
-            <TopContentPanel
-              title="참여율(ER) TOP"
-              why={METRIC_WHY.er}
-              metric={{ kind: "er" }}
-              items={topByEr}
-              aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
-            />
-            <TopContentPanel
-              title="초기 반응"
-              why={METRIC_WHY.early}
-              metric={{ kind: "earlyViews" }}
-              items={topByEarly}
-              aside={earlyAside}
-            />
-          </div>
-
-          <div className="grid items-start gap-3.5 lg:grid-cols-2">
+          <div className="grid items-start gap-3 lg:grid-cols-2">
             <PlatformErPanel rows={platformErRows} />
-            <div className="rounded-[18px] border border-[var(--line)] bg-[var(--surface)]">
+            <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
               <PanelTitle title="상품별 성과" why={METRIC_WHY.product} />
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[480px] border-collapse text-left text-[12.5px]">

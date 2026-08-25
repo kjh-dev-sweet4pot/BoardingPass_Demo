@@ -57,7 +57,7 @@ export default async function CompanyPage() {
           <form action={signOut}>
             <input type="hidden" name="next" value="/com/login" />
             <button
-              className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--muted)] transition hover:bg-[var(--surface-hover)]"
+              className="text-[15px] font-semibold text-[var(--muted)] transition hover:text-[var(--ink)]"
               type="submit"
             >
               로그아웃

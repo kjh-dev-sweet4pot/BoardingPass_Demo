@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { signInCompany } from "@/app/actions/auth";
 import { fieldClass, primaryBtnClass } from "@/components/ui";
 
-const inputClass = `${fieldClass} h-auto w-full rounded-2xl border-[#E8D5BE] px-5 py-4 text-sm text-[#3D1F0A] placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10 disabled:opacity-60`;
+const inputClass = `${fieldClass} h-auto w-full rounded-[6px] border-[#E8D5BE] px-5 py-4 text-sm text-[#3D1F0A] placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10 disabled:opacity-60`;
 
 function Fields() {
   const { pending } = useFormStatus();
@@ -29,7 +29,7 @@ function Fields() {
         disabled={pending}
       />
       <button
-        className={`${primaryBtnClass} h-auto w-full rounded-2xl bg-[#6B3B1F] py-4 text-sm font-semibold tracking-wide hover:bg-[#7D4726] disabled:cursor-wait disabled:opacity-90`}
+        className={`${primaryBtnClass} h-auto w-full rounded-[6px] bg-[#6B3B1F] py-4 text-sm font-semibold tracking-wide hover:bg-[#7D4726] disabled:cursor-wait disabled:opacity-90`}
         type="submit"
         disabled={pending}
         aria-busy={pending}
