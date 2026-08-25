@@ -236,7 +236,7 @@ export function AdminAllocSchedule({
     "md:grid-cols-[minmax(92px,1.1fr)_minmax(0,1.35fr)_minmax(0,1.15fr)_minmax(60px,0.85fr)_minmax(0,1fr)_minmax(96px,1.1fr)_minmax(52px,0.62fr)]";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pb-8 sm:px-7">
+    <div className="flex flex-col gap-4 px-4 pb-8 sm:px-7">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
@@ -564,7 +564,7 @@ export function AdminAllocSchedule({
           <div className="py-2.5 text-right">상세</div>
         </div>
 
-        <div className="max-h-[440px] overflow-y-auto">
+        <div>
           {listRows.rows.length === 0 ? (
             <p className="py-12 text-center text-sm text-[var(--muted)]">
               조건에 맞는 배정이 없습니다.

@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
-import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
-import { getStoreSessionId, isAdminSession } from "@/lib/session";
+import {
+  createApiClientIfConfigured,
+  supabaseConfigError,
+} from "@/lib/supabase/api-client";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
+import {
+  getStoreSessionId,
+  isAdminSession,
+  mintAndSetAuthToken,
+  setStoreSessionId,
+} from "@/lib/session";
 
 export async function GET() {
   const isAdmin = await isAdminSession();
@@ -13,8 +22,19 @@ export async function GET() {
     );
   }
 
-  const supabase = await createApiClientIfConfigured();
+  // 카운터를 연 채로 두면 JWT/쿠키가 만료되며 목록이 빈 배열로 덮임 → 사용 중엔 세션 연장
+  if (storeId) {
+    await setStoreSessionId(storeId);
+    if (!hasServiceRoleKey()) {
+      await mintAndSetAuthToken({ role: "store", store_id: storeId });
+    }
+  }
+
+  const supabase = hasServiceRoleKey()
+    ? createServiceClient()
+    : await createApiClientIfConfigured();
   if (!supabase) return supabaseConfigError();
+
   let query = supabase
     .from("allocations")
     .select("*, products(*), stores(*), influencers(*)")
