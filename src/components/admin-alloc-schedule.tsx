@@ -25,7 +25,11 @@ type StatusTab = "all" | VisitBucket;
 
 const BADGE: Record<VisitBucket, { bg: string; fg: string; dot: string }> = {
   plan: { bg: "bg-[#f5ecdb]", fg: "text-[#8a6a3c]", dot: "bg-[#dcc39a]" },
-  visited: { bg: "bg-[#f2e8d8]", fg: "text-[#7a5a2e]", dot: "bg-[#a8834e]" },
+  visited: {
+    bg: "bg-[var(--badge-ok-bg)]",
+    fg: "text-[var(--badge-ok-fg)]",
+    dot: "bg-[#3d8b55]",
+  },
   received: { bg: "bg-[#e8f0e6]", fg: "text-[#2f5c3c]", dot: "bg-[#4a7c59]" },
 };
 
@@ -45,7 +49,7 @@ function StatusBar({
         <div className="bg-[#4a7c59]" style={{ width: `${w.wReceived}%` }} />
       ) : null}
       {w.wVisited > 0 ? (
-        <div className="bg-[#a8834e]" style={{ width: `${w.wVisited}%` }} />
+        <div className="bg-[#3d8b55]" style={{ width: `${w.wVisited}%` }} />
       ) : null}
       {w.wPlan > 0 ? (
         <div className="bg-[#dcc39a]" style={{ width: `${w.wPlan}%` }} />
@@ -331,7 +335,8 @@ export function AdminAllocSchedule({
         <KpiCell
           label={VISIT_BUCKET_LABEL.visited}
           value={monthStats.kpi.visited}
-          dot="bg-[#a8834e]"
+          dot="bg-[#3d8b55]"
+          valueClass="text-[#2f6b3c]"
         />
         <KpiCell
           label={VISIT_BUCKET_LABEL.received}
@@ -371,7 +376,7 @@ export function AdminAllocSchedule({
                 반출
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-sm bg-[#a8834e]" />
+                <span className="h-2 w-2 rounded-sm bg-[#3d8b55]" />
                 방문
               </span>
               <span className="flex items-center gap-1.5">
