@@ -70,7 +70,7 @@ export function CompanyPublishFeed() {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-3">
+      <div className="min-h-0 flex-1 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3">
         {filtered.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
             해당 유형의 발행 콘텐츠가 없습니다.
@@ -102,7 +102,7 @@ function PublishThumb({ item }: { item: PublishItem }) {
       : null;
 
   return (
-    <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-[#efe4d6]">
+    <div className="relative aspect-square w-full overflow-hidden rounded-[6px] bg-[#efe4d6]">
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -133,7 +133,7 @@ function PublishCard({ row }: { row: PublishItem }) {
       href={row.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[#fffdfb] shadow-[0_1px_0_rgba(61,31,10,0.06)] transition hover:border-[var(--accent)]/50"
+      className="flex flex-col overflow-hidden rounded-[6px] border border-[var(--line)] bg-[#fffdfb] shadow-[0_1px_0_rgba(61,31,10,0.06)] transition hover:border-[var(--accent)]/50"
     >
       <div className="relative">
         <PublishThumb item={row} />

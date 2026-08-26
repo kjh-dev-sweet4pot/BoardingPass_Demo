@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { CompanyPerformanceLookupTab } from "@/components/company-performance-lookup-tab";
 import { CompanyPerformanceTab } from "@/components/company-performance-tab";
 import {
   CompanyConsoleShell,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/creator-link";
 import { todayYmdKst } from "@/lib/inf-visit";
 import { VISIT_CONTENT_GUIDE_URL } from "@/lib/creator-pool-mock";
+import { regionBadgeText } from "@/lib/region-display";
 import {
   allocationStatusDisplayLabel,
   formatMd,
@@ -38,7 +40,7 @@ import {
 } from "@/lib/types";
 
 const contentGuideLinkClass =
-  "inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-2 text-xs font-bold text-[var(--accent)] shadow-sm transition hover:bg-[var(--accent)] hover:!text-white";
+  "inline-flex items-center gap-1.5 rounded-[6px] border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-2 text-xs font-bold text-[var(--accent)] shadow-sm transition hover:bg-[var(--accent)] hover:!text-white";
 
 function fmtCollectedKst(iso: string) {
   const d = new Date(iso);
@@ -166,7 +168,7 @@ function AllocSortTh({
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        className={`inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition ${
+        className={`inline-flex items-center gap-1 rounded-[6px] px-1 py-0.5 transition ${
           right ? "ml-auto" : ""
         } ${
           active
@@ -205,7 +207,7 @@ export function CompanyConsole({
 }) {
   const isDemo = isDemoCompany(company);
   const gate = useBudgetGate(company.id);
-  const [view, setView] = useState<"alloc" | "content" | "pool" | "publish">(
+  const [view, setView] = useState<CompanyConsoleView>(
     isDemo ? "pool" : "publish",
   );
   // live: 배정은 진행현황·배정 탭 진입 시 지연 로드
@@ -456,7 +458,7 @@ export function CompanyConsole({
   }
 
   const sidebarFooter =
-    view === "content" && performanceMeta ? (
+    (view === "content" || view === "contentLookup") && performanceMeta ? (
       <>
         <p>{performanceMeta.asOf} 조회 시점 기준</p>
         {performanceMeta.lastCollected ? (
@@ -497,7 +499,7 @@ export function CompanyConsole({
   return (
     <CompanyConsoleShell
       companyName={company.name}
-      view={view as CompanyConsoleView}
+      view={view}
       onViewChange={setView}
       sidebarActions={sidebarActions}
       sidebarFooter={sidebarFooter}
@@ -515,6 +517,19 @@ export function CompanyConsole({
           initialAllocations={progressItems}
           live={!isDemo}
           loading={allocsLoading}
+        />
+      ) : view === "contentLookup" ? (
+        <CompanyPerformanceLookupTab
+          initialData={
+            isDemo
+              ? (buildPublishDemoPerformance() as never)
+              : initialPerformanceData
+                ? (initialPerformanceData as never)
+                : undefined
+          }
+          period={period}
+          onPeriodChange={setPeriod}
+          onMetaChange={setPerformanceMeta}
         />
       ) : view === "content" ? (
         <CompanyPerformanceTab
@@ -535,48 +550,21 @@ export function CompanyConsole({
           배정 불러오는 중…
         </div>
       ) : (
-      <div className="grid min-h-0 flex-1 gap-3 overflow-auto px-[28px] py-[26px] lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.7fr)]">
+      <div className="grid min-h-0 flex-1 gap-4 overflow-auto px-8 py-6 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.85fr)]">
         <div className="flex min-h-0 flex-col gap-3">
-      <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
-        {(
-          [
-            ["all", "배정", counters.total, counterActive.all],
-            ["visited", "방문 완료", counters.visited, counterActive.visited],
-            ["picked", "수령 완료", counters.picked, counterActive.picked],
-            ["linked", "링크 제출", counters.linked, counterActive.linked],
-          ] as const
-        ).map(([key, label, value, active]) => (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={active}
-            onClick={() => applyCounter(key)}
-            className={`rounded-2xl border px-4 py-4 text-left transition ${
-              active
-                ? "border-[var(--accent)] bg-white"
-                : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--accent)]/50"
-            }`}
-          >
-            <p className="text-xs text-[var(--muted)]">{label}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--accent)]">
-              {value}
-              <span className="ml-1 text-sm font-medium text-[var(--muted)]">
-                건
-              </span>
-            </p>
-          </button>
-        ))}
-      </div>
+      <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
+        배정 현황
+      </h2>
 
       <div className="flex shrink-0 flex-wrap gap-2">
         <input
-          className="h-10 min-w-[12rem] flex-1 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
-          placeholder="인플루언서 · 상품 검색"
+          className="h-11 min-w-[12rem] flex-1 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
+          placeholder="이름 · 핸들 · 상품 검색"
           value={searchQ}
           onChange={(e) => setSearchQ(e.target.value)}
         />
         <select
-          className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+          className="h-11 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
           value={storeId}
           onChange={(e) => setStoreId(e.target.value)}
         >
@@ -588,7 +576,7 @@ export function CompanyConsole({
           ))}
         </select>
         <select
-          className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-sm"
+          className="h-11 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         >
@@ -605,7 +593,7 @@ export function CompanyConsole({
               v === "all" ? "has" : v === "has" ? "none" : "all",
             )
           }
-          className={`h-10 rounded-xl border px-3 text-sm font-medium ${
+          className={`h-11 rounded-[6px] border px-3 text-sm font-medium ${
             linkFilter === "all"
               ? "border-[var(--line)] text-[var(--muted)]"
               : "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
@@ -620,9 +608,52 @@ export function CompanyConsole({
                 ? "제출 완료"
                 : "제출"}
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSearchQ("");
+            setStoreId("");
+            setStatus("");
+            setLinkFilter("all");
+          }}
+          className="h-11 rounded-[6px] px-3 text-sm font-medium text-[var(--muted)] hover:text-[var(--ink)]"
+        >
+          필터 초기화
+        </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
+      <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
+        {(
+          [
+            ["all", "전체 배정", counters.total, counterActive.all],
+            ["visited", "방문 완료", counters.visited, counterActive.visited],
+            ["picked", "수령 완료", counters.picked, counterActive.picked],
+            ["linked", "링크 제출", counters.linked, counterActive.linked],
+          ] as const
+        ).map(([key, label, value, active]) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={active}
+            onClick={() => applyCounter(key)}
+            className={`rounded-[6px] border px-4 py-4 text-left transition ${
+              active
+                ? "border-[var(--accent)] bg-[var(--surface)]"
+                : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--accent)]/40"
+            }`}
+          >
+            <p className="text-[13px] text-[var(--muted)]">{label}</p>
+            <p className="mt-1 text-[26px] font-bold tabular-nums text-[var(--ink)]">
+              {value}
+              <span className="ml-1 text-sm font-medium text-[var(--muted)]">
+                건
+              </span>
+            </p>
+          </button>
+        ))}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
         {filtered.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
             조건에 맞는 배정이 없습니다.
@@ -751,7 +782,7 @@ export function CompanyConsole({
 
         </div>
 
-        <aside className="min-h-[50vh] min-w-0 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm lg:min-h-0">
+        <aside className="min-h-[50vh] min-w-0 overflow-y-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-6 lg:min-h-0">
           {selected ? (
             <CompanyInfPanel
               item={selected}
@@ -824,214 +855,231 @@ function CompanyInfPanel({
   const sns = snsUrl(item.influencers?.sns_url);
   const links = (item.creator_links || []) as CreatorLink[];
   const linkSum = summarizeAllocationLinks(links);
+  const countryBadge = regionBadgeText(item.influencers?.region);
 
   return (
     <div>
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
-              Influencer
-            </p>
-            <h3 className="mt-1 text-2xl font-bold text-[var(--ink)]">
-              {item.influencers?.name || handle}
-            </h3>
-            <p className="mt-1 text-[var(--accent)]">{handle}</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusChipClass(item)}`}
-              >
-                {statusChipLabel(item)}
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
+            배정 상세
+          </p>
+          <h3 className="mt-1 text-2xl font-bold text-[var(--ink)]">
+            {item.influencers?.name || handle}
+          </h3>
+          <p className="mt-1 text-[var(--accent)]">{handle}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {countryBadge ? (
+              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+                {countryBadge}
               </span>
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${linkChipClass(linkSum)}`}
-              >
-                {ALLOCATION_LINK_LABEL[linkSum]}
-              </span>
-            </div>
+            ) : null}
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusChipClass(item)}`}
+            >
+              {statusChipLabel(item)}
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${linkChipClass(linkSum)}`}
+            >
+              {ALLOCATION_LINK_LABEL[linkSum]}
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-sm text-[var(--muted)]"
-          >
-            닫기
-          </button>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-sm text-[var(--muted)]"
+        >
+          닫기
+        </button>
+      </div>
 
+      <dl className="grid gap-3 rounded-[6px] bg-[var(--accent-soft)]/50 px-4 py-4 sm:grid-cols-2">
+        <div>
+          <dt className="text-xs text-[var(--muted)]">방문 예정일</dt>
+          <dd className="mt-1 font-semibold">
+            {formatVisitLabel(visitKey(item))}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[var(--muted)]">상품 / 수량</dt>
+          <dd className="mt-1 font-semibold">
+            {item.products?.name || "상품"} · {item.quantity}개
+            {item.products?.sku ? (
+              <span className="mt-0.5 block text-xs font-normal text-[var(--muted)]">
+                SKU {item.products.sku}
+              </span>
+            ) : null}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[var(--muted)]">매장</dt>
+          <dd className="mt-1">{item.stores?.name || "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[var(--muted)]">진행 상태</dt>
+          <dd className="mt-1">
+            <span
+              className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusChipClass(item)}`}
+            >
+              {statusChipLabel(item)}
+            </span>
+          </dd>
+        </div>
+        {item.visit_code ? (
+          <div>
+            <dt className="text-xs text-[var(--muted)]">방문 코드</dt>
+            <dd className="mt-1">{item.visit_code}</dd>
+          </div>
+        ) : null}
+        <div>
+          <dt className="text-xs text-[var(--muted)]">최초 방문</dt>
+          <dd className="mt-1 text-sm">{formatKst(item.verified_at)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[var(--muted)]">최근 방문</dt>
+          <dd className="mt-1 text-sm">{formatKst(item.last_visited_at)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[var(--muted)]">수령일시</dt>
+          <dd className="mt-1 text-sm">{formatKst(item.picked_up_at)}</dd>
+        </div>
+      </dl>
+
+      {insight ? (
+        <div className="mt-5 rounded-[6px] border border-[var(--line)] px-4 py-4">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold">콘텐츠 성과</h4>
+            <span className="text-[11px] text-[var(--muted)]">
+              {insight.source === "mock" ? "미리보기" : "수집"}
+            </span>
+          </div>
+          <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <dt className="text-[11px] text-[var(--muted)]">조회</dt>
+              <dd className="mt-0.5 text-sm font-semibold tabular-nums">
+                {formatMetric(insight.views)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] text-[var(--muted)]">좋아요</dt>
+              <dd className="mt-0.5 text-sm font-semibold tabular-nums">
+                {formatMetric(insight.likes)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] text-[var(--muted)]">댓글</dt>
+              <dd className="mt-0.5 text-sm font-semibold tabular-nums">
+                {formatMetric(insight.comments)}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
+
+      <div className="mt-5">
+        <h4 className="mb-2 text-sm font-semibold">콘텐츠 링크</h4>
+        {links.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">제출된 링크가 없습니다.</p>
+        ) : (
+          <ul className="space-y-2">
+            {links.map((link) => (
+              <li
+                key={link.id}
+                className="rounded-[6px] border border-[var(--line)] px-3 py-2.5 text-sm"
+              >
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all text-[var(--accent)] underline"
+                >
+                  {link.url}
+                </a>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  {link.platform} ·{" "}
+                  {
+                    ALLOCATION_LINK_LABEL[
+                      link.status === "approved"
+                        ? "approved"
+                        : link.status === "submitted"
+                          ? "reviewing"
+                          : "rejected"
+                    ]
+                  }{" "}
+                  · {formatKst(link.submitted_at)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-5 flex flex-col gap-2">
         {sns ? (
           <a
             href={sns}
             target="_blank"
             rel="noopener noreferrer"
-            className="mb-5 inline-flex rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white"
+            className="inline-flex items-center justify-center rounded-[6px] bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white"
           >
-            SNS 프로필
+            Instagram 콘텐츠 보기
           </a>
         ) : null}
-
+        {insight ? (
+          <button
+            type="button"
+            onClick={() => onOpenContent(insight.id)}
+            className="w-full rounded-[6px] border border-[var(--line)] px-3 py-2.5 text-sm font-medium"
+          >
+            콘텐츠 대시보드에서 보기
+          </button>
+        ) : null}
         <a
           href={VISIT_CONTENT_GUIDE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className={`mb-5 w-full justify-center py-2.5 text-sm ${contentGuideLinkClass}`}
+          className={`w-full justify-center py-2.5 text-sm ${contentGuideLinkClass}`}
         >
-          컨텐츠 가이드라인 보기
+          콘텐츠 가이드라인 보기
           <span aria-hidden>↗</span>
         </a>
+      </div>
 
-        <dl className="grid gap-3 rounded-2xl bg-[var(--accent-soft)]/50 px-4 py-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs text-[var(--muted)]">상품</dt>
-            <dd className="mt-1 font-semibold">
-              {item.products?.name || "상품"}
-              {item.products?.sku ? (
-                <span className="ml-2 text-xs font-normal text-[var(--muted)]">
-                  SKU {item.products.sku}
-                </span>
-              ) : null}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-[var(--muted)]">수량</dt>
-            <dd className="mt-1 font-semibold">{item.quantity}개</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-[var(--muted)]">매장</dt>
-            <dd className="mt-1">{item.stores?.name || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-[var(--muted)]">방문 예정일</dt>
-            <dd className="mt-1">{formatVisitLabel(visitKey(item))}</dd>
-          </div>
-          {item.visit_code ? (
-            <div>
-              <dt className="text-xs text-[var(--muted)]">방문 코드</dt>
-              <dd className="mt-1">{item.visit_code}</dd>
-            </div>
-          ) : null}
-          <div>
-            <dt className="text-xs text-[var(--muted)]">최초 방문</dt>
-            <dd className="mt-1 text-sm">{formatKst(item.verified_at)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-[var(--muted)]">최근 방문</dt>
-            <dd className="mt-1 text-sm">{formatKst(item.last_visited_at)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-[var(--muted)]">수령일시</dt>
-            <dd className="mt-1 text-sm">{formatKst(item.picked_up_at)}</dd>
-          </div>
-        </dl>
-
-        {insight ? (
-          <div className="mt-5 rounded-2xl border border-[var(--line)] px-4 py-4">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="text-sm font-semibold">콘텐츠 성과</h4>
-              <span className="text-[11px] text-[var(--muted)]">
-                {insight.source === "mock" ? "미리보기" : "수집"}
-              </span>
-            </div>
-            <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div>
-                <dt className="text-[11px] text-[var(--muted)]">조회</dt>
-                <dd className="mt-0.5 text-sm font-semibold tabular-nums">
-                  {formatMetric(insight.views)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[11px] text-[var(--muted)]">좋아요</dt>
-                <dd className="mt-0.5 text-sm font-semibold tabular-nums">
-                  {formatMetric(insight.likes)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[11px] text-[var(--muted)]">댓글</dt>
-                <dd className="mt-0.5 text-sm font-semibold tabular-nums">
-                  {formatMetric(insight.comments)}
-                </dd>
-              </div>
-            </dl>
-            <button
-              type="button"
-              onClick={() => onOpenContent(insight.id)}
-              className="mt-3 w-full rounded-xl border border-[var(--line)] px-3 py-2 text-xs font-medium"
-            >
-              콘텐츠 대시보드에서 보기
-            </button>
-          </div>
-        ) : null}
-
+      {related.length > 1 ? (
         <div className="mt-5">
-          <h4 className="mb-2 text-sm font-semibold">콘텐츠 링크</h4>
-          {links.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">제출된 링크가 없습니다.</p>
-          ) : (
-            <ul className="space-y-2">
-              {links.map((link) => (
-                <li
-                  key={link.id}
-                  className="rounded-xl border border-[var(--line)] px-3 py-2.5 text-sm"
-                >
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="break-all text-[var(--accent)] underline"
+          <button
+            type="button"
+            onClick={() => setRelatedOpen((v) => !v)}
+            className="w-full rounded-[6px] border border-[var(--line)] px-4 py-3 text-left text-sm"
+          >
+            이 인플루언서 자사 배정 {related.length}건{" "}
+            {relatedOpen ? "▲" : "▼"}
+          </button>
+          {relatedOpen ? (
+            <ul className="mt-2 space-y-2">
+              {related.map((row) => (
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(row.id)}
+                    className={`w-full rounded-[6px] border px-4 py-3 text-left text-sm ${
+                      row.id === item.id
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                        : "border-[var(--line)]"
+                    }`}
                   >
-                    {link.url}
-                  </a>
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    {link.platform} ·{" "}
-                    {
-                      ALLOCATION_LINK_LABEL[
-                        link.status === "approved"
-                          ? "approved"
-                          : link.status === "submitted"
-                            ? "reviewing"
-                            : "rejected"
-                      ]
-                    }{" "}
-                    · {formatKst(link.submitted_at)}
-                  </p>
+                    {row.products?.name || "상품"} ·{" "}
+                    {formatVisitLabel(visitKey(row))} ·{" "}
+                    {allocationStatusDisplayLabel(row)}
+                  </button>
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
         </div>
-
-        {related.length > 1 ? (
-          <div className="mt-5">
-            <button
-              type="button"
-              onClick={() => setRelatedOpen((v) => !v)}
-              className="w-full rounded-xl border border-[var(--line)] px-4 py-3 text-left text-sm"
-            >
-              이 인플루언서 자사 배정 {related.length}건{" "}
-              {relatedOpen ? "▲" : "▼"}
-            </button>
-            {relatedOpen ? (
-              <ul className="mt-2 space-y-2">
-                {related.map((row) => (
-                  <li key={row.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(row.id)}
-                      className={`w-full rounded-xl border px-4 py-3 text-left text-sm ${
-                        row.id === item.id
-                          ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                          : "border-[var(--line)]"
-                      }`}
-                    >
-                      {row.products?.name || "상품"} ·{" "}
-                      {formatVisitLabel(visitKey(row))} ·{" "}
-                      {allocationStatusDisplayLabel(row)}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
+      ) : null}
     </div>
   );
 }

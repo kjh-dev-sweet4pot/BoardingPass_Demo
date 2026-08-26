@@ -67,6 +67,8 @@ export type Influencer = {
   profile_image_path: string | null;
   /** SNS 팔로워 수 (프로필 수집) */
   followers?: number | null;
+  /** 계정 국가 ISO */
+  region?: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

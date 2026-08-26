@@ -54,54 +54,53 @@ button {
   font: inherit;
 }
 
-/* ── OWM 운영 콘솔 / 관리자 (홈·Inf와 톤 통일) ── */
+/* ── OWM 운영 콘솔 / 회원사 / 관리자 (Figma Brown 팔레트) ── */
 .owm-theme {
-  --background: #f6efe6;
-  --foreground: #3d1f0a;
-  --surface: #fffdfb;
-  --surface-hover: #f0e6d8;
-  --line: #e8d5be;
-  --muted: #a07050;
-  --accent: #6b3b1f;
-  --accent-soft: #f5ede3;
-  --ink: #3d1f0a;
+  --background: #f1ece4;
+  --foreground: #2f231d;
+  --surface: #faf9f7;
+  --surface-hover: #f1ece4;
+  --line: #e0d7ca;
+  --muted: #83786f;
+  --accent: #56433a;
+  --accent-soft: #e0d7ca;
+  --ink: #2f231d;
   --danger: #9b2c2c;
   color: var(--foreground);
-  background:
-    radial-gradient(circle at 88% 0%, rgba(232, 199, 154, 0.35) 0%, transparent 42%),
-    linear-gradient(165deg, #faf6f0 0%, #f3ebe0 52%, #efe4d6 100%);
+  background: #f1ece4;
+  font-family: var(--font-sans-kr), var(--font-display), sans-serif;
 }
 
 .owm-theme input,
 .owm-theme select,
 .owm-theme textarea {
-  border-radius: 1rem;
+  border-radius: 6px;
 }
 
 .owm-theme .owm-panel {
-  border-radius: 1.25rem;
+  border-radius: 6px;
   overflow: hidden;
 }
 
 .owm-theme .owm-btn-primary {
-  border-radius: 1rem;
-  background: #6b3b1f;
+  border-radius: 6px;
+  background: #56433a;
 }
 
 .owm-theme .owm-btn-primary:hover {
-  background: #7d4726;
+  background: #2f231d;
   filter: none;
 }
 
 .owm-theme .owm-btn-secondary {
-  border-radius: 9999px;
-  border-color: #e8d5be;
-  background: #fffdfb;
-  color: #6b3b1f;
+  border-radius: 6px;
+  border-color: #e0d7ca;
+  background: #faf9f7;
+  color: #56433a;
 }
 
 .owm-theme .owm-btn-secondary:hover {
-  background: #f5ede3;
+  background: #f1ece4;
 }
 
 /* ── OWM 랜딩 페이지 (역할 선택) ── */

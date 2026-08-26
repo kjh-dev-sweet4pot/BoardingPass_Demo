@@ -10,7 +10,7 @@ export function EmptyState({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-[var(--line)] px-6 py-10 text-center ${
+      className={`rounded-[6px] border border-[var(--line)] px-6 py-10 text-center ${
         positive ? "bg-[var(--accent-soft)]/40" : "bg-[var(--surface)]"
       }`}
     >

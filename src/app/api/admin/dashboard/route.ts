@@ -4,7 +4,7 @@ import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-cl
 
 /**
  * GET /api/admin/dashboard?company_id=&from=&to=
- * 처리 대기 큐 5종 + 성과·예산 집계
+ * 발행완료 현황 + 처리 대기 큐 5종 + 성과·예산 집계
  * 운영자 이상만 접근 가능
  */
 export async function GET(request: NextRequest) {
@@ -43,11 +43,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  let publishedQuery = supabase
+    .from("creator_links")
+    .select("id, allocations!inner(company_id)", { count: "exact", head: true })
+    .eq("content_status", "발행완료");
+  if (companyId) publishedQuery = publishedQuery.eq("allocations.company_id", companyId);
+
   const [
     { count: reviewPending },
     { count: verifyFailed },
     { count: publishStale },
     { count: castingStale },
+    { count: publishedCount },
   ] = await Promise.all([
     supabase
       .from("creator_links")
@@ -71,6 +78,8 @@ export async function GET(request: NextRequest) {
       .select("*", { count: "exact", head: true })
       .eq("status", "Pending")
       .lt("created_at", sevenDaysAgo),
+
+    publishedQuery,
   ]);
 
   // ── 성과·예산 집계 ──────────────────────────────────────────────────────
@@ -142,6 +151,7 @@ export async function GET(request: NextRequest) {
       publishStale: publishStale ?? 0,
       castingStale: castingStale ?? 0,
     },
+    publishedCount: publishedCount ?? 0,
     performance: {
       posts: totalPosts,
       views: totalViews,

@@ -84,11 +84,13 @@ export function useInfLocale() {
   return useContext(InfLocaleContext) ?? FALLBACK_LOCALE;
 }
 
-/** 레이아웃 프로바이더가 빠져도 INF 화면이 깨지지 않게 감쌉니다. */
+/**
+ * 레이아웃의 InfLocaleProvider에 맡긴다.
+ * 컨텍스트 유무로 Provider를 조건 래핑하면 SSR/CSR DOM이 달라져 hydration mismatch가 난다.
+ * Provider가 없을 때는 useInfLocale()의 FALLBACK_LOCALE(ko)로 동작한다.
+ */
 export function InfLocaleEnsure({ children }: { children: ReactNode }) {
-  const ctx = useContext(InfLocaleContext);
-  if (ctx) return children;
-  return <InfLocaleProvider>{children}</InfLocaleProvider>;
+  return children;
 }
 
 export function InfLanguageToggle({
@@ -122,14 +124,14 @@ export function InfLanguageToggle({
           aria-haspopup="listbox"
           aria-label="Language"
           onClick={() => setOpen((v) => !v)}
-          className="rounded-full border border-[#E8D5BE] bg-white px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#A07050] transition hover:bg-[#F5EDE3]"
+          className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--muted)] transition hover:bg-[var(--accent-soft)]"
         >
           {INF_LOCALE_LABEL[locale]}
         </button>
         {open ? (
           <ul
             role="listbox"
-            className="absolute right-0 top-full z-20 mt-1 min-w-[5.5rem] overflow-hidden rounded-xl border border-[#E8D5BE] bg-white py-1 shadow-lg"
+            className="absolute right-0 top-full z-20 mt-1 min-w-[5.5rem] overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] py-1 shadow-lg"
           >
             {INF_LOCALES.map((code) => {
               const active = locale === code;
@@ -143,8 +145,8 @@ export function InfLanguageToggle({
                     }}
                     className={`block w-full px-3 py-1.5 text-left text-[11px] font-semibold ${
                       active
-                        ? "bg-[#F5EDE3] text-[#6B3B1F]"
-                        : "text-[#A07050] hover:bg-[#Faf6f1]"
+                        ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                        : "text-[var(--muted)] hover:bg-[var(--accent-soft)]"
                     }`}
                   >
                     {INF_LOCALE_LABEL[code]}
@@ -160,7 +162,7 @@ export function InfLanguageToggle({
 
   return (
     <div
-      className={`flex items-center gap-0.5 rounded-full border border-[#E8D5BE] bg-white/90 p-0.5 shadow-sm backdrop-blur-sm ${className}`}
+      className={`flex items-center gap-0.5 rounded-[6px] border border-[var(--line)] bg-[var(--surface)]/90 p-0.5 shadow-sm backdrop-blur-sm ${className}`}
       role="group"
       aria-label="Language"
     >
@@ -172,10 +174,10 @@ export function InfLanguageToggle({
             type="button"
             aria-pressed={active}
             onClick={() => setLocale(code)}
-            className={`rounded-full px-2.5 py-1.5 text-[11px] font-semibold tracking-wide transition ${
+            className={`rounded-[6px] px-2.5 py-1.5 text-[11px] font-semibold tracking-wide transition ${
               active
-                ? "bg-[#6B3B1F] text-white"
-                : "text-[#A07050] hover:bg-[#F5EDE3]"
+                ? "bg-[var(--accent)] text-white"
+                : "text-[var(--muted)] hover:bg-[var(--accent-soft)]"
             }`}
           >
             {INF_LOCALE_LABEL[code]}

@@ -133,16 +133,16 @@ export async function POST(
       handle: data.instagram_handle_normalized || data.instagram_handle,
       snsUrl: data.sns_url,
     });
-    if (!result?.path) {
+    if (!result || (!result.path && result.followers == null && !result.region)) {
       if (batchInfluencerId) {
         await updateBatchInfluencerProfileStatus(
           db.supabase,
           batchInfluencerId,
           "failed",
-          "프로필 이미지를 찾지 못했습니다.",
+          "프로필을 찾지 못했습니다.",
         );
       }
-      return NextResponse.json({ error: "프로필 이미지를 찾지 못했습니다." }, { status: 404 });
+      return NextResponse.json({ error: "프로필을 찾지 못했습니다." }, { status: 404 });
     }
     if (batchInfluencerId) {
       await updateBatchInfluencerProfileStatus(db.supabase, batchInfluencerId, "ok", null);

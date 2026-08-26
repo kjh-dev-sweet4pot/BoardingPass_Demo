@@ -205,7 +205,7 @@ function InfLinksClientInner({
 
   if (items.length === 0) {
     return (
-      <p className="mt-10 text-center text-sm text-[#999]">
+      <p className="mt-10 text-center text-sm text-[var(--muted)]">
         {t.noPickedUpProducts}
       </p>
     );
@@ -219,7 +219,7 @@ function InfLinksClientInner({
       ) : null}
       <header className="pt-2">
         <h1 className="text-xl font-bold text-[#1a1a2e]">{t.contentLinks}</h1>
-        <p className="mt-2 text-sm leading-relaxed text-[#8a6a4a]">
+        <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
           {t.linksHint}
         </p>
         <p className="mt-3 text-xs font-semibold tracking-wide text-[#C4956A]">
@@ -229,7 +229,7 @@ function InfLinksClientInner({
 
       {pending.length > 0 ? (
         <section className="space-y-4">
-          <h2 className="text-sm font-bold text-[#3D1F0A]">
+          <h2 className="text-sm font-bold text-[var(--ink)]">
             {t.linksNeedSection}
           </h2>
           {pending.map((group) => (
@@ -250,14 +250,14 @@ function InfLinksClientInner({
           ))}
         </section>
       ) : (
-        <p className="rounded-2xl bg-[#f3eee3] px-4 py-3 text-center text-sm font-semibold text-[#8a7a5c]">
+        <p className="rounded-[6px] bg-[var(--accent-soft)] px-4 py-3 text-center text-sm font-semibold text-[var(--muted)]">
           {t.linksAllDone}
         </p>
       )}
 
       {done.length > 0 ? (
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-[#999]">{t.linksDoneSection}</h2>
+          <h2 className="text-sm font-bold text-[var(--muted)]">{t.linksDoneSection}</h2>
           {done.map((group) => {
             const open = openDoneKey === group.key;
             const title = visitTitle(
@@ -272,7 +272,7 @@ function InfLinksClientInner({
             return (
               <article
                 key={group.key}
-                className="overflow-hidden rounded-3xl border border-[#eee] bg-[#fafafa]"
+                className="overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface-hover)]"
               >
                 <button
                   type="button"
@@ -284,10 +284,10 @@ function InfLinksClientInner({
                   }
                 >
                   <span>
-                    <span className="block text-sm font-semibold text-[#3D1F0A]">
+                    <span className="block text-sm font-semibold text-[var(--ink)]">
                       {title}
                     </span>
-                    <span className="mt-0.5 block text-xs text-[#999]">
+                    <span className="mt-0.5 block text-xs text-[var(--muted)]">
                       {productNames}
                     </span>
                   </span>
@@ -296,7 +296,7 @@ function InfLinksClientInner({
                   </span>
                 </button>
                 {open ? (
-                  <div className="space-y-3 border-t border-[#eee] px-4 pb-4 pt-3">
+                  <div className="space-y-3 border-t border-[var(--line)] px-4 pb-4 pt-3">
                     {group.items.map((item) => (
                       <ProductLinks
                         key={item.id}
@@ -350,7 +350,7 @@ function VisitCard({
   const title = visitTitle(group, locale, t.dateUndecided, t.storeFallback);
 
   return (
-    <article className="rounded-3xl border border-[#e8e8e8] bg-white p-5 shadow-sm">
+    <article className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
       <p className="text-lg font-bold text-[#1a1a2e]">{title}</p>
       <p className="mt-4 text-[11px] font-semibold tracking-wide text-[#C4956A]">
         {t.linksProductsReceived}
@@ -362,7 +362,7 @@ function VisitCard({
           return (
             <div
               key={item.id}
-              className="rounded-2xl border border-[#f0e6d8] bg-[#faf7f2] px-3.5 py-3"
+              className="rounded-[6px] border border-[var(--line)] bg-[var(--accent-soft)] px-3.5 py-3"
             >
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm font-bold text-[#1a1a2e]">
@@ -371,7 +371,7 @@ function VisitCard({
                 </p>
                 <span
                   className={`shrink-0 text-xs font-semibold ${
-                    missing ? "text-[#C4956A]" : "text-[#8a7a5c]"
+                    missing ? "text-[#C4956A]" : "text-[var(--muted)]"
                   }`}
                 >
                   {missing ? t.linkNotRegistered : t.linkRegisteredShort}
@@ -391,7 +391,7 @@ function VisitCard({
                 <div className="mt-2 space-y-2">
                   <div className="flex gap-2">
                     <input
-                      className="h-11 min-w-0 flex-1 rounded-2xl border border-[#e8e8e8] bg-white px-3 text-sm"
+                      className="h-11 min-w-0 flex-1 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
                       type="url"
                       placeholder={t.linkPlaceholder}
                       value={drafts[item.id] || ""}
@@ -409,7 +409,7 @@ function VisitCard({
                         previewingId === item.id || !(drafts[item.id] || "").trim()
                       }
                       onClick={() => onPreview(item.id)}
-                      className="rounded-2xl border border-[#d8c0ab] bg-white px-4 text-sm font-semibold text-[#6B3B1F] disabled:opacity-50"
+                      className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--accent)] disabled:opacity-50"
                     >
                       {previewingId === item.id ? t.linkPreviewLoading : t.linkPreview}
                     </button>
@@ -417,7 +417,7 @@ function VisitCard({
                       type="button"
                       disabled={savingId === item.id || !(drafts[item.id] || "").trim()}
                       onClick={() => onSubmit(item.id)}
-                      className="rounded-2xl bg-[#6B3B1F] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                      className="rounded-[6px] bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-50"
                     >
                       {t.linkSubmit}
                     </button>
@@ -455,7 +455,7 @@ function PreviewModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-xl"
+        className="w-full max-w-sm rounded-[6px] bg-[var(--surface)] p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -470,7 +470,7 @@ function PreviewModal({
         </div>
 
         {preview.unsupported ? (
-          <p className="text-sm text-[#8a7a5c]">{t.linkPreviewUnsupported}</p>
+          <p className="text-sm text-[var(--muted)]">{t.linkPreviewUnsupported}</p>
         ) : (
           <div className="space-y-3">
             {preview.thumbnailUrl ? (
@@ -478,15 +478,15 @@ function PreviewModal({
               <img
                 src={imgSrc(preview.thumbnailUrl, preview.platform)}
                 alt={preview.profileName || "thumbnail"}
-                className="aspect-[9/16] w-full rounded-2xl object-cover"
+                className="aspect-[9/16] w-full rounded-[6px] object-cover"
               />
             ) : (
-              <div className="flex aspect-[9/16] w-full items-center justify-center rounded-2xl bg-[#f3eee3] text-sm text-[#8a7a5c]">
+              <div className="flex aspect-[9/16] w-full items-center justify-center rounded-[6px] bg-[var(--accent-soft)] text-sm text-[var(--muted)]">
                 No Image
               </div>
             )}
             <div className="flex items-center gap-2 px-1">
-              <span className="rounded-full bg-[#f3eee3] px-2.5 py-1 text-[11px] font-semibold text-[#8a6a4a]">
+              <span className="rounded-[6px] bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)]">
                 {CREATOR_PLATFORM_LABEL[preview.platform]}
               </span>
               <p className="truncate text-sm font-bold text-[#1a1a2e]">
@@ -535,16 +535,16 @@ function LinkList({
   return (
     <ul className="space-y-2">
       {links.map((link) => (
-        <li key={link.id} className="rounded-2xl bg-white px-3 py-2.5">
+        <li key={link.id} className="rounded-[6px] bg-[var(--surface)] px-3 py-2.5">
           <a
             href={link.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="break-all text-sm text-[#6B3B1F] underline"
+            className="break-all text-sm text-[var(--accent)] underline"
           >
             {link.url}
           </a>
-          <div className="mt-1 flex items-center justify-between gap-2 text-xs text-[#999]">
+          <div className="mt-1 flex items-center justify-between gap-2 text-xs text-[var(--muted)]">
             <span>
               {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform]} ·{" "}
               {statusLabel(link.status, t)}
@@ -553,7 +553,7 @@ function LinkList({
             {link.status !== "approved" ? (
               <button
                 type="button"
-                className="font-semibold text-[#999]"
+                className="font-semibold text-[var(--muted)]"
                 onClick={() => onRemove(link.id)}
               >
                 {t.linkDelete}

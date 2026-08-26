@@ -141,7 +141,6 @@ export function AdminCompanyPanel({
         >
           <h2
             className="text-lg text-[var(--ink)]"
-            style={{ fontFamily: "var(--font-display), serif" }}
           >
             회원사 관리
           </h2>
@@ -162,7 +161,7 @@ export function AdminCompanyPanel({
               list.map((company) => (
               <li
                 key={company.id}
-                className="flex items-center justify-between gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-2 rounded-[6px] border border-[var(--line)] px-3 py-2 text-sm"
               >
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{company.name}</p>

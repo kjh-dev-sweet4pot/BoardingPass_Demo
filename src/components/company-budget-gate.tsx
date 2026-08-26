@@ -38,7 +38,7 @@ export function CompanyBudgetGate({
 
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center px-4 py-8">
-      <div className="w-full max-w-lg rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-8 shadow-sm">
+      <div className="w-full max-w-lg rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-8 shadow-sm">
         <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
           Onboarding
         </p>
@@ -53,7 +53,7 @@ export function CompanyBudgetGate({
           뒤 활성화됩니다.
         </p>
 
-        <dl className="mt-6 grid gap-3 rounded-2xl bg-[var(--accent-soft)]/60 px-4 py-4 sm:grid-cols-2">
+        <dl className="mt-6 grid gap-3 rounded-[6px] bg-[var(--accent-soft)]/60 px-4 py-4 sm:grid-cols-2">
           <div>
             <dt className="text-xs text-[var(--muted)]">확정 예산</dt>
             <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--accent)]">
@@ -84,7 +84,7 @@ export function CompanyBudgetGate({
         <button
           type="button"
           onClick={() => onUnlock("deposit")}
-          className="mt-6 w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold !text-white"
+          className="mt-6 w-full rounded-[6px] bg-[var(--accent)] px-4 py-3 text-sm font-semibold !text-white"
         >
           입금 확인 요청
         </button>

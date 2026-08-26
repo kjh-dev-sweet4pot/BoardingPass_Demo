@@ -157,7 +157,7 @@ function InfSubmitClientInner({
 
   if (items.length === 0) {
     return (
-      <p className="mt-10 text-center text-sm text-[#999]">{t.noPickedUpProducts}</p>
+      <p className="mt-10 text-center text-sm text-[var(--muted)]">{t.noPickedUpProducts}</p>
     );
   }
 
@@ -165,17 +165,17 @@ function InfSubmitClientInner({
     <div className="mx-auto w-full max-w-md space-y-6 pb-6">
       <header className="pt-2">
         <h1 className="text-xl font-bold text-[#1a1a2e]">{t.contentSubmitTab}</h1>
-        <p className="mt-2 text-sm leading-relaxed text-[#8a6a4a]">{t.submitFileHint}</p>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{t.submitFileHint}</p>
       </header>
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
       {selected ? (
-        <section className="rounded-3xl border border-[#e8e8e8] bg-white p-5 shadow-sm">
+        <section className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
           <p className="text-lg font-bold text-[#1a1a2e]">
             {selected.products?.name || t.productFallback}
           </p>
-          <p className="mt-1 text-xs text-[#999]">
+          <p className="mt-1 text-xs text-[var(--muted)]">
             {formatVisitDateLocalized(
               asYmd(selected.visit_date) || asYmd(selected.picked_up_at),
               locale,
@@ -186,22 +186,22 @@ function InfSubmitClientInner({
           {rejected ? (
             <div className="mt-4 space-y-2">
               <p className="text-xs font-semibold text-red-700">{t.contentRejected}</p>
-              <p className="rounded-xl bg-[#faf7f2] px-3 py-2 text-xs font-medium text-[#6B3B1F]">
+              <p className="rounded-[6px] bg-[var(--accent-soft)] px-3 py-2 text-xs font-medium text-[var(--accent)]">
                 {contentSummary(rejected, t.submitHistoryFile)}
               </p>
               {rejected.memo ? (
-                <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+                <p className="rounded-[6px] bg-red-50 px-3 py-2 text-xs text-red-800">
                   <span className="font-semibold">{t.submitRejectedReason}: </span>
                   {rejected.memo}
                 </p>
               ) : null}
             </div>
           ) : null}
-          <label className="mt-6 flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#d8c0ab] bg-[#faf7f2] px-4 py-6">
-            <span className="text-sm font-semibold text-[#6B3B1F]">
+          <label className="mt-6 flex min-h-[100px] cursor-pointer flex-col items-center justify-center rounded-[6px] border-2 border-dashed border-[var(--line)] bg-[var(--accent-soft)] px-4 py-6">
+            <span className="text-sm font-semibold text-[var(--accent)]">
               {pickedName || t.submitFilePick}
             </span>
-            <span className="mt-1 text-xs text-[#999]">{t.submitFileTypes}</span>
+            <span className="mt-1 text-xs text-[var(--muted)]">{t.submitFileTypes}</span>
             <input
               ref={fileRef}
               type="file"
@@ -210,9 +210,9 @@ function InfSubmitClientInner({
               onChange={(e) => setPickedName(e.target.files?.[0]?.name || null)}
             />
           </label>
-          <p className="mt-4 text-xs font-semibold text-[#8a6a4a]">{t.submitUrlLabel}</p>
+          <p className="mt-4 text-xs font-semibold text-[var(--muted)]">{t.submitUrlLabel}</p>
           <input
-            className="mt-2 h-14 w-full rounded-2xl border border-[#e8e8e8] px-4 text-base"
+            className="mt-2 h-14 w-full rounded-[6px] border border-[var(--line)] px-4 text-base"
             type="url"
             inputMode="url"
             placeholder={t.submitUrlPlaceholder}
@@ -223,13 +223,13 @@ function InfSubmitClientInner({
             type="button"
             disabled={uploadingId === selected.id}
             onClick={() => void submit(selected.id)}
-            className="mt-4 w-full rounded-2xl bg-[#6B3B1F] py-4 text-base font-semibold text-white disabled:opacity-50"
+            className="mt-4 w-full rounded-[6px] bg-[var(--accent)] py-4 text-base font-semibold text-white disabled:opacity-50"
           >
             {uploadingId === selected.id ? t.submitFileUploading : t.submitFileBtn}
           </button>
           <button
             type="button"
-            className="mt-3 w-full rounded-2xl py-3 text-sm font-semibold text-[#999]"
+            className="mt-3 w-full rounded-[6px] py-3 text-sm font-semibold text-[var(--muted)]"
             onClick={() => selectItem(null)}
           >
             {t.close}
@@ -237,24 +237,24 @@ function InfSubmitClientInner({
         </section>
       ) : pending.length > 0 ? (
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-[#3D1F0A]">{t.submitNeedSection}</h2>
+          <h2 className="text-sm font-bold text-[var(--ink)]">{t.submitNeedSection}</h2>
           {pending.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => selectItem(item.id)}
-              className="flex w-full flex-col rounded-2xl border border-[#f0e6d8] bg-[#faf7f2] px-4 py-4 text-left"
+              className="flex w-full flex-col rounded-[6px] border border-[var(--line)] bg-[var(--accent-soft)] px-4 py-4 text-left"
             >
               <span className="flex w-full items-center justify-between gap-2">
                 <span>
                   <span className="block text-sm font-bold text-[#1a1a2e]">
                     {item.products?.name || t.productFallback}
                   </span>
-                  <span className="mt-0.5 block text-xs text-[#999]">
+                  <span className="mt-0.5 block text-xs text-[var(--muted)]">
                     {item.stores?.name || t.storeFallback}
                   </span>
                 </span>
-                <span className="shrink-0 text-xs font-semibold text-[#6B3B1F]">
+                <span className="shrink-0 text-xs font-semibold text-[var(--accent)]">
                   {t.submitFileBtn}
                 </span>
               </span>
@@ -267,14 +267,14 @@ function InfSubmitClientInner({
           ))}
         </section>
       ) : history.length === 0 ? (
-        <p className="rounded-2xl bg-[#f3eee3] px-4 py-3 text-center text-sm font-semibold text-[#8a7a5c]">
+        <p className="rounded-[6px] bg-[var(--accent-soft)] px-4 py-3 text-center text-sm font-semibold text-[var(--muted)]">
           {t.submitAllDone}
         </p>
       ) : null}
 
       {history.length > 0 ? (
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-[#3D1F0A]">{t.submitDoneSection}</h2>
+          <h2 className="text-sm font-bold text-[var(--ink)]">{t.submitDoneSection}</h2>
           {history.map(({ link, allocation }) => {
             const href = contentHref(link);
             const summary = contentSummary(link, t.submitHistoryFile);
@@ -282,18 +282,18 @@ function InfSubmitClientInner({
             return (
               <div
                 key={link.id}
-                className="rounded-2xl border border-[#eee] bg-[#fafafa] px-4 py-3"
+                className="rounded-[6px] border border-[var(--line)] bg-[var(--surface-hover)] px-4 py-3"
               >
                 <p className="text-sm font-semibold text-[#1a1a2e]">
                   {allocation.products?.name || t.productFallback}
                 </p>
-                <p className="mt-0.5 text-xs text-[#999]">
+                <p className="mt-0.5 text-xs text-[var(--muted)]">
                   {allocation.stores?.name || t.storeFallback}
                   {submittedYmd
                     ? ` · ${formatVisitDateLocalized(submittedYmd, locale, t.dateUndecided)}`
                     : null}
                 </p>
-                <p className="mt-2 text-xs text-[#6B3B1F]">
+                <p className="mt-2 text-xs text-[var(--accent)]">
                   {href ? (
                     <a
                       href={href}
@@ -312,7 +312,7 @@ function InfSubmitClientInner({
                   {contentStatusLabel(link, t)}
                 </p>
                 {isRejected(link) && link.memo ? (
-                  <p className="mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-800">
+                  <p className="mt-2 rounded-[6px] bg-red-50 px-2 py-1.5 text-xs text-red-800">
                     <span className="font-semibold">{t.submitRejectedReason}: </span>
                     {link.memo}
                   </p>

@@ -10,7 +10,7 @@ import {
 } from "@/lib/types";
 
 const compactFieldClass =
-  "h-10 w-full rounded-xl border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--accent)]";
+  "h-10 w-full rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]";
 
 const STATUSES: AllocationStatus[] = [
   "pending",
@@ -111,7 +111,7 @@ export function AdminAllocationEditForm({
       className={
         compact
           ? "space-y-3"
-          : "space-y-3 rounded-2xl border border-[var(--line)] bg-white px-4 py-4"
+          : "space-y-3 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4"
       }
     >
       {!compact ? (
@@ -222,7 +222,7 @@ export function AdminAllocationEditForm({
       <button
         type="submit"
         disabled={saving || !dirty}
-        className="inline-flex h-10 items-center justify-center rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-40"
+        className="inline-flex h-10 items-center justify-center rounded-[6px] bg-[var(--accent)] px-4 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-40"
       >
         {saving ? "저장 중…" : "방문 정보 저장"}
       </button>

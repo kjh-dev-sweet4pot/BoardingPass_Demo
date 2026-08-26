@@ -100,7 +100,7 @@ export function CompanyContentDashboard({
         ) : null}
 
         {snapshot.posts.length === 0 ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-6 py-12 text-center">
+          <div className="flex min-h-0 flex-1 items-center justify-center rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-6 py-12 text-center">
             <div>
               <p className="font-medium text-[var(--ink)]">
                 아직 성과로 볼 콘텐츠가 없습니다
@@ -113,7 +113,7 @@ export function CompanyContentDashboard({
           </div>
         ) : (
           <>
-            <section className="min-h-0 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
+            <section className="min-h-0 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
               <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3">
                 <h2 className="text-sm font-semibold">상품별 성과</h2>
               </header>
@@ -172,7 +172,7 @@ export function CompanyContentDashboard({
               </table>
             </section>
 
-            <section className="min-h-0 flex-1 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
+            <section className="min-h-0 flex-1 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
               <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3">
                 <h2 className="text-sm font-semibold">최근 콘텐츠</h2>
               </header>
@@ -219,7 +219,7 @@ export function CompanyContentDashboard({
         )}
       </div>
 
-      <aside className="min-h-[50vh] min-w-0 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm lg:min-h-0">
+      <aside className="min-h-[50vh] min-w-0 overflow-y-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm lg:min-h-0">
         {selectedPost ? (
           <PostDetail
             post={selectedPost}
@@ -292,7 +292,7 @@ function Kpi({
   unit?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-4">
+    <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4">
       <p className="text-xs text-[var(--muted)]">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--accent)]">
         {value}
@@ -317,7 +317,7 @@ function BreakdownPanel({
 }) {
   const maxViews = rows[0]?.views || 1;
   return (
-    <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
+    <section className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
       <header className="border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3">
         <h2 className="text-sm font-semibold">{title}</h2>
       </header>
@@ -381,7 +381,7 @@ function PostDetail({
         {post.influencerName} · {post.influencerHandle}
       </p>
       <p className="mt-2 text-sm text-[var(--muted)]">{post.caption}</p>
-      <dl className="mt-5 grid grid-cols-3 gap-2 rounded-2xl bg-[var(--accent-soft)]/50 px-3 py-4 text-center">
+      <dl className="mt-5 grid grid-cols-3 gap-2 rounded-[6px] bg-[var(--accent-soft)]/50 px-3 py-4 text-center">
         <div>
           <dt className="text-[11px] text-[var(--muted)]">조회</dt>
           <dd className="mt-1 font-semibold tabular-nums">
@@ -410,14 +410,14 @@ function PostDetail({
           href={post.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex justify-center rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white"
+          className="inline-flex justify-center rounded-[6px] bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white"
         >
           콘텐츠 열기
         </a>
         <button
           type="button"
           onClick={onOpenAllocation}
-          className="rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm font-medium"
+          className="rounded-[6px] border border-[var(--line)] px-4 py-2.5 text-sm font-medium"
         >
           배정에서 보기
         </button>
@@ -448,7 +448,7 @@ function ProductDetail({
       <h3 className="mt-1 text-xl font-bold text-[var(--ink)]">
         {product.productName}
       </h3>
-      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-[var(--accent-soft)]/50 px-4 py-4">
+      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-[6px] bg-[var(--accent-soft)]/50 px-4 py-4">
         <div>
           <dt className="text-xs text-[var(--muted)]">조회수</dt>
           <dd className="mt-1 font-semibold tabular-nums">
@@ -473,7 +473,7 @@ function ProductDetail({
       <button
         type="button"
         onClick={onOpenAllocation}
-        className="mt-4 w-full rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm font-medium"
+        className="mt-4 w-full rounded-[6px] border border-[var(--line)] px-4 py-2.5 text-sm font-medium"
       >
         이 상품 배정 보기
       </button>
@@ -483,7 +483,7 @@ function ProductDetail({
             <button
               type="button"
               onClick={() => onSelectPost(post.id)}
-              className="w-full rounded-xl border border-[var(--line)] px-3 py-2.5 text-left text-sm"
+              className="w-full rounded-[6px] border border-[var(--line)] px-3 py-2.5 text-left text-sm"
             >
               <span className="block font-medium">{post.influencerName}</span>
               <span className="text-xs text-[var(--muted)]">
@@ -521,7 +521,7 @@ function InfluencerDetail({
         {influencer.name}
       </h3>
       <p className="mt-1 text-[var(--accent)]">{influencer.handle}</p>
-      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-[var(--accent-soft)]/50 px-4 py-4">
+      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-[6px] bg-[var(--accent-soft)]/50 px-4 py-4">
         <div>
           <dt className="text-xs text-[var(--muted)]">조회수</dt>
           <dd className="mt-1 font-semibold tabular-nums">
@@ -546,7 +546,7 @@ function InfluencerDetail({
       <button
         type="button"
         onClick={onOpenAllocation}
-        className="mt-4 w-full rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm font-medium"
+        className="mt-4 w-full rounded-[6px] border border-[var(--line)] px-4 py-2.5 text-sm font-medium"
       >
         이 인플루언서 배정 보기
       </button>
@@ -556,7 +556,7 @@ function InfluencerDetail({
             <button
               type="button"
               onClick={() => onSelectPost(post.id)}
-              className="w-full rounded-xl border border-[var(--line)] px-3 py-2.5 text-left text-sm"
+              className="w-full rounded-[6px] border border-[var(--line)] px-3 py-2.5 text-left text-sm"
             >
               <span className="block font-medium">{post.productName}</span>
               <span className="text-xs text-[var(--muted)]">
@@ -601,7 +601,7 @@ function InfluencerRank({
             <button
               type="button"
               onClick={() => onSelect(row.influencerId)}
-              className="flex w-full items-center gap-3 rounded-xl border border-[var(--line)] px-3 py-2.5 text-left"
+              className="flex w-full items-center gap-3 rounded-[6px] border border-[var(--line)] px-3 py-2.5 text-left"
             >
               <span className="w-5 text-xs font-semibold text-[var(--muted)]">
                 {idx + 1}

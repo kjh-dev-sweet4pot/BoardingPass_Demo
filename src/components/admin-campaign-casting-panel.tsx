@@ -377,7 +377,7 @@ export function AdminCampaignCastingPanel({
       <Notice error={error ?? undefined} message={message ?? undefined} />
 
       <div
-        className="inline-flex w-fit rounded-full border border-[var(--line)] bg-[var(--surface)] p-0.5"
+        className="inline-flex w-fit rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-0.5"
         role="tablist"
       >
         {(
@@ -392,7 +392,7 @@ export function AdminCampaignCastingPanel({
             role="tab"
             aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
-            className={`rounded-full px-4 py-1.5 text-sm ${
+            className={`rounded-[6px] px-4 py-1.5 text-sm ${
               tab === item.id
                 ? "bg-[var(--accent)] font-semibold text-[var(--surface)]"
                 : "text-[var(--muted)]"
@@ -414,7 +414,6 @@ export function AdminCampaignCastingPanel({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
               <h2
                 className="text-lg text-[var(--ink)]"
-                style={{ fontFamily: "var(--font-display), serif" }}
               >
                 캠페인 목록
               </h2>
@@ -700,7 +699,6 @@ export function AdminCampaignCastingPanel({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
               <h2
                 className="text-lg text-[var(--ink)]"
-                style={{ fontFamily: "var(--font-display), serif" }}
               >
                 섭외 목록
               </h2>
@@ -724,7 +722,7 @@ export function AdminCampaignCastingPanel({
                       key={f.id || "all"}
                       type="button"
                       onClick={() => setCastingFilter(f.id)}
-                      className={`rounded-full px-3 py-1 text-xs ${
+                      className={`rounded-[6px] px-3 py-1 text-xs ${
                         castingFilter === f.id
                           ? "bg-[var(--accent)] text-[var(--surface)]"
                           : "border border-[var(--line)] text-[var(--muted)]"
@@ -1062,7 +1060,7 @@ export function AdminCampaignCastingPanel({
                     {logs.map((log) => (
                       <li
                         key={log.id}
-                        className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
+                        className="rounded-[6px] border border-[var(--line)] px-3 py-2 text-sm"
                       >
                         <p className="text-xs text-[var(--muted)]">
                           {fmtDt(log.created_at)} · {log.proposer === "operator" ? "운영" : "회원사"}

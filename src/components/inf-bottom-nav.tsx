@@ -22,7 +22,7 @@ function InfBottomNavInner() {
   ];
 
   return (
-    <nav className="sticky bottom-0 z-20 border-t border-[#eee] bg-white/95 px-2 py-2 backdrop-blur">
+    <nav className="sticky bottom-0 z-20 border-t border-[var(--line)] bg-[var(--surface)]/95 px-2 py-2 backdrop-blur">
       <div className="mx-auto flex max-w-md gap-1">
         {items.map((item) => {
           const active =
@@ -33,8 +33,8 @@ function InfBottomNavInner() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 rounded-xl py-3 text-center text-xs font-semibold leading-tight sm:text-sm ${
-                active ? "bg-[#F5EDE3] text-[#6B3B1F]" : "text-[#999]"
+              className={`flex-1 rounded-[6px] py-3 text-center text-xs font-semibold leading-tight sm:text-sm ${
+                active ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--muted)]"
               }`}
             >
               {item.label}

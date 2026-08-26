@@ -2,7 +2,6 @@
 
 import {
   InfLanguageToggle,
-  InfLocaleEnsure,
   useInfLocale,
 } from "@/components/inf-locale-provider";
 
@@ -11,14 +10,6 @@ export function InfAppHeader({
 }: {
   showLanguage?: boolean;
 }) {
-  return (
-    <InfLocaleEnsure>
-      <InfAppHeaderInner showLanguage={showLanguage} />
-    </InfLocaleEnsure>
-  );
-}
-
-function InfAppHeaderInner({ showLanguage }: { showLanguage: boolean }) {
   const { t } = useInfLocale();
 
   return (
@@ -35,7 +26,7 @@ function InfAppHeaderInner({ showLanguage }: { showLanguage: boolean }) {
         <form action="/api/inf/clear" method="post">
           <button
             type="submit"
-            className="rounded-full px-3 py-1.5 text-xs font-medium text-[#A07050] transition hover:bg-[#F0E6D8] active:bg-[#E8D8C8]"
+            className="rounded-[6px] px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition hover:bg-[var(--accent-soft)] active:bg-[var(--line)]"
           >
             {t.logout}
           </button>

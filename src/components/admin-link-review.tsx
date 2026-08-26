@@ -57,7 +57,7 @@ function MetricsBadge({ link, onRefresh }: { link: ReviewRow; onRefresh: (id: st
     : null;
 
   return (
-    <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)] px-3 py-2">
+    <div className="mt-2 flex items-center justify-between gap-3 rounded-[6px] bg-[var(--surface)] px-3 py-2">
       <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--ink)]">
         <span title="조회수">👁 {fmt(link.views)}</span>
         <span title="좋아요">♥ {fmt(link.likes)}</span>
@@ -78,7 +78,7 @@ function MetricsBadge({ link, onRefresh }: { link: ReviewRow; onRefresh: (id: st
         type="button"
         disabled={refreshing}
         onClick={() => void handleRefresh()}
-        className="shrink-0 rounded-lg border border-[var(--line)] px-2.5 py-1 text-xs font-semibold text-[var(--accent)] disabled:opacity-50"
+        className="shrink-0 rounded-[6px] border border-[var(--line)] px-2.5 py-1 text-xs font-semibold text-[var(--accent)] disabled:opacity-50"
       >
         {refreshing ? "조회 중…" : "↻ 새로고침"}
       </button>
@@ -196,7 +196,6 @@ export function AdminLinkReview() {
       >
         <h2
           className="text-lg text-[var(--ink)]"
-          style={{ fontFamily: "var(--font-display), serif" }}
         >
           링크·콘텐츠 검수
           {submitted.length > 0 && (
@@ -213,15 +212,15 @@ export function AdminLinkReview() {
       {open ? (
         <div className="border-t border-[var(--line)] px-5 pb-5 pt-4">
           {/* 탭 */}
-          <div className="mb-3 flex gap-1 rounded-xl bg-[var(--line)] p-1">
+          <div className="mb-3 flex gap-1 rounded-[6px] bg-[var(--line)] p-1">
             {(["submitted", "approved"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setTab(t)}
-                className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
+                className={`flex-1 rounded-[6px] py-1.5 text-xs font-semibold transition ${
                   tab === t
-                    ? "bg-white text-[var(--accent)] shadow-sm"
+                    ? "bg-[var(--surface)] text-[var(--accent)] shadow-sm"
                     : "text-[var(--muted)]"
                 }`}
               >
@@ -255,7 +254,7 @@ export function AdminLinkReview() {
                 return (
                   <li
                     key={link.id}
-                    className="rounded-xl border border-[var(--line)] px-3 py-3 text-sm"
+                    className="rounded-[6px] border border-[var(--line)] px-3 py-3 text-sm"
                   >
                     <p className="font-semibold">
                       {alloc?.influencers?.name || "인플루언서"} ·{" "}
@@ -297,7 +296,7 @@ export function AdminLinkReview() {
                     {tab === "submitted" ? (
                       <>
                         <input
-                          className="mt-2 h-9 w-full rounded-lg border border-[var(--line)] px-2 text-xs"
+                          className="mt-2 h-9 w-full rounded-[6px] border border-[var(--line)] px-2 text-xs"
                           placeholder="반려 사유"
                           value={memoById[link.id] || ""}
                           onChange={(e) =>
@@ -310,14 +309,14 @@ export function AdminLinkReview() {
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"
-                            className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white"
+                            className="rounded-[6px] bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white"
                             onClick={() => void review(link.id, "approved")}
                           >
                             승인
                           </button>
                           <button
                             type="button"
-                            className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs"
+                            className="rounded-[6px] border border-[var(--line)] px-3 py-1.5 text-xs"
                             onClick={() => void review(link.id, "rejected")}
                           >
                             반려

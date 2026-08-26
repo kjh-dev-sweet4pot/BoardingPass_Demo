@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { type Store } from "@/lib/types";
 
-const inputClass = `${fieldClass} h-auto w-full rounded-2xl border-[#E8D5BE] px-5 py-4 text-sm text-[#3D1F0A] placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10`;
+const inputClass = `${fieldClass} h-auto w-full rounded-[6px] border-[#E8D5BE] px-5 py-4 text-sm text-[#3D1F0A] placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10`;
 
 export default async function PharLoginPage({
   searchParams,
@@ -104,7 +104,7 @@ export default async function PharLoginPage({
             required
           />
           <button
-            className={`${primaryBtnClass} h-auto w-full rounded-2xl bg-[#6B3B1F] py-4 text-sm font-semibold tracking-wide hover:bg-[#7D4726] disabled:opacity-50`}
+            className={`${primaryBtnClass} h-auto w-full rounded-[6px] bg-[#6B3B1F] py-4 text-sm font-semibold tracking-wide hover:bg-[#7D4726] disabled:opacity-50`}
             type="submit"
             disabled={storeList.length === 0}
           >

@@ -99,9 +99,13 @@ async function downloadImageBytes(imageUrl: string) {
 export async function scrapeProfileDetails(
   handle: string,
   snsUrl?: string | null,
-): Promise<{ imageUrl: string | null; followers: number | null }> {
+): Promise<{
+  imageUrl: string | null;
+  followers: number | null;
+  region: string | null;
+}> {
   const target = profileTarget(handle, snsUrl);
-  if (!target) return { imageUrl: null, followers: null };
+  if (!target) return { imageUrl: null, followers: null, region: null };
   if (target.platform === "tiktok") {
     return scrapeTikTokProfile(target.handle);
   }
@@ -114,7 +118,7 @@ export async function scrapeProfileImageUrl(handle: string, snsUrl?: string | nu
   return r.imageUrl;
 }
 
-/** Apify → Storage 아바타 + influencers.followers */
+/** Apify → Storage 아바타 + influencers.followers + influencers.region */
 export async function fetchAndStoreInfluencerProfile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
@@ -131,16 +135,23 @@ export async function fetchAndStoreInfluencerProfile(
   if (profile.followers != null) {
     patch.followers = profile.followers;
   }
+  if (profile.region) {
+    patch.region = profile.region;
+  }
 
   let path: string | null = null;
   if (profile.imageUrl) {
-    const { bytes, contentType } = await downloadImageBytes(profile.imageUrl);
-    path = influencerAvatarObjectPath(influencerId);
-    const { error: uploadErr } = await supabase.storage
-      .from(INFLUENCER_AVATARS_BUCKET)
-      .upload(path, bytes, { contentType, upsert: true });
-    if (uploadErr) throw new Error(uploadErr.message);
-    patch.profile_image_path = path;
+    try {
+      const { bytes, contentType } = await downloadImageBytes(profile.imageUrl);
+      path = influencerAvatarObjectPath(influencerId);
+      const { error: uploadErr } = await supabase.storage
+        .from(INFLUENCER_AVATARS_BUCKET)
+        .upload(path, bytes, { contentType, upsert: true });
+      if (uploadErr) throw new Error(uploadErr.message);
+      patch.profile_image_path = path;
+    } catch {
+      /* CDN 실패 시 followers/region 만 저장 */
+    }
   }
 
   if (Object.keys(patch).length <= 1) return null;
@@ -151,7 +162,7 @@ export async function fetchAndStoreInfluencerProfile(
     .eq("id", influencerId);
   if (updateErr) throw new Error(updateErr.message);
 
-  return { path, followers: profile.followers };
+  return { path, followers: profile.followers, region: profile.region };
 }
 
 /** 등록 직후 백그라운드 수집 — 실패해도 본 흐름은 유지 */
@@ -168,7 +179,10 @@ export function scheduleInfluencerProfileFetch(
   }
   void fetchAndStoreInfluencerProfile(supabase, influencerId, input)
     .then((result) => {
-      if (result && (result.path || result.followers != null)) {
+      if (
+        result &&
+        (result.path || result.followers != null || result.region)
+      ) {
         onComplete?.({ ok: true });
       } else {
         onComplete?.({ ok: false, error: "프로필·팔로워를 찾지 못했습니다." });

@@ -9,10 +9,10 @@ import {
 export type CreatorPhotoSize = "card" | "detail" | "avatar" | "thumb";
 
 function sizeClass(size: CreatorPhotoSize) {
-  if (size === "detail") return "h-28 w-28 rounded-2xl";
-  if (size === "avatar") return "h-[26px] w-[26px] shrink-0 rounded-full";
-  if (size === "thumb") return "h-11 w-11 shrink-0 rounded-xl";
-  return "aspect-square w-full rounded-xl";
+  if (size === "detail") return "h-28 w-28 rounded-[6px]";
+  if (size === "avatar") return "h-[26px] w-[26px] shrink-0 rounded-[6px]";
+  if (size === "thumb") return "h-11 w-11 shrink-0 rounded-[6px]";
+  return "aspect-square w-full rounded-[6px]";
 }
 
 /** 크리에이터 탭 카드와 동일한 SNS 사진 후보·fallback */
