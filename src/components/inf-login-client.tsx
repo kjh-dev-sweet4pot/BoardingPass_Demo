@@ -66,14 +66,20 @@ function WelcomeScreen({
       }`}
     >
       <div className="inf-check-wrap relative mb-6 flex h-20 w-20 items-center justify-center">
-        <div className="absolute inset-0 rounded-full bg-[#6B3B1F]/10" />
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+        <div className="absolute inset-0 rounded-full bg-[var(--accent)]/10" />
+        <svg
+          width="40"
+          height="40"
+          viewBox="0 0 40 40"
+          fill="none"
+          className="text-[var(--accent)]"
+        >
           <circle
             className="inf-check-ring"
             cx="20"
             cy="20"
             r="16"
-            stroke="#6B3B1F"
+            stroke="currentColor"
             strokeWidth="2"
             strokeOpacity=".45"
             fill="none"
@@ -81,7 +87,7 @@ function WelcomeScreen({
           <path
             className="inf-check-mark"
             d="M13 20l5.5 5.5 9.5-10"
-            stroke="#6B3B1F"
+            stroke="currentColor"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -94,7 +100,7 @@ function WelcomeScreen({
         <p className="text-[0.62rem] font-medium tracking-[0.28em] text-[#C4956A] uppercase">
           Welcome
         </p>
-        <h1 className="mt-3 text-[1.35rem] font-semibold tracking-wide text-[#3D1F0A]">
+        <h1 className="mt-3 text-[1.35rem] font-semibold tracking-wide text-[var(--ink)]">
           {t.welcomeName(name)}
         </h1>
         <p className="mt-2 text-sm tracking-wide text-[#B09070]">
@@ -254,11 +260,11 @@ function InfLoginClientInner({ initialError }: { initialError?: string }) {
 
   if (phase === "ready" && influencer) {
     return (
-      <div className="inf-content-enter flex min-h-screen flex-col bg-white">
+      <div className="inf-content-enter flex min-h-screen flex-col bg-[var(--surface)]">
         <InfAppHeader />
         <main className="flex flex-1 flex-col">
           {bootstrapError ? (
-            <p className="mx-6 mb-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-sm text-red-400">
+            <p className="mx-6 mb-3 rounded-[6px] border border-red-100 bg-red-50 px-4 py-3 text-center text-sm text-red-400">
               {bootstrapError}
             </p>
           ) : null}
@@ -274,7 +280,7 @@ function InfLoginClientInner({ initialError }: { initialError?: string }) {
 
   if (phase === "welcome" && influencer) {
     return (
-      <div className="relative flex min-h-screen flex-col bg-white">
+      <div className="relative flex min-h-screen flex-col bg-[var(--surface)]">
         <div className="absolute top-5 right-4 z-10">
           <InfLanguageToggle size="mini" />
         </div>
@@ -293,7 +299,7 @@ function InfLoginClientInner({ initialError }: { initialError?: string }) {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-white">
+    <div className="relative flex min-h-screen flex-col bg-[var(--surface)]">
       <div className="absolute top-5 right-4 z-10">
         <InfLanguageToggle size="full" />
       </div>
@@ -316,7 +322,7 @@ function InfLoginClientInner({ initialError }: { initialError?: string }) {
         <div className="inf-entry-reveal mb-10 h-px w-10 bg-[#C4956A]" />
 
         <div className="inf-entry-reveal mb-8 text-center">
-          <h1 className="text-[1.15rem] font-semibold tracking-wide text-[#3D1F0A]">
+          <h1 className="text-[1.15rem] font-semibold tracking-wide text-[var(--ink)]">
             {t.enterSnsId}
           </h1>
           <p className="mt-2 text-sm tracking-wide text-[#B09070]">
@@ -325,7 +331,7 @@ function InfLoginClientInner({ initialError }: { initialError?: string }) {
         </div>
 
         {error ? (
-          <div className="inf-entry-reveal mb-5 w-full max-w-[320px] rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-sm text-red-400">
+          <div className="inf-entry-reveal mb-5 w-full max-w-[320px] rounded-[6px] border border-red-100 bg-red-50 px-4 py-3 text-center text-sm text-red-400">
             {error}
           </div>
         ) : null}
@@ -342,12 +348,12 @@ function InfLoginClientInner({ initialError }: { initialError?: string }) {
             required
             autoComplete="off"
             disabled={pending}
-            className="w-full rounded-2xl border border-[#E8D5BE] bg-white px-5 py-4 text-sm text-[#3D1F0A] outline-none transition placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10 disabled:opacity-60"
+            className="w-full rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-5 py-4 text-sm text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10 disabled:opacity-60"
           />
           <button
             type="submit"
             disabled={pending}
-            className="w-full rounded-2xl bg-[#6B3B1F] py-4 text-sm font-semibold tracking-wide text-white transition hover:bg-[#7D4726] active:brightness-90 disabled:cursor-wait disabled:opacity-70"
+            className="w-full rounded-[6px] bg-[var(--accent)] py-4 text-sm font-semibold tracking-wide text-white transition hover:brightness-110 active:brightness-90 disabled:cursor-wait disabled:opacity-70"
           >
             {pending ? t.confirming : t.confirm}
           </button>

@@ -124,8 +124,8 @@ function LinkRegisterAction({
       onClick={onClick}
       className={
         done
-          ? `block rounded-2xl bg-[#f3eee3] py-3.5 text-center text-sm font-semibold text-[#8a7a5c] ${className || ""}`
-          : `block rounded-2xl bg-[#6B3B1F] py-3.5 text-center text-sm font-semibold !text-white ${className || ""}`
+          ? `block rounded-[6px] bg-[var(--accent-soft)] py-3.5 text-center text-sm font-semibold text-[var(--muted)] ${className || ""}`
+          : `block rounded-[6px] bg-[var(--accent)] py-3.5 text-center text-sm font-semibold !text-white ${className || ""}`
       }
     >
       {done ? doneLabel : label}
@@ -183,12 +183,12 @@ function AllocationCard({
         ? t.pickupAvailable
         : t.visitScheduled;
   const statusChipClass = isCancelled
-    ? "bg-[#ebe8e3] text-[#a39e96]"
+    ? "bg-[var(--accent-soft)] text-[#a39e96]"
     : done
-      ? "bg-[#ebe8e3] text-[#8a7a5c]"
+      ? "bg-[var(--accent-soft)] text-[var(--muted)]"
       : isTodayPickup
-        ? "bg-[#F5EDE3] text-[#6B3B1F]"
-        : "bg-[#e8e6e2] text-[#6b6862]";
+        ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+        : "bg-[var(--accent-soft)] text-[#6b6862]";
 
   const weekday = formatVisitWeekdayLocalized(visitYmd, locale);
 
@@ -196,20 +196,20 @@ function AllocationCard({
     <button
       type="button"
       onClick={() => onOpen(item)}
-      className={`relative w-full overflow-hidden rounded-3xl border text-left shadow-sm transition active:brightness-95 ${
+      className={`relative w-full overflow-hidden rounded-[6px] border text-left shadow-sm transition active:brightness-95 ${
         isTodayPickup
-          ? "border-[#e8e8e8] bg-white"
-          : "border-[#ddd9d3] bg-[#F6F5F3]"
+          ? "border-[var(--line)] bg-[var(--surface)]"
+          : "border-[var(--line)] bg-[var(--surface-hover)]"
       }`}
     >
       <div className="absolute right-4 top-4 flex items-center gap-1.5">
         {isTodayPickup ? (
-          <span className="rounded-full bg-[#6B3B1F] px-2 py-0.5 text-[10px] font-bold text-white">
+          <span className="rounded-[6px] bg-[var(--accent)] px-2 py-0.5 text-[10px] font-bold text-white">
             {t.today}
           </span>
         ) : null}
         <span
-          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusChipClass}`}
+          className={`rounded-[6px] px-2.5 py-1 text-[11px] font-semibold ${statusChipClass}`}
         >
           {statusLabel}
         </span>
@@ -226,7 +226,7 @@ function AllocationCard({
           </p>
           <p
             className={`mt-1 text-[1.55rem] font-bold leading-tight ${
-              isTodayPickup ? "text-[#1a1a2e]" : "text-[#5c5a56]"
+              isTodayPickup ? "text-[var(--ink)]" : "text-[#5c5a56]"
             }`}
           >
             {storeName}
@@ -234,7 +234,7 @@ function AllocationCard({
         </div>
 
         <div
-          className={`h-px ${isTodayPickup ? "bg-[#f2f2f2]" : "bg-[#e8e4de]"}`}
+          className={`h-px ${isTodayPickup ? "bg-[var(--line)]" : "bg-[var(--line)]"}`}
         />
 
         <dl className="grid grid-cols-2 gap-x-4 gap-y-4">
@@ -248,14 +248,14 @@ function AllocationCard({
             </dt>
             <dd
               className={`mt-1 text-base font-bold ${
-                isTodayPickup ? "text-[#6B3B1F]" : "text-[#6b6862]"
+                isTodayPickup ? "text-[var(--accent)]" : "text-[#6b6862]"
               }`}
             >
               {formatVisitDateLocalized(visitYmd, locale, t.dateUndecided)}
               {visitYmd && weekday ? (
                 <span
                   className={`ml-1 text-sm font-normal ${
-                    isTodayPickup ? "text-[#999]" : "text-[#a39e96]"
+                    isTodayPickup ? "text-[var(--muted)]" : "text-[#a39e96]"
                   }`}
                 >
                   ({weekday})
@@ -300,7 +300,7 @@ function AllocationCard({
         </dl>
 
         {!done && !isCancelled && (
-          <div className="rounded-2xl bg-[#F5EDE3] py-3.5 text-center text-sm font-semibold text-[#6B3B1F]">
+          <div className="rounded-[6px] bg-[var(--accent-soft)] py-3.5 text-center text-sm font-semibold text-[var(--accent)]">
             {t.openPickupInfo}
           </div>
         )}
@@ -583,14 +583,19 @@ function InfAllocationListInner({
         {fromWelcome ? null : (
           <div className={introPlayed ? undefined : "inf-check-wrap"}>
             <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center">
-              <div className="absolute inset-0 rounded-full bg-[#6B3B1F]/10" />
-              <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
-                <circle
+              <div className="absolute inset-0 rounded-full bg-[var(--accent)]/10" />
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 40 40"
+                fill="none"
+                className="text-[var(--accent)]"
+              >                <circle
                   className={introPlayed ? undefined : "inf-check-ring"}
                   cx="20"
                   cy="20"
                   r="16"
-                  stroke="#6B3B1F"
+                  stroke="currentColor"
                   strokeWidth="2"
                   strokeOpacity=".45"
                   fill="none"
@@ -598,7 +603,7 @@ function InfAllocationListInner({
                 <path
                   className={introPlayed ? undefined : "inf-check-mark"}
                   d="M13 20l5.5 5.5 9.5-10"
-                  stroke="#6B3B1F"
+                  stroke="currentColor"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -619,7 +624,7 @@ function InfAllocationListInner({
           }
         >
           <h1
-            className={`font-bold text-[#1a1a2e] ${
+            className={`font-bold text-[var(--ink)] ${
               fromWelcome ? "text-lg" : "text-xl"
             }`}
           >
@@ -628,11 +633,11 @@ function InfAllocationListInner({
               : t.helloName(influencer.name || displayName)}
           </h1>
           {todayActive.length > 0 ? (
-            <p className="mt-1.5 text-sm font-medium text-[#6B3B1F]">
+            <p className="mt-1.5 text-sm font-medium text-[var(--accent)]">
               {t.todayPickupCount(todayActive.length)}
             </p>
           ) : (
-            <p className="mt-1.5 text-sm text-[#999]">
+            <p className="mt-1.5 text-sm text-[var(--muted)]">
               {fromWelcome ? t.checkProductsBelow : t.verifiedDone}
             </p>
           )}
@@ -641,7 +646,7 @@ function InfAllocationListInner({
               href={formatSnsUrl(influencer.sns_url)!}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-1 inline-block text-xs text-[#6B3B1F] underline underline-offset-2"
+              className="mt-1 inline-block text-xs text-[var(--accent)] underline underline-offset-2"
             >
               {t.snsProfile}
             </a>
@@ -650,7 +655,7 @@ function InfAllocationListInner({
       </div>
 
       <div
-        className="mx-5 h-px bg-[#f0f0f0]"
+        className="mx-5 h-px bg-[var(--line)]"
         style={
           fromWelcome
             ? {
@@ -676,7 +681,7 @@ function InfAllocationListInner({
       >
         {allocations.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-20 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f5f5]">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--surface-hover)]">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <path
                   d="M3 9h18M3 9l2-4h14l2 4M3 9v10h18V9"
@@ -741,7 +746,7 @@ function InfAllocationListInner({
 function BottomNav() {
   const { t } = useInfLocale();
   return (
-    <nav className="border-t border-[#f0f0f0] bg-white px-6 pb-12 pt-5">
+    <nav className="border-t border-[var(--line)] bg-[var(--surface)] px-6 pb-12 pt-5">
       <div className="flex items-center justify-center">
         <form action="/api/inf/clear" method="post">
           <button type="submit" className="flex flex-col items-center gap-1">
@@ -880,24 +885,24 @@ function PickupSheetBody({
       <div className="inf-sheet-content flex h-full min-h-0 flex-1 flex-col gap-[clamp(0.5rem,1.6vh,1.25rem)] overflow-hidden">
         <div className="flex shrink-0 items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="[font-size:clamp(0.65rem,1.4vh,0.75rem)] font-medium tracking-widest text-[#6B3B1F] uppercase">
+            <p className="[font-size:clamp(0.65rem,1.4vh,0.75rem)] font-medium tracking-widest text-[var(--accent)] uppercase">
               {step === "confirm" ? "Confirm" : "Review"}
             </p>
-            <h3 className="mt-[clamp(0.15rem,0.6vh,0.35rem)] [font-size:clamp(1.05rem,2.8vh,1.25rem)] font-bold text-[#1a1a2e]">
+            <h3 className="mt-[clamp(0.15rem,0.6vh,0.35rem)] [font-size:clamp(1.05rem,2.8vh,1.25rem)] font-bold text-[var(--ink)]">
               {title}
             </h3>
-            <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(0.75rem,1.8vh,0.875rem)] text-[#999]">
+            <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(0.75rem,1.8vh,0.875rem)] text-[var(--muted)]">
               {step === "confirm" ? t.pickupConfirmHint : t.pickupReviewHint}
             </p>
           </div>
 
           {/* 약사님 안내 — Pickup info 오른쪽 */}
-          <div className="w-[min(42%,11.5rem)] shrink-0 rounded-2xl border border-[#6B3B1F]/25 bg-[#F5EDE3] px-2.5 py-[clamp(0.45rem,1.2vh,0.7rem)] text-center">
-            <p className="[font-size:clamp(0.7rem,1.7vh,0.8rem)] font-bold leading-snug tracking-wide text-[#6B3B1F]">
+          <div className="w-[min(42%,11.5rem)] shrink-0 rounded-[6px] border border-[var(--accent)]/25 bg-[var(--accent-soft)] px-2.5 py-[clamp(0.45rem,1.2vh,0.7rem)] text-center">
+            <p className="[font-size:clamp(0.7rem,1.7vh,0.8rem)] font-bold leading-snug tracking-wide text-[var(--accent)]">
               {t.showToPharmacist}
             </p>
             {locale !== "ko" ? (
-              <p className="mt-0.5 [font-size:clamp(0.6rem,1.3vh,0.68rem)] leading-snug text-[#8a6a4a]">
+              <p className="mt-0.5 [font-size:clamp(0.6rem,1.3vh,0.68rem)] leading-snug text-[var(--muted)]">
                 약사님께 보여주세요
               </p>
             ) : null}
@@ -905,13 +910,13 @@ function PickupSheetBody({
         </div>
 
         {/* 약사용 본문 — 공간 부족 시 이 박스만 줄어듦 (스크롤 없음) */}
-        <div className="flex min-h-0 flex-1 flex-col justify-evenly gap-[clamp(0.35rem,1.2vh,1rem)] overflow-hidden rounded-2xl bg-[#f9f9f9] px-5 py-[clamp(0.75rem,2vh,1.5rem)]">
+        <div className="flex min-h-0 flex-1 flex-col justify-evenly gap-[clamp(0.35rem,1.2vh,1rem)] overflow-hidden rounded-[6px] bg-[var(--surface-hover)] px-5 py-[clamp(0.75rem,2vh,1.5rem)]">
           <div className="flex min-h-0 flex-col justify-start gap-[clamp(0.35rem,1.1vh,0.75rem)] text-center">
             <div className="min-h-0 shrink-0">
               <p className="[font-size:clamp(0.8rem,1.8vh,0.9rem)] font-medium tracking-wide text-[#aaa]">
                 {bl(sheet.product, ko.product)}
               </p>
-              <p className="mt-[clamp(0.25rem,0.7vh,0.45rem)] [font-size:clamp(1.7rem,5vh,2.35rem)] font-bold leading-snug text-[#1a1a2e]">
+              <p className="mt-[clamp(0.25rem,0.7vh,0.45rem)] [font-size:clamp(1.7rem,5vh,2.35rem)] font-bold leading-snug text-[var(--ink)]">
                 {selected.products?.name || bl(sheet.product, ko.product)}
               </p>
               {selected.products?.description ? (
@@ -921,13 +926,13 @@ function PickupSheetBody({
               ) : null}
             </div>
 
-            <div className="mx-auto my-[clamp(0.05rem,0.3vh,0.2rem)] h-px w-10 shrink-0 bg-[#e8e8e8]" />
+            <div className="mx-auto my-[clamp(0.05rem,0.3vh,0.2rem)] h-px w-10 shrink-0 bg-[var(--line)]" />
 
             <div className="min-h-0 shrink">
               <p className="[font-size:clamp(0.72rem,1.5vh,0.8rem)] font-medium tracking-wide text-[#aaa]">
                 {bl(sheet.store, ko.store)}
               </p>
-              <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold text-[#1a1a2e]">
+              <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold text-[var(--ink)]">
                 {storeName}
               </p>
             </div>
@@ -937,25 +942,25 @@ function PickupSheetBody({
                 {bl(sheet.visitDate, ko.visitDate)}
               </p>
               {locale === "ko" ? (
-                <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold tabular-nums text-[#6B3B1F]">
+                <p className="mt-[clamp(0.15rem,0.5vh,0.35rem)] [font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold tabular-nums text-[var(--accent)]">
                   {visitDateKo}
                   {visitWeekKo ? (
-                    <span className="ml-1.5 [font-size:clamp(0.85rem,2.2vh,1.05rem)] font-semibold text-[#999]">
+                    <span className="ml-1.5 [font-size:clamp(0.85rem,2.2vh,1.05rem)] font-semibold text-[var(--muted)]">
                       ({visitWeekKo}요일)
                     </span>
                   ) : null}
                 </p>
               ) : (
                 <div className="mt-[clamp(0.15rem,0.5vh,0.35rem)] space-y-0.5">
-                  <p className="[font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold tabular-nums text-[#6B3B1F]">
+                  <p className="[font-size:clamp(1.15rem,3.1vh,1.4rem)] font-bold tabular-nums text-[var(--accent)]">
                     {visitDateLocal}
                     {visitWeekLocal ? (
-                      <span className="ml-1.5 [font-size:clamp(0.85rem,2.2vh,1.05rem)] font-semibold text-[#999]">
+                      <span className="ml-1.5 [font-size:clamp(0.85rem,2.2vh,1.05rem)] font-semibold text-[var(--muted)]">
                         ({visitWeekLocal})
                       </span>
                     ) : null}
                   </p>
-                  <p className="[font-size:clamp(0.85rem,2vh,1rem)] font-semibold tabular-nums text-[#8a6a4a]">
+                  <p className="[font-size:clamp(0.85rem,2vh,1rem)] font-semibold tabular-nums text-[var(--muted)]">
                     {visitDateKo}
                     {visitWeekKo ? ` (${visitWeekKo}요일)` : ""}
                   </p>
@@ -964,10 +969,10 @@ function PickupSheetBody({
             </div>
           </div>
 
-          <div className="shrink-0 space-y-[clamp(0.25rem,0.9vh,0.55rem)] border-t border-[#eee] pt-[clamp(0.5rem,1.4vh,1rem)] text-left">
+          <div className="shrink-0 space-y-[clamp(0.25rem,0.9vh,0.55rem)] border-t border-[var(--line)] pt-[clamp(0.5rem,1.4vh,1rem)] text-left">
             <InfoRow label={bl(sheet.influencer, ko.influencer)}>
               {influencer.name}{" "}
-              <span className="text-[#6B3B1F]">
+              <span className="text-[var(--accent)]">
                 {formatIgHandle(influencer)}
               </span>
             </InfoRow>
@@ -986,10 +991,10 @@ function PickupSheetBody({
               <span
                 className={
                   alreadyPickedUp
-                    ? "text-[#8a7a5c]"
+                    ? "text-[var(--muted)]"
                     : cancelled
                       ? "text-[#aaa]"
-                      : "text-[#6B3B1F]"
+                      : "text-[var(--accent)]"
                 }
               >
                 {bl(statusLocal, statusKo)}
@@ -1004,7 +1009,7 @@ function PickupSheetBody({
         </div>
 
         {error ? (
-          <p className="shrink-0 rounded-2xl bg-red-50 px-4 py-2 text-sm text-red-500">
+          <p className="shrink-0 rounded-[6px] bg-red-50 px-4 py-2 text-sm text-red-500">
             {error}
           </p>
         ) : null}
@@ -1012,7 +1017,7 @@ function PickupSheetBody({
         <div className="shrink-0 pb-1">
           {alreadyPickedUp ? (
             <div className="space-y-2">
-              <div className="rounded-2xl bg-[#f3eee3] px-4 py-[clamp(0.6rem,1.6vh,0.75rem)] text-center text-sm font-semibold text-[#8a7a5c]">
+              <div className="rounded-[6px] bg-[var(--accent-soft)] px-4 py-[clamp(0.6rem,1.6vh,0.75rem)] text-center text-sm font-semibold text-[var(--muted)]">
                 {t.pickupDoneBanner}
                 {selected.picked_up_at
                   ? ` · ${formatKst(selected.picked_up_at)}`
@@ -1034,14 +1039,14 @@ function PickupSheetBody({
               <button
                 type="button"
                 onClick={requestClose}
-                className="w-[28%] shrink-0 rounded-2xl border border-[#e8e8e8] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[#666]"
+                className="w-[28%] shrink-0 rounded-[6px] border border-[var(--line)] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[var(--muted)]"
               >
                 {t.close}
               </button>
               <button
                 type="button"
                 onClick={() => onStep("confirm")}
-                className="min-w-0 flex-1 rounded-2xl bg-[#6B3B1F] px-3 py-[clamp(0.65rem,1.8vh,0.9rem)] text-sm font-semibold text-white"
+                className="min-w-0 flex-1 rounded-[6px] bg-[var(--accent)] px-3 py-[clamp(0.65rem,1.8vh,0.9rem)] text-sm font-semibold text-white"
               >
                 <BilingualActionLabel
                   locale={locale}
@@ -1052,7 +1057,7 @@ function PickupSheetBody({
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="rounded-2xl bg-[#F5EDE3] px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] text-center text-sm leading-snug text-[#6B3B1F]">
+              <div className="rounded-[6px] bg-[var(--accent-soft)] px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] text-center text-sm leading-snug text-[var(--accent)]">
                 <BilingualActionLabel
                   locale={locale}
                   local={t.pickupIrreversible}
@@ -1068,7 +1073,7 @@ function PickupSheetBody({
                     onStep("review");
                     onClearError();
                   }}
-                  className="w-[28%] shrink-0 rounded-2xl border border-[#e8e8e8] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[#666] disabled:opacity-50"
+                  className="w-[28%] shrink-0 rounded-[6px] border border-[var(--line)] py-[clamp(0.75rem,2vh,1rem)] text-sm font-semibold text-[var(--muted)] disabled:opacity-50"
                 >
                   {t.previous}
                 </button>
@@ -1076,7 +1081,7 @@ function PickupSheetBody({
                   type="button"
                   disabled={confirming}
                   onClick={onConfirm}
-                  className="min-w-0 flex-1 rounded-2xl bg-[#6B3B1F] px-3 py-[clamp(0.65rem,1.8vh,0.9rem)] text-sm font-semibold text-white disabled:opacity-50"
+                  className="min-w-0 flex-1 rounded-[6px] bg-[var(--accent)] px-3 py-[clamp(0.65rem,1.8vh,0.9rem)] text-sm font-semibold text-white disabled:opacity-50"
                 >
                   <BilingualActionLabel
                     locale={locale}
@@ -1137,7 +1142,7 @@ function InfoRow({
       <dt className="w-[min(42%,9.5rem)] shrink-0 [font-size:clamp(0.72rem,1.55vh,0.82rem)] leading-snug text-[#aaa]">
         {label}
       </dt>
-      <dd className="min-w-0 flex-1 [font-size:clamp(0.95rem,2.1vh,1.1rem)] leading-snug text-[#1a1a2e]">
+      <dd className="min-w-0 flex-1 [font-size:clamp(0.95rem,2.1vh,1.1rem)] leading-snug text-[var(--ink)]">
         {children}
       </dd>
     </div>
@@ -1314,7 +1319,7 @@ function BottomSheet({
       onClick={requestClose}
     >
       <div
-        className={`inf-sheet-panel flex w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white px-5 pb-[max(1.75rem,calc(env(safe-area-inset-bottom)+0.75rem))] pt-3 shadow-2xl${
+        className={`inf-sheet-panel flex w-full max-w-lg flex-col overflow-hidden rounded-t-[6px] bg-[var(--surface)] px-5 pb-[max(1.75rem,calc(env(safe-area-inset-bottom)+0.75rem))] pt-3 shadow-2xl${
           settled ? " is-settled" : ""
         }${closing && !swipeClosing ? " is-closing" : ""}${
           dragging ? " is-dragging" : ""
@@ -1332,7 +1337,7 @@ function BottomSheet({
           className="mx-auto mb-2 flex h-6 w-full shrink-0 cursor-grab items-start justify-center active:cursor-grabbing"
           aria-hidden
         >
-          <div className="mt-1 h-1 w-12 rounded-full bg-[#e8e8e8]" />
+          <div className="mt-1 h-1 w-12 rounded-full bg-[var(--line)]" />
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <SheetCloseContext.Provider value={requestClose}>

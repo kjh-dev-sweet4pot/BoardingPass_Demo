@@ -20,7 +20,7 @@ export default async function InfPage({
 
   if (!configured) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--surface)] px-6">
         <InfServerMessage kind="serverConfigError" />
       </div>
     );
@@ -76,7 +76,7 @@ export default async function InfPage({
   const allocations = (rows as unknown as AllocationWithRelations[]) || [];
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen flex-col bg-[var(--surface)]">
       <InfAppHeader />
       <main className="flex flex-1 flex-col">
         <InfAllocationList

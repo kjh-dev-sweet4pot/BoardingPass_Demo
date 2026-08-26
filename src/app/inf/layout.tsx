@@ -17,7 +17,9 @@ export default function InfLayout({ children }: { children: ReactNode }) {
         type="image/webp"
         fetchPriority="high"
       />
-      <InfLocaleProvider>{children}</InfLocaleProvider>
+      <div className="owm-theme min-h-screen">
+        <InfLocaleProvider>{children}</InfLocaleProvider>
+      </div>
     </>
   );
 }

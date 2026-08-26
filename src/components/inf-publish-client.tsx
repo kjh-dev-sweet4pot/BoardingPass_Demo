@@ -112,7 +112,7 @@ function InfPublishClientInner({
 
   if (items.length === 0) {
     return (
-      <p className="mt-10 text-center text-sm text-[#999]">{t.noPickedUpProducts}</p>
+      <p className="mt-10 text-center text-sm text-[var(--muted)]">{t.noPickedUpProducts}</p>
     );
   }
 
@@ -120,17 +120,17 @@ function InfPublishClientInner({
     <div className="mx-auto w-full max-w-md space-y-6 pb-6">
       <header className="pt-2">
         <h1 className="text-xl font-bold text-[#1a1a2e]">{t.contentPublishTab}</h1>
-        <p className="mt-2 text-sm leading-relaxed text-[#8a6a4a]">{t.publishUrlHint}</p>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{t.publishUrlHint}</p>
       </header>
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
       {selected && selectedLink ? (
-        <section className="rounded-3xl border border-[#e8e8e8] bg-white p-5 shadow-sm">
+        <section className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
           <p className="text-lg font-bold text-[#1a1a2e]">
             {selected.products?.name || t.productFallback}
           </p>
-          <p className="mt-1 text-xs text-[#999]">
+          <p className="mt-1 text-xs text-[var(--muted)]">
             {formatVisitDateLocalized(
               asYmd(selected.visit_date) || asYmd(selected.picked_up_at),
               locale,
@@ -138,7 +138,7 @@ function InfPublishClientInner({
             )}
           </p>
           <input
-            className="mt-6 h-14 w-full rounded-2xl border border-[#e8e8e8] px-4 text-base"
+            className="mt-6 h-14 w-full rounded-[6px] border border-[var(--line)] px-4 text-base"
             type="url"
             placeholder={t.linkPlaceholder}
             value={drafts[selected.id] || ""}
@@ -150,13 +150,13 @@ function InfPublishClientInner({
             type="button"
             disabled={savingId === selected.id || !(drafts[selected.id] || "").trim()}
             onClick={() => void publish(selected.id, selectedLink.id)}
-            className="mt-4 w-full rounded-2xl bg-[#6B3B1F] py-4 text-base font-semibold text-white disabled:opacity-50"
+            className="mt-4 w-full rounded-[6px] bg-[var(--accent)] py-4 text-base font-semibold text-white disabled:opacity-50"
           >
             {savingId === selected.id ? t.publishUrlSaving : t.publishUrlSubmit}
           </button>
           <button
             type="button"
-            className="mt-3 w-full rounded-2xl py-3 text-sm font-semibold text-[#999]"
+            className="mt-3 w-full rounded-[6px] py-3 text-sm font-semibold text-[var(--muted)]"
             onClick={() => setSelectedId(null)}
           >
             {t.close}
@@ -164,38 +164,38 @@ function InfPublishClientInner({
         </section>
       ) : pending.length > 0 ? (
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-[#3D1F0A]">{t.publishNeedSection}</h2>
+          <h2 className="text-sm font-bold text-[var(--ink)]">{t.publishNeedSection}</h2>
           {pending.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setSelectedId(item.id)}
-              className="flex w-full items-center justify-between rounded-2xl border border-[#f0e6d8] bg-[#faf7f2] px-4 py-4 text-left"
+              className="flex w-full items-center justify-between rounded-[6px] border border-[var(--line)] bg-[var(--accent-soft)] px-4 py-4 text-left"
             >
               <span className="text-sm font-bold text-[#1a1a2e]">
                 {item.products?.name || t.productFallback}
               </span>
-              <span className="text-xs font-semibold text-[#6B3B1F]">
+              <span className="text-xs font-semibold text-[var(--accent)]">
                 {t.publishUrlSubmit}
               </span>
             </button>
           ))}
         </section>
       ) : (
-        <p className="rounded-2xl bg-[#f3eee3] px-4 py-3 text-center text-sm font-semibold text-[#8a7a5c]">
+        <p className="rounded-[6px] bg-[var(--accent-soft)] px-4 py-3 text-center text-sm font-semibold text-[var(--muted)]">
           {t.publishAllDone}
         </p>
       )}
 
       {done.length > 0 ? (
         <section className="space-y-3">
-          <h2 className="text-sm font-bold text-[#999]">{t.publishDoneSection}</h2>
+          <h2 className="text-sm font-bold text-[var(--muted)]">{t.publishDoneSection}</h2>
           {done.map((item) => {
             const link = activeLink(item);
             return (
               <div
                 key={item.id}
-                className="rounded-2xl border border-[#eee] bg-[#fafafa] px-4 py-3"
+                className="rounded-[6px] border border-[var(--line)] bg-[var(--surface-hover)] px-4 py-3"
               >
                 <p className="text-sm font-semibold text-[#1a1a2e]">
                   {item.products?.name || t.productFallback}
@@ -205,13 +205,13 @@ function InfPublishClientInner({
                     href={link.publish_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 block break-all text-xs text-[#6B3B1F] underline"
+                    className="mt-1 block break-all text-xs text-[var(--accent)] underline"
                   >
                     {link.publish_url}
                   </a>
                 ) : null}
                 {link?.platform && link.platform !== "etc" ? (
-                  <p className="mt-1 text-xs text-[#999]">
+                  <p className="mt-1 text-xs text-[var(--muted)]">
                     {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform]}
                   </p>
                 ) : null}

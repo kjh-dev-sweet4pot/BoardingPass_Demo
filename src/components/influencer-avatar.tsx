@@ -3,8 +3,8 @@
 import { useState } from "react";
 
 function sizeClass(size: "avatar" | "thumb" | "md") {
-  if (size === "thumb") return "h-11 w-11 shrink-0 rounded-xl";
-  if (size === "md") return "h-14 w-14 shrink-0 rounded-xl";
+  if (size === "thumb") return "h-11 w-11 shrink-0 rounded-[6px]";
+  if (size === "md") return "h-14 w-14 shrink-0 rounded-[6px]";
   return "h-[26px] w-[26px] shrink-0 rounded-full";
 }
 
