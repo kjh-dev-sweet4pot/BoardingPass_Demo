@@ -2,7 +2,6 @@
 
 import {
   InfLanguageToggle,
-  InfLocaleEnsure,
   useInfLocale,
 } from "@/components/inf-locale-provider";
 
@@ -11,14 +10,6 @@ export function InfAppHeader({
 }: {
   showLanguage?: boolean;
 }) {
-  return (
-    <InfLocaleEnsure>
-      <InfAppHeaderInner showLanguage={showLanguage} />
-    </InfLocaleEnsure>
-  );
-}
-
-function InfAppHeaderInner({ showLanguage }: { showLanguage: boolean }) {
   const { t } = useInfLocale();
 
   return (

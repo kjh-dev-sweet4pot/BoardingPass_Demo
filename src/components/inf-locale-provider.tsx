@@ -84,11 +84,13 @@ export function useInfLocale() {
   return useContext(InfLocaleContext) ?? FALLBACK_LOCALE;
 }
 
-/** 레이아웃 프로바이더가 빠져도 INF 화면이 깨지지 않게 감쌉니다. */
+/**
+ * 레이아웃의 InfLocaleProvider에 맡긴다.
+ * 컨텍스트 유무로 Provider를 조건 래핑하면 SSR/CSR DOM이 달라져 hydration mismatch가 난다.
+ * Provider가 없을 때는 useInfLocale()의 FALLBACK_LOCALE(ko)로 동작한다.
+ */
 export function InfLocaleEnsure({ children }: { children: ReactNode }) {
-  const ctx = useContext(InfLocaleContext);
-  if (ctx) return children;
-  return <InfLocaleProvider>{children}</InfLocaleProvider>;
+  return children;
 }
 
 export function InfLanguageToggle({
