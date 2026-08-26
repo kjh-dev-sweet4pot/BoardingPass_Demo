@@ -7,6 +7,7 @@ type InfRow = {
   instagram_handle_normalized?: string | null;
   sns_url?: string | null;
   followers?: number | null;
+  region?: string | null;
 };
 
 function bareHandle(raw: string) {
@@ -47,6 +48,7 @@ export function poolCreatorFromInfluencer(
     name: (inf.name || "").trim() || handle,
     handle: handle ? `@${handle}` : "@",
     market: marketDefault(),
+    region: inf.region ?? null,
     channel,
     profileUrl: (inf.sns_url || "").trim() || null,
     priceKrw: 0,

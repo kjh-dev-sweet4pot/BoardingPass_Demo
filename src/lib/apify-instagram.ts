@@ -1,9 +1,10 @@
 import { apifyErrorMessage } from "@/lib/apify-errors";
+import { regionFromCountryLabel } from "@/lib/region-display";
 
 /** 게시물 지표: patient_discovery (저장·공유·리포스트 포함) */
 const POST_ACTOR_ID = "oi5NGnwthRXoqEux1"; // patient_discovery/instagram-reel-analytics-by-url
-/** 프로필 아바타: 공식 Instagram Scraper */
-const PROFILE_ACTOR_ID = "shu8hvrXbJbY3Eb9W";
+/** 프로필 + about.country(계정 국가): data-slayer cookieless */
+const PROFILE_COUNTRY_ACTOR_ID = "data-slayer~instagram-user-info-scraper-cookieless";
 const APIFY_BASE = "https://api.apify.com/v2";
 
 export interface InstagramScraperResult {
@@ -253,46 +254,67 @@ export async function scrapeInstagramPosts(
   return results;
 }
 
-/** 프로필 URL → 아바타 URL + 팔로워 */
+/** 프로필 URL·핸들 → 아바타·팔로워·region(about.country) */
 export async function scrapeInstagramProfile(
   profileUrlOrHandle: string,
   memoryMbytes = 1024,
-): Promise<{ imageUrl: string | null; followers: number | null }> {
+): Promise<{
+  imageUrl: string | null;
+  followers: number | null;
+  region: string | null;
+}> {
   const token = getApifyToken();
   const profileUrl = profileUrlOrHandle.includes("instagram.com")
     ? profileUrlOrHandle
     : instagramProfileUrlFromHandle(profileUrlOrHandle);
+  const handle =
+    instagramHandleFromUrl(profileUrl) ||
+    bareHandleFromInput(profileUrlOrHandle);
+  if (!handle) {
+    throw new Error(`유효한 Instagram 핸들이 아닙니다: "${profileUrlOrHandle}"`);
+  }
 
   const res = await fetch(
-    `${APIFY_BASE}/acts/${PROFILE_ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
+    `${APIFY_BASE}/acts/${PROFILE_COUNTRY_ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        resultsType: "details",
-        directUrls: [profileUrl],
-        resultsLimit: 1,
-        addParentData: false,
-      }),
+      body: JSON.stringify({ usernames: [handle] }),
     },
   );
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(await apifyErrorMessage(res.status, text));
   }
-  const items = (await res.json()) as Array<
-    InstagramScraperResult & { followersCount?: number; followers?: number }
-  >;
+  const items = (await res.json()) as Array<{
+    error?: string;
+    username?: string;
+    follower_count?: number;
+    profile_pic_url_hd?: string;
+    profile_pic_url?: string;
+    hd_profile_pic_url_info?: { url?: string };
+    about?: { country?: string | null };
+  }>;
   const item = items[0];
-  if (!item) return { imageUrl: null, followers: null };
-  const followers =
-    numOrNull(item.followersCount) ??
-    numOrNull(item.followers) ??
+  if (!item) return { imageUrl: null, followers: null, region: null };
+  if (item.error) {
+    throw new Error(`Instagram 프로필 수집 실패 (@${handle}): ${item.error}`);
+  }
+  const followers = numOrNull(item.follower_count);
+  const imageUrl =
+    item.profile_pic_url_hd ||
+    item.hd_profile_pic_url_info?.url ||
+    item.profile_pic_url ||
     null;
   return {
-    imageUrl: item.profilePicUrlHD || item.profilePicUrl || null,
+    imageUrl,
     followers,
+    region: regionFromCountryLabel(item.about?.country),
   };
+}
+
+function bareHandleFromInput(raw: string) {
+  return raw.replace(/^@+/, "").trim().split(/[/?#]/)[0] || "";
 }
 
 export function findInstagramResultForUrl(

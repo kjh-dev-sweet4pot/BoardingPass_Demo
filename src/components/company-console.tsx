@@ -29,6 +29,7 @@ import {
 } from "@/lib/creator-link";
 import { todayYmdKst } from "@/lib/inf-visit";
 import { VISIT_CONTENT_GUIDE_URL } from "@/lib/creator-pool-mock";
+import { regionBadgeText } from "@/lib/region-display";
 import {
   allocationStatusDisplayLabel,
   formatMd,
@@ -840,6 +841,7 @@ function CompanyInfPanel({
   const sns = snsUrl(item.influencers?.sns_url);
   const links = (item.creator_links || []) as CreatorLink[];
   const linkSum = summarizeAllocationLinks(links);
+  const countryBadge = regionBadgeText(item.influencers?.region);
 
   return (
     <div>
@@ -853,6 +855,11 @@ function CompanyInfPanel({
           </h3>
           <p className="mt-1 text-[var(--accent)]">{handle}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
+            {countryBadge ? (
+              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+                {countryBadge}
+              </span>
+            ) : null}
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusChipClass(item)}`}
             >

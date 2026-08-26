@@ -357,27 +357,23 @@ export function AdminImportPanel({
             </span>
           ) : null}
           {status !== "skipped" ? (
-            <>
-              <button
-                type="button"
-                className={`${secondaryBtnClass} !px-2.5 !py-1 text-xs`}
-                disabled={busy}
-                onClick={() => void refreshProfile(item, false)}
-              >
-                {busy ? "조회 중…" : "다시 조회"}
-              </button>
-              {status !== "ok" || imageMissing ? (
-                <button
-                  type="button"
-                  className={`${secondaryBtnClass} !px-2.5 !py-1 text-xs`}
-                  disabled={busy}
-                  onClick={() => void refreshProfile(item, true)}
-                >
-                  {busy ? "수집 중…" : "Apify 재수집"}
-                </button>
-              ) : null}
-            </>
+            <button
+              type="button"
+              className={`${secondaryBtnClass} !px-2.5 !py-1 text-xs`}
+              disabled={busy}
+              onClick={() => void refreshProfile(item, false)}
+            >
+              {busy ? "조회 중…" : "다시 조회"}
+            </button>
           ) : null}
+          <button
+            type="button"
+            className={`${secondaryBtnClass} !px-2.5 !py-1 text-xs`}
+            disabled={busy}
+            onClick={() => void refreshProfile(item, true)}
+          >
+            {busy ? "수집 중…" : "Apify 재수집"}
+          </button>
         </div>
       </li>
     );

@@ -25,6 +25,7 @@ export type PoolCreator = {
   name: string;
   handle: string;
   market: CreatorMarket;
+  region?: string | null;
   channel: CreatorChannel;
   profileUrl: string | null;
   /** 집행 단가 (원) — 팔로워 구간 추정 */

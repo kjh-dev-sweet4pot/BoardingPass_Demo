@@ -10,7 +10,6 @@ import {
   formatMetric,
   getCreatorBrief,
   isLiveInfluencerId,
-  MARKET_LABEL,
   OVERLAP_LABEL,
   POOL_PAGE,
   POST_PLATFORM_LABEL,
@@ -25,6 +24,7 @@ const contentGuideLinkClass =
   "inline-flex items-center gap-1.5 rounded-[6px] border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-2 text-xs font-bold text-[var(--accent)] shadow-sm transition hover:bg-[var(--accent)] hover:!text-white";
 import { polishDemoMetrics } from "@/lib/demo-metrics";
 import { isDemoCompany } from "@/lib/company";
+import { regionBadgeText } from "@/lib/region-display";
 
 type PickMap = Record<string, "selected" | "excluded">;
 
@@ -605,6 +605,7 @@ function CreatorCard({
   onExclude: () => void;
   onReplace: () => void;
 }) {
+  const countryBadge = regionBadgeText(row.region);
   return (
     <article
       className={`flex cursor-pointer flex-col overflow-hidden rounded-[6px] border bg-[var(--surface)] transition ${
@@ -636,8 +637,10 @@ function CreatorCard({
             담김
           </span>
         ) : null}
-        <span className="absolute top-2 right-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] shadow-sm">
-          {TIER_LABEL[row.tier]}
+        <span className="absolute top-2 right-2 max-w-[calc(100%-2.5rem)] truncate rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] shadow-sm">
+          {countryBadge
+            ? `${TIER_LABEL[row.tier]} · ${countryBadge}`
+            : TIER_LABEL[row.tier]}
         </span>
       </div>
 
@@ -761,6 +764,7 @@ function CreatorDetail({
   onReplace: () => void;
 }) {
   const brief = getCreatorBrief(creator);
+  const countryBadge = regionBadgeText(creator.region);
   const metrics = isLiveInfluencerId(creator.id)
     ? {
         views: creator.metrics.views ?? 0,
@@ -789,9 +793,11 @@ function CreatorDetail({
             </h3>
             <p className="mt-1 text-[var(--accent)]">{creator.handle}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
-                {MARKET_LABEL[creator.market]}
-              </span>
+              {countryBadge ? (
+                <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
+                  {countryBadge}
+                </span>
+              ) : null}
               <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
                 {CHANNEL_LABEL[creator.channel]}
               </span>

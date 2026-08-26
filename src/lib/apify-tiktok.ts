@@ -1,15 +1,16 @@
 /**
- * Apify TikTok Scraper (clockworks/tiktok-scraper, actor ID: GdWCkxBtKWOsKjdch)
- *
- * Input:  { postURLs: string[] }
- * Output: TikTokPost[]  (see type below)
- *
- * Docs: https://apify.com/clockworks/tiktok-scraper
+ * TikTok via Apify
+ * - posts/metrics: clockworks/tiktok-scraper (GdWCkxBtKWOsKjdch)
+ * - profile+region: toolzerhub/tiktok-profile-scraper
  */
 
 import { apifyErrorMessage } from "@/lib/apify-errors";
+import { normalizeRegionCode } from "@/lib/region-display";
 
+/** 게시물·지표: clockworks (region 미제공) */
 const ACTOR_ID = "GdWCkxBtKWOsKjdch";
+/** 프로필·region: toolzerhub */
+const PROFILE_ACTOR_ID = "toolzerhub~tiktok-profile-scraper";
 const APIFY_BASE = "https://api.apify.com/v2";
 
 export interface TikTokScraperResult {
@@ -120,11 +121,15 @@ export async function scrapeTikTokPosts(
   return items;
 }
 
-/** @handle·username·프로필 URL → 아바타 URL + 팔로워 */
+/** @handle·username·프로필 URL → 아바타·팔로워·region */
 export async function scrapeTikTokProfile(
   handle: string,
   memoryMbytes = 1024,
-): Promise<{ imageUrl: string | null; followers: number | null }> {
+): Promise<{
+  imageUrl: string | null;
+  followers: number | null;
+  region: string | null;
+}> {
   const token = getApifyToken();
   const username = normalizeTikTokUsername(handle);
   if (!username) {
@@ -134,14 +139,13 @@ export async function scrapeTikTokProfile(
   }
 
   const res = await fetch(
-    `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
+    `${APIFY_BASE}/acts/${PROFILE_ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        profiles: [username],
-        resultsPerPage: 1,
-        shouldDownloadCovers: false,
+        username: [username],
+        addonUserDetails: true,
       }),
     },
   );
@@ -151,22 +155,31 @@ export async function scrapeTikTokProfile(
     throw new Error(await apifyErrorMessage(res.status, text));
   }
 
-  const items = (await res.json()) as TikTokScraperResult[];
+  const items = (await res.json()) as Array<{
+    error?: string;
+    avatar_url?: string;
+    avatarLarger?: string;
+    stats?: { follower_count?: number; followerCount?: number };
+    user?: { avatarLarger?: string };
+    user_detail?: { country?: string | { country?: string | null } | null };
+  }>;
   const item = items[0];
-  if (!item) return { imageUrl: null, followers: null };
-  const fans = item.authorMeta?.fans ?? item.authorMeta?.followers;
+  if (!item) return { imageUrl: null, followers: null, region: null };
+  if (item.error) {
+    throw new Error(`TikTok 프로필 수집 실패 (${username}): ${item.error}`);
+  }
+  const fans = item.stats?.follower_count ?? item.stats?.followerCount;
   const followers =
     typeof fans === "number" && Number.isFinite(fans) && fans >= 0
       ? Math.round(fans)
       : null;
+  // addonUserDetails → user_detail.country = "US" | { country: "US" }
+  const raw = item.user_detail?.country;
+  const country = typeof raw === "string" ? raw : raw?.country;
   return {
-    imageUrl:
-      item.originalAvatarUrl ||
-      item.avatar ||
-      item.authorMeta?.originalAvatarUrl ||
-      item.authorMeta?.avatar ||
-      null,
+    imageUrl: item.avatarLarger || item.user?.avatarLarger || item.avatar_url || null,
     followers,
+    region: normalizeRegionCode(country),
   };
 }
 
