@@ -327,6 +327,75 @@ function Preview({
   return null;
 }
 
+function GuidelinePdfEmbed({ guideline }: { guideline: Guideline }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!guideline.file_path) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setUrl(null);
+    fetch(`/api/admin/guidelines/${guideline.id}/file`, { cache: "no-store" })
+      .then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || "가이드라인 파일을 열 수 없습니다.");
+        if (!cancelled) setUrl(json.url as string);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "불러오기 실패");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [guideline.id, guideline.file_path]);
+
+  if (!guideline.file_path) {
+    return guideline.body ? (
+      <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--muted)]">{guideline.body}</p>
+    ) : null;
+  }
+
+  if (loading) {
+    return <p className="mt-2 text-xs text-[var(--muted)]">PDF 불러오는 중…</p>;
+  }
+  if (error) {
+    return <p className="mt-2 text-xs text-[var(--danger)]">{error}</p>;
+  }
+  if (!url) return null;
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface-hover)]">
+      <iframe
+        title={guideline.title || "가이드라인 PDF"}
+        src={url}
+        className="h-[420px] w-full border-0 bg-white"
+      />
+      <div className="flex items-center justify-between gap-2 border-t border-[var(--line)] px-3 py-2">
+        <p className="truncate text-xs text-[var(--muted)]">
+          {guideline.title || "컨텐츠 가이드라인"}
+        </p>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 text-xs font-semibold text-[var(--accent)] underline"
+        >
+          새 탭에서 열기 ↗
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function ReviewLogLinkDetail({
   item,
   loading,
@@ -961,11 +1030,15 @@ export function AdminReviewQueue({
                   i === index ? "bg-[var(--surface-hover)]" : ""
                 }`}
               >
-                <span className="block font-medium">
+                <span className="block font-semibold text-[var(--ink)]">
                   {item.allocations?.influencers?.name || "인플루언서"}
                 </span>
-                <span className="block text-xs text-[var(--muted)]">
-                  {item.allocations?.products?.name || "상품"} · {fmtDt(item.submitted_at)}
+                <span className="mt-0.5 block text-xs font-medium text-[var(--ink)]">
+                  {item.allocations?.companies?.name || "회원사"} ·{" "}
+                  {item.allocations?.products?.name || "상품"}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-[var(--muted)]">
+                  {fmtDt(item.submitted_at)}
                 </span>
               </button>
             </li>
@@ -988,31 +1061,39 @@ export function AdminReviewQueue({
           <section className="owm-panel flex min-w-0 flex-col gap-4 border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
           {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
 
-          <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-[var(--muted)]">인플루언서</dt>
-              <dd>
-                {alloc?.influencers?.name || "—"}
-                {alloc?.influencers?.instagram_handle
-                  ? ` @${alloc.influencers.instagram_handle.replace(/^@/, "")}`
-                  : ""}
-              </dd>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+              검수 대상
+            </p>
+            <h2 className="mt-1 text-[26px] font-bold leading-tight tracking-[-0.03em] text-[var(--ink)]">
+              {alloc?.influencers?.name || "인플루언서"}
+            </h2>
+            {alloc?.influencers?.instagram_handle ? (
+              <p className="mt-1 text-[13px] text-[var(--muted)]">
+                @{alloc.influencers.instagram_handle.replace(/^@/, "")}
+              </p>
+            ) : null}
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface-hover)] px-3 py-2.5">
+                <p className="text-[11px] font-semibold text-[var(--muted)]">회원사</p>
+                <p className="mt-0.5 text-[16px] font-bold text-[var(--ink)]">
+                  {alloc?.companies?.name || "—"}
+                </p>
+              </div>
+              <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface-hover)] px-3 py-2.5">
+                <p className="text-[11px] font-semibold text-[var(--muted)]">상품</p>
+                <p className="mt-0.5 text-[16px] font-bold text-[var(--ink)]">
+                  {alloc?.products?.name || "—"}
+                </p>
+              </div>
             </div>
-            <div>
-              <dt className="text-[var(--muted)]">캠페인</dt>
-              <dd>{campaign?.name || "(이름 없음)"} {campaign?.status ? `· ${campaign.status}` : ""}</dd>
-            </div>
-            <div>
-              <dt className="text-[var(--muted)]">회원사 · 상품</dt>
-              <dd>
-                {alloc?.companies?.name || "—"} · {alloc?.products?.name || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[var(--muted)]">제출 일시</dt>
-              <dd>{fmtDt(current.submitted_at)}</dd>
-            </div>
-          </dl>
+            <p className="mt-2 text-[12px] text-[var(--muted)]">
+              {campaign?.name || "캠페인"}
+              {campaign?.status ? ` · ${campaign.status}` : ""}
+              {" · 제출 "}
+              {fmtDt(current.submitted_at)}
+            </p>
+          </div>
 
           {current.verification_failed ? (
             <div className="space-y-2 rounded-[6px] bg-red-50 px-3 py-2">
@@ -1032,15 +1113,33 @@ export function AdminReviewQueue({
           ) : null}
 
           <div>
-            <h3 className="text-sm font-semibold">가이드라인</h3>
+            <h3 className="text-sm font-semibold">컨텐츠 가이드라인</h3>
             {guidelines.length === 0 ? (
               <p className="mt-1 text-sm text-[var(--muted)]">등록된 가이드라인이 없습니다.</p>
             ) : (
-              <ul className="mt-2 space-y-2">
+              <ul className="mt-2 space-y-3">
                 {guidelines.map((g) => (
-                  <li key={g.id} className="rounded-[6px] border border-[var(--line)] px-3 py-2 text-sm">
-                    <p className="font-medium">{g.title || "가이드라인"}</p>
-                    {g.body ? <p className="mt-1 whitespace-pre-wrap text-[var(--muted)]">{g.body}</p> : null}
+                  <li key={g.id}>
+                    {!g.file_path ? (
+                      <div className="rounded-[6px] border border-[var(--line)] px-3 py-2 text-sm">
+                        <p className="font-medium">{g.title || "가이드라인"}</p>
+                        {g.body ? (
+                          <p className="mt-1 whitespace-pre-wrap text-[var(--muted)]">{g.body}</p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-[13px] font-medium text-[var(--ink)]">
+                          {g.title || "가이드라인 PDF"}
+                        </p>
+                        <GuidelinePdfEmbed guideline={g} />
+                        {g.body ? (
+                          <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--muted)]">
+                            {g.body}
+                          </p>
+                        ) : null}
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
