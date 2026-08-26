@@ -35,7 +35,7 @@ type DetailPayload = {
 };
 
 const filterControlClass =
-  "h-9 w-full min-w-0 appearance-none rounded-none border border-[var(--line)] bg-white px-2.5 text-xs font-normal normal-case tracking-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]";
+  "h-9 w-full min-w-0 appearance-none rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-2.5 text-xs font-normal normal-case tracking-normal text-[var(--ink)] outline-none transition focus:border-[var(--accent)]";
 
 const filterSelectClass = `${filterControlClass} bg-[length:12px] bg-[right_8px_center] bg-no-repeat pr-7`;
 
@@ -130,11 +130,11 @@ function VisitConfirmControls({
   const pending = item.status === "pending";
   const btnClass = full
     ? pending
-      ? "flex h-14 w-full cursor-pointer items-center justify-center rounded-xl bg-[var(--accent)] text-base font-bold !text-white shadow-sm transition hover:brightness-110 hover:shadow-md active:scale-[0.98] disabled:opacity-50"
-      : "flex h-14 w-full cursor-pointer items-center justify-center rounded-xl border border-[var(--line)] bg-white text-base font-bold text-[var(--ink)] shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] active:scale-[0.98] disabled:opacity-50"
+      ? "flex h-14 w-full cursor-pointer items-center justify-center rounded-[6px] bg-[var(--accent)] text-base font-bold !text-white shadow-sm transition hover:brightness-110 hover:shadow-md active:scale-[0.98] disabled:opacity-50"
+      : "flex h-14 w-full cursor-pointer items-center justify-center rounded-[6px] border border-[var(--line)] bg-[var(--surface)] text-base font-bold text-[var(--ink)] shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] active:scale-[0.98] disabled:opacity-50"
     : pending
-      ? "cursor-pointer rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white shadow-sm transition hover:brightness-110 hover:shadow-md active:scale-[0.98] disabled:opacity-50"
-      : "cursor-pointer rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] active:scale-[0.98] disabled:opacity-50";
+      ? "cursor-pointer rounded-[6px] bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white shadow-sm transition hover:brightness-110 hover:shadow-md active:scale-[0.98] disabled:opacity-50"
+      : "cursor-pointer rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] active:scale-[0.98] disabled:opacity-50";
 
   return (
     <div className="space-y-2">
@@ -170,7 +170,7 @@ function VisitConfirmControls({
       </div>
 
       {asking && pending ? (
-        <div className="rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-3">
+        <div className="rounded-[6px] border border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-3">
           <p className="text-sm font-semibold text-[var(--ink)]">
             방문을 확정할까요?
           </p>
@@ -181,7 +181,7 @@ function VisitConfirmControls({
             <button
               type="button"
               disabled={busy}
-              className="cursor-pointer rounded-lg bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold !text-white disabled:opacity-50"
+              className="cursor-pointer rounded-[6px] bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold !text-white disabled:opacity-50"
               onClick={() => void run("confirm")}
             >
               {busy ? "확정 중…" : "확정"}
@@ -189,7 +189,7 @@ function VisitConfirmControls({
             <button
               type="button"
               disabled={busy}
-              className="cursor-pointer rounded-lg border border-[var(--line)] bg-white px-3.5 py-2 text-sm font-semibold disabled:opacity-50"
+              className="cursor-pointer rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold disabled:opacity-50"
               onClick={() => setAsking(false)}
             >
               취소
@@ -263,7 +263,7 @@ function PickupToggleControls({
   }
 
   return (
-    <div className="space-y-2 rounded-2xl border border-[var(--line)] bg-white px-4 py-4">
+    <div className="space-y-2 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs tracking-[0.16em] text-[var(--muted)] uppercase">
@@ -274,10 +274,10 @@ function PickupToggleControls({
           </p>
         </div>
         <span
-          className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+          className={`rounded-[6px] border px-3 py-1 text-xs font-semibold ${
             picked
               ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
-              : "border-[var(--line)] bg-white text-[var(--muted)]"
+              : "border-[var(--line)] bg-[var(--surface)] text-[var(--muted)]"
           }`}
         >
           {picked ? "수령 완료" : "미수령"}
@@ -288,7 +288,7 @@ function PickupToggleControls({
           type="button"
           disabled={busy || picked}
           onClick={() => void run("picked_up")}
-          className="rounded-xl bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          className="rounded-[6px] bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-40"
         >
           {busy && !picked ? "처리 중…" : "수령 처리"}
         </button>
@@ -296,7 +296,7 @@ function PickupToggleControls({
           type="button"
           disabled={busy || !picked}
           onClick={() => void run("ready")}
-          className="rounded-xl border border-[var(--line)] px-3.5 py-2 text-sm font-semibold text-[var(--ink)] disabled:opacity-40"
+          className="rounded-[6px] border border-[var(--line)] px-3.5 py-2 text-sm font-semibold text-[var(--ink)] disabled:opacity-40"
         >
           {busy && picked ? "해제 중…" : "수령 해제"}
         </button>
@@ -376,7 +376,7 @@ function InfluencerEditCard({
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-4">
+    <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]/60 px-4 py-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs tracking-[0.16em] text-[var(--muted)] uppercase">
@@ -392,7 +392,7 @@ function InfluencerEditCard({
             setEditing((v) => !v);
             setError(null);
           }}
-          className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+          className="rounded-[6px] border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
         >
           {editing ? "닫기" : "수정"}
         </button>
@@ -406,7 +406,7 @@ function InfluencerEditCard({
               type="text"
               value={form.name}
               onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-              className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+              className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
             />
           </label>
           <label className="grid gap-1.5">
@@ -417,7 +417,7 @@ function InfluencerEditCard({
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, instagram_handle: e.target.value }))
               }
-              className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+              className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
             />
           </label>
           <label className="grid gap-1.5">
@@ -426,7 +426,7 @@ function InfluencerEditCard({
               type="url"
               value={form.sns_url}
               onChange={(e) => setForm((prev) => ({ ...prev, sns_url: e.target.value }))}
-              className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+              className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
             />
           </label>
           <label className="grid gap-1.5">
@@ -435,7 +435,7 @@ function InfluencerEditCard({
               value={form.notes}
               onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
               rows={4}
-              className="rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+              className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
             />
           </label>
           {error ? (
@@ -445,7 +445,7 @@ function InfluencerEditCard({
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded-xl border border-[var(--line)] px-3.5 py-2 text-sm font-medium"
+              className="rounded-[6px] border border-[var(--line)] px-3.5 py-2 text-sm font-medium"
             >
               취소
             </button>
@@ -453,7 +453,7 @@ function InfluencerEditCard({
               type="button"
               disabled={saving}
               onClick={() => void save()}
-              className="rounded-xl bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-[6px] bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               {saving ? "저장 중…" : "저장"}
             </button>
@@ -534,13 +534,13 @@ function CounterDetailPanel({
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 rounded-full px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]"
+          className="shrink-0 rounded-[6px] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]"
         >
           닫기
         </button>
       </div>
 
-      <div className="space-y-4 rounded-2xl bg-[var(--accent-soft)]/50 px-5 py-5">
+      <div className="space-y-4 rounded-[6px] bg-[var(--accent-soft)]/50 px-5 py-5">
         <div>
           <p className="text-xs tracking-wide text-[var(--muted)]">배정 상품</p>
           <p className="mt-1.5 text-2xl font-bold text-[var(--ink)]">
@@ -587,12 +587,12 @@ function CounterDetailPanel({
           href={sns}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-14 items-center justify-center rounded-xl bg-[var(--accent)] text-base font-bold !text-white transition hover:brightness-110"
+          className="flex h-14 items-center justify-center rounded-[6px] bg-[var(--accent)] text-base font-bold !text-white transition hover:brightness-110"
         >
           SNS 프로필 확인
         </a>
       ) : (
-        <p className="rounded-xl border border-[var(--line)] px-4 py-3.5 text-center text-base text-[var(--muted)]">
+        <p className="rounded-[6px] border border-[var(--line)] px-4 py-3.5 text-center text-base text-[var(--muted)]">
           등록된 SNS 링크가 없습니다
         </p>
       )}
@@ -643,7 +643,7 @@ function CounterDetailPanel({
             type="button"
             aria-expanded={relatedOpen}
             onClick={() => setRelatedOpen((open) => !open)}
-            className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-left transition hover:bg-[var(--accent-soft)]/40"
+            className="flex w-full items-center justify-between gap-2 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-left transition hover:bg-[var(--accent-soft)]/40"
           >
             <span className="text-sm font-medium tracking-wide text-[var(--muted)]">
               이 지점 배정 {related.length}건
@@ -667,10 +667,10 @@ function CounterDetailPanel({
                     <button
                       type="button"
                       onClick={() => onSelectRelated(row.id)}
-                      className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                      className={`w-full rounded-[6px] border px-4 py-3 text-left transition ${
                         active
                           ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                          : "border-[var(--line)] bg-white hover:bg-[var(--accent-soft)]/40"
+                          : "border-[var(--line)] bg-[var(--surface)] hover:bg-[var(--accent-soft)]/40"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -1764,7 +1764,7 @@ export function PharListWithModal({
           <div className="mb-2 flex shrink-0 justify-end">
             <button
               type="button"
-              className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:bg-[var(--accent-soft)]"
+              className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:bg-[var(--accent-soft)]"
               onClick={() => void document.exitFullscreen().catch(() => {})}
             >
               전체화면 종료
@@ -1779,7 +1779,7 @@ export function PharListWithModal({
             className={`${counterGridClass} ${counterTall ? "flex-1" : ""}`}
           >
             <div className="flex min-h-0 min-w-0 flex-col gap-3">
-              <div className="shrink-0 rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)]/70 p-3 shadow-sm sm:p-3.5">
+              <div className="shrink-0 rounded-[6px] border border-[var(--accent)]/25 bg-[var(--accent-soft)]/70 p-3 shadow-sm sm:p-3.5">
                 <div className="mb-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                   <div className="flex items-baseline gap-2">
                     <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
@@ -1790,7 +1790,7 @@ export function PharListWithModal({
                     </p>
                   </div>
                   <div
-                    className="flex rounded-full border border-[var(--line)] bg-white/90 p-0.5"
+                    className="flex rounded-[6px] border border-[var(--line)] bg-[var(--surface)]/90 p-0.5"
                     role="group"
                     aria-label="조회 기간"
                   >
@@ -1806,7 +1806,7 @@ export function PharListWithModal({
                         type="button"
                         aria-pressed={statsPeriod === value}
                         onClick={() => onStatsPeriodChange(value)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        className={`rounded-[6px] px-3 py-1.5 text-xs font-semibold transition ${
                           statsPeriod === value
                             ? "bg-[var(--accent)] text-white"
                             : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -1819,7 +1819,7 @@ export function PharListWithModal({
                 </div>
 
                 <div
-                  className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]"
+                  className="overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)]"
                   role="group"
                   aria-label={statsPeriodLabel}
                 >
@@ -1918,7 +1918,7 @@ export function PharListWithModal({
                 {statsPeriod !== "today" ? (
                   <button
                     type="button"
-                    className="absolute right-14 top-6 z-20 -translate-y-1/2 rounded-full border border-[var(--line)] bg-white/95 px-3 py-1.5 text-xs font-medium text-[var(--accent)] shadow-sm backdrop-blur-sm hover:bg-[var(--accent-soft)]"
+                    className="absolute right-14 top-6 z-20 -translate-y-1/2 rounded-[6px] border border-[var(--line)] bg-[var(--surface)]/95 px-3 py-1.5 text-xs font-medium text-[var(--accent)] shadow-sm backdrop-blur-sm hover:bg-[var(--accent-soft)]"
                     onClick={scrollToTodaySection}
                   >
                     오늘로 이동
@@ -1926,7 +1926,7 @@ export function PharListWithModal({
                 ) : null}
                 <div
                   ref={listScrollRef}
-                  className="h-full overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm"
+                  className="h-full overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] shadow-sm"
                 >
                   <table className="w-full border-collapse text-left text-base">
                     <thead className="sticky top-0 z-10">
@@ -2075,7 +2075,7 @@ export function PharListWithModal({
 
             <div className="flex min-h-0 min-w-0 flex-col gap-2">
               <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <label className="flex cursor-pointer items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink)]">
+                <label className="flex cursor-pointer items-center gap-2 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--ink)]">
                   <input
                     type="checkbox"
                     className="h-3.5 w-3.5 accent-[var(--accent)]"
@@ -2102,7 +2102,7 @@ export function PharListWithModal({
                 <input
                   ref={searchInputRef}
                   id="phar-unified-search"
-                  className="h-10 min-w-0 flex-1 basis-0 rounded-xl border border-[var(--line)] bg-white px-3.5 text-sm text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+                  className="h-10 min-w-0 flex-1 basis-0 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 text-sm text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
                   type="search"
                   value={searchQ}
                   onChange={(e) => setSearchQ(e.target.value)}
@@ -2111,7 +2111,7 @@ export function PharListWithModal({
                   autoComplete="off"
                 />
                 <select
-                  className="h-10 w-32 shrink-0 appearance-none rounded-xl border border-[var(--line)] bg-white bg-[length:12px] bg-[right_10px_center] bg-no-repeat px-3 pr-8 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+                  className="h-10 w-32 shrink-0 appearance-none rounded-[6px] border border-[var(--line)] bg-[var(--surface)] bg-[length:12px] bg-[right_10px_center] bg-no-repeat px-3 pr-8 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
                   style={{ backgroundImage: selectChevron }}
                   value={status}
                   onChange={(e) => {
@@ -2133,7 +2133,7 @@ export function PharListWithModal({
               </div>
 
               <aside
-                className={`min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm ${
+                className={`min-h-0 flex-1 overflow-y-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm ${
                   counterTall
                     ? ""
                     : "max-h-[min(70vh,calc(100vh-14rem))]"
@@ -2194,7 +2194,7 @@ export function PharListWithModal({
 
         <div className="flex flex-wrap items-center gap-2">
           <div
-            className="flex rounded-full border border-[var(--line)] bg-white p-0.5"
+            className="flex rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-0.5"
             role="group"
             aria-label="목록 범위"
           >
@@ -2205,7 +2205,7 @@ export function PharListWithModal({
                 setTodayOnly(true);
                 setVisitDate("");
               }}
-              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+              className={`rounded-[6px] px-3.5 py-2 text-xs font-semibold transition ${
                 todayOnly
                   ? "bg-[var(--accent)] text-white"
                   : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -2217,7 +2217,7 @@ export function PharListWithModal({
               type="button"
               aria-pressed={!todayOnly}
               onClick={() => setTodayOnly(false)}
-              className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+              className={`rounded-[6px] px-3.5 py-2 text-xs font-semibold transition ${
                 !todayOnly
                   ? "bg-[var(--accent)] text-white"
                   : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -2229,7 +2229,7 @@ export function PharListWithModal({
           {!todayOnly ? (
             <button
               type="button"
-              className="rounded-full border border-[var(--line)] bg-white px-3 py-2 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+              className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
               onClick={scrollToTodaySection}
             >
               오늘로 이동
@@ -2252,7 +2252,7 @@ export function PharListWithModal({
       ) : (
         <div
           ref={listScrollRef}
-          className={`overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-sm ${
+          className={`overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] shadow-sm ${
             fillHeight
               ? "min-h-0 flex-1"
               : "max-h-[min(70vh,calc(100vh-14rem))]"
@@ -2523,7 +2523,6 @@ export function PharListWithModal({
                 </p>
                 <h2
                   className="mt-1 text-2xl text-[var(--ink)]"
-                  style={{ fontFamily: "var(--font-display), serif" }}
                 >
                   {detail
                     ? formatIgHandle(detail.influencer) || "핸들 없음"
@@ -2563,7 +2562,7 @@ export function PharListWithModal({
                   </p>
                 )}
 
-                <dl className="grid gap-4 border border-[var(--line)] bg-white/50 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
+                <dl className="grid gap-4 border border-[var(--line)] bg-[var(--surface)]/50 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <dt className="text-xs text-[var(--muted)]">SNS 핸들</dt>
                     <dd className="mt-1 text-sm font-medium">
@@ -2618,7 +2617,6 @@ export function PharListWithModal({
                     <div>
                       <h3
                         className="mb-3 text-lg"
-                        style={{ fontFamily: "var(--font-display), serif" }}
                       >
                         업로드 콘텐츠
                       </h3>
@@ -2626,12 +2624,12 @@ export function PharListWithModal({
                         {allLinks.map((link) => (
                           <div
                             key={link.id}
-                            className="rounded-xl border border-[var(--line)] bg-white/60 px-4 py-3"
+                            className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]/60 px-4 py-3"
                           >
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent)]">
+                                  <span className="rounded-[6px] bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent)]">
                                     {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform] ?? link.platform}
                                   </span>
                                   <span className="text-[11px] text-[var(--muted)]">
@@ -2680,7 +2678,7 @@ export function PharListWithModal({
                                     e.stopPropagation();
                                     void refreshLinkMetrics(link.id);
                                   }}
-                                  className="shrink-0 rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+                                  className="shrink-0 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
                                 >
                                   {refreshingLinkId === link.id
                                     ? "갱신 중…"
@@ -2700,7 +2698,7 @@ export function PharListWithModal({
                     type="button"
                     aria-expanded={allocTableOpen}
                     onClick={() => setAllocTableOpen((v) => !v)}
-                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-left transition hover:bg-[var(--accent-soft)]/40"
+                    className="flex w-full items-center justify-between gap-2 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-left transition hover:bg-[var(--accent-soft)]/40"
                   >
                     <span className="text-sm font-medium text-[var(--ink)]">
                       수령 배정{" "}

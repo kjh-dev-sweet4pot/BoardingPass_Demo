@@ -96,7 +96,11 @@ export function AppShell({
               </div>
               <h1
                 className="mt-0.5 text-3xl leading-tight text-[var(--ink)]"
-                style={{ fontFamily: "var(--font-display), serif" }}
+                style={
+                  owm
+                    ? undefined
+                    : { fontFamily: "var(--font-display), serif" }
+                }
               >
                 {title}
               </h1>
@@ -118,7 +122,11 @@ export function AppShell({
               </p>
               <h1
                 className="mt-2 text-4xl text-[var(--ink)]"
-                style={{ fontFamily: "var(--font-display), serif" }}
+                style={
+                  owm
+                    ? undefined
+                    : { fontFamily: "var(--font-display), serif" }
+                }
               >
                 {title}
               </h1>
@@ -164,8 +172,8 @@ export function Notice({
     <div
       className={`mb-6 border px-4 py-3 text-sm ${
         error
-          ? "rounded-2xl border-red-200 bg-red-50 text-[var(--danger)]"
-          : "rounded-2xl border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent)]"
+          ? "rounded-[6px] border-red-200 bg-red-50 text-[var(--danger)]"
+          : "rounded-[6px] border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent)]"
       }`}
     >
       {error || message}
@@ -189,7 +197,7 @@ export function Field({
 }
 
 export const fieldClass =
-  "h-11 border border-[var(--line)] bg-white px-3 outline-none focus:border-[var(--accent)]";
+  "h-11 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 outline-none focus:border-[var(--accent)]";
 
 export const primaryBtnClass =
   "owm-btn-primary inline-flex h-11 items-center justify-center bg-[var(--accent)] px-5 text-sm font-medium text-white transition hover:brightness-110";
