@@ -1136,7 +1136,7 @@ export function CompanyPerformanceTab({
         ) : (
           <div>
             <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
-              성과
+              성과 대시보드
             </h2>
           </div>
         )}

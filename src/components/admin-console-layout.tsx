@@ -6,7 +6,7 @@ import { AdminCampaignCastingPanel } from "@/components/admin-campaign-casting-p
 import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
 import { AdminDashboard, type AdminQueueKey } from "@/components/admin-dashboard";
-import { AdminPerformanceTab } from "@/components/admin-performance-tab";
+import { AdminPerformanceLookupTab, AdminPerformanceTab } from "@/components/admin-performance-tab";
 import { AdminReviewQueue, type AdminReviewTab } from "@/components/admin-review-queue";
 import { AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
 import { Notice } from "@/components/ui";
@@ -18,9 +18,11 @@ import {
   type Store,
 } from "@/lib/types";
 
-const PAGE: Record<AdminSection, { eyebrow: string; title: string }> = {
+const PAGE: Record<
+  Exclude<AdminSection, "performance" | "performanceLookup">,
+  { eyebrow: string; title: string }
+> = {
   dashboard: { eyebrow: "Overview", title: "대시보드" },
-  performance: { eyebrow: "Performance", title: "성과" },
   campaigns: { eyebrow: "Campaigns", title: "캠페인·섭외" },
   review: { eyebrow: "Review", title: "검수" },
   allocations: { eyebrow: "Allocations", title: "배정·매장" },
@@ -41,7 +43,7 @@ function PageHeader({
   section,
   extra,
 }: {
-  section: AdminSection;
+  section: Exclude<AdminSection, "performance" | "performanceLookup">;
   extra?: ReactNode;
 }) {
   const meta = PAGE[section];
@@ -107,7 +109,7 @@ export function AdminConsoleLayout({
   }
 
   const headerFooter =
-    section === "performance" && performanceMeta ? (
+    (section === "performance" || section === "performanceLookup") && performanceMeta ? (
       <>
         <p>
           {performanceMeta.asOf} 조회 시점 기준
@@ -129,7 +131,7 @@ export function AdminConsoleLayout({
       onSectionChange={(next) => {
         if (next !== "campaigns") setCastingStale(false);
         if (next !== "review") setReviewQueue("reviewPending");
-        if (next !== "performance") setPerformanceMeta(null);
+        if (next !== "performance" && next !== "performanceLookup") setPerformanceMeta(null);
         setSection(next);
       }}
       sidebarActions={sidebarActions}
@@ -157,6 +159,15 @@ export function AdminConsoleLayout({
       {section === "performance" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AdminPerformanceTab
+            companies={companyList}
+            onMetaChange={setPerformanceMeta}
+          />
+        </div>
+      ) : null}
+
+      {section === "performanceLookup" ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <AdminPerformanceLookupTab
             companies={companyList}
             onMetaChange={setPerformanceMeta}
           />

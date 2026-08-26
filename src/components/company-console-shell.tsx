@@ -2,15 +2,40 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import {
+  NavHoverDropdown,
+  NavSubSegment,
+  type NavDropdownItem,
+} from "@/components/nav-hover-dropdown";
 
-export type CompanyConsoleView = "pool" | "content" | "publish" | "alloc";
+export type CompanyConsoleView =
+  | "pool"
+  | "publish"
+  | "alloc"
+  | "content"
+  | "contentLookup";
 
-const TABS: { id: CompanyConsoleView; label: string }[] = [
+const MAIN_TABS: { id: Exclude<CompanyConsoleView, "content" | "contentLookup">; label: string }[] = [
+  { id: "pool", label: "크리에이터" },
+  { id: "publish", label: "진행 현황" },
+  { id: "alloc", label: "배정 현황" },
+];
+
+const PERFORMANCE_ITEMS: NavDropdownItem<"content" | "contentLookup">[] = [
+  { id: "content", label: "성과 대시보드", hint: "캠페인 전체 요약" },
+  { id: "contentLookup", label: "성과 조회", hint: "인플루언서별 상세" },
+];
+
+const MOBILE_TABS: { id: CompanyConsoleView; label: string }[] = [
   { id: "pool", label: "크리에이터" },
   { id: "publish", label: "진행 현황" },
   { id: "alloc", label: "배정 현황" },
   { id: "content", label: "성과" },
 ];
+
+function isPerformanceView(v: CompanyConsoleView) {
+  return v === "content" || v === "contentLookup";
+}
 
 export function CompanyConsoleShell({
   companyName,
@@ -27,14 +52,12 @@ export function CompanyConsoleShell({
   onViewChange: (v: CompanyConsoleView) => void;
   sidebarExtra?: ReactNode;
   sidebarFooter?: ReactNode;
-  /** 로그아웃 등 */
   sidebarActions?: ReactNode;
   mobileActions?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* 모바일: 브랜드 + 액션 */}
       <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-3 lg:hidden">
         <div className="flex min-w-0 items-center gap-2.5">
           <Link href="/">
@@ -55,31 +78,42 @@ export function CompanyConsoleShell({
           {mobileActions}
         </div>
       </div>
-      <div className="mb-2 flex shrink-0 px-4 lg:hidden">
+      <div className="mb-2 flex shrink-0 flex-col gap-2 px-4 lg:hidden">
         <div
           className="flex w-full rounded-full border border-[var(--line)] bg-[var(--surface)] p-0.5"
           role="tablist"
         >
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={view === tab.id}
-              onClick={() => onViewChange(tab.id)}
-              className={`flex-1 rounded-full px-2 py-2 text-xs font-semibold ${
-                view === tab.id
-                  ? "bg-[var(--accent)] !text-white"
-                  : "text-[var(--muted)]"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {MOBILE_TABS.map((tab) => {
+            const active =
+              tab.id === view ||
+              (tab.id === "content" && view === "contentLookup");
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => onViewChange(tab.id)}
+                className={`flex-1 rounded-full px-2 py-2 text-xs font-semibold ${
+                  active
+                    ? "bg-[var(--accent)] !text-white"
+                    : "text-[var(--muted)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
+        {isPerformanceView(view) ? (
+          <NavSubSegment
+            items={PERFORMANCE_ITEMS}
+            view={view as "content" | "contentLookup"}
+            onViewChange={onViewChange}
+          />
+        ) : null}
       </div>
 
-      {/* 데스크톱: 상단 GNB (Figma 1차 UX) */}
       <header className="hidden shrink-0 items-center gap-6 border-b border-[var(--line)] bg-[var(--surface)] px-8 py-3.5 lg:flex">
         <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -103,7 +137,7 @@ export function CompanyConsoleShell({
           className="flex min-w-0 flex-1 items-center justify-start gap-8"
           role="tablist"
         >
-          {TABS.map((tab) => {
+          {MAIN_TABS.map((tab) => {
             const active = view === tab.id;
             return (
               <button
@@ -122,6 +156,14 @@ export function CompanyConsoleShell({
               </button>
             );
           })}
+
+          <NavHoverDropdown
+            label="성과"
+            items={PERFORMANCE_ITEMS}
+            active={isPerformanceView(view)}
+            selectedId={isPerformanceView(view) ? view : undefined}
+            onSelect={onViewChange}
+          />
         </nav>
 
         <div className="flex shrink-0 items-center gap-3">

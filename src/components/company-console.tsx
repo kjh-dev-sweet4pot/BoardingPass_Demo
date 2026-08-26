@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { CompanyPerformanceLookupTab } from "@/components/company-performance-lookup-tab";
 import { CompanyPerformanceTab } from "@/components/company-performance-tab";
 import {
   CompanyConsoleShell,
@@ -206,7 +207,7 @@ export function CompanyConsole({
 }) {
   const isDemo = isDemoCompany(company);
   const gate = useBudgetGate(company.id);
-  const [view, setView] = useState<"alloc" | "content" | "pool" | "publish">(
+  const [view, setView] = useState<CompanyConsoleView>(
     isDemo ? "pool" : "publish",
   );
   // live: 배정은 진행현황·배정 탭 진입 시 지연 로드
@@ -457,7 +458,7 @@ export function CompanyConsole({
   }
 
   const sidebarFooter =
-    view === "content" && performanceMeta ? (
+    (view === "content" || view === "contentLookup") && performanceMeta ? (
       <>
         <p>{performanceMeta.asOf} 조회 시점 기준</p>
         {performanceMeta.lastCollected ? (
@@ -498,7 +499,7 @@ export function CompanyConsole({
   return (
     <CompanyConsoleShell
       companyName={company.name}
-      view={view as CompanyConsoleView}
+      view={view}
       onViewChange={setView}
       sidebarActions={sidebarActions}
       sidebarFooter={sidebarFooter}
@@ -516,6 +517,19 @@ export function CompanyConsole({
           initialAllocations={progressItems}
           live={!isDemo}
           loading={allocsLoading}
+        />
+      ) : view === "contentLookup" ? (
+        <CompanyPerformanceLookupTab
+          initialData={
+            isDemo
+              ? (buildPublishDemoPerformance() as never)
+              : initialPerformanceData
+                ? (initialPerformanceData as never)
+                : undefined
+          }
+          period={period}
+          onPeriodChange={setPeriod}
+          onMetaChange={setPerformanceMeta}
         />
       ) : view === "content" ? (
         <CompanyPerformanceTab
