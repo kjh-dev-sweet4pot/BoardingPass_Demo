@@ -55,7 +55,7 @@ export async function signedContentFileUrl(
 
 export const CONTENT_UPLOAD_MAX_BYTES = 80 * 1024 * 1024;
 
-export function validateContentUpload(file: File) {
+export function validateContentUpload(file: { size: number; type: string }) {
   if (!file.size) return "파일을 선택하세요.";
   if (file.size > CONTENT_UPLOAD_MAX_BYTES) {
     return "파일 크기는 80MB 이하여야 합니다.";
