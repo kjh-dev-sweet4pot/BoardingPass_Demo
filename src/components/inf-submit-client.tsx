@@ -6,6 +6,7 @@ import {
   formatVisitDateLocalized,
   translateInfApiError,
 } from "@/lib/inf-i18n";
+import { createClient } from "@/lib/supabase/client";
 import { type AllocationWithRelations, type CreatorLink } from "@/lib/types";
 
 function asYmd(value: string | null | undefined) {
@@ -125,18 +126,50 @@ function InfSubmitClientInner({
       setError(t.submitNeedFileOrUrl);
       return;
     }
+    if (file && file.size > 80 * 1024 * 1024) {
+      setError(translateInfApiError("파일 크기는 80MB 이하여야 합니다.", t));
+      return;
+    }
     setUploadingId(allocationId);
     setError(null);
     try {
-      const form = new FormData();
-      form.set("allocation_id", allocationId);
-      if (url) form.set("url", url);
-      if (file) form.set("file", file);
-      const res = await fetch("/api/inf/content", { method: "POST", body: form });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(body.error || t.pickupFailed);
+      let objectPath: string | undefined;
+      if (file) {
+        const signRes = await fetch("/api/inf/content", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sign: true,
+            allocation_id: allocationId,
+            filename: file.name || "content",
+            content_type: file.type || "application/octet-stream",
+            size: file.size,
+          }),
+        });
+        const signBody = await signRes.json().catch(() => ({}));
+        if (!signRes.ok) {
+          throw new Error(signBody.error || "콘텐츠 제출에 실패했습니다.");
+        }
+        const { error: uploadError } = await createClient()
+          .storage.from("content-files")
+          .uploadToSignedUrl(signBody.path as string, signBody.token as string, file, {
+            contentType: file.type || "application/octet-stream",
+          });
+        if (uploadError) throw new Error(uploadError.message);
+        objectPath = signBody.path as string;
       }
+
+      const res = await fetch("/api/inf/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          allocation_id: allocationId,
+          ...(url ? { url } : {}),
+          ...(objectPath ? { object_path: objectPath } : {}),
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "콘텐츠 제출에 실패했습니다.");
       const link = body.link as CreatorLink;
       setItems((prev) =>
         prev.map((row) =>

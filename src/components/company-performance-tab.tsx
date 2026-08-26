@@ -946,7 +946,6 @@ export function CompanyPerformanceTab({
   const curvePoints = useMemo(() => {
     if (!timelineStartIso || metrics.length === 0) return [];
     const startTs = new Date(timelineStartIso).getTime();
-    // 수집 시각마다: 그 시점까지 각 콘텐츠의 최신 조회를 합산 (같은 날 재수집도 곡선에 반영)
     const times = [
       ...new Set(
         metrics
@@ -956,7 +955,9 @@ export function CompanyPerformanceTab({
     ].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     if (times.length < 2) return [];
 
-    return times.map((t) => {
+    // 일(D+) 버킷으로 묶어 같은 날 재수집·평탄 구간을 줄임
+    const daily = new Map<number, number>();
+    for (const t of times) {
       const tMs = new Date(t).getTime();
       const latest = new Map<string, number>();
       for (const m of metrics) {
@@ -965,10 +966,20 @@ export function CompanyPerformanceTab({
         const prev = latest.get(m.creator_link_id);
         if (prev == null || m.views > prev) latest.set(m.creator_link_id, m.views);
       }
-      return {
-        day: Math.max(0, (tMs - startTs) / 86400000),
-        views: [...latest.values()].reduce((sum, v) => sum + v, 0),
-      };
+      const views = [...latest.values()].reduce((sum, v) => sum + v, 0);
+      const elapsed = Math.max(0, (tMs - startTs) / 86400000);
+      const key = elapsed < 1 ? Math.round(elapsed * 48) / 48 : Math.floor(elapsed);
+      daily.set(key, views);
+    }
+
+    const raw = [...daily.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([day, views]) => ({ day, views }));
+
+    // 조회수가 같은 중간 점 제거 → 평탄 구간 축소
+    return raw.filter((p, i) => {
+      if (i === 0 || i === raw.length - 1) return true;
+      return p.views !== raw[i - 1].views;
     });
   }, [metrics, timelineStartIso]);
   const platformErRows = useMemo(() => {
