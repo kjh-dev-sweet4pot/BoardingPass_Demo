@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { requireAdminManager, requireAnyAdmin } from "@/lib/access";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { hashPassword } from "@/lib/password";
-import { normalizeLoginId } from "@/lib/company";
-
-const COMPANY_SELECT =
-  "id, name, login_id, aliases, contact, is_active, created_at, updated_at";
+import {
+  COMPANY_SELECT,
+  COMPANY_SELECT_BASE,
+  isMissingColumnError,
+  normalizeLoginId,
+} from "@/lib/company";
 
 export async function GET() {
   const auth = await requireAnyAdmin();
@@ -14,14 +16,24 @@ export async function GET() {
   const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
-  const { data, error } = await supabase
+  const first = await supabase
     .from("companies")
     .select(COMPANY_SELECT)
     .order("name", { ascending: true });
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (first.error && isMissingColumnError(first.error.message, "contact_email")) {
+    const fallback = await supabase
+      .from("companies")
+      .select(COMPANY_SELECT_BASE)
+      .order("name", { ascending: true });
+    if (fallback.error) {
+      return NextResponse.json({ error: fallback.error.message }, { status: 500 });
+    }
+    return NextResponse.json({ companies: fallback.data || [] });
   }
-  return NextResponse.json({ companies: data || [] });
+  if (first.error) {
+    return NextResponse.json({ error: first.error.message }, { status: 500 });
+  }
+  return NextResponse.json({ companies: first.data || [] });
 }
 
 export async function POST(request: Request) {
@@ -37,6 +49,7 @@ export async function POST(request: Request) {
     password?: string;
     aliases?: string[];
     contact?: string | null;
+    contact_email?: string | null;
     is_active?: boolean;
   };
   try {
@@ -61,19 +74,34 @@ export async function POST(request: Request) {
   const aliases = Array.isArray(body.aliases)
     ? body.aliases.map((a) => String(a).trim()).filter(Boolean)
     : [];
+  const contact_email = String(body.contact_email || "").trim() || null;
 
-  const { data, error } = await supabase
+  const insertRow: Record<string, unknown> = {
+    name,
+    login_id,
+    password_hash: hashPassword(password),
+    aliases,
+    contact: String(body.contact || "").trim() || null,
+    is_active: body.is_active !== false,
+  };
+  if (contact_email) insertRow.contact_email = contact_email;
+
+  let { data, error } = await supabase
     .from("companies")
-    .insert({
-      name,
-      login_id,
-      password_hash: hashPassword(password),
-      aliases,
-      contact: String(body.contact || "").trim() || null,
-      is_active: body.is_active !== false,
-    })
+    .insert(insertRow)
     .select(COMPANY_SELECT)
     .single();
+
+  if (error && isMissingColumnError(error.message, "contact_email")) {
+    delete insertRow.contact_email;
+    const retry = await supabase
+      .from("companies")
+      .insert(insertRow)
+      .select(COMPANY_SELECT_BASE)
+      .single();
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
 
   if (error || !data) {
     const msg = error?.message || "회원사 생성에 실패했습니다.";

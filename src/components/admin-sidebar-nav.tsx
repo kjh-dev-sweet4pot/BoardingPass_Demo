@@ -12,14 +12,25 @@ export type AdminSection =
   | "dashboard"
   | "performance"
   | "performanceLookup"
+  | "companies"
+  | "companiesRegister"
+  | "companiesMail"
   | "campaigns"
   | "review"
   | "allocations";
 
-const AFTER_PERF: { id: Exclude<AdminSection, "dashboard" | "performance" | "performanceLookup">; label: string }[] = [
+const AFTER_PERF: { id: Exclude<AdminSection, "dashboard" | "performance" | "performanceLookup" | "companies" | "companiesRegister" | "companiesMail">; label: string }[] = [
   { id: "campaigns", label: "캠페인·섭외" },
   { id: "review", label: "검수" },
   { id: "allocations", label: "배정·매장" },
+];
+
+export const COMPANIES_NAV: NavDropdownItem<
+  "companies" | "companiesRegister" | "companiesMail"
+>[] = [
+  { id: "companies", label: "목록", hint: "회원사 조회" },
+  { id: "companiesRegister", label: "등록", hint: "회원사 개설" },
+  { id: "companiesMail", label: "메일 발송", hint: "계약서·견적서·가이드라인" },
 ];
 
 const PERF: NavDropdownItem<"performance" | "performanceLookup">[] = [
@@ -30,6 +41,7 @@ const PERF: NavDropdownItem<"performance" | "performanceLookup">[] = [
 const MOBILE: { id: AdminSection; label: string }[] = [
   { id: "dashboard", label: "대시보드" },
   { id: "performance", label: "성과" },
+  { id: "companies", label: "회원사" },
   { id: "campaigns", label: "캠페인·섭외" },
   { id: "review", label: "검수" },
   { id: "allocations", label: "배정·매장" },
@@ -37,6 +49,10 @@ const MOBILE: { id: AdminSection; label: string }[] = [
 
 function isPerf(s: AdminSection) {
   return s === "performance" || s === "performanceLookup";
+}
+
+function isCompanies(s: AdminSection) {
+  return s === "companies" || s === "companiesRegister" || s === "companiesMail";
 }
 
 export function AdminConsoleShell({
@@ -71,7 +87,9 @@ export function AdminConsoleShell({
         >
           {MOBILE.map((item) => {
             const active =
-              section === item.id || (item.id === "performance" && isPerf(section));
+              section === item.id ||
+              (item.id === "performance" && isPerf(section)) ||
+              (item.id === "companies" && isCompanies(section));
             return (
               <button
                 key={item.id}
@@ -92,6 +110,13 @@ export function AdminConsoleShell({
           <NavSubSegment
             items={PERF}
             view={section as "performance" | "performanceLookup"}
+            onViewChange={onSectionChange}
+          />
+        ) : null}
+        {isCompanies(section) ? (
+          <NavSubSegment
+            items={COMPANIES_NAV}
+            view={section as "companies" | "companiesRegister" | "companiesMail"}
             onViewChange={onSectionChange}
           />
         ) : null}
@@ -136,6 +161,17 @@ export function AdminConsoleShell({
             active={isPerf(section)}
             selectedId={
               isPerf(section) ? (section as "performance" | "performanceLookup") : undefined
+            }
+            onSelect={onSectionChange}
+          />
+          <NavHoverDropdown
+            label="회원사"
+            items={COMPANIES_NAV}
+            active={isCompanies(section)}
+            selectedId={
+              isCompanies(section)
+                ? (section as "companies" | "companiesRegister" | "companiesMail")
+                : undefined
             }
             onSelect={onSectionChange}
           />

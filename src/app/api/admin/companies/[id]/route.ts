@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { requireAdminManager } from "@/lib/access";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { hashPassword } from "@/lib/password";
-import { normalizeLoginId } from "@/lib/company";
-
-const COMPANY_SELECT =
-  "id, name, login_id, aliases, contact, is_active, created_at, updated_at";
+import {
+  COMPANY_SELECT,
+  COMPANY_SELECT_BASE,
+  isMissingColumnError,
+  normalizeLoginId,
+} from "@/lib/company";
 
 export async function PATCH(
   request: Request,
@@ -23,6 +25,7 @@ export async function PATCH(
     password?: string;
     aliases?: string[];
     contact?: string | null;
+    contact_email?: string | null;
     is_active?: boolean;
   };
   try {
@@ -62,16 +65,31 @@ export async function PATCH(
   if ("contact" in body) {
     patch.contact = String(body.contact || "").trim() || null;
   }
+  if ("contact_email" in body) {
+    patch.contact_email = String(body.contact_email || "").trim() || null;
+  }
   if ("is_active" in body) {
     patch.is_active = Boolean(body.is_active);
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("companies")
     .update(patch)
     .eq("id", id)
     .select(COMPANY_SELECT)
     .maybeSingle();
+
+  if (error && isMissingColumnError(error.message, "contact_email")) {
+    delete patch.contact_email;
+    const retry = await supabase
+      .from("companies")
+      .update(patch)
+      .eq("id", id)
+      .select(COMPANY_SELECT_BASE)
+      .maybeSingle();
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
 
   if (error) {
     const status = error.message.toLowerCase().includes("unique") ? 409 : 500;

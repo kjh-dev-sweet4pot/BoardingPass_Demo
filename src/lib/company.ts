@@ -1,3 +1,13 @@
+export const COMPANY_SELECT_BASE =
+  "id, name, login_id, aliases, contact, is_active, created_at, updated_at";
+export const COMPANY_SELECT =
+  "id, name, login_id, aliases, contact, contact_email, is_active, created_at, updated_at";
+
+export function isMissingColumnError(message: string, column: string) {
+  const m = message.toLowerCase();
+  return m.includes(column.toLowerCase()) && (m.includes("column") || m.includes("schema"));
+}
+
 export type CompanyMatchInput = {
   id: string;
   name: string;

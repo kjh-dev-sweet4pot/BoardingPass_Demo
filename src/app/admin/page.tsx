@@ -21,15 +21,16 @@ export default async function AdminPage({
   const supabase = await createAuthedDbClient();
   if (!supabase) redirect("/admin/login");
   const adminRole = await getAdminRole();
-  const [{ data: stores }, { data: companies }, { data: products }, { data: allocations, error }] =
+  const companiesQuery = supabase
+    .from("companies")
+    .select(
+      "id, name, login_id, aliases, contact, contact_email, is_active, created_at, updated_at",
+    )
+    .order("name", { ascending: true });
+  const [{ data: stores }, companiesRes, { data: products }, { data: allocations, error }] =
     await Promise.all([
       supabase.from("stores").select("*").order("name", { ascending: true }),
-      supabase
-        .from("companies")
-        .select(
-          "id, name, login_id, aliases, contact, is_active, created_at, updated_at",
-        )
-        .order("name", { ascending: true }),
+      companiesQuery,
       supabase.from("products").select("*").order("name", { ascending: true }),
       supabase
         .from("allocations")
@@ -39,6 +40,14 @@ export default async function AdminPage({
         .order("visit_date", { ascending: false })
         .order("created_at", { ascending: false }),
     ]);
+  let companies = companiesRes.data;
+  if (companiesRes.error) {
+    const fallback = await supabase
+      .from("companies")
+      .select("id, name, login_id, aliases, contact, is_active, created_at, updated_at")
+      .order("name", { ascending: true });
+    companies = fallback.data as typeof companies;
+  }
 
   const list = (allocations as AllocationWithRelations[]) || [];
   const storeList = (stores as Store[]) || [];

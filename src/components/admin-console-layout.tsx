@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { AdminAllocSchedule } from "@/components/admin-alloc-schedule";
 import { AdminCampaignCastingPanel } from "@/components/admin-campaign-casting-panel";
+import { AdminCompaniesTab } from "@/components/admin-companies-tab";
 import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
 import { AdminDashboard, type AdminQueueKey } from "@/components/admin-dashboard";
@@ -19,7 +20,14 @@ import {
 } from "@/lib/types";
 
 const PAGE: Record<
-  Exclude<AdminSection, "performance" | "performanceLookup">,
+  Exclude<
+    AdminSection,
+    | "performance"
+    | "performanceLookup"
+    | "companies"
+    | "companiesRegister"
+    | "companiesMail"
+  >,
   { eyebrow: string; title: string }
 > = {
   dashboard: { eyebrow: "Overview", title: "대시보드" },
@@ -43,7 +51,14 @@ function PageHeader({
   section,
   extra,
 }: {
-  section: Exclude<AdminSection, "performance" | "performanceLookup">;
+  section: Exclude<
+    AdminSection,
+    | "performance"
+    | "performanceLookup"
+    | "companies"
+    | "companiesRegister"
+    | "companiesMail"
+  >;
   extra?: ReactNode;
 }) {
   const meta = PAGE[section];
@@ -170,6 +185,19 @@ export function AdminConsoleLayout({
           <AdminPerformanceLookupTab
             companies={companyList}
             onMetaChange={setPerformanceMeta}
+          />
+        </div>
+      ) : null}
+
+      {section === "companies" ||
+      section === "companiesRegister" ||
+      section === "companiesMail" ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <AdminCompaniesTab
+            companies={companyList}
+            isManager={isManager}
+            sub={section}
+            onSubChange={setSection}
           />
         </div>
       ) : null}

@@ -18,6 +18,7 @@ export function AdminCompanyPanel({
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [contact, setContact] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [aliases, setAliases] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export function AdminCompanyPanel({
     setLoginId("");
     setPassword("");
     setContact("");
+    setContactEmail("");
     setAliases("");
   }
 
@@ -64,6 +66,7 @@ export function AdminCompanyPanel({
     setLoginId(company.login_id);
     setPassword("");
     setContact(company.contact || "");
+    setContactEmail(company.contact_email || "");
     setAliases((company.aliases || []).join(", "));
     setOpen(true);
   }
@@ -78,6 +81,7 @@ export function AdminCompanyPanel({
         login_id: loginId,
         password,
         contact,
+        contact_email: contactEmail,
         aliases: aliases
           .split(",")
           .map((a) => a.trim())
@@ -216,6 +220,13 @@ export function AdminCompanyPanel({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required={!editing}
+            />
+            <input
+              className={fieldClass}
+              type="email"
+              placeholder="수신 메일 (선택)"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
             />
             <input
               className={fieldClass}
