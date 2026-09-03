@@ -5,9 +5,44 @@ import { hashPassword } from "@/lib/password";
 import {
   COMPANY_SELECT,
   COMPANY_SELECT_BASE,
+  COMPANY_SELECT_MAIL,
+  companyCrmFieldsFromBody,
   isMissingColumnError,
+  isMissingCompanyCrmColumn,
   normalizeLoginId,
 } from "@/lib/company";
+
+async function selectCompanies(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+) {
+  const first = await supabase
+    .from("companies")
+    .select(COMPANY_SELECT)
+    .order("name", { ascending: true });
+  if (!first.error) return first;
+  if (isMissingCompanyCrmColumn(first.error.message)) {
+    const mail = await supabase
+      .from("companies")
+      .select(COMPANY_SELECT_MAIL)
+      .order("name", { ascending: true });
+    if (!mail.error) return mail;
+    if (isMissingColumnError(mail.error.message, "contact_email")) {
+      return supabase
+        .from("companies")
+        .select(COMPANY_SELECT_BASE)
+        .order("name", { ascending: true });
+    }
+    return mail;
+  }
+  if (isMissingColumnError(first.error.message, "contact_email")) {
+    return supabase
+      .from("companies")
+      .select(COMPANY_SELECT_BASE)
+      .order("name", { ascending: true });
+  }
+  return first;
+}
 
 export async function GET() {
   const auth = await requireAnyAdmin();
@@ -16,24 +51,11 @@ export async function GET() {
   const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
-  const first = await supabase
-    .from("companies")
-    .select(COMPANY_SELECT)
-    .order("name", { ascending: true });
-  if (first.error && isMissingColumnError(first.error.message, "contact_email")) {
-    const fallback = await supabase
-      .from("companies")
-      .select(COMPANY_SELECT_BASE)
-      .order("name", { ascending: true });
-    if (fallback.error) {
-      return NextResponse.json({ error: fallback.error.message }, { status: 500 });
-    }
-    return NextResponse.json({ companies: fallback.data || [] });
+  const res = await selectCompanies(supabase);
+  if (res.error) {
+    return NextResponse.json({ error: res.error.message }, { status: 500 });
   }
-  if (first.error) {
-    return NextResponse.json({ error: first.error.message }, { status: 500 });
-  }
-  return NextResponse.json({ companies: first.data || [] });
+  return NextResponse.json({ companies: res.data || [] });
 }
 
 export async function POST(request: Request) {
@@ -43,15 +65,7 @@ export async function POST(request: Request) {
   const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
-  let body: {
-    name?: string;
-    login_id?: string;
-    password?: string;
-    aliases?: string[];
-    contact?: string | null;
-    contact_email?: string | null;
-    is_active?: boolean;
-  };
+  let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
@@ -75,6 +89,10 @@ export async function POST(request: Request) {
     ? body.aliases.map((a) => String(a).trim()).filter(Boolean)
     : [];
   const contact_email = String(body.contact_email || "").trim() || null;
+  const crm = companyCrmFieldsFromBody(body, "create");
+  if (crm.error) {
+    return NextResponse.json({ error: crm.error }, { status: 400 });
+  }
 
   const insertRow: Record<string, unknown> = {
     name,
@@ -83,8 +101,9 @@ export async function POST(request: Request) {
     aliases,
     contact: String(body.contact || "").trim() || null,
     is_active: body.is_active !== false,
+    contact_email,
+    ...crm.fields,
   };
-  if (contact_email) insertRow.contact_email = contact_email;
 
   let { data, error } = await supabase
     .from("companies")
@@ -92,8 +111,27 @@ export async function POST(request: Request) {
     .select(COMPANY_SELECT)
     .single();
 
+  if (error && isMissingCompanyCrmColumn(error.message)) {
+    for (const key of Object.keys(crm.fields)) delete insertRow[key];
+    const retry = await supabase
+      .from("companies")
+      .insert(insertRow)
+      .select(COMPANY_SELECT_MAIL)
+      .single();
+    data = retry.data as typeof data;
+    error = retry.error;
+    if (!error) {
+      return NextResponse.json({
+        company: data,
+        warning:
+          "계약·예산 컬럼이 DB에 없습니다. scripts/sql/companies-contract-fields.sql 을 실행해 주세요.",
+      });
+    }
+  }
+
   if (error && isMissingColumnError(error.message, "contact_email")) {
     delete insertRow.contact_email;
+    for (const key of Object.keys(crm.fields)) delete insertRow[key];
     const retry = await supabase
       .from("companies")
       .insert(insertRow)

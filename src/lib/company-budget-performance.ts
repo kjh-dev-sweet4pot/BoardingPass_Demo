@@ -106,22 +106,35 @@ function stageLabel(opts: {
 export async function buildBudgetPerformanceForCompany(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
-  company: { id: string; login_id?: string | null },
+  company: {
+    id: string;
+    login_id?: string | null;
+    /** 회원사 배정 예산. 있으면 캠페인 합보다 우선 */
+    budget_amount?: number | null;
+  },
 ): Promise<BudgetPerformancePayload> {
   const companyId = company.id;
-  const { data: campaigns, error: campErr } = await supabase
-    .from("campaigns")
-    .select("budget_amount")
-    .eq("company_id", companyId);
-  if (campErr) throw new Error(campErr.message);
+  const companyBudget = Number(company.budget_amount);
+  const hasCompanyBudget =
+    Number.isFinite(companyBudget) && companyBudget > 0;
 
-  const totalBudget = (campaigns || []).reduce((sum, c) => {
-    const n = Number(c.budget_amount);
-    return sum + (Number.isFinite(n) ? n : 0);
-  }, 0);
-  const budgetTotal =
-    totalBudget > 0
-      ? totalBudget
+  let campaignBudgetSum = 0;
+  if (!hasCompanyBudget) {
+    const { data: campaigns, error: campErr } = await supabase
+      .from("campaigns")
+      .select("budget_amount")
+      .eq("company_id", companyId);
+    if (campErr) throw new Error(campErr.message);
+    campaignBudgetSum = (campaigns || []).reduce((sum, c) => {
+      const n = Number(c.budget_amount);
+      return sum + (Number.isFinite(n) ? n : 0);
+    }, 0);
+  }
+
+  const budgetTotal = hasCompanyBudget
+    ? companyBudget
+    : campaignBudgetSum > 0
+      ? campaignBudgetSum
       : isDemoCompany(company)
         ? 90_000_000
         : null;

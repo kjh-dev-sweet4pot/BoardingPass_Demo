@@ -42,11 +42,20 @@ export async function GET() {
   const supabase = await getClient();
   if (!supabase) return supabaseConfigError();
 
-  const { data: company, error: companyErr } = await supabase
+  let { data: company, error: companyErr } = await supabase
     .from("companies")
-    .select("id, name, login_id")
+    .select("id, name, login_id, budget_amount")
     .eq("id", companyId)
     .maybeSingle();
+  if (companyErr?.message?.toLowerCase().includes("budget_amount")) {
+    const fallback = await supabase
+      .from("companies")
+      .select("id, name, login_id")
+      .eq("id", companyId)
+      .maybeSingle();
+    company = fallback.data as typeof company;
+    companyErr = fallback.error;
+  }
   if (companyErr || !company) {
     return NextResponse.json(
       { error: companyErr?.message || "회원사를 찾을 수 없습니다." },

@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Field, fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
+import { COMPANY_CONTRACT_STAGES } from "@/lib/company";
 import {
   COMPANY_MAIL_KINDS,
   buildCompanyMailTemplate,
   resolveCompanyMailTo,
   type CompanyMailKind,
 } from "@/lib/company-mail";
+import { formatKrw } from "@/lib/creator-pool-mock";
 import { type Company } from "@/lib/types";
 
 export type CompaniesSub = "companies" | "companiesRegister" | "companiesMail";
@@ -48,7 +50,15 @@ function CompanyForm({
   const [contact, setContact] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [aliases, setAliases] = useState("");
+  const [firstMeetOn, setFirstMeetOn] = useState("");
+  const [plannedStartOn, setPlannedStartOn] = useState("");
+  const [plannedEndOn, setPlannedEndOn] = useState("");
+  const [contractStage, setContractStage] = useState("");
+  const [budgetAmount, setBudgetAmount] = useState("");
+  const [spentAmount, setSpentAmount] = useState("");
+  const [guidelineUrl, setGuidelineUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => setList(companies), [companies]);
@@ -66,6 +76,13 @@ function CompanyForm({
     setContact("");
     setContactEmail("");
     setAliases("");
+    setFirstMeetOn("");
+    setPlannedStartOn("");
+    setPlannedEndOn("");
+    setContractStage("");
+    setBudgetAmount("");
+    setSpentAmount("");
+    setGuidelineUrl("");
   }
 
   function startEdit(company: Company) {
@@ -76,6 +93,17 @@ function CompanyForm({
     setContact(company.contact || "");
     setContactEmail(company.contact_email || "");
     setAliases((company.aliases || []).join(", "));
+    setFirstMeetOn(company.first_meet_on?.slice(0, 10) || "");
+    setPlannedStartOn(company.planned_start_on?.slice(0, 10) || "");
+    setPlannedEndOn(company.planned_end_on?.slice(0, 10) || "");
+    setContractStage(company.contract_stage || "");
+    setBudgetAmount(
+      company.budget_amount != null ? String(company.budget_amount) : "",
+    );
+    setSpentAmount(
+      company.spent_amount != null ? String(company.spent_amount) : "",
+    );
+    setGuidelineUrl(company.guideline_url || "");
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -83,6 +111,7 @@ function CompanyForm({
     if (!isManager) return;
     setSaving(true);
     setError(null);
+    setWarning(null);
     try {
       const payload = {
         name,
@@ -94,6 +123,13 @@ function CompanyForm({
           .split(",")
           .map((a) => a.trim())
           .filter(Boolean),
+        first_meet_on: firstMeetOn || null,
+        planned_start_on: plannedStartOn || null,
+        planned_end_on: plannedEndOn || null,
+        contract_stage: contractStage || null,
+        budget_amount: budgetAmount || null,
+        spent_amount: spentAmount || null,
+        guideline_url: guidelineUrl || null,
       };
       const res = await fetch(
         editingId ? `/api/admin/companies/${editingId}` : "/api/admin/companies",
@@ -105,6 +141,7 @@ function CompanyForm({
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || "저장 실패");
+      if (typeof body.warning === "string") setWarning(body.warning);
       const next = body.company as Company;
       setList((prev) => {
         const exists = prev.some((c) => c.id === next.id);
@@ -146,7 +183,7 @@ function CompanyForm({
             disabled={!isManager}
           />
         </Field>
-        <Field label="수신 메일">
+        <Field label="수신 메일 (Email)">
           <input
             className={fieldClass}
             type="email"
@@ -162,7 +199,90 @@ function CompanyForm({
         <Field label="별칭 (쉼표)">
           <input className={fieldClass} value={aliases} onChange={(e) => setAliases(e.target.value)} disabled={!isManager} />
         </Field>
+
+        <p className="pt-2 text-xs font-semibold text-[var(--muted)]">계약 · 캠페인 진행</p>
+        <Field label="최초 미팅 일자">
+          <input
+            className={fieldClass}
+            type="date"
+            value={firstMeetOn}
+            onChange={(e) => setFirstMeetOn(e.target.value)}
+            disabled={!isManager}
+          />
+        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="소요예정 시작">
+            <input
+              className={fieldClass}
+              type="date"
+              value={plannedStartOn}
+              onChange={(e) => setPlannedStartOn(e.target.value)}
+              disabled={!isManager}
+            />
+          </Field>
+          <Field label="소요예정 종료">
+            <input
+              className={fieldClass}
+              type="date"
+              value={plannedEndOn}
+              onChange={(e) => setPlannedEndOn(e.target.value)}
+              disabled={!isManager}
+            />
+          </Field>
+        </div>
+        <Field label="계약 진행 단계">
+          <select
+            className={fieldClass}
+            value={contractStage}
+            onChange={(e) => setContractStage(e.target.value)}
+            disabled={!isManager}
+          >
+            <option value="">선택</option>
+            {COMPANY_CONTRACT_STAGES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="배정 예산 (원)">
+            <input
+              className={fieldClass}
+              inputMode="numeric"
+              placeholder="예: 35000000"
+              value={budgetAmount}
+              onChange={(e) => setBudgetAmount(e.target.value)}
+              disabled={!isManager}
+            />
+          </Field>
+          <Field label="소요 비용 (원)">
+            <input
+              className={fieldClass}
+              inputMode="numeric"
+              placeholder="운영 기록용"
+              value={spentAmount}
+              onChange={(e) => setSpentAmount(e.target.value)}
+              disabled={!isManager}
+            />
+          </Field>
+        </div>
+        <p className="text-[11px] text-[var(--muted)]">
+          배정 예산은 홈·예산 성과의 총 예산으로 쓰입니다. 소요 비용은 운영 메모용이며 배정 노출가 합계와 별개입니다.
+        </p>
+        <Field label="콘텐츠 가이드라인 URL">
+          <input
+            className={fieldClass}
+            type="url"
+            placeholder="https://drive.google.com/…"
+            value={guidelineUrl}
+            onChange={(e) => setGuidelineUrl(e.target.value)}
+            disabled={!isManager}
+          />
+        </Field>
+
         {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
+        {warning ? <p className="text-xs text-[var(--accent)]">{warning}</p> : null}
         <div className="flex gap-2">
           <button className={primaryBtnClass} type="submit" disabled={saving || !isManager}>
             {saving ? "저장 중…" : editing ? "수정 저장" : "등록"}
@@ -212,7 +332,14 @@ function CompanyList({
     const key = q.trim().toLowerCase();
     if (!key) return companies;
     return companies.filter((c) =>
-      [c.name, c.login_id, c.contact, c.contact_email, ...(c.aliases || [])]
+      [
+        c.name,
+        c.login_id,
+        c.contact,
+        c.contact_email,
+        c.contract_stage,
+        ...(c.aliases || []),
+      ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(key)),
     );
@@ -242,13 +369,14 @@ function CompanyList({
       />
       {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
       <div className="overflow-x-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[960px] text-left text-sm">
           <thead className="border-b border-[var(--line)] text-[11px] font-medium text-[var(--muted)]">
             <tr>
               <th className="px-3 py-2">회원사</th>
               <th className="px-3 py-2">로그인</th>
+              <th className="px-3 py-2">계약 단계</th>
+              <th className="px-3 py-2">배정 예산</th>
               <th className="px-3 py-2">수신 메일</th>
-              <th className="px-3 py-2">연락처</th>
               <th className="px-3 py-2">상태</th>
               <th className="px-3 py-2" />
             </tr>
@@ -256,7 +384,7 @@ function CompanyList({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td className="px-3 py-6 text-[var(--muted)]" colSpan={6}>
+                <td className="px-3 py-6 text-[var(--muted)]" colSpan={7}>
                   등록된 회원사가 없습니다.
                 </td>
               </tr>
@@ -265,10 +393,15 @@ function CompanyList({
                 <tr key={c.id} className="border-b border-[var(--line)] last:border-0">
                   <td className="px-3 py-2.5 font-semibold">{c.name}</td>
                   <td className="px-3 py-2.5 text-[var(--muted)]">{c.login_id}</td>
+                  <td className="px-3 py-2.5">{c.contract_stage || "—"}</td>
+                  <td className="px-3 py-2.5 tabular-nums text-[var(--muted)]">
+                    {c.budget_amount != null
+                      ? `${formatKrw(c.budget_amount)}원`
+                      : "—"}
+                  </td>
                   <td className="px-3 py-2.5">
                     {c.contact_email || resolveCompanyMailTo(c) || "—"}
                   </td>
-                  <td className="px-3 py-2.5 text-[var(--muted)]">{c.contact || "—"}</td>
                   <td className="px-3 py-2.5">{c.is_active ? "활성" : "비활성"}</td>
                   <td className="px-3 py-2.5 text-right">
                     <button

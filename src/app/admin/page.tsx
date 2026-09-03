@@ -3,6 +3,13 @@ import { signOut } from "@/app/actions/auth";
 import { AdminConsoleLayout } from "@/components/admin-console-layout";
 import { AppShell } from "@/components/ui";
 import { isAdminSession, getAdminRole } from "@/lib/session";
+import {
+  COMPANY_SELECT,
+  COMPANY_SELECT_BASE,
+  COMPANY_SELECT_MAIL,
+  isMissingColumnError,
+  isMissingCompanyCrmColumn,
+} from "@/lib/company";
 import { createAuthedDbClient } from "@/lib/supabase/api-client";
 import { type AllocationWithRelations, type Company, type Product, type Store } from "@/lib/types";
 
@@ -23,9 +30,7 @@ export default async function AdminPage({
   const adminRole = await getAdminRole();
   const companiesQuery = supabase
     .from("companies")
-    .select(
-      "id, name, login_id, aliases, contact, contact_email, is_active, created_at, updated_at",
-    )
+    .select(COMPANY_SELECT)
     .order("name", { ascending: true });
   const [{ data: stores }, companiesRes, { data: products }, { data: allocations, error }] =
     await Promise.all([
@@ -42,9 +47,15 @@ export default async function AdminPage({
     ]);
   let companies = companiesRes.data;
   if (companiesRes.error) {
+    const msg = companiesRes.error.message;
+    const select = isMissingCompanyCrmColumn(msg)
+      ? COMPANY_SELECT_MAIL
+      : isMissingColumnError(msg, "contact_email")
+        ? COMPANY_SELECT_BASE
+        : COMPANY_SELECT_BASE;
     const fallback = await supabase
       .from("companies")
-      .select("id, name, login_id, aliases, contact, is_active, created_at, updated_at")
+      .select(select)
       .order("name", { ascending: true });
     companies = fallback.data as typeof companies;
   }
