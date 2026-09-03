@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isDemoCompany } from "@/lib/company";
 import { fetchInsights } from "@/app/api/com/insights/route";
+import { buildBudgetPerformanceForCompany } from "@/lib/company-budget-performance";
 import {
   buildDemoCompanyNews,
   buildDerivedNews,
@@ -76,24 +77,16 @@ export async function GET() {
 
   const { data: castings } = await supabase
     .from("castings")
-    .select(
-      "id, status, campaign_id, allocations ( allocation_pricing ( display_price ) )",
-    )
+    .select("id")
     .eq("company_id", companyId)
     .eq("status", "Accept");
 
-  let spent = 0;
-  for (const row of castings || []) {
-    const alloc = Array.isArray(row.allocations)
-      ? row.allocations[0]
-      : row.allocations;
-    const pricing = alloc?.allocation_pricing;
-    const priceRow = Array.isArray(pricing) ? pricing[0] : pricing;
-    const price = Number(priceRow?.display_price ?? 0);
-    if (Number.isFinite(price)) spent += price;
-  }
-  if (isDemoCompany(company) && spent <= 0) {
-    spent = 40_000_000;
+  let budget = summarizeBudget(budgetTotal, 0, 0);
+  try {
+    const bp = await buildBudgetPerformanceForCompany(supabase, company);
+    budget = summarizeBudget(bp.budgetTotal, bp.spent, bp.scheduled);
+  } catch {
+    /* 캠페인 합계만 유지 */
   }
 
   const { data: allocs } = await supabase
@@ -284,7 +277,7 @@ export async function GET() {
 
   const payload: CompanyHomePayload = {
     asOf,
-    budget: summarizeBudget(budgetTotal, spent),
+    budget,
     content: {
       published,
       target: targetSum > 0 ? targetSum : null,

@@ -45,8 +45,14 @@ export type CompanyHomePayload = {
   asOf: string;
   budget: {
     total: number | null;
+    /** 발행완료 — 실제 사용 (예산 성과와 동일) */
     spent: number;
+    /** 진행~발행 이전 — 차감 예정 */
+    scheduled: number;
+    /** spent + scheduled */
+    committed: number;
     remaining: number | null;
+    /** committed / total */
     pct: number | null;
   };
   content: { published: number; target: number | null };
@@ -94,13 +100,25 @@ export function rankBestPosts(
     .slice(0, limit);
 }
 
-export function summarizeBudget(total: number | null, spent: number) {
+export function summarizeBudget(
+  total: number | null,
+  spent: number,
+  scheduled = 0,
+) {
+  const committed = spent + scheduled;
   if (total == null || total <= 0) {
-    return { total, spent, remaining: null as number | null, pct: null as number | null };
+    return {
+      total,
+      spent,
+      scheduled,
+      committed,
+      remaining: null as number | null,
+      pct: null as number | null,
+    };
   }
-  const remaining = Math.max(0, total - spent);
-  const pct = Math.round((spent / total) * 1000) / 10;
-  return { total, spent, remaining, pct };
+  const remaining = Math.max(0, total - committed);
+  const pct = Math.round((committed / total) * 1000) / 10;
+  return { total, spent, scheduled, committed, remaining, pct };
 }
 
 export function addDaysYmd(ymd: string, delta: number) {
@@ -588,6 +606,14 @@ function assertRankBestPosts() {
   }
   const all = rankBestPosts(posts, null, 1);
   if (all[0]!.id !== "b") throw new Error("rankBestPosts all failed");
+  const bgt = summarizeBudget(10_000_000, 700_000, 800_000);
+  if (
+    bgt.committed !== 1_500_000 ||
+    bgt.remaining !== 8_500_000 ||
+    bgt.pct !== 15
+  ) {
+    throw new Error("summarizeBudget committed failed");
+  }
   const series = viewsByPublishDay(posts, "2026-09-03", 7);
   if (series.length !== 7 || series[4] !== 100) {
     throw new Error("viewsByPublishDay failed");

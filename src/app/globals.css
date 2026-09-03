@@ -571,7 +571,7 @@ button {
 }
 
 .bp-ticker-track {
-  animation: bp-ticker-roll 26s linear infinite;
+  animation: bp-ticker-roll 55s linear infinite;
   width: max-content;
 }
 

@@ -13,6 +13,7 @@ import {
   useBudgetGate,
 } from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
+import { CompanyBudgetPerformanceTab } from "@/components/company-budget-performance-tab";
 import { CompanyHomeLanding } from "@/components/company-home-landing";
 import { CompanyProgressTab } from "@/components/company-progress-tab";
 import { isDemoCompany } from "@/lib/company";
@@ -457,7 +458,10 @@ export function CompanyConsole({
   }
 
   const sidebarFooter =
-    (view === "content" || view === "contentLookup") && performanceMeta ? (
+    (view === "content" ||
+      view === "contentLookup" ||
+      view === "budgetPerformance") &&
+    performanceMeta ? (
       <>
         <p>{performanceMeta.asOf} 조회 시점 기준</p>
         {performanceMeta.lastCollected ? (
@@ -509,6 +513,7 @@ export function CompanyConsole({
           companyName={company.name}
           companyId={company.id}
           onOpenPerformance={() => setView("content")}
+          onOpenBudgetPerformance={() => setView("budgetPerformance")}
           onOpenPublish={() => setView("publish")}
           onOpenPool={() => setView("pool")}
         />
@@ -536,6 +541,11 @@ export function CompanyConsole({
           }
           period={period}
           onPeriodChange={setPeriod}
+          onMetaChange={setPerformanceMeta}
+        />
+      ) : view === "budgetPerformance" ? (
+        <CompanyBudgetPerformanceTab
+          companyId={company.id}
           onMetaChange={setPerformanceMeta}
         />
       ) : view === "content" ? (

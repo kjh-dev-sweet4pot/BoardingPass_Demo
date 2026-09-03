@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { createPortal } from "react-dom";
 import { CreatorPhoto } from "@/components/creator-photo";
 import {
   CompanyHomePerformanceBoard,
@@ -43,6 +44,77 @@ function donutPct(pct: number | null) {
     return { fill: 0, label: null as number | null };
   }
   return { fill: Math.min(100, Math.max(0, pct)), label: Math.round(pct) };
+}
+
+function KpiHoverTip({
+  title,
+  rows,
+  note,
+  children,
+}: {
+  title: string;
+  rows: { label: string; value: string }[];
+  note?: string;
+  children: ReactNode;
+}) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  function show(el: HTMLElement) {
+    const r = el.getBoundingClientRect();
+    const tipW = 248;
+    const pad = 12;
+    setPos({
+      top: r.bottom + 8,
+      left: Math.max(
+        pad + tipW / 2,
+        Math.min(r.left + r.width / 2, window.innerWidth - pad - tipW / 2),
+      ),
+    });
+  }
+
+  return (
+    <div
+      className="relative min-w-0 w-full"
+      onMouseEnter={(e) => show(e.currentTarget)}
+      onMouseLeave={() => setPos(null)}
+      onFocus={(e) => show(e.currentTarget)}
+      onBlur={() => setPos(null)}
+    >
+      {children}
+      {mounted && pos
+        ? createPortal(
+            <div
+              role="tooltip"
+              className="pointer-events-none fixed z-[200] w-[248px] -translate-x-1/2 rounded-[6px] border border-[var(--line)] bg-[var(--ink)] px-3 py-2.5 text-white shadow-lg"
+              style={{ top: pos.top, left: pos.left }}
+            >
+              <p className="mb-1.5 text-[10px] font-medium tracking-wide text-white/60">
+                {title}
+              </p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">
+                {rows.map((row) => (
+                  <Fragment key={row.label}>
+                    <dt className="text-white/65">{row.label}</dt>
+                    <dd className="text-right font-semibold tabular-nums">
+                      {row.value}
+                    </dd>
+                  </Fragment>
+                ))}
+              </dl>
+              {note ? (
+                <p className="mt-2 text-[10.5px] leading-relaxed text-white/55">
+                  {note}
+                </p>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
 }
 
 function DonutCell({
@@ -581,12 +653,14 @@ export function CompanyHomeLanding({
   companyName,
   companyId,
   onOpenPerformance,
+  onOpenBudgetPerformance,
   onOpenPublish,
   onOpenPool,
 }: {
   companyName: string;
   companyId: string;
   onOpenPerformance?: () => void;
+  onOpenBudgetPerformance?: () => void;
   onOpenPublish?: () => void;
   onOpenPool?: () => void;
 }) {
@@ -596,9 +670,9 @@ export function CompanyHomeLanding({
   const [insightLinks, setInsightLinks] = useState<HomeInsightLink[]>([]);
   const [insightsLoading, setInsightsLoading] = useState(true);
   const [insightsError, setInsightsError] = useState<string | null>(null);
-  const [flashWeekly, setFlashWeekly] = useState(false);
+  const [flashMonthly, setFlashMonthly] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const weeklyRef = useRef<HTMLElement | null>(null);
+  const monthlyRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -671,13 +745,14 @@ export function CompanyHomeLanding({
   }, [companyId]);
 
   const week = data?.best.week || [];
-  const tickerItems = reduceMotion ? week.slice(0, 3) : week;
-  const tickerLoop = !reduceMotion && week.length > 0;
+  const month = data?.best.month || [];
+  const tickerItems = reduceMotion ? month.slice(0, 3) : month;
+  const tickerLoop = !reduceMotion && month.length > 0;
 
-  function goWeekly() {
-    weeklyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setFlashWeekly(true);
-    window.setTimeout(() => setFlashWeekly(false), 900);
+  function goMonthly() {
+    monthlyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setFlashMonthly(true);
+    window.setTimeout(() => setFlashMonthly(false), 900);
   }
 
   const budget = data?.budget;
@@ -706,71 +781,171 @@ export function CompanyHomeLanding({
         {data ? (
           <>
             <p className="px-5 pt-3 text-[11.5px] text-[var(--muted)] sm:px-8">
-              {companyName} · {data.asOf} 조회 시점 기준 · 예산은 섭외 Accept 노출가
+              {companyName} · {data.asOf} 조회 시점 기준 · 예산은 노출가 실제 사용·차감 예정
             </p>
             <div className="mt-3 grid grid-cols-1 gap-3 px-5 sm:grid-cols-2 sm:px-8 xl:grid-cols-4">
-              <DonutCell
-                pct={budget?.pct ?? null}
-                color="var(--ink)"
-                label="예산 집행"
-                caption={
-                  budget?.total != null
-                    ? `${formatKrw(budget.spent)} / ${formatKrw(budget.total)}원`
-                    : budget?.spent
-                      ? `${formatKrw(budget.spent)}원`
-                      : "—"
-                }
-                onClick={onOpenPerformance}
-              />
-              <DonutCell
-                pct={
-                  content?.target
-                    ? (content.published / content.target) * 100
-                    : null
-                }
-                color="var(--accent)"
-                label="콘텐츠 발행"
-                caption={
-                  content?.target
-                    ? `${content.published}건 / ${content.target}건`
-                    : `${content?.published ?? 0}건`
-                }
-                onClick={onOpenPublish}
-              />
-              <StripPlain
-                label="계약 인플루언서"
-                value={inf ? `${inf.contracted}명` : "0명"}
-                hint={`성과 발생 ${inf?.withPerformance ?? 0}명`}
-                extra={
-                  <div className="h-[5px] overflow-hidden rounded-full bg-[#EDE7DC]">
-                    <span
-                      className="block h-full bg-[#2F7D5A]"
-                      style={{ width: `${infBar}%` }}
-                    />
-                  </div>
-                }
-                onClick={onOpenPool}
-              />
-              <ViewsCell
-                total={weekViews?.total ?? 0}
-                wowPct={weekViews?.wowPct ?? null}
-                curve={weekViews?.curve || []}
-                onClick={onOpenPerformance}
-              />
+              <KpiHoverTip
+                title="예산 집행"
+                rows={[
+                  {
+                    label: "캠페인 예산",
+                    value:
+                      budget?.total != null
+                        ? `${formatKrw(budget.total)}원`
+                        : "—",
+                  },
+                  {
+                    label: "실제 사용",
+                    value: `${formatKrw(budget?.spent ?? 0)}원`,
+                  },
+                  {
+                    label: "차감 예정",
+                    value: `${formatKrw(budget?.scheduled ?? 0)}원`,
+                  },
+                  {
+                    label: "집행 합계",
+                    value: `${formatKrw(budget?.committed ?? 0)}원`,
+                  },
+                  {
+                    label: "잔여",
+                    value:
+                      budget?.remaining != null
+                        ? `${formatKrw(budget.remaining)}원`
+                        : "—",
+                  },
+                  {
+                    label: "집행률",
+                    value:
+                      budget?.pct != null ? `${budget.pct}%` : "—",
+                  },
+                ]}
+                note="노출가 기준. 실제 사용은 발행완료, 차감 예정은 진행~발행 이전 배정입니다."
+              >
+                <DonutCell
+                  pct={budget?.pct ?? null}
+                  color="var(--ink)"
+                  label="예산 집행"
+                  caption={
+                    budget?.total != null
+                      ? `${formatKrw(budget.committed)} / ${formatKrw(budget.total)}원`
+                      : budget?.committed
+                        ? `${formatKrw(budget.committed)}원`
+                        : "—"
+                  }
+                  onClick={onOpenBudgetPerformance}
+                />
+              </KpiHoverTip>
+              <KpiHoverTip
+                title="콘텐츠 발행"
+                rows={[
+                  {
+                    label: "발행완료",
+                    value: `${content?.published ?? 0}건`,
+                  },
+                  {
+                    label: "목표",
+                    value:
+                      content?.target != null
+                        ? `${content.target}건`
+                        : "미설정",
+                  },
+                  {
+                    label: "진행률",
+                    value:
+                      content?.target
+                        ? `${Math.round((content.published / content.target) * 100)}%`
+                        : "—",
+                  },
+                ]}
+                note="발행완료 콘텐츠 건수 / 배정 목표 콘텐츠 수 합계입니다."
+              >
+                <DonutCell
+                  pct={
+                    content?.target
+                      ? (content.published / content.target) * 100
+                      : null
+                  }
+                  color="var(--accent)"
+                  label="콘텐츠 발행"
+                  caption={
+                    content?.target
+                      ? `${content.published}건 / ${content.target}건`
+                      : `${content?.published ?? 0}건`
+                  }
+                  onClick={onOpenPublish}
+                />
+              </KpiHoverTip>
+              <KpiHoverTip
+                title="계약 인플루언서"
+                rows={[
+                  {
+                    label: "계약",
+                    value: `${inf?.contracted ?? 0}명`,
+                  },
+                  {
+                    label: "성과 발생",
+                    value: `${inf?.withPerformance ?? 0}명`,
+                  },
+                  {
+                    label: "성과 발생률",
+                    value: infBar ? `${infBar}%` : "0%",
+                  },
+                ]}
+                note="배정된 인플루언서입니다. 성과 발생은 조회수가 있는 인원입니다."
+              >
+                <StripPlain
+                  label="계약 인플루언서"
+                  value={inf ? `${inf.contracted}명` : "0명"}
+                  hint={`성과 발생 ${inf?.withPerformance ?? 0}명`}
+                  extra={
+                    <div className="h-[5px] overflow-hidden rounded-full bg-[#EDE7DC]">
+                      <span
+                        className="block h-full bg-[#2F7D5A]"
+                        style={{ width: `${infBar}%` }}
+                      />
+                    </div>
+                  }
+                  onClick={onOpenPool}
+                />
+              </KpiHoverTip>
+              <KpiHoverTip
+                title="누적 조회"
+                rows={[
+                  {
+                    label: "누적 조회",
+                    value: formatHomeViews(weekViews?.total ?? 0),
+                  },
+                  {
+                    label: "7일 대비",
+                    value:
+                      weekViews?.wowPct == null
+                        ? "—"
+                        : `${weekViews.wowPct > 0 ? "+" : ""}${weekViews.wowPct}%`,
+                  },
+                ]}
+                note={`${data.asOf} 조회 시점 기준 · 성과 탭과 동일 누적값입니다.`}
+              >
+                <ViewsCell
+                  total={weekViews?.total ?? 0}
+                  wowPct={weekViews?.wowPct ?? null}
+                  curve={weekViews?.curve || []}
+                  onClick={onOpenPerformance}
+                />
+              </KpiHoverTip>
             </div>
 
             <div className="mt-4 flex items-center gap-3.5 overflow-hidden border-y border-[var(--line)] bg-[var(--surface)] px-5 py-2 sm:px-8">
               <button
                 type="button"
                 className="shrink-0 bg-transparent text-[11.5px] font-bold text-[var(--accent)] hover:underline"
-                onClick={goWeekly}
+                onClick={goMonthly}
               >
-                주간 랭킹 바로가기
+                월간 랭킹 바로가기
               </button>
               <div className="h-5 min-w-0 flex-1 overflow-hidden">
-                {week.length === 0 ? (
+                {month.length === 0 ? (
                   <span className="text-[12.5px] text-[var(--muted)]">
-                    이번 주 발행된 게시물이 없습니다
+                    최근 30일 발행된 게시물이 없습니다
                   </span>
                 ) : (
                   <div
@@ -827,8 +1002,6 @@ export function CompanyHomeLanding({
                 title="주간 랭킹 TOP 10"
                 sub="조회수 기준 · 4명씩 자동 스크롤"
                 empty="이번 주 발행된 게시물이 없습니다"
-                cardRef={weeklyRef}
-                flash={flashWeekly}
                 reduceMotion={reduceMotion}
                 rows={week.map((row, i) => (
                   <RankPostRow key={row.id} row={row} rank={i + 1} />
@@ -838,8 +1011,10 @@ export function CompanyHomeLanding({
                 title="월간 랭킹 TOP 10"
                 sub="조회수 기준 · 4명씩 자동 스크롤"
                 empty="최근 30일 발행된 게시물이 없습니다"
+                cardRef={monthlyRef}
+                flash={flashMonthly}
                 reduceMotion={reduceMotion}
-                rows={data.best.month.map((row, i) => (
+                rows={month.map((row, i) => (
                   <RankPostRow key={row.id} row={row} rank={i + 1} />
                 ))}
               />

@@ -37,6 +37,8 @@ function CumulativeChart({ points }: { points: WeekPoint[] }) {
   const maxV = Math.max(...points.map((p) => p.views), 1);
   const maxL = Math.max(...points.map((p) => p.likes), 1);
   const maxS = Math.max(...points.map((p) => p.saves), 1);
+  // ponytail: 조회수 강조 — 나머지 지표는 최댓값이 차트 높이 ~1/4만 쓰게 스케일
+  const OTHER_SCALE = 4;
   const n = points.length;
   const plotH = H - pad.t - pad.b;
   const xAt = (i: number) =>
@@ -69,7 +71,10 @@ function CumulativeChart({ points }: { points: WeekPoint[] }) {
         );
       })}
       {points.map((p, i) => {
-        const h = Math.max((plotH * p.uploads) / maxU, p.uploads > 0 ? 2 : 0);
+        const h = Math.max(
+          (plotH * p.uploads) / (maxU * OTHER_SCALE),
+          p.uploads > 0 ? 2 : 0,
+        );
         const x = xAt(i) - barW / 2;
         const y = pad.t + plotH - h;
         const isLast = i === n - 1;
@@ -106,12 +111,12 @@ function CumulativeChart({ points }: { points: WeekPoint[] }) {
         )}
         fill="none"
         stroke="#3b82f6"
-        strokeWidth={2.2}
+        strokeWidth={2.4}
       />
       <path
         d={line(
           points.map((p) => p.likes),
-          maxL,
+          maxL * OTHER_SCALE,
         )}
         fill="none"
         stroke="#f59e0b"
@@ -120,7 +125,7 @@ function CumulativeChart({ points }: { points: WeekPoint[] }) {
       <path
         d={line(
           points.map((p) => p.saves),
-          maxS,
+          maxS * OTHER_SCALE,
         )}
         fill="none"
         stroke="#22c55e"

@@ -13,28 +13,39 @@ export type CompanyConsoleView =
   | "publish"
   | "alloc"
   | "content"
-  | "contentLookup";
+  | "contentLookup"
+  | "budgetPerformance";
 
-const MAIN_TABS: { id: Exclude<CompanyConsoleView, "content" | "contentLookup">; label: string }[] = [
+type PerformanceView = "content" | "contentLookup" | "budgetPerformance";
+
+const MAIN_TABS: {
+  id: Exclude<CompanyConsoleView, PerformanceView>;
+  label: string;
+}[] = [
+  { id: "home", label: "홈" },
   { id: "pool", label: "크리에이터" },
   { id: "publish", label: "진행 현황" },
   { id: "alloc", label: "배정 현황" },
 ];
 
-const PERFORMANCE_ITEMS: NavDropdownItem<"content" | "contentLookup">[] = [
+const PERFORMANCE_ITEMS: NavDropdownItem<PerformanceView>[] = [
   { id: "content", label: "성과 대시보드", hint: "캠페인 전체 요약" },
   { id: "contentLookup", label: "성과 조회", hint: "인플루언서별 상세" },
+  { id: "budgetPerformance", label: "예산 성과", hint: "노출가 사용·차감 예정" },
 ];
 
 const MOBILE_TABS: { id: CompanyConsoleView; label: string }[] = [
+  { id: "home", label: "홈" },
   { id: "pool", label: "크리에이터" },
   { id: "publish", label: "진행 현황" },
   { id: "alloc", label: "배정 현황" },
   { id: "content", label: "성과" },
 ];
 
-function isPerformanceView(v: CompanyConsoleView) {
-  return v === "content" || v === "contentLookup";
+function isPerformanceView(v: CompanyConsoleView): v is PerformanceView {
+  return (
+    v === "content" || v === "contentLookup" || v === "budgetPerformance"
+  );
 }
 
 export function CompanyConsoleShell({
@@ -89,7 +100,7 @@ export function CompanyConsoleShell({
           {MOBILE_TABS.map((tab) => {
             const active =
               tab.id === view ||
-              (tab.id === "content" && view === "contentLookup");
+              (tab.id === "content" && isPerformanceView(view));
             return (
               <button
                 key={tab.id}
@@ -111,7 +122,7 @@ export function CompanyConsoleShell({
         {isPerformanceView(view) ? (
           <NavSubSegment
             items={PERFORMANCE_ITEMS}
-            view={view as "content" | "contentLookup"}
+            view={view}
             onViewChange={onViewChange}
           />
         ) : null}
