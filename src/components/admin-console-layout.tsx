@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AdminAllocSchedule } from "@/components/admin-alloc-schedule";
 import { AdminCampaignCastingPanel } from "@/components/admin-campaign-casting-panel";
 import { AdminCompaniesTab } from "@/components/admin-companies-tab";
 import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
 import { AdminDashboard, type AdminQueueKey } from "@/components/admin-dashboard";
+import { AdminInfluencersTab } from "@/components/admin-influencers-tab";
 import { AdminPerformanceLookupTab, AdminPerformanceTab } from "@/components/admin-performance-tab";
-import { AdminReviewQueue, type AdminReviewTab } from "@/components/admin-review-queue";
+import { type AdminReviewTab } from "@/components/admin-review-queue";
 import { AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
 import { Notice } from "@/components/ui";
 import {
@@ -20,20 +20,11 @@ import {
 } from "@/lib/types";
 
 const PAGE: Record<
-  Exclude<
-    AdminSection,
-    | "performance"
-    | "performanceLookup"
-    | "companies"
-    | "companiesRegister"
-    | "companiesMail"
-  >,
+  "dashboard" | "campaigns",
   { eyebrow: string; title: string }
 > = {
   dashboard: { eyebrow: "Overview", title: "대시보드" },
   campaigns: { eyebrow: "Campaigns", title: "캠페인·섭외" },
-  review: { eyebrow: "Review", title: "검수" },
-  allocations: { eyebrow: "Allocations", title: "배정·매장" },
 };
 
 function fmtCollectedKst(iso: string) {
@@ -51,14 +42,7 @@ function PageHeader({
   section,
   extra,
 }: {
-  section: Exclude<
-    AdminSection,
-    | "performance"
-    | "performanceLookup"
-    | "companies"
-    | "companiesRegister"
-    | "companiesMail"
-  >;
+  section: "dashboard" | "campaigns";
   extra?: ReactNode;
 }) {
   const meta = PAGE[section];
@@ -120,7 +104,7 @@ export function AdminConsoleLayout({
         ? "collectResults"
         : queue;
     setReviewQueue(tab);
-    setSection("review");
+    setSection("influencersReview");
   }
 
   const headerFooter =
@@ -145,7 +129,7 @@ export function AdminConsoleLayout({
       section={section}
       onSectionChange={(next) => {
         if (next !== "campaigns") setCastingStale(false);
-        if (next !== "review") setReviewQueue("reviewPending");
+        if (next !== "influencersReview") setReviewQueue("reviewPending");
         if (next !== "performance" && next !== "performanceLookup") setPerformanceMeta(null);
         setSection(next);
       }}
@@ -202,6 +186,23 @@ export function AdminConsoleLayout({
         </div>
       ) : null}
 
+      {section === "influencersRegister" ||
+      section === "influencersReview" ||
+      section === "influencersAlloc" ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <AdminInfluencersTab
+            sub={section}
+            isManager={isManager}
+            storeList={storeList}
+            companyList={companyList}
+            productList={productList}
+            allocations={list}
+            reviewQueue={reviewQueue}
+            onReviewQueueChange={setReviewQueue}
+          />
+        </div>
+      ) : null}
+
       {section === "campaigns" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PageHeader section="campaigns" />
@@ -214,28 +215,6 @@ export function AdminConsoleLayout({
               staleCastings={castingStale}
             />
           </div>
-        </div>
-      ) : null}
-
-      {section === "review" ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <PageHeader section="review" />
-          <div className="min-h-0 flex-1 overflow-auto px-4 pb-8 sm:px-7">
-            <AdminReviewQueue
-              queue={reviewQueue}
-              onQueueChange={setReviewQueue}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {section === "allocations" ? (
-        <div className="min-h-0 flex-1 overflow-auto pt-5">
-          <AdminAllocSchedule
-            list={list}
-            storeList={storeList}
-            companyList={companyList}
-          />
         </div>
       ) : null}
     </AdminConsoleShell>

@@ -43,9 +43,11 @@ function profileStatusClass(status: ImportProfileFetchStatus) {
 export function AdminImportPanel({
   compact = false,
   companies = [],
+  onSuccess,
 }: {
   compact?: boolean;
   companies?: Company[];
+  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(!compact);
@@ -244,6 +246,7 @@ export function AdminImportPanel({
       );
       void loadBatches();
       router.refresh();
+      onSuccess?.();
     } catch (err: unknown) {
       setResultError(
         err instanceof Error ? err.message : "가져오기 중 오류가 발생했습니다.",
