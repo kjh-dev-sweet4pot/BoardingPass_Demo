@@ -13,6 +13,7 @@ import {
   useBudgetGate,
 } from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
+import { CompanyHomeLanding } from "@/components/company-home-landing";
 import { CompanyProgressTab } from "@/components/company-progress-tab";
 import { isDemoCompany } from "@/lib/company";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
@@ -207,9 +208,7 @@ export function CompanyConsole({
 }) {
   const isDemo = isDemoCompany(company);
   const gate = useBudgetGate(company.id);
-  const [view, setView] = useState<CompanyConsoleView>(
-    isDemo ? "pool" : "publish",
-  );
+  const [view, setView] = useState<CompanyConsoleView>("home");
   // live: 배정은 진행현황·배정 탭 진입 시 지연 로드
   const [liveAllocations, setLiveAllocations] =
     useState<AllocationWithRelations[]>(initialAllocations);
@@ -505,7 +504,12 @@ export function CompanyConsole({
       sidebarFooter={sidebarFooter}
       mobileActions={mobileActions}
     >
-      {view === "pool" ? (
+      {view === "home" ? (
+        <CompanyHomeLanding
+          companyName={company.name}
+          onOpenPerformance={() => setView("content")}
+        />
+      ) : view === "pool" ? (
         <CompanyCreatorPool
           companyId={company.id}
           companyName={company.name}

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   NavHoverDropdown,
@@ -9,6 +8,7 @@ import {
 } from "@/components/nav-hover-dropdown";
 
 export type CompanyConsoleView =
+  | "home"
   | "pool"
   | "publish"
   | "alloc"
@@ -59,20 +59,23 @@ export function CompanyConsoleShell({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-3 lg:hidden">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <Link href="/">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/owm-logo.webp"
-              alt="O.W.M"
-              className="h-8 w-8 object-contain"
-              draggable={false}
-            />
-          </Link>
+        <button
+          type="button"
+          onClick={() => onViewChange("home")}
+          className="flex min-w-0 items-center gap-2.5 text-left"
+          aria-label="요약 홈"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/owm-logo.webp"
+            alt=""
+            className="h-8 w-8 object-contain"
+            draggable={false}
+          />
           <p className="truncate text-base font-semibold text-[var(--ink)]">
             {companyName}
           </p>
-        </div>
+        </button>
         <div className="flex flex-wrap items-center gap-2">
           {sidebarActions}
           {mobileActions}
@@ -115,11 +118,16 @@ export function CompanyConsoleShell({
       </div>
 
       <header className="hidden shrink-0 items-center gap-6 border-b border-[var(--line)] bg-[var(--surface)] px-8 py-3.5 lg:flex">
-        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2.5">
+        <button
+          type="button"
+          onClick={() => onViewChange("home")}
+          className="flex min-w-0 shrink-0 items-center gap-2.5 text-left"
+          aria-label="요약 홈"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/owm-logo.webp"
-            alt="O.W.M"
+            alt=""
             className="h-9 w-9 shrink-0 object-contain"
             draggable={false}
           />
@@ -131,7 +139,7 @@ export function CompanyConsoleShell({
               {companyName}
             </p>
           </div>
-        </Link>
+        </button>
 
         <nav
           className="flex min-w-0 flex-1 items-center justify-start gap-8"
