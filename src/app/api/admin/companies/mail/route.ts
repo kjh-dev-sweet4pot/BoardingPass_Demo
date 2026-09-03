@@ -5,6 +5,7 @@ import {
   COMPANY_MAIL_KINDS,
   buildCompanyMailTemplate,
   isCompanyMailConfigured,
+  probeResendMailAccount,
   isCompanyMailKind,
   isMailAddress,
   parseMailAddresses,
@@ -48,20 +49,26 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query;
   if (error) {
     if (missingTable(error.message)) {
+      const resend = await probeResendMailAccount();
       return NextResponse.json({
         logs: [],
         configured: isCompanyMailConfigured(),
         kinds: COMPANY_MAIL_KINDS,
+        from: resend.from,
+        resend,
         setup:
           "scripts/sql/company-mail.sql 을 Supabase SQL editor에서 실행하세요.",
       });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  const resend = await probeResendMailAccount();
   return NextResponse.json({
     logs: data || [],
     configured: isCompanyMailConfigured(),
     kinds: COMPANY_MAIL_KINDS,
+    from: resend.from,
+    resend,
   });
 }
 

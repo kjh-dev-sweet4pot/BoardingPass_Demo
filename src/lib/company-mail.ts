@@ -90,28 +90,30 @@ export function mailTextToHtml(text: string) {
   return `<p style="white-space:pre-wrap;font-family:sans-serif;font-size:14px;line-height:1.6">${escapeMailHtml(text)}</p>`;
 }
 
-const DEFAULT_MAIL_FROM = "Boarding Pass <noreply@updates.slam-global.com>";
+const DEFAULT_MAIL_FROM = "Brandslam <manager@slam-global.com>";
 
 export function getCompanyMailFrom() {
   const raw = process.env.COMPANY_MAIL_FROM?.trim() || "";
-  if (!raw || /boardingpass\.local|resend\.dev/i.test(raw)) {
+  if (!raw || /boardingpass\.local|resend\.dev|updates\.slam-global\.com/i.test(raw)) {
     return DEFAULT_MAIL_FROM;
   }
-  return raw;
+  return raw.replace(/^Boarding Pass\b/i, "Brandslam");
 }
 
 function explainResendError(message: string) {
   const m = message.toLowerCase();
-  if (m.includes("not verified") || m.includes("domain")) {
+  if (m.includes("not verified") || m.includes("domain is not verified")) {
     return (
-      "발신 도메인 updates.slam-global.com 이 Resend에 인증되어 있지 않습니다. " +
-      "https://resend.com/domains 에서 이 도메인을 추가하고 DNS(SPF/DKIM)를 인증하세요."
+      "From 주소의 도메인이 이 API 키 계정에서 Verified가 아닙니다. " +
+      "Resend는 서브도메인과 루트를 별개로 봅니다. " +
+      "`updates.slam-global.com` 인증만으로는 `manager@slam-global.com` 발신이 안 됩니다. " +
+      `(Resend: ${message})`
     );
   }
   if (m.includes("only send testing") || m.includes("your own email")) {
     return (
       "Resend 테스트 발신은 가입 메일로만 보낼 수 있습니다. " +
-      "회원사로 보내려면 updates.slam-global.com 이 Resend에서 Verified 상태여야 합니다."
+      `From을 인증된 도메인 주소로 바꿔야 합니다. (Resend: ${message})`
     );
   }
   return message;
@@ -119,6 +121,38 @@ function explainResendError(message: string) {
 
 export function isCompanyMailConfigured() {
   return Boolean(process.env.RESEND_API_KEY?.trim());
+}
+
+export type ResendDomainRow = { name: string; status: string; region: string };
+
+export async function probeResendMailAccount() {
+  const from = getCompanyMailFrom();
+  const key = process.env.RESEND_API_KEY?.trim();
+  if (!key) {
+    return { from, configured: false, domains: [] as ResendDomainRow[], error: "RESEND_API_KEY 없음" };
+  }
+  const res = await fetch("https://api.resend.com/domains", {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    data?: { name?: string; status?: string; region?: string }[];
+    message?: string;
+    error?: { message?: string };
+  };
+  if (!res.ok) {
+    return {
+      from,
+      configured: true,
+      domains: [] as ResendDomainRow[],
+      error: json.error?.message || json.message || `Resend domains ${res.status}`,
+    };
+  }
+  const domains = (json.data || []).map((d) => ({
+    name: String(d.name || ""),
+    status: String(d.status || ""),
+    region: String(d.region || ""),
+  }));
+  return { from, configured: true, domains, error: null as string | null };
 }
 
 export type MailAttachment = {
@@ -163,10 +197,14 @@ export async function sendCompanyMailViaResend(input: {
     error?: { message?: string };
   };
   if (!res.ok) {
+    const probe = await probeResendMailAccount();
+    const seen = probe.error
+      ? probe.error
+      : probe.domains.map((d) => `${d.name}:${d.status}`).join(", ") || "도메인 없음";
     throw new Error(
-      explainResendError(
+      `${explainResendError(
         json.error?.message || json.message || `메일 발송 실패 (${res.status})`,
-      ),
+      )} (from: ${probe.from} · 이 키의 도메인: ${seen})`,
     );
   }
   return { id: json.id || null };

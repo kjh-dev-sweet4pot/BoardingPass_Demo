@@ -317,6 +317,8 @@ function MailPanel({
   const [files, setFiles] = useState<File[]>([]);
   const [logs, setLogs] = useState<MailLog[]>([]);
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [mailFrom, setMailFrom] = useState<string>("");
+  const [resendHint, setResendHint] = useState<string>("");
   const [setup, setSetup] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -372,6 +374,16 @@ function MailPanel({
     setLogs(j.logs || []);
     setConfigured(Boolean(j.configured));
     setSetup(j.setup || null);
+    setMailFrom(typeof j.from === "string" ? j.from : "");
+    const r = j.resend as
+      | { error?: string | null; domains?: { name: string; status: string }[] }
+      | undefined;
+    if (r?.error) setResendHint(`Resend 키: ${r.error}`);
+    else if (r?.domains?.length) {
+      setResendHint(
+        r.domains.map((d) => `${d.name} (${d.status})`).join(" · "),
+      );
+    } else setResendHint("");
   }, [companyId]);
 
   useEffect(() => {
@@ -417,6 +429,13 @@ function MailPanel({
           <p className="text-xs text-[var(--danger)]">
             RESEND_API_KEY가 없습니다. 회원사로 보내려면 Resend에서 도메인을 인증한 뒤
             COMPANY_MAIL_FROM을 그 주소로 넣으세요.
+          </p>
+        ) : null}
+        {mailFrom || resendHint ? (
+          <p className="text-xs leading-relaxed text-[var(--muted)]">
+            {mailFrom ? `발신 ${mailFrom}` : null}
+            {mailFrom && resendHint ? " · " : null}
+            {resendHint || null}
           </p>
         ) : null}
         {setup ? <p className="text-xs text-[var(--muted)]">{setup}</p> : null}
