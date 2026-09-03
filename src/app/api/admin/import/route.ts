@@ -337,17 +337,41 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const { error } = await supabase.from("allocations").insert({
-        influencer_id: influencer.id,
-        product_id: productId,
-        store_id: storeId,
-        company_id: row.company_id,
-        quantity: row.quantity,
-        visit_date: row.visit_date,
-        status: "pending",
-      });
+      const { data: allocation, error } = await supabase
+        .from("allocations")
+        .insert({
+          influencer_id: influencer.id,
+          product_id: productId,
+          store_id: storeId,
+          company_id: row.company_id,
+          quantity: row.quantity,
+          visit_date: row.visit_date,
+          status: "pending",
+        })
+        .select("id")
+        .single();
 
-      if (error) throw new Error(error.message);
+      if (error || !allocation?.id) {
+        throw new Error(error?.message || "배정 생성에 실패했습니다.");
+      }
+
+      if (row.display_price != null && row.cost_amount != null) {
+        // ponytail: 방문형 CSV는 확정가로 간주. 캠페인 섭외 Accept와 별개 경로.
+        // 천장: accepted_at 의미가 Accept와 섞임 → 나중에 source 컬럼 분리.
+        const { error: priceErr } = await supabase
+          .from("allocation_pricing")
+          .insert({
+            allocation_id: allocation.id,
+            company_id: row.company_id,
+            display_price: row.display_price,
+            cost_amount: row.cost_amount,
+            accepted_at: new Date().toISOString(),
+          });
+        if (priceErr) {
+          await supabase.from("allocations").delete().eq("id", allocation.id);
+          throw new Error(`가격 저장 실패: ${priceErr.message}`);
+        }
+      }
 
       created++;
       results.push({

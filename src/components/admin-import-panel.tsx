@@ -214,6 +214,8 @@ export function AdminImportPanel({
         store: r.store,
         product: r.product,
         quantity: r.quantity,
+        display_price: r.display_price ?? "",
+        cost_amount: r.cost_amount ?? "",
       })),
     };
 
@@ -686,6 +688,8 @@ export function AdminImportPanel({
                       <th className="px-3 py-2 font-medium">매장</th>
                       <th className="px-3 py-2 font-medium">상품</th>
                       <th className="px-3 py-2 font-medium text-right">수량</th>
+                      <th className="px-3 py-2 font-medium text-right">노출가</th>
+                      <th className="px-3 py-2 font-medium text-right">원가</th>
                       <th className="px-3 py-2 font-medium">오류</th>
                     </tr>
                   </thead>
@@ -753,6 +757,16 @@ export function AdminImportPanel({
                         <td className="px-3 py-2">{row.product || "—"}</td>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {row.quantity}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {row.display_price != null
+                            ? row.display_price.toLocaleString("ko-KR")
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {row.cost_amount != null
+                            ? row.cost_amount.toLocaleString("ko-KR")
+                            : "—"}
                         </td>
                         <td className="px-3 py-2 text-xs text-[var(--danger)]">
                           {row.errors.join(", ") || "—"}

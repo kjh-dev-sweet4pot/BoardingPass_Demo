@@ -6,6 +6,7 @@ import {
   stripPricingDeep,
 } from "@/lib/access";
 import { acceptCasting } from "@/lib/admin-casting-accept";
+import { isMoneyOk, parseMoney } from "@/lib/money";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { type CastingStatus } from "@/lib/types";
 
@@ -25,11 +26,6 @@ const CASTING_SELECT = `
 `;
 
 type CastingAction = "start_nego" | "accept" | "reject";
-
-function parseMoney(v: unknown) {
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
-}
 
 export async function GET(
   _request: NextRequest,
@@ -150,7 +146,12 @@ export async function PATCH(
     const storeId = String(body.store_id || "").trim();
     const visitDate = String(body.visit_date || "").trim();
 
-    if (displayPrice == null || costAmount == null || targetContentCount == null || targetContentCount < 1) {
+    if (
+      !isMoneyOk(displayPrice) ||
+      !isMoneyOk(costAmount) ||
+      !isMoneyOk(targetContentCount) ||
+      targetContentCount < 1
+    ) {
       return NextResponse.json(
         { error: "노출가·원가·목표 콘텐츠 수를 입력하세요." },
         { status: 400 },

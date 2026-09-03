@@ -654,7 +654,6 @@ export function CompanyPerformanceTab({
   onMetaChange,
   insightsUrl = "/api/com/insights",
   enableRecollect = true,
-  embedded = false,
   toolbarExtra,
 }: {
   companyId: string;
@@ -669,8 +668,6 @@ export function CompanyPerformanceTab({
   /** 기본: 회원사 세션 API. admin은 /api/admin/insights */
   insightsUrl?: string;
   enableRecollect?: boolean;
-  /** admin 등 상위 헤더가 있을 때 타이틀 숨김 */
-  embedded?: boolean;
   toolbarExtra?: ReactNode;
 }) {
   const [allLinks, setAllLinks] = useState<LinkRow[]>(initialData?.links ?? []);
@@ -1134,23 +1131,13 @@ export function CompanyPerformanceTab({
   }
 
   return (
-    <div
-      className={
-        embedded
-          ? "flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-1 py-2"
-          : "flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-[28px] py-[26px]"
-      }
-    >
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-[28px] py-[26px]">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        {embedded ? (
-          <div />
-        ) : (
-          <div>
-            <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
-              성과 대시보드
-            </h2>
-          </div>
-        )}
+        <div>
+          <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
+            성과 대시보드
+          </h2>
+        </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"

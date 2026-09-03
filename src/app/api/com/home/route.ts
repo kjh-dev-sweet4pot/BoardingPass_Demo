@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { isDemoCompany } from "@/lib/company";
+import { fetchInsights } from "@/app/api/com/insights/route";
 import {
   buildDemoCompanyNews,
   buildDerivedNews,
+  buildViewsCurvePoints,
+  cumulativeViewsSeriesFromMetrics,
   rankBestPosts,
+  rankInfluencers,
   summarizeBudget,
   windowStartIso,
+  wowPct,
   ymdKstNow,
   type CompanyHomeBestPost,
+  type CompanyHomeInfluencerRow,
   type CompanyHomePayload,
 } from "@/lib/company-home";
 import { getCompanySessionId } from "@/lib/session";
@@ -93,11 +99,14 @@ export async function GET() {
   const { data: allocs } = await supabase
     .from("allocations")
     .select(
-      "id, influencer_id, influencers(id, name, instagram_handle_normalized, instagram_handle), products(id, name)",
+      "id, influencer_id, status, rollup_status, target_content_count, influencers(id, name, instagram_handle_normalized, instagram_handle, followers), products(id, name)",
     )
     .eq("company_id", companyId);
 
   const allocMap = new Map((allocs || []).map((a) => [a.id, a]));
+  const activeAllocs = (allocs || []).filter(
+    (a) => a.status !== "cancelled" && a.rollup_status !== "취소",
+  );
   const allocIds = [...allocMap.keys()];
 
   let posts: CompanyHomeBestPost[] = [];
@@ -176,6 +185,94 @@ export async function GET() {
   const weekSince = windowStartIso(7, asOf);
   const monthSince = windowStartIso(30, asOf);
 
+  const published = posts.length;
+  const targetSum = activeAllocs.reduce((s, a) => {
+    const n = Number(a.target_content_count);
+    return s + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+
+  const viewsByInf = new Map<string, number>();
+  for (const p of posts) {
+    viewsByInf.set(p.influencerId, (viewsByInf.get(p.influencerId) || 0) + p.views);
+  }
+
+  const infRows = new Map<string, CompanyHomeInfluencerRow>();
+  for (const a of activeAllocs) {
+    const inf = Array.isArray(a.influencers) ? a.influencers[0] : a.influencers;
+    const id = inf?.id || a.influencer_id;
+    if (!id || infRows.has(id)) continue;
+    const product = Array.isArray(a.products) ? a.products[0] : a.products;
+    const handleRaw =
+      inf?.instagram_handle_normalized || inf?.instagram_handle || "";
+    infRows.set(id, {
+      id,
+      name: inf?.name || "인플루언서",
+      handle: handleRaw ? `@${String(handleRaw).replace(/^@+/, "")}` : "—",
+      product: product?.name || "상품",
+      followers: Number(inf?.followers) || 0,
+      views: viewsByInf.get(id) || 0,
+    });
+  }
+  for (const p of posts) {
+    if (infRows.has(p.influencerId)) continue;
+    infRows.set(p.influencerId, {
+      id: p.influencerId,
+      name: p.name,
+      handle: p.handle,
+      product: p.product,
+      followers: 0,
+      views: p.views,
+    });
+  }
+
+  const ranking = rankInfluencers([...infRows.values()]);
+
+  // 성과 탭과 동일 소스: creator_links.views 합 + content_metrics 곡선
+  let weekViewTotal = posts.reduce((s, p) => s + (p.views || 0), 0);
+  let weekSeries: number[] = Array.from({ length: 7 }, () => 0);
+  weekSeries[6] = weekViewTotal;
+  let weekWow: number | null = null;
+  let weekCurve: { day: number; views: number }[] = [];
+  try {
+    const insights = await fetchInsights(supabase, companyId, { days: 90 });
+    const insightLinks = (insights.links || []) as {
+      id: string;
+      views?: number | null;
+      published_at?: string | null;
+    }[];
+    const linkTotal = insightLinks.reduce(
+      (s, l) => s + (Number(l.views) || 0),
+      0,
+    );
+    if (linkTotal > 0 || insightLinks.length > 0) {
+      weekViewTotal = linkTotal;
+    }
+    const metrics = (insights.metrics || []) as {
+      creator_link_id: string;
+      collected_at: string;
+      views: number | null;
+    }[];
+    weekCurve = buildViewsCurvePoints(
+      insightLinks.map((l) => ({
+        id: l.id,
+        published_at: l.published_at ?? null,
+      })),
+      metrics,
+    );
+    if (metrics.length > 0) {
+      const series = cumulativeViewsSeriesFromMetrics(metrics, asOf, 7);
+      if (weekViewTotal > 0 && (series.every((v) => v === 0) || series[6] === 0)) {
+        series[6] = weekViewTotal;
+      }
+      weekSeries = series;
+      weekWow = wowPct(weekSeries[6] || 0, weekSeries[0] || 0);
+    } else {
+      weekSeries = Array.from({ length: 7 }, () => weekViewTotal);
+    }
+  } catch {
+    /* posts 스냅샷 유지 */
+  }
+
   const news = isDemoCompany(company)
     ? buildDemoCompanyNews(company.name)
     : buildDerivedNews({
@@ -188,6 +285,21 @@ export async function GET() {
   const payload: CompanyHomePayload = {
     asOf,
     budget: summarizeBudget(budgetTotal, spent),
+    content: {
+      published,
+      target: targetSum > 0 ? targetSum : null,
+    },
+    influencers: {
+      contracted: infRows.size,
+      withPerformance: [...infRows.values()].filter((r) => r.views > 0).length,
+      ranking,
+    },
+    weekViews: {
+      total: weekViewTotal,
+      wowPct: weekWow,
+      series: weekSeries,
+      curve: weekCurve,
+    },
     best: {
       week: rankBestPosts(posts, weekSince),
       month: rankBestPosts(posts, monthSince),

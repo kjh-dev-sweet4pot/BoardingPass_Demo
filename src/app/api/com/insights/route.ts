@@ -25,7 +25,7 @@ export async function fetchInsights(
   let allocQuery = supabase
     .from("allocations")
     .select(
-      "id, company_id, influencer_id, target_content_count, influencers(id, name, instagram_handle_normalized, instagram_handle), products(id, name), companies(id, name)",
+      "id, company_id, influencer_id, target_content_count, influencers(id, name, instagram_handle_normalized, instagram_handle, region), products(id, name), companies(id, name), allocation_pricing(display_price)",
     );
 
   if (companyId) allocQuery = allocQuery.eq("company_id", companyId);
@@ -52,22 +52,25 @@ export async function fetchInsights(
   if (linksErr) throw new Error(linksErr.message);
   if (!rawLinks || rawLinks.length === 0) return { links: [], metrics: [], collectedAt: null, source: "apify" };
 
-  // 관계 데이터 병합
-  const links = rawLinks.map((l) => ({
-    id: l.id,
-    link_url: (l.publish_url || l.url || "").trim() || null,
-    status: l.status,
-    published_at: l.submitted_at || null,
-    views: l.views,
-    likes: l.likes,
-    comments: l.comments,
-    saves: l.saves,
-    shares: l.shares,
-    reposts: l.reposts,
-    metrics_collected_at: l.metrics_collected_at,
-    allocation_id: l.allocation_id,
-    allocations: allocMap.get(l.allocation_id) ?? null,
-  }));
+  // 관계 데이터 병합 (노출가만 — 원가·마진 미포함)
+  const links = rawLinks.map((l) => {
+    const alloc = allocMap.get(l.allocation_id) ?? null;
+    return {
+      id: l.id,
+      link_url: (l.publish_url || l.url || "").trim() || null,
+      status: l.status,
+      published_at: l.submitted_at || null,
+      views: l.views,
+      likes: l.likes,
+      comments: l.comments,
+      saves: l.saves,
+      shares: l.shares,
+      reposts: l.reposts,
+      metrics_collected_at: l.metrics_collected_at,
+      allocation_id: l.allocation_id,
+      allocations: alloc,
+    };
+  });
 
   const linkIds = links.map((l) => l.id);
   const since = new Date(Date.now() - days * 86400 * 1000).toISOString();

@@ -1,61 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
 import {
+  CompanyHomePerformanceBoard,
+  CompanyHomeShareDonuts,
+} from "@/components/company-home-performance-board";
+import {
+  displayHandle,
   formatHomeViews,
   newsKindTone,
   type CompanyHomeBestPost,
+  type CompanyHomeInfluencerRow,
   type CompanyHomeNewsItem,
   type CompanyHomePayload,
+  type HomeInsightLink,
 } from "@/lib/company-home";
-import {
-  findPoolCreator,
-  formatKrw,
-  type PoolCreator,
-} from "@/lib/creator-pool-mock";
-
-function bestPostPhotoCreator(row: CompanyHomeBestPost): PoolCreator {
-  const fromPool = findPoolCreator({
-    id: row.influencerId,
-    handle: row.handle,
-    name: row.name,
-  });
-  if (fromPool) return fromPool;
-  const channel = /tiktok/i.test(row.url || "")
-    ? ("tiktok" as const)
-    : ("instagram" as const);
-  return {
-    id: row.influencerId || row.id,
-    name: row.name,
-    handle: row.handle,
-    market: "jp",
-    channel,
-    profileUrl: null,
-    priceKrw: 0,
-    followers: 0,
-    overlap: null,
-    tier: "micro",
-    product: row.product,
-    posts: row.url
-      ? [{ platform: channel, url: row.url }]
-      : [],
-    uploadYmd: null,
-    metrics: {
-      views: row.views,
-      likes: row.likes,
-      comments: row.comments,
-      saves: null,
-      shares: null,
-    },
-    category: null,
-  };
-}
-
-/** 한 명 정지 → 다음으로 한 칸 (ms). 화면에는 약 4명 노출 */
-const BEST_STEP_PAUSE_MS = 2800;
-const BEST_ROW_PX = 64;
-const BEST_VISIBLE = 4;
+import { formatKrw, resolvePoolCreator } from "@/lib/creator-pool-mock";
 
 function fmtNewsWhen(iso: string) {
   const d = new Date(iso);
@@ -73,303 +34,831 @@ function fmtNewsWhen(iso: string) {
   return `${md} ${hm}`;
 }
 
-function BestRow({
+function isNewsFresh(iso: string) {
+  return Date.now() - new Date(iso).getTime() < 24 * 60 * 60 * 1000;
+}
+
+function donutPct(pct: number | null) {
+  if (pct == null || !Number.isFinite(pct)) {
+    return { fill: 0, label: null as number | null };
+  }
+  return { fill: Math.min(100, Math.max(0, pct)), label: Math.round(pct) };
+}
+
+function DonutCell({
+  pct,
+  color,
+  label,
+  caption,
+  onClick,
+}: {
+  pct: number | null;
+  color: string;
+  label: string;
+  caption: string;
+  onClick?: () => void;
+}) {
+  const { fill, label: n } = donutPct(pct);
+  const size = 100;
+  const sw = 12;
+  const r = (size - sw) / 2;
+  const c = 2 * Math.PI * r;
+  const off = c * (1 - fill / 100);
+  const inner = (
+    <>
+      <div className="relative h-[56px] w-[56px] shrink-0">
+        <svg
+          viewBox={`0 0 ${size} ${size}`}
+          className="h-full w-full"
+          role="img"
+          aria-label={n == null ? label : `${label} ${n}%`}
+        >
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke="#EAE3D6"
+            strokeWidth={sw}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth={sw}
+            strokeLinecap="round"
+            strokeDasharray={c.toFixed(2)}
+            strokeDashoffset={off.toFixed(2)}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-[13px] font-extrabold tabular-nums text-[var(--ink)]">
+          {n == null ? "—" : `${n}%`}
+        </span>
+      </div>
+      <div className="min-w-0 flex-1 text-left">
+        <span className="block text-[11px] text-[var(--muted)]">{label}</span>
+        <span className="mt-0.5 block text-[14px] font-extrabold leading-snug tabular-nums text-[var(--ink)]">
+          {caption}
+        </span>
+      </div>
+    </>
+  );
+  const cls =
+    "flex h-[88px] w-full items-center gap-3 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2";
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${cls} cursor-pointer`}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className={cls}>{inner}</div>;
+}
+
+function StripPlain({
+  label,
+  value,
+  hint,
+  extra,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  extra?: ReactNode;
+  onClick?: () => void;
+}) {
+  const inner = (
+    <>
+      <div className="min-w-0 flex-1 text-left">
+        <div className="text-[11px] text-[var(--muted)]">{label}</div>
+        <div className="mt-0.5 text-[18px] font-extrabold tabular-nums tracking-tight text-[var(--ink)]">
+          {value}
+        </div>
+        <div className="mt-0.5 text-[11px] text-[var(--muted)]">{hint}</div>
+      </div>
+      {extra ? <div className="w-[42%] shrink-0">{extra}</div> : null}
+    </>
+  );
+  const cls =
+    "flex h-[88px] w-full items-center gap-3 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2";
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${cls} cursor-pointer`}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className={cls}>{inner}</div>;
+}
+
+function formatCurveAxis(day: number, useHours: boolean) {
+  if (useHours) {
+    const h = Math.max(0, Math.round(day * 24));
+    return `${h}시간`;
+  }
+  return `D+${Math.max(0, Math.floor(day))}`;
+}
+
+function HomeViewsCurve({ points }: { points: { day: number; views: number }[] }) {
+  if (points.length < 2) {
+    return (
+      <p className="text-[10px] leading-snug text-[var(--muted)]">
+        수집 2회↑ 시 곡선
+      </p>
+    );
+  }
+  const maxViews = Math.max(...points.map((p) => p.views), 1);
+  const maxDay = Math.max(points[points.length - 1]?.day ?? 0, 1e-9);
+  const useHours = maxDay < 1;
+  const W = 200;
+  const H = 56;
+  const pad = { l: 2, r: 2, t: 4, b: 12 };
+  const pts = points.map((p) => ({
+    x: pad.l + (p.day / maxDay) * (W - pad.l - pad.r),
+    y: pad.t + (1 - p.views / maxViews) * (H - pad.t - pad.b),
+  }));
+  const line = pts
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(" ");
+  const last = pts[pts.length - 1]!;
+  const first = pts[0]!;
+  const area = `${line} L${last.x.toFixed(1)},${H - pad.b} L${first.x.toFixed(1)},${H - pad.b} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-[52px] w-full" aria-hidden>
+      <path d={area} fill="var(--accent)" opacity={0.1} />
+      <path d={line} fill="none" stroke="var(--accent)" strokeWidth={1.8} />
+      <circle cx={last.x} cy={last.y} r={2.2} fill="var(--accent)" />
+      <text x={pad.l} y={H - 1} fill="var(--muted)" fontSize={8}>
+        {formatCurveAxis(0, useHours)}
+      </text>
+      <text x={W - 28} y={H - 1} fill="var(--muted)" fontSize={8}>
+        {formatCurveAxis(maxDay, useHours)}
+      </text>
+    </svg>
+  );
+}
+
+function ViewsCell({
+  total,
+  wowPct,
+  curve,
+  onClick,
+}: {
+  total: number;
+  wowPct: number | null;
+  curve: { day: number; views: number }[];
+  onClick?: () => void;
+}) {
+  const inner = (
+    <>
+      <div className="min-w-0 shrink-0 text-left">
+        <div className="text-[11px] text-[var(--muted)]">누적 조회</div>
+        <div className="mt-0.5 text-[18px] font-extrabold tabular-nums tracking-tight text-[var(--ink)]">
+          {formatHomeViews(total)}
+        </div>
+        <div className="mt-0.5 text-[10px] text-[var(--muted)]">
+          {wowPct == null
+            ? "성과와 동일"
+            : `${wowPct > 0 ? "+" : ""}${wowPct}% · 7일`}
+        </div>
+      </div>
+      <div className="min-w-0 flex-1">
+        <HomeViewsCurve points={curve} />
+      </div>
+    </>
+  );
+  const cls =
+    "flex h-[88px] w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2";
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${cls} cursor-pointer`}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className={cls}>{inner}</div>;
+}
+
+function EfficiencyPlaceholder() {
+  const pills = ["ER", "좋아요", "조회수", "저장수", "Repost"];
+  return (
+    <section className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-4">
+      <h3 className="text-sm font-bold text-[var(--ink)]">가성비 리스트</h3>
+      <p className="mb-3 mt-0.5 text-[11.5px] text-[var(--muted)]">
+        노출가 대비 성과 · 지표 산식 준비 중
+      </p>
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {pills.map((p, i) => (
+          <span
+            key={p}
+            className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold ${
+              i < 3
+                ? "border-[var(--ink)] bg-[var(--ink)] text-white"
+                : "border-[var(--line)] bg-[var(--surface)] text-[var(--muted)]"
+            }`}
+            aria-hidden
+          >
+            {p}
+          </span>
+        ))}
+      </div>
+      <div className="divide-y divide-[var(--line)]">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="flex h-[60px] items-center gap-2.5">
+            <span className="w-[18px] text-right text-[12px] tabular-nums text-[var(--muted)]">
+              {i + 1}
+            </span>
+            <span className="h-11 w-11 shrink-0 rounded-[6px] bg-[var(--surface-hover)]" />
+            <span className="min-w-0 flex-1 space-y-1.5">
+              <span className="block h-2.5 w-[42%] rounded bg-[var(--surface-hover)]" />
+              <span className="block h-2 w-[58%] rounded bg-[var(--surface-hover)]" />
+            </span>
+            <span className="h-2.5 w-10 shrink-0 rounded bg-[var(--surface-hover)]" />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+const RANK_VISIBLE = 4;
+const RANK_ROW_PX = 60;
+const RANK_TICK_MS = 3000;
+
+function RankPostRow({
   row,
   rank,
 }: {
   row: CompanyHomeBestPost;
   rank: number;
 }) {
-  const creator = useMemo(() => bestPostPhotoCreator(row), [row]);
+  const creator = useMemo(
+    () =>
+      resolvePoolCreator({
+        id: row.influencerId || row.id,
+        name: row.name,
+        handle: row.handle,
+        url: row.url,
+        product: row.product,
+        views: row.views,
+        likes: row.likes,
+        comments: row.comments,
+      }),
+    [row],
+  );
   const inner = (
     <>
-      <span className="w-5 shrink-0 text-[11px] font-semibold tabular-nums text-[var(--muted)]">
+      <span className="w-[18px] shrink-0 text-right text-[12px] tabular-nums text-[var(--muted)]">
         {rank}
       </span>
       <CreatorPhoto creator={creator} size="thumb" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-semibold text-[var(--ink)]">
+        <span className="block truncate text-[12.5px] font-semibold text-[var(--ink)]">
           {row.handle}
         </span>
         <span className="block truncate text-[11px] text-[var(--muted)]">
           {row.name} · {row.product}
         </span>
       </span>
-      <span className="shrink-0 text-right text-[12px] font-semibold tabular-nums text-[var(--accent)]">
+      <span className="shrink-0 text-right text-[12.5px] font-bold tabular-nums text-[var(--ink)]">
         {formatHomeViews(row.views)}
-        <span className="mt-0.5 block text-[10px] font-medium text-[var(--muted)]">
-          조회
-        </span>
+        <span className="block text-[10.5px] font-medium text-[var(--muted)]">조회</span>
       </span>
     </>
   );
+  const cls =
+    "flex h-[60px] items-center gap-2.5 border-b border-[var(--line)] px-0";
   if (row.url) {
     return (
       <a
         href={row.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex h-full items-center gap-3 px-4 transition hover:bg-[var(--surface-hover)]"
+        className={`${cls} hover:bg-[var(--surface-hover)]`}
       >
         {inner}
       </a>
     );
   }
-  return (
-    <div className="flex h-full items-center gap-3 px-4">{inner}</div>
-  );
+  return <div className={cls}>{inner}</div>;
 }
 
-function BestList({
-  title,
-  items,
+function RankInfRow({
+  row,
+  rank,
+  onOpen,
 }: {
-  title: string;
-  items: CompanyHomeBestPost[];
+  row: CompanyHomeInfluencerRow;
+  rank: number;
+  onOpen?: () => void;
 }) {
-  const [index, setIndex] = useState(0);
-  const pausedRef = useRef(false);
-  const maxIndex = Math.max(0, items.length - BEST_VISIBLE);
-  const step = maxIndex > 0;
-  const viewportH = BEST_ROW_PX * Math.min(BEST_VISIBLE, items.length || BEST_VISIBLE);
+  const creator = useMemo(
+    () =>
+      resolvePoolCreator({
+        id: row.id,
+        name: row.name,
+        handle: row.handle,
+        product: row.product,
+        views: row.views,
+      }),
+    [row],
+  );
+  const hasPerf = row.views > 0;
+  const inner = (
+    <>
+      <span className="w-[18px] shrink-0 text-right text-[12px] tabular-nums text-[var(--muted)]">
+        {rank}
+      </span>
+      <CreatorPhoto creator={creator} size="thumb" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[12.5px] font-semibold text-[var(--ink)]">
+          {row.handle}
+        </span>
+        <span className="block truncate text-[11px] text-[var(--muted)]">
+          {row.name} · {row.product}
+        </span>
+      </span>
+      <span className="shrink-0 text-right text-[12.5px] font-bold tabular-nums text-[var(--ink)]">
+        {formatHomeViews(hasPerf ? row.views : row.followers)}
+        <span className="block text-[10.5px] font-medium text-[var(--muted)]">
+          {hasPerf ? "조회" : "팔로워"}
+        </span>
+      </span>
+    </>
+  );
+  const cls =
+    "flex h-[60px] w-full items-center gap-2.5 border-b border-[var(--line)] text-left";
+  if (onOpen) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`${cls} hover:bg-[var(--surface-hover)]`}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return <div className={cls}>{inner}</div>;
+}
+
+/** 4줄 고정 뷰포트 · 3초마다 한 줄씩 위로 밀기 */
+function AutoScrollRankRows({
+  rows,
+  reduceMotion,
+}: {
+  rows: ReactNode[];
+  reduceMotion: boolean;
+}) {
+  const n = rows.length;
+  const canScroll = !reduceMotion && n > RANK_VISIBLE;
+  const [offset, setOffset] = useState(0);
+  const [animate, setAnimate] = useState(true);
 
   useEffect(() => {
-    setIndex(0);
-  }, [items]);
+    setOffset(0);
+    setAnimate(true);
+  }, [n]);
 
   useEffect(() => {
-    if (!step) return;
-    const reduced =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) return;
-
+    if (!canScroll) return;
     const id = window.setInterval(() => {
-      if (pausedRef.current) return;
-      setIndex((i) => (i >= maxIndex ? 0 : i + 1));
-    }, BEST_STEP_PAUSE_MS);
+      setAnimate(true);
+      setOffset((o) => o + 1);
+    }, RANK_TICK_MS);
     return () => window.clearInterval(id);
-  }, [step, maxIndex]);
+  }, [canScroll, n]);
+
+  useEffect(() => {
+    if (!canScroll || offset < n) return;
+    const t = window.setTimeout(() => {
+      setAnimate(false);
+      setOffset(0);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setAnimate(true));
+      });
+    }, 420);
+    return () => window.clearTimeout(t);
+  }, [offset, n, canScroll]);
+
+  if (n === 0) return null;
+
+  const track = canScroll
+    ? [...rows, ...rows.slice(0, RANK_VISIBLE)]
+    : rows.slice(0, RANK_VISIBLE);
 
   return (
-    <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
-      <div className="border-b border-[var(--line)] px-4 py-3">
-        <h3 className="text-sm font-semibold text-[var(--ink)]">{title}</h3>
-        <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-          조회수 TOP 10
-          {step ? (
-            <span className="ml-1.5 tabular-nums text-[var(--accent)]">
-              {index + 1}–{Math.min(index + BEST_VISIBLE, items.length)}/{items.length}
-            </span>
-          ) : null}
-        </p>
+    <div
+      className="overflow-hidden"
+      style={{ height: RANK_VISIBLE * RANK_ROW_PX }}
+      aria-live="off"
+    >
+      <div
+        className={
+          animate && canScroll
+            ? "transition-transform duration-[420ms] ease-out"
+            : ""
+        }
+        style={{
+          transform: canScroll
+            ? `translateY(-${offset * RANK_ROW_PX}px)`
+            : undefined,
+        }}
+      >
+        {track.map((row, i) => (
+          <div key={i} style={{ height: RANK_ROW_PX }}>
+            {row}
+          </div>
+        ))}
       </div>
-      {items.length === 0 ? (
-        <p className="px-4 py-5 text-sm text-[var(--muted)]">아직 게시물이 없습니다.</p>
-      ) : (
-        <div
-          className="relative overflow-hidden"
-          style={{ height: viewportH }}
-          onMouseEnter={() => {
-            pausedRef.current = true;
-          }}
-          onMouseLeave={() => {
-            pausedRef.current = false;
-          }}
-        >
-          <ol
-            className="divide-y divide-[#f4ece2] transition-transform duration-500 ease-out"
-            style={{
-              transform: step
-                ? `translateY(-${index * BEST_ROW_PX}px)`
-                : undefined,
-            }}
-          >
-            {items.map((row, i) => (
-              <li key={row.id} style={{ height: BEST_ROW_PX }}>
-                <BestRow row={row} rank={i + 1} />
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
     </div>
   );
 }
 
-function NewsTimeline({ items }: { items: CompanyHomeNewsItem[] }) {
+function RankCard({
+  title,
+  sub,
+  empty,
+  rows,
+  cardRef,
+  flash,
+  reduceMotion,
+}: {
+  title: string;
+  sub: string;
+  empty: string;
+  rows: ReactNode[];
+  cardRef?: Ref<HTMLElement>;
+  flash?: boolean;
+  reduceMotion: boolean;
+}) {
   return (
-    <section className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="relative flex h-2.5 w-2.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#7cb87c] opacity-60" />
-          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#5a9e5a]" />
-        </span>
-        <h2 className="text-sm font-semibold text-[var(--ink)]">
-          Live 뉴스
-          <span className="ml-2 text-[11px] font-medium text-[var(--muted)]">
-            브랜드 · 예산 · 일정
-          </span>
-        </h2>
-      </div>
-      {items.length === 0 ? (
-        <p className="text-sm text-[var(--muted)]">등록된 뉴스가 없습니다.</p>
+    <section
+      ref={cardRef}
+      className={`scroll-mt-4 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-4 transition-colors duration-150 ${
+        flash ? "!bg-[#FBF3E4]" : ""
+      }`}
+    >
+      <h3 className="text-sm font-bold text-[var(--ink)]">{title}</h3>
+      <p className="mb-3 mt-0.5 text-[11.5px] text-[var(--muted)]">{sub}</p>
+      {rows.length > 0 ? (
+        <AutoScrollRankRows rows={rows} reduceMotion={reduceMotion} />
       ) : (
-        <ol className="relative space-y-0 border-l border-[#e8dfd2] pl-5">
-          {items.map((item) => (
-            <li key={item.id} className="relative pb-5 last:pb-0">
-              <span className="absolute -left-[23px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[var(--accent)] shadow-sm" />
-              <p className="text-[11px] tabular-nums text-[var(--muted)]">
-                {fmtNewsWhen(item.at)}
-                <span className={`ml-2 font-semibold ${newsKindTone(item.kind)}`}>
-                  {item.kind}
-                </span>
-              </p>
-              <p className="mt-0.5 text-[14px] font-semibold leading-snug text-[var(--ink)]">
-                {item.title}
-              </p>
-              <p className="mt-0.5 text-[12.5px] leading-relaxed text-[var(--muted)]">
-                {item.body}
-              </p>
-            </li>
-          ))}
-        </ol>
+        <p className="py-4 text-sm text-[var(--muted)]">{empty}</p>
       )}
     </section>
   );
 }
 
+function NewsSidebar({
+  items,
+  insightLinks,
+  insightsLoading,
+}: {
+  items: CompanyHomeNewsItem[];
+  insightLinks: HomeInsightLink[];
+  insightsLoading: boolean;
+}) {
+  const shown = items.slice(0, 8);
+  return (
+    <aside className="flex w-full flex-col gap-3 self-start xl:w-[300px] xl:shrink-0">
+      <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-4">
+        <h3 className="text-sm font-bold text-[var(--ink)]">Live 뉴스</h3>
+        <p className="mb-2.5 mt-0.5 text-[11.5px] text-[var(--muted)]">
+          업로드 · 방문 · 운영 · 최대 8건
+        </p>
+        {shown.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">아직 뉴스가 없습니다.</p>
+        ) : (
+          <ul className="m-0 max-h-[360px] list-none overflow-auto p-0">
+            {shown.map((item, i) => {
+              const fresh = isNewsFresh(item.at);
+              return (
+                <li
+                  key={item.id}
+                  className={`relative border-[var(--line)] py-2 pl-3.5 ${
+                    i === 0 ? "border-t-0" : "border-t"
+                  }`}
+                >
+                  <span
+                    className={`absolute left-0 top-3.5 h-[5px] w-[5px] rounded-full ${
+                      fresh ? "bp-news-dot bg-[#1F5FD8]" : "bg-[var(--line)]"
+                    }`}
+                  />
+                  <p className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
+                    <b className="font-semibold text-[var(--ink)]">
+                      {fmtNewsWhen(item.at)}
+                    </b>
+                    <span className={newsKindTone(item.kind)}>{item.kind}</span>
+                  </p>
+                  <p
+                    className={`my-0.5 text-[12.5px] font-bold leading-snug ${
+                      fresh ? "bp-news-title text-[#1F5FD8]" : "text-[var(--ink)]"
+                    }`}
+                  >
+                    {item.title}
+                  </p>
+                  <p className="line-clamp-2 text-[11px] leading-snug text-[var(--muted)]">
+                    {item.body}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      <CompanyHomeShareDonuts links={insightLinks} loading={insightsLoading} />
+    </aside>
+  );
+}
+
 export function CompanyHomeLanding({
   companyName,
+  companyId,
   onOpenPerformance,
+  onOpenPublish,
+  onOpenPool,
 }: {
   companyName: string;
+  companyId: string;
   onOpenPerformance?: () => void;
+  onOpenPublish?: () => void;
+  onOpenPool?: () => void;
 }) {
   const [data, setData] = useState<CompanyHomePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [insightLinks, setInsightLinks] = useState<HomeInsightLink[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(true);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+  const [flashWeekly, setFlashWeekly] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const weeklyRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduceMotion(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetch("/api/com/home", { cache: "no-store" })
+    const load = () => {
+      fetch("/api/com/home", { cache: "no-store" })
+        .then(async (res) => {
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || "요약을 불러오지 못했습니다.");
+          if (!cancelled) {
+            setData(body as CompanyHomePayload);
+            setError(null);
+          }
+        })
+        .catch((e) => {
+          if (!cancelled) {
+            setError(
+              e instanceof Error ? e.message : "요약을 불러오지 못했습니다.",
+            );
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    };
+    load();
+    const id = window.setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  // ponytail: board + 도넛이 같은 소스 — 한 번만 fetch
+  useEffect(() => {
+    let cancelled = false;
+    setInsightsLoading(true);
+    fetch("/api/com/insights?days=180", { cache: "no-store" })
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error || "요약을 불러오지 못했습니다.");
-        if (!cancelled) setData(body as CompanyHomePayload);
+        if (!res.ok) throw new Error(body.error || "성과를 불러오지 못했습니다.");
+        if (!cancelled) {
+          setInsightLinks(
+            Array.isArray(body.links) ? (body.links as HomeInsightLink[]) : [],
+          );
+          setInsightsError(null);
+        }
       })
       .catch((e) => {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "요약을 불러오지 못했습니다.");
+          setInsightLinks([]);
+          setInsightsError(
+            e instanceof Error ? e.message : "성과를 불러오지 못했습니다.",
+          );
         }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setInsightsLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [companyId]);
+
+  const week = data?.best.week || [];
+  const tickerItems = reduceMotion ? week.slice(0, 3) : week;
+  const tickerLoop = !reduceMotion && week.length > 0;
+
+  function goWeekly() {
+    weeklyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setFlashWeekly(true);
+    window.setTimeout(() => setFlashWeekly(false), 900);
+  }
 
   const budget = data?.budget;
-  const pct = budget?.pct;
-  const barWidth =
-    pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  const content = data?.content;
+  const inf = data?.influencers;
+  const weekViews = data?.weekViews;
+  const infBar =
+    inf && inf.contracted > 0
+      ? Math.min(100, Math.round((inf.withPerformance / inf.contracted) * 100))
+      : 0;
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
-      <div className="px-4 pb-8 pt-5 sm:px-7">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">
-              Home
-            </p>
-            <h1 className="mt-1 text-[28px] font-semibold leading-tight text-[var(--ink)] sm:text-[30px]">
-              {companyName} 요약
-            </h1>
-            <p className="mt-1 text-[12.5px] text-[var(--muted)]">
-              {data?.asOf
-                ? `${data.asOf} 조회 시점 기준 · 예산은 섭외 Accept 노출가 합산`
-                : "예산 · 베스트 게시물 · 운영 뉴스"}
-            </p>
-          </div>
-          {onOpenPerformance ? (
-            <button
-              type="button"
-              onClick={onOpenPerformance}
-              className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 text-xs font-semibold text-[var(--muted)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
-            >
-              성과 대시보드 →
-            </button>
-          ) : null}
-        </div>
-
-        {loading ? (
-          <p className="text-sm text-[var(--muted)]">불러오는 중…</p>
+      <div className="px-0 pb-8 pt-0 sm:px-0">
+        {loading && !data ? (
+          <p className="px-5 py-5 text-sm text-[var(--muted)] sm:px-8">
+            불러오는 중…
+          </p>
         ) : null}
-        {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
+        {error ? (
+          <p className="px-5 py-3 text-sm text-[var(--danger)] sm:px-8">
+            {error}
+          </p>
+        ) : null}
 
         {data ? (
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="space-y-5">
-              <section className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
-                <h2 className="text-sm font-semibold text-[var(--ink)]">예산</h2>
-                <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <p className="text-[11px] text-[var(--muted)]">전체 예산</p>
-                    <p className="mt-1 text-[22px] font-bold tabular-nums text-[var(--ink)]">
-                      {budget?.total != null
-                        ? `${formatKrw(budget.total)}원`
-                        : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-[var(--muted)]">사용</p>
-                    <p className="mt-1 text-[22px] font-bold tabular-nums text-[var(--accent)]">
-                      {formatKrw(budget?.spent ?? 0)}원
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-[var(--muted)]">잔여</p>
-                    <p className="mt-1 text-[22px] font-bold tabular-nums text-[var(--ink)]">
-                      {budget?.remaining != null
-                        ? `${formatKrw(budget.remaining)}원`
-                        : "—"}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="mb-1.5 flex justify-between text-[11px] text-[var(--muted)]">
-                    <span>집행률</span>
-                    <span className="tabular-nums font-semibold text-[var(--ink)]">
-                      {pct != null ? `${pct}%` : "—"}
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-[#f0e8dc]">
-                    <div
-                      className="h-full rounded-full bg-[var(--accent)] transition-all"
-                      style={{ width: `${barWidth}%` }}
+          <>
+            <p className="px-5 pt-3 text-[11.5px] text-[var(--muted)] sm:px-8">
+              {companyName} · {data.asOf} 조회 시점 기준 · 예산은 섭외 Accept 노출가
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-3 px-5 sm:grid-cols-2 sm:px-8 xl:grid-cols-4">
+              <DonutCell
+                pct={budget?.pct ?? null}
+                color="var(--ink)"
+                label="예산 집행"
+                caption={
+                  budget?.total != null
+                    ? `${formatKrw(budget.spent)} / ${formatKrw(budget.total)}원`
+                    : budget?.spent
+                      ? `${formatKrw(budget.spent)}원`
+                      : "—"
+                }
+                onClick={onOpenPerformance}
+              />
+              <DonutCell
+                pct={
+                  content?.target
+                    ? (content.published / content.target) * 100
+                    : null
+                }
+                color="var(--accent)"
+                label="콘텐츠 발행"
+                caption={
+                  content?.target
+                    ? `${content.published}건 / ${content.target}건`
+                    : `${content?.published ?? 0}건`
+                }
+                onClick={onOpenPublish}
+              />
+              <StripPlain
+                label="계약 인플루언서"
+                value={inf ? `${inf.contracted}명` : "0명"}
+                hint={`성과 발생 ${inf?.withPerformance ?? 0}명`}
+                extra={
+                  <div className="h-[5px] overflow-hidden rounded-full bg-[#EDE7DC]">
+                    <span
+                      className="block h-full bg-[#2F7D5A]"
+                      style={{ width: `${infBar}%` }}
                     />
                   </div>
-                </div>
-              </section>
+                }
+                onClick={onOpenPool}
+              />
+              <ViewsCell
+                total={weekViews?.total ?? 0}
+                wowPct={weekViews?.wowPct ?? null}
+                curve={weekViews?.curve || []}
+                onClick={onOpenPerformance}
+              />
+            </div>
 
-              <div>
-                <h2 className="mb-3 text-sm font-semibold text-[var(--ink)]">
-                  베스트 게시물
-                </h2>
-                <div className="grid gap-3 lg:grid-cols-3">
-                  <BestList title="주간" items={data.best.week} />
-                  <BestList title="월간" items={data.best.month} />
-                  <BestList title="전체" items={data.best.all} />
-                </div>
+            <div className="mt-4 flex items-center gap-3.5 overflow-hidden border-y border-[var(--line)] bg-[var(--surface)] px-5 py-2 sm:px-8">
+              <button
+                type="button"
+                className="shrink-0 bg-transparent text-[11.5px] font-bold text-[var(--accent)] hover:underline"
+                onClick={goWeekly}
+              >
+                주간 랭킹 바로가기
+              </button>
+              <div className="h-5 min-w-0 flex-1 overflow-hidden">
+                {week.length === 0 ? (
+                  <span className="text-[12.5px] text-[var(--muted)]">
+                    이번 주 발행된 게시물이 없습니다
+                  </span>
+                ) : (
+                  <div
+                    className={`flex gap-7 whitespace-nowrap ${
+                      tickerLoop ? "bp-ticker-track" : ""
+                    }`}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.animationPlayState =
+                        "paused";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.animationPlayState =
+                        "running";
+                    }}
+                  >
+                    {(tickerLoop ? [0, 1] : [0]).flatMap((copy) =>
+                      tickerItems.map((row, i) => (
+                        <span
+                          key={`${copy}-${row.id}`}
+                          className="text-[12.5px] text-[var(--ink)]"
+                        >
+                          <b className="mr-1.5 font-semibold tabular-nums text-[var(--muted)]">
+                            {i + 1}
+                          </b>
+                          {displayHandle(row.name)} · {formatHomeViews(row.views)}{" "}
+                          조회
+                        </span>
+                      )),
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            <NewsTimeline items={data.news} />
-          </div>
+            <div className="flex flex-col gap-5 border-b border-[var(--line)] px-5 py-5 sm:px-8 xl:flex-row xl:items-start">
+              <div className="min-w-0 flex-1">
+                <CompanyHomePerformanceBoard
+                  links={insightLinks}
+                  loading={insightsLoading}
+                  error={insightsError}
+                  onOpenMore={onOpenPerformance}
+                />
+              </div>
+              <NewsSidebar
+                items={data.news}
+                insightLinks={insightLinks}
+                insightsLoading={insightsLoading}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 px-5 py-5 sm:px-8 md:grid-cols-2 xl:grid-cols-4">
+              <EfficiencyPlaceholder />
+              <RankCard
+                title="주간 랭킹 TOP 10"
+                sub="조회수 기준 · 4명씩 자동 스크롤"
+                empty="이번 주 발행된 게시물이 없습니다"
+                cardRef={weeklyRef}
+                flash={flashWeekly}
+                reduceMotion={reduceMotion}
+                rows={week.map((row, i) => (
+                  <RankPostRow key={row.id} row={row} rank={i + 1} />
+                ))}
+              />
+              <RankCard
+                title="월간 랭킹 TOP 10"
+                sub="조회수 기준 · 4명씩 자동 스크롤"
+                empty="최근 30일 발행된 게시물이 없습니다"
+                reduceMotion={reduceMotion}
+                rows={data.best.month.map((row, i) => (
+                  <RankPostRow key={row.id} row={row} rank={i + 1} />
+                ))}
+              />
+              <RankCard
+                title="인플루언서"
+                sub="성과순 → 팔로워순 · 4명씩 자동 스크롤"
+                empty="계약된 인플루언서가 없습니다"
+                reduceMotion={reduceMotion}
+                rows={(inf?.ranking || []).map((row, i) => (
+                  <RankInfRow
+                    key={row.id}
+                    row={row}
+                    rank={i + 1}
+                    onOpen={onOpenPool}
+                  />
+                ))}
+              />
+            </div>
+          </>
         ) : null}
       </div>
     </div>

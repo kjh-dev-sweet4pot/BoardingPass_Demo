@@ -1,5 +1,6 @@
 import { normalizeHandle } from "@/lib/auth";
 import { matchCompany, type CompanyMatchInput } from "@/lib/company";
+import { parseMoney } from "@/lib/money";
 
 export type ImportRowInput = {
   company?: string;
@@ -11,6 +12,10 @@ export type ImportRowInput = {
   store?: string;
   product?: string;
   quantity?: string | number;
+  /** 노출가(회원사 공급가). CSV 헤더: display_price / 노출가 / 공급가 */
+  display_price?: string | number;
+  /** 원가. CSV 헤더: cost_amount / 원가 */
+  cost_amount?: string | number;
 };
 
 export type ParsedImportRow = {
@@ -26,6 +31,8 @@ export type ParsedImportRow = {
   store: string;
   product: string;
   quantity: number;
+  display_price: number | null;
+  cost_amount: number | null;
   errors: string[];
   ok: boolean;
 };
@@ -60,6 +67,15 @@ const HEADER_ALIASES: Record<string, keyof ImportRowInput> = {
   상품: "product",
   quantity: "quantity",
   수량: "quantity",
+  display_price: "display_price",
+  노출가: "display_price",
+  공급가: "display_price",
+  exposure_price: "display_price",
+  supply_price: "display_price",
+  cost_amount: "cost_amount",
+  cost_price: "cost_amount",
+  원가: "cost_amount",
+  cost: "cost_amount",
 };
 
 export function parseCsv(text: string): string[][] {
@@ -262,11 +278,18 @@ export function rowsFromCsvMatrix(matrix: unknown[][]): ParsedImportRow[] {
     const raw: ImportRowInput = {};
     headers.forEach((key, idx) => {
       if (!key) return;
-      const value = cellToString(cells[idx]);
-      if (key === "quantity") {
-        raw.quantity = value;
+      const cell = cells[idx];
+      if (
+        key === "quantity" ||
+        key === "display_price" ||
+        key === "cost_amount"
+      ) {
+        raw[key] =
+          typeof cell === "number" && Number.isFinite(cell)
+            ? cell
+            : cellToString(cell);
       } else {
-        raw[key] = value;
+        raw[key] = cellToString(cell);
       }
     });
 
@@ -315,6 +338,23 @@ export function validateImportRow(
   if (!product) errors.push("상품(product) 필요");
   if (!Number.isFinite(quantity) || quantity < 1) errors.push("수량 오류");
 
+  const displayRaw = parseMoney(raw.display_price);
+  const costRaw = parseMoney(raw.cost_amount);
+  let display_price: number | null = null;
+  let cost_amount: number | null = null;
+  if (Number.isNaN(displayRaw)) errors.push("노출가(공급가) 형식 오류");
+  if (Number.isNaN(costRaw)) errors.push("원가 형식 오류");
+  if (!Number.isNaN(displayRaw) && !Number.isNaN(costRaw)) {
+    const hasDisplay = displayRaw != null;
+    const hasCost = costRaw != null;
+    if (hasDisplay !== hasCost) {
+      errors.push("노출가·원가는 둘 다 입력하거나 둘 다 비워 주세요");
+    } else if (hasDisplay && hasCost) {
+      display_price = displayRaw;
+      cost_amount = costRaw;
+    }
+  }
+
   return {
     rowNumber,
     company_raw,
@@ -328,6 +368,8 @@ export function validateImportRow(
     store,
     product,
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    display_price,
+    cost_amount,
     errors,
     ok: errors.length === 0,
   };
@@ -446,10 +488,12 @@ export const IMPORT_TEMPLATE_HEADERS = [
   "store",
   "product",
   "quantity",
+  "display_price",
+  "cost_amount",
 ] as const;
 
 export const IMPORT_TEMPLATE_HEADER_LABEL =
-  "company(회원사), snsid, snsurl, name, visit_date, store, product, quantity";
+  "company(회원사), snsid, snsurl, name, visit_date, store, product, quantity, display_price(노출가), cost_amount(원가)";
 
 function csvCell(value: string) {
   if (/[",\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
@@ -472,6 +516,8 @@ export function buildImportTemplateRows(
           "강남점",
           i === 0 ? "텔로액트 두피 스케일러" : "샘플 상품",
           String(i === 0 ? 2 : 1),
+          i === 0 ? "300000" : "250000",
+          i === 0 ? "200000" : "150000",
         ])
       : [
           [
@@ -483,6 +529,8 @@ export function buildImportTemplateRows(
             "강남점",
             "텔로액트 두피 스케일러",
             "2",
+            "300000",
+            "200000",
           ],
         ];
   return [[...IMPORT_TEMPLATE_HEADERS], ...examples];
@@ -499,3 +547,25 @@ export const IMPORT_CSV_TEMPLATE = buildImportCsvTemplate([]);
 
 export const IMPORT_ACCEPT =
   ".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+if (process.env.RUN_CSV_IMPORT_SELF_CHECK === "1") {
+  const a = parseMoney("300,000원");
+  const b = parseMoney("");
+  const c = parseMoney("-1");
+  if (a !== 300000 || b !== null || !Number.isNaN(c as number)) {
+    throw new Error("parseMoney self-check failed");
+  }
+  const half = validateImportRow(1, {
+    company: "옵티마",
+    snsid: "@a",
+    visit_date: "2026-08-20",
+    store: "강남점",
+    product: "상품",
+    quantity: 1,
+    display_price: 100,
+  });
+  if (half.ok || !half.errors.some((e) => e.includes("둘 다"))) {
+    throw new Error("validateImportRow pair rule failed");
+  }
+  console.log("csv-import self-check ok");
+}

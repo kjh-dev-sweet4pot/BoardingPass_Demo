@@ -507,7 +507,10 @@ export function CompanyConsole({
       {view === "home" ? (
         <CompanyHomeLanding
           companyName={company.name}
+          companyId={company.id}
           onOpenPerformance={() => setView("content")}
+          onOpenPublish={() => setView("publish")}
+          onOpenPool={() => setView("pool")}
         />
       ) : view === "pool" ? (
         <CompanyCreatorPool
