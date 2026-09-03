@@ -254,6 +254,37 @@ export async function scrapeInstagramPosts(
   return results;
 }
 
+export type InstagramProfileItem = {
+  error?: string;
+  username?: string;
+  follower_count?: number;
+  profile_pic_url_hd?: string;
+  profile_pic_url?: string;
+  hd_profile_pic_url_info?: { url?: string; width?: number; height?: number };
+  hd_profile_pic_versions?: Array<{ url?: string; width?: number; height?: number }>;
+  about?: { country?: string | null };
+};
+
+/** Apify data-slayer 응답에서 가장 큰 프로필 사진 URL */
+export function extractInstagramProfilePicUrl(
+  item: InstagramProfileItem | null | undefined,
+): string | null {
+  if (!item) return null;
+  const versions = Array.isArray(item.hd_profile_pic_versions)
+    ? [...item.hd_profile_pic_versions].sort(
+        (a, b) => (b.width || 0) - (a.width || 0),
+      )
+    : [];
+  const fromVersions = versions.find((v) => typeof v.url === "string" && v.url)?.url;
+  const url =
+    item.hd_profile_pic_url_info?.url ||
+    fromVersions ||
+    item.profile_pic_url_hd ||
+    item.profile_pic_url ||
+    null;
+  return typeof url === "string" && /^https?:\/\//i.test(url) ? url : null;
+}
+
 /** 프로필 URL·핸들 → 아바타·팔로워·region(about.country) */
 export async function scrapeInstagramProfile(
   profileUrlOrHandle: string,
@@ -286,29 +317,15 @@ export async function scrapeInstagramProfile(
     const text = await res.text().catch(() => "");
     throw new Error(await apifyErrorMessage(res.status, text));
   }
-  const items = (await res.json()) as Array<{
-    error?: string;
-    username?: string;
-    follower_count?: number;
-    profile_pic_url_hd?: string;
-    profile_pic_url?: string;
-    hd_profile_pic_url_info?: { url?: string };
-    about?: { country?: string | null };
-  }>;
+  const items = (await res.json()) as InstagramProfileItem[];
   const item = items[0];
   if (!item) return { imageUrl: null, followers: null, region: null };
   if (item.error) {
     throw new Error(`Instagram 프로필 수집 실패 (@${handle}): ${item.error}`);
   }
-  const followers = numOrNull(item.follower_count);
-  const imageUrl =
-    item.profile_pic_url_hd ||
-    item.hd_profile_pic_url_info?.url ||
-    item.profile_pic_url ||
-    null;
   return {
-    imageUrl,
-    followers,
+    imageUrl: extractInstagramProfilePicUrl(item),
+    followers: numOrNull(item.follower_count),
     region: regionFromCountryLabel(item.about?.country),
   };
 }
@@ -366,4 +383,18 @@ export function extractInstagramViews(
     dynamic.video_play_count ??
     null
   );
+}
+
+if (process.env.RUN_APIFY_PROFILE_SELF_CHECK === "1") {
+  const url = extractInstagramProfilePicUrl({
+    hd_profile_pic_versions: [
+      { width: 320, url: "https://cdn.example/small.jpg" },
+      { width: 1080, url: "https://cdn.example/large.jpg" },
+    ],
+    profile_pic_url: "https://cdn.example/fallback.jpg",
+  });
+  if (url !== "https://cdn.example/large.jpg") {
+    throw new Error("extractInstagramProfilePicUrl prefer largest version");
+  }
+  console.log("apify-instagram profile self-check ok");
 }

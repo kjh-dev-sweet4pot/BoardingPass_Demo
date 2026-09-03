@@ -1,6 +1,16 @@
+import http from "node:http";
+import https from "node:https";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { scrapeInstagramProfile, resolveInstagramProfileUrl, instagramHandleFromUrl } from "@/lib/apify-instagram";
-import { normalizeTikTokUsername, scrapeTikTokProfile, tiktokHandleFromUrl } from "@/lib/apify-tiktok";
+import {
+  scrapeInstagramProfile,
+  resolveInstagramProfileUrl,
+  instagramHandleFromUrl,
+} from "@/lib/apify-instagram";
+import {
+  normalizeTikTokUsername,
+  scrapeTikTokProfile,
+  tiktokHandleFromUrl,
+} from "@/lib/apify-tiktok";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 export const INFLUENCER_AVATARS_BUCKET = "influencer-avatars";
@@ -80,20 +90,114 @@ function profileTarget(handle: string, snsUrl?: string | null) {
   };
 }
 
-async function downloadImageBytes(imageUrl: string) {
-  const res = await fetch(imageUrl, {
-    redirect: "follow",
-    headers: {
-      "user-agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-    },
+function cdnReferer(imageUrl: string): string | null {
+  try {
+    const host = new URL(imageUrl).hostname.replace(/^www\./, "").toLowerCase();
+    if (host.includes("tiktokcdn") || host.includes("tiktok.com") || host.includes("muscdn")) {
+      return "https://www.tiktok.com/";
+    }
+    if (
+      host.includes("cdninstagram.com") ||
+      host.includes("instagram.com") ||
+      host.includes("fbcdn.net")
+    ) {
+      return "https://www.instagram.com/";
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/**
+ * Meta/TikTok CDN — undici fetch 가 IPv6 로 붙다 타임아웃하는 경우가 있어
+ * https.request + family:4 로 받는다. (Referer 필수)
+ */
+function downloadImageBytes(imageUrl: string, redirects = 0): Promise<{
+  bytes: Buffer;
+  contentType: string;
+}> {
+  if (redirects > 5) {
+    return Promise.reject(new Error("프로필 이미지 리다이렉트가 너무 많습니다."));
+  }
+  const referer = cdnReferer(imageUrl);
+  const headers: Record<string, string> = {
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+  };
+  if (referer) {
+    headers.Referer = referer;
+    headers.Origin = new URL(referer).origin;
+  }
+
+  return new Promise((resolve, reject) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(imageUrl);
+    } catch {
+      reject(new Error("프로필 이미지 URL이 올바르지 않습니다."));
+      return;
+    }
+    const lib = parsed.protocol === "http:" ? http : https;
+    const req = lib.request(
+      {
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        port: parsed.port || undefined,
+        path: `${parsed.pathname}${parsed.search}`,
+        method: "GET",
+        family: 4,
+        headers,
+        timeout: 25_000,
+      },
+      (res) => {
+        const status = res.statusCode || 0;
+        if (status >= 300 && status < 400 && res.headers.location) {
+          res.resume();
+          const next = new URL(res.headers.location, imageUrl).toString();
+          resolve(downloadImageBytes(next, redirects + 1));
+          return;
+        }
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          if (status < 200 || status >= 300) {
+            reject(new Error(`프로필 이미지 다운로드 실패 (${status})`));
+            return;
+          }
+          const bytes = Buffer.concat(chunks);
+          if (bytes.length < 500) {
+            reject(new Error("프로필 이미지가 너무 작습니다."));
+            return;
+          }
+          const rawType = res.headers["content-type"] || "image/jpeg";
+          const contentType = Array.isArray(rawType) ? rawType[0]! : rawType;
+          if (
+            contentType &&
+            !contentType.startsWith("image/") &&
+            !contentType.includes("octet-stream")
+          ) {
+            reject(new Error(`프로필 이미지 형식이 아닙니다 (${contentType})`));
+            return;
+          }
+          resolve({
+            bytes,
+            contentType: contentType.startsWith("image/")
+              ? contentType
+              : "image/jpeg",
+          });
+        });
+        res.on("error", reject);
+      },
+    );
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error("프로필 이미지 다운로드 시간 초과"));
+    });
+    req.on("error", reject);
+    req.end();
   });
-  if (!res.ok) throw new Error(`프로필 이미지 다운로드 실패 (${res.status})`);
-  const contentType = res.headers.get("content-type") || "image/jpeg";
-  const bytes = Buffer.from(await res.arrayBuffer());
-  if (bytes.length < 500) throw new Error("프로필 이미지가 너무 작습니다.");
-  return { bytes, contentType };
 }
 
 export async function scrapeProfileDetails(
@@ -118,13 +222,21 @@ export async function scrapeProfileImageUrl(handle: string, snsUrl?: string | nu
   return r.imageUrl;
 }
 
+export type FetchStoreProfileResult = {
+  path: string | null;
+  followers: number | null;
+  region: string | null;
+  /** CDN 다운로드/업로드 실패 메시지 (팔로워는 저장됐을 수 있음) */
+  imageError?: string;
+};
+
 /** Apify → Storage 아바타 + influencers.followers + influencers.region */
 export async function fetchAndStoreInfluencerProfile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
   influencerId: string,
   input: { handle: string; snsUrl?: string | null },
-) {
+): Promise<FetchStoreProfileResult | null> {
   if (!process.env.APIFY_TOKEN?.trim()) return null;
 
   const profile = await scrapeProfileDetails(input.handle, input.snsUrl);
@@ -140,6 +252,7 @@ export async function fetchAndStoreInfluencerProfile(
   }
 
   let path: string | null = null;
+  let imageError: string | undefined;
   if (profile.imageUrl) {
     try {
       const { bytes, contentType } = await downloadImageBytes(profile.imageUrl);
@@ -149,12 +262,21 @@ export async function fetchAndStoreInfluencerProfile(
         .upload(path, bytes, { contentType, upsert: true });
       if (uploadErr) throw new Error(uploadErr.message);
       patch.profile_image_path = path;
-    } catch {
-      /* CDN 실패 시 followers/region 만 저장 */
+    } catch (err) {
+      imageError =
+        err instanceof Error ? err.message : "프로필 이미지 저장 실패";
+      console.warn(
+        `[avatar] ${influencerId} image download failed:`,
+        imageError,
+      );
     }
   }
 
-  if (Object.keys(patch).length <= 1) return null;
+  if (Object.keys(patch).length <= 1) {
+    return imageError
+      ? { path: null, followers: null, region: null, imageError }
+      : null;
+  }
 
   const { error: updateErr } = await supabase
     .from("influencers")
@@ -162,7 +284,12 @@ export async function fetchAndStoreInfluencerProfile(
     .eq("id", influencerId);
   if (updateErr) throw new Error(updateErr.message);
 
-  return { path, followers: profile.followers, region: profile.region };
+  return {
+    path,
+    followers: profile.followers,
+    region: profile.region,
+    imageError,
+  };
 }
 
 /** 등록 직후 백그라운드 수집 — 실패해도 본 흐름은 유지 */
@@ -179,10 +306,19 @@ export function scheduleInfluencerProfileFetch(
   }
   void fetchAndStoreInfluencerProfile(supabase, influencerId, input)
     .then((result) => {
-      if (
-        result &&
-        (result.path || result.followers != null || result.region)
-      ) {
+      if (!result) {
+        onComplete?.({ ok: false, error: "프로필·팔로워를 찾지 못했습니다." });
+        return;
+      }
+      // 사진은 Apify가 URL을 줬는데 CDN 저장 실패 → 재수집 대상
+      if (result.imageError && !result.path) {
+        onComplete?.({
+          ok: false,
+          error: `프로필 사진 저장 실패: ${result.imageError}`,
+        });
+        return;
+      }
+      if (result.path || result.followers != null || result.region) {
         onComplete?.({ ok: true });
       } else {
         onComplete?.({ ok: false, error: "프로필·팔로워를 찾지 못했습니다." });

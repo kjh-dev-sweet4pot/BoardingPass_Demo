@@ -121,6 +121,56 @@ export async function scrapeTikTokPosts(
   return items;
 }
 
+export type TikTokProfileItem = {
+  error?: string;
+  avatar_url?: string;
+  avatarLarger?: string;
+  avatarMedium?: string;
+  avatarThumb?: string;
+  region?: string | null;
+  stats?: { follower_count?: number; followerCount?: number };
+  user?: {
+    avatarLarger?: string;
+    avatarMedium?: string;
+    avatarThumb?: string;
+  };
+  user_detail?: { country?: string | { country?: string | null } | null };
+};
+
+/** toolzerhub 응답 — 큰 해상도 우선 */
+export function extractTikTokProfilePicUrl(
+  item: TikTokProfileItem | null | undefined,
+): string | null {
+  if (!item) return null;
+  const candidates = [
+    item.avatarLarger,
+    item.user?.avatarLarger,
+    item.avatarMedium,
+    item.user?.avatarMedium,
+    item.avatar_url,
+    item.avatarThumb,
+    item.user?.avatarThumb,
+  ];
+  for (const url of candidates) {
+    if (typeof url === "string" && /^https?:\/\//i.test(url)) return url;
+  }
+  return null;
+}
+
+function tikTokFollowers(item: TikTokProfileItem): number | null {
+  const fans = item.stats?.follower_count ?? item.stats?.followerCount;
+  return typeof fans === "number" && Number.isFinite(fans) && fans >= 0
+    ? Math.round(fans)
+    : null;
+}
+
+function tikTokRegion(item: TikTokProfileItem): string | null {
+  if (item.region) return normalizeRegionCode(item.region);
+  const raw = item.user_detail?.country;
+  const country = typeof raw === "string" ? raw : raw?.country;
+  return normalizeRegionCode(country);
+}
+
 /** @handle·username·프로필 URL → 아바타·팔로워·region */
 export async function scrapeTikTokProfile(
   handle: string,
@@ -155,32 +205,29 @@ export async function scrapeTikTokProfile(
     throw new Error(await apifyErrorMessage(res.status, text));
   }
 
-  const items = (await res.json()) as Array<{
-    error?: string;
-    avatar_url?: string;
-    avatarLarger?: string;
-    stats?: { follower_count?: number; followerCount?: number };
-    user?: { avatarLarger?: string };
-    user_detail?: { country?: string | { country?: string | null } | null };
-  }>;
+  const items = (await res.json()) as TikTokProfileItem[];
   const item = items[0];
   if (!item) return { imageUrl: null, followers: null, region: null };
   if (item.error) {
     throw new Error(`TikTok 프로필 수집 실패 (${username}): ${item.error}`);
   }
-  const fans = item.stats?.follower_count ?? item.stats?.followerCount;
-  const followers =
-    typeof fans === "number" && Number.isFinite(fans) && fans >= 0
-      ? Math.round(fans)
-      : null;
-  // addonUserDetails → user_detail.country = "US" | { country: "US" }
-  const raw = item.user_detail?.country;
-  const country = typeof raw === "string" ? raw : raw?.country;
   return {
-    imageUrl: item.avatarLarger || item.user?.avatarLarger || item.avatar_url || null,
-    followers,
-    region: normalizeRegionCode(country),
+    imageUrl: extractTikTokProfilePicUrl(item),
+    followers: tikTokFollowers(item),
+    region: tikTokRegion(item),
   };
+}
+
+if (process.env.RUN_APIFY_PROFILE_SELF_CHECK === "1") {
+  const url = extractTikTokProfilePicUrl({
+    avatar_url: "https://cdn.example/a.jpg",
+    avatarLarger: "https://cdn.example/large.jpg",
+    avatarMedium: "https://cdn.example/med.jpg",
+  });
+  if (url !== "https://cdn.example/large.jpg") {
+    throw new Error("extractTikTokProfilePicUrl prefer avatarLarger");
+  }
+  console.log("apify-tiktok profile self-check ok");
 }
 
 /** postURL 1개에 대응하는 결과를 찾아 반환. */
