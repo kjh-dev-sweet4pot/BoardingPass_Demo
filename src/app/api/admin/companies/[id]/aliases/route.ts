@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminManager } from "@/lib/access";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
-import { normalizeCompanyKey } from "@/lib/company";
-
-const COMPANY_SELECT =
-  "id, name, login_id, aliases, contact, is_active, created_at, updated_at";
+import { COMPANY_SELECT, normalizeCompanyKey } from "@/lib/company";
 
 export async function POST(
   request: Request,

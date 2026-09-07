@@ -139,10 +139,30 @@ export async function POST(
           db.supabase,
           batchInfluencerId,
           "failed",
-          "프로필을 찾지 못했습니다.",
+          result?.imageError || "프로필을 찾지 못했습니다.",
         );
       }
-      return NextResponse.json({ error: "프로필을 찾지 못했습니다." }, { status: 404 });
+      return NextResponse.json(
+        { error: result?.imageError || "프로필을 찾지 못했습니다." },
+        { status: 404 },
+      );
+    }
+    if (result.imageError && !result.path) {
+      if (batchInfluencerId) {
+        await updateBatchInfluencerProfileStatus(
+          db.supabase,
+          batchInfluencerId,
+          "failed",
+          `프로필 사진 저장 실패: ${result.imageError}`,
+        );
+      }
+      return NextResponse.json(
+        {
+          error: `프로필 사진 저장 실패: ${result.imageError}`,
+          followers: result.followers,
+        },
+        { status: 502 },
+      );
     }
     if (batchInfluencerId) {
       await updateBatchInfluencerProfileStatus(db.supabase, batchInfluencerId, "ok", null);

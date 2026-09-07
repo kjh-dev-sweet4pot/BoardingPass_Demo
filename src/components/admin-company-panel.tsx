@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
+import { COMPANY_CONTRACT_STAGES } from "@/lib/company";
 import { type Company } from "@/lib/types";
 
 export function AdminCompanyPanel({
@@ -18,7 +19,15 @@ export function AdminCompanyPanel({
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [contact, setContact] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [aliases, setAliases] = useState("");
+  const [firstMeetOn, setFirstMeetOn] = useState("");
+  const [plannedStartOn, setPlannedStartOn] = useState("");
+  const [plannedEndOn, setPlannedEndOn] = useState("");
+  const [contractStage, setContractStage] = useState("");
+  const [budgetAmount, setBudgetAmount] = useState("");
+  const [spentAmount, setSpentAmount] = useState("");
+  const [guidelineUrl, setGuidelineUrl] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -55,7 +64,15 @@ export function AdminCompanyPanel({
     setLoginId("");
     setPassword("");
     setContact("");
+    setContactEmail("");
     setAliases("");
+    setFirstMeetOn("");
+    setPlannedStartOn("");
+    setPlannedEndOn("");
+    setContractStage("");
+    setBudgetAmount("");
+    setSpentAmount("");
+    setGuidelineUrl("");
   }
 
   function startEdit(company: Company) {
@@ -64,7 +81,19 @@ export function AdminCompanyPanel({
     setLoginId(company.login_id);
     setPassword("");
     setContact(company.contact || "");
+    setContactEmail(company.contact_email || "");
     setAliases((company.aliases || []).join(", "));
+    setFirstMeetOn(company.first_meet_on?.slice(0, 10) || "");
+    setPlannedStartOn(company.planned_start_on?.slice(0, 10) || "");
+    setPlannedEndOn(company.planned_end_on?.slice(0, 10) || "");
+    setContractStage(company.contract_stage || "");
+    setBudgetAmount(
+      company.budget_amount != null ? String(company.budget_amount) : "",
+    );
+    setSpentAmount(
+      company.spent_amount != null ? String(company.spent_amount) : "",
+    );
+    setGuidelineUrl(company.guideline_url || "");
     setOpen(true);
   }
 
@@ -78,10 +107,18 @@ export function AdminCompanyPanel({
         login_id: loginId,
         password,
         contact,
+        contact_email: contactEmail,
         aliases: aliases
           .split(",")
           .map((a) => a.trim())
           .filter(Boolean),
+        first_meet_on: firstMeetOn || null,
+        planned_start_on: plannedStartOn || null,
+        planned_end_on: plannedEndOn || null,
+        contract_stage: contractStage || null,
+        budget_amount: budgetAmount || null,
+        spent_amount: spentAmount || null,
+        guideline_url: guidelineUrl || null,
       };
       const res = await fetch(
         editingId
@@ -139,11 +176,7 @@ export function AdminCompanyPanel({
           className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
           aria-expanded={open}
         >
-          <h2
-            className="text-lg text-[var(--ink)]"
-          >
-            회원사 관리
-          </h2>
+          <h2 className="text-lg text-[var(--ink)]">회원사 관리</h2>
           <span className="text-xs font-medium text-[var(--muted)]">
             {open ? "접기 ▲" : `${list.length}곳 ▼`}
           </span>
@@ -159,34 +192,37 @@ export function AdminCompanyPanel({
               <li className="text-sm text-[var(--muted)]">등록된 회원사가 없습니다.</li>
             ) : (
               list.map((company) => (
-              <li
-                key={company.id}
-                className="flex items-center justify-between gap-2 rounded-[6px] border border-[var(--line)] px-3 py-2 text-sm"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{company.name}</p>
-                  <p className="text-xs text-[var(--muted)]">
-                    {company.login_id}
-                    {!company.is_active ? " · 비활성" : ""}
-                  </p>
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  <button
-                    type="button"
-                    className="text-xs text-[var(--accent)]"
-                    onClick={() => startEdit(company)}
-                  >
-                    수정
-                  </button>
-                  <button
-                    type="button"
-                    className="text-xs text-[var(--muted)]"
-                    onClick={() => void toggleActive(company)}
-                  >
-                    {company.is_active ? "비활성" : "활성"}
-                  </button>
-                </div>
-              </li>
+                <li
+                  key={company.id}
+                  className="flex items-center justify-between gap-2 rounded-[6px] border border-[var(--line)] px-3 py-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{company.name}</p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {company.login_id}
+                      {company.contract_stage
+                        ? ` · ${company.contract_stage}`
+                        : ""}
+                      {!company.is_active ? " · 비활성" : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      className="text-xs text-[var(--accent)]"
+                      onClick={() => startEdit(company)}
+                    >
+                      수정
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-[var(--muted)]"
+                      onClick={() => void toggleActive(company)}
+                    >
+                      {company.is_active ? "비활성" : "활성"}
+                    </button>
+                  </div>
+                </li>
               ))
             )}
           </ul>
@@ -219,6 +255,13 @@ export function AdminCompanyPanel({
             />
             <input
               className={fieldClass}
+              type="email"
+              placeholder="수신 메일 (선택)"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+            />
+            <input
+              className={fieldClass}
               placeholder="담당자 연락처 (선택)"
               value={contact}
               onChange={(e) => setContact(e.target.value)}
@@ -228,6 +271,73 @@ export function AdminCompanyPanel({
               placeholder="별칭, 쉼표로 구분"
               value={aliases}
               onChange={(e) => setAliases(e.target.value)}
+            />
+            <p className="pt-1 text-[11px] font-semibold text-[var(--muted)]">
+              계약 · 캠페인 진행
+            </p>
+            <label className="text-[11px] text-[var(--muted)]">
+              최초 미팅
+              <input
+                className={`${fieldClass} mt-1`}
+                type="date"
+                value={firstMeetOn}
+                onChange={(e) => setFirstMeetOn(e.target.value)}
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-[11px] text-[var(--muted)]">
+                소요예정 시작
+                <input
+                  className={`${fieldClass} mt-1`}
+                  type="date"
+                  value={plannedStartOn}
+                  onChange={(e) => setPlannedStartOn(e.target.value)}
+                />
+              </label>
+              <label className="text-[11px] text-[var(--muted)]">
+                소요예정 종료
+                <input
+                  className={`${fieldClass} mt-1`}
+                  type="date"
+                  value={plannedEndOn}
+                  onChange={(e) => setPlannedEndOn(e.target.value)}
+                />
+              </label>
+            </div>
+            <select
+              className={fieldClass}
+              value={contractStage}
+              onChange={(e) => setContractStage(e.target.value)}
+            >
+              <option value="">계약 진행 단계</option>
+              {COMPANY_CONTRACT_STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                className={fieldClass}
+                inputMode="numeric"
+                placeholder="배정 예산 (원)"
+                value={budgetAmount}
+                onChange={(e) => setBudgetAmount(e.target.value)}
+              />
+              <input
+                className={fieldClass}
+                inputMode="numeric"
+                placeholder="소요 비용 (원)"
+                value={spentAmount}
+                onChange={(e) => setSpentAmount(e.target.value)}
+              />
+            </div>
+            <input
+              className={fieldClass}
+              type="url"
+              placeholder="가이드라인 URL (Drive 등)"
+              value={guidelineUrl}
+              onChange={(e) => setGuidelineUrl(e.target.value)}
             />
             {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
             <div className="flex gap-2">

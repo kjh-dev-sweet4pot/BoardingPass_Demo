@@ -560,3 +560,46 @@ button {
 .owm-drawer-panel {
   animation: owm-drawer-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+@keyframes bp-ticker-roll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.bp-ticker-track {
+  animation: bp-ticker-roll 55s linear infinite;
+  width: max-content;
+}
+
+@keyframes bp-news-blip {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@keyframes bp-news-blip-text {
+  50% {
+    color: var(--ink);
+  }
+}
+
+.bp-news-dot {
+  animation: bp-news-blip 1.4s steps(1, end) infinite;
+}
+
+.bp-news-title {
+  animation: bp-news-blip-text 1.4s steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-ticker-track,
+  .bp-news-dot,
+  .bp-news-title {
+    animation: none;
+  }
+}
+

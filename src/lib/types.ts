@@ -13,9 +13,24 @@ export type Company = {
   login_id: string;
   aliases: string[];
   contact: string | null;
+  contact_email?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  /** 최초 미팅 일자 (YYYY-MM-DD) */
+  first_meet_on?: string | null;
+  /** 소요예정기간 시작 */
+  planned_start_on?: string | null;
+  /** 소요예정기간 종료 */
+  planned_end_on?: string | null;
+  /** 계약 진행 단계 */
+  contract_stage?: string | null;
+  /** 회원사 배정 예산(원) */
+  budget_amount?: number | null;
+  /** 운영 기록용 소요 비용(원) */
+  spent_amount?: number | null;
+  /** 콘텐츠 가이드라인 URL */
+  guideline_url?: string | null;
 };
 
 export type CreatorLinkStatus = "submitted" | "approved" | "rejected";

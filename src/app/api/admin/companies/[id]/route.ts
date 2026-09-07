@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { requireAdminManager } from "@/lib/access";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { hashPassword } from "@/lib/password";
-import { normalizeLoginId } from "@/lib/company";
-
-const COMPANY_SELECT =
-  "id, name, login_id, aliases, contact, is_active, created_at, updated_at";
+import {
+  COMPANY_SELECT,
+  COMPANY_SELECT_BASE,
+  COMPANY_SELECT_MAIL,
+  companyCrmFieldsFromBody,
+  isMissingColumnError,
+  isMissingCompanyCrmColumn,
+  normalizeLoginId,
+} from "@/lib/company";
 
 export async function PATCH(
   request: Request,
@@ -17,14 +22,7 @@ export async function PATCH(
   const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
-  let body: {
-    name?: string;
-    login_id?: string;
-    password?: string;
-    aliases?: string[];
-    contact?: string | null;
-    is_active?: boolean;
-  };
+  let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
@@ -62,16 +60,57 @@ export async function PATCH(
   if ("contact" in body) {
     patch.contact = String(body.contact || "").trim() || null;
   }
+  if ("contact_email" in body) {
+    patch.contact_email = String(body.contact_email || "").trim() || null;
+  }
   if ("is_active" in body) {
     patch.is_active = Boolean(body.is_active);
   }
 
-  const { data, error } = await supabase
+  const crm = companyCrmFieldsFromBody(body, "patch");
+  if (crm.error) {
+    return NextResponse.json({ error: crm.error }, { status: 400 });
+  }
+  Object.assign(patch, crm.fields);
+
+  let { data, error } = await supabase
     .from("companies")
     .update(patch)
     .eq("id", id)
     .select(COMPANY_SELECT)
     .maybeSingle();
+
+  if (error && isMissingCompanyCrmColumn(error.message)) {
+    for (const key of Object.keys(crm.fields)) delete patch[key];
+    const retry = await supabase
+      .from("companies")
+      .update(patch)
+      .eq("id", id)
+      .select(COMPANY_SELECT_MAIL)
+      .maybeSingle();
+    data = retry.data as typeof data;
+    error = retry.error;
+    if (!error && data) {
+      return NextResponse.json({
+        company: data,
+        warning:
+          "계약·예산 컬럼이 DB에 없습니다. scripts/sql/companies-contract-fields.sql 을 실행해 주세요.",
+      });
+    }
+  }
+
+  if (error && isMissingColumnError(error.message, "contact_email")) {
+    delete patch.contact_email;
+    for (const key of Object.keys(crm.fields)) delete patch[key];
+    const retry = await supabase
+      .from("companies")
+      .update(patch)
+      .eq("id", id)
+      .select(COMPANY_SELECT_BASE)
+      .maybeSingle();
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
 
   if (error) {
     const status = error.message.toLowerCase().includes("unique") ? 409 : 500;

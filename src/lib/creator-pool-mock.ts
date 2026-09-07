@@ -162,6 +162,51 @@ export function findPoolCreator(opts: {
   return undefined;
 }
 
+/** 풀에 없으면 CreatorPhoto용 최소 PoolCreator */
+export function resolvePoolCreator(opts: {
+  id: string;
+  name: string;
+  handle: string;
+  url?: string | null;
+  product?: string | null;
+  views?: number;
+  likes?: number;
+  comments?: number;
+}): PoolCreator {
+  const fromPool = findPoolCreator({
+    id: opts.id,
+    handle: opts.handle,
+    name: opts.name,
+  });
+  if (fromPool) return fromPool;
+  const channel = /tiktok/i.test(opts.url || "")
+    ? ("tiktok" as const)
+    : ("instagram" as const);
+  return {
+    id: opts.id,
+    name: opts.name,
+    handle: opts.handle,
+    market: "jp",
+    channel,
+    profileUrl: null,
+    priceKrw: 0,
+    followers: 0,
+    overlap: null,
+    tier: "micro",
+    product: opts.product ?? null,
+    posts: opts.url ? [{ platform: channel, url: opts.url }] : [],
+    uploadYmd: null,
+    metrics: {
+      views: opts.views ?? 0,
+      likes: opts.likes ?? 0,
+      comments: opts.comments ?? 0,
+      saves: null,
+      shares: null,
+    },
+    category: null,
+  };
+}
+
 function extractHandleFromUrl(url: string, channel: string) {
   const u = url.trim();
   if (!u) return "";

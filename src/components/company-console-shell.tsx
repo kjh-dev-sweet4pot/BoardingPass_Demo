@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   NavHoverDropdown,
@@ -9,32 +8,44 @@ import {
 } from "@/components/nav-hover-dropdown";
 
 export type CompanyConsoleView =
+  | "home"
   | "pool"
   | "publish"
   | "alloc"
   | "content"
-  | "contentLookup";
+  | "contentLookup"
+  | "budgetPerformance";
 
-const MAIN_TABS: { id: Exclude<CompanyConsoleView, "content" | "contentLookup">; label: string }[] = [
+type PerformanceView = "content" | "contentLookup" | "budgetPerformance";
+
+const MAIN_TABS: {
+  id: Exclude<CompanyConsoleView, PerformanceView>;
+  label: string;
+}[] = [
+  { id: "home", label: "홈" },
   { id: "pool", label: "크리에이터" },
   { id: "publish", label: "진행 현황" },
   { id: "alloc", label: "배정 현황" },
 ];
 
-const PERFORMANCE_ITEMS: NavDropdownItem<"content" | "contentLookup">[] = [
+const PERFORMANCE_ITEMS: NavDropdownItem<PerformanceView>[] = [
   { id: "content", label: "성과 대시보드", hint: "캠페인 전체 요약" },
   { id: "contentLookup", label: "성과 조회", hint: "인플루언서별 상세" },
+  { id: "budgetPerformance", label: "예산 성과", hint: "노출가 사용·차감 예정" },
 ];
 
 const MOBILE_TABS: { id: CompanyConsoleView; label: string }[] = [
+  { id: "home", label: "홈" },
   { id: "pool", label: "크리에이터" },
   { id: "publish", label: "진행 현황" },
   { id: "alloc", label: "배정 현황" },
   { id: "content", label: "성과" },
 ];
 
-function isPerformanceView(v: CompanyConsoleView) {
-  return v === "content" || v === "contentLookup";
+function isPerformanceView(v: CompanyConsoleView): v is PerformanceView {
+  return (
+    v === "content" || v === "contentLookup" || v === "budgetPerformance"
+  );
 }
 
 export function CompanyConsoleShell({
@@ -59,20 +70,23 @@ export function CompanyConsoleShell({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-3 lg:hidden">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <Link href="/">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/owm-logo.webp"
-              alt="O.W.M"
-              className="h-8 w-8 object-contain"
-              draggable={false}
-            />
-          </Link>
+        <button
+          type="button"
+          onClick={() => onViewChange("home")}
+          className="flex min-w-0 items-center gap-2.5 text-left"
+          aria-label="요약 홈"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/owm-logo.webp"
+            alt=""
+            className="h-8 w-8 object-contain"
+            draggable={false}
+          />
           <p className="truncate text-base font-semibold text-[var(--ink)]">
             {companyName}
           </p>
-        </div>
+        </button>
         <div className="flex flex-wrap items-center gap-2">
           {sidebarActions}
           {mobileActions}
@@ -86,7 +100,7 @@ export function CompanyConsoleShell({
           {MOBILE_TABS.map((tab) => {
             const active =
               tab.id === view ||
-              (tab.id === "content" && view === "contentLookup");
+              (tab.id === "content" && isPerformanceView(view));
             return (
               <button
                 key={tab.id}
@@ -108,18 +122,23 @@ export function CompanyConsoleShell({
         {isPerformanceView(view) ? (
           <NavSubSegment
             items={PERFORMANCE_ITEMS}
-            view={view as "content" | "contentLookup"}
+            view={view}
             onViewChange={onViewChange}
           />
         ) : null}
       </div>
 
       <header className="hidden shrink-0 items-center gap-6 border-b border-[var(--line)] bg-[var(--surface)] px-8 py-3.5 lg:flex">
-        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2.5">
+        <button
+          type="button"
+          onClick={() => onViewChange("home")}
+          className="flex min-w-0 shrink-0 items-center gap-2.5 text-left"
+          aria-label="요약 홈"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/owm-logo.webp"
-            alt="O.W.M"
+            alt=""
             className="h-9 w-9 shrink-0 object-contain"
             draggable={false}
           />
@@ -131,7 +150,7 @@ export function CompanyConsoleShell({
               {companyName}
             </p>
           </div>
-        </Link>
+        </button>
 
         <nav
           className="flex min-w-0 flex-1 items-center justify-start gap-8"

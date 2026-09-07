@@ -12,14 +12,32 @@ export type AdminSection =
   | "dashboard"
   | "performance"
   | "performanceLookup"
-  | "campaigns"
-  | "review"
-  | "allocations";
+  | "companies"
+  | "companiesRegister"
+  | "companiesMail"
+  | "influencersRegister"
+  | "influencersReview"
+  | "influencersAlloc"
+  | "campaigns";
 
-const AFTER_PERF: { id: Exclude<AdminSection, "dashboard" | "performance" | "performanceLookup">; label: string }[] = [
+const AFTER_PERF: { id: "campaigns"; label: string }[] = [
   { id: "campaigns", label: "캠페인·섭외" },
-  { id: "review", label: "검수" },
-  { id: "allocations", label: "배정·매장" },
+];
+
+export const COMPANIES_NAV: NavDropdownItem<
+  "companies" | "companiesRegister" | "companiesMail"
+>[] = [
+  { id: "companies", label: "목록", hint: "회원사 조회" },
+  { id: "companiesRegister", label: "등록", hint: "회원사 개설" },
+  { id: "companiesMail", label: "메일 발송", hint: "계약서·견적서·가이드라인" },
+];
+
+export const INFLUENCERS_NAV: NavDropdownItem<
+  "influencersRegister" | "influencersReview" | "influencersAlloc"
+>[] = [
+  { id: "influencersRegister", label: "등록", hint: "인플루언서 개설·수정" },
+  { id: "influencersReview", label: "검수", hint: "콘텐츠 승인·반려" },
+  { id: "influencersAlloc", label: "배정·매장", hint: "방문 배정·지점" },
 ];
 
 const PERF: NavDropdownItem<"performance" | "performanceLookup">[] = [
@@ -30,13 +48,25 @@ const PERF: NavDropdownItem<"performance" | "performanceLookup">[] = [
 const MOBILE: { id: AdminSection; label: string }[] = [
   { id: "dashboard", label: "대시보드" },
   { id: "performance", label: "성과" },
+  { id: "companies", label: "회원사" },
+  { id: "influencersRegister", label: "인플루언서" },
   { id: "campaigns", label: "캠페인·섭외" },
-  { id: "review", label: "검수" },
-  { id: "allocations", label: "배정·매장" },
 ];
 
 function isPerf(s: AdminSection) {
   return s === "performance" || s === "performanceLookup";
+}
+
+function isCompanies(s: AdminSection) {
+  return s === "companies" || s === "companiesRegister" || s === "companiesMail";
+}
+
+function isInfluencers(s: AdminSection) {
+  return (
+    s === "influencersRegister" ||
+    s === "influencersReview" ||
+    s === "influencersAlloc"
+  );
 }
 
 export function AdminConsoleShell({
@@ -71,7 +101,10 @@ export function AdminConsoleShell({
         >
           {MOBILE.map((item) => {
             const active =
-              section === item.id || (item.id === "performance" && isPerf(section));
+              section === item.id ||
+              (item.id === "performance" && isPerf(section)) ||
+              (item.id === "companies" && isCompanies(section)) ||
+              (item.id === "influencersRegister" && isInfluencers(section));
             return (
               <button
                 key={item.id}
@@ -92,6 +125,25 @@ export function AdminConsoleShell({
           <NavSubSegment
             items={PERF}
             view={section as "performance" | "performanceLookup"}
+            onViewChange={onSectionChange}
+          />
+        ) : null}
+        {isCompanies(section) ? (
+          <NavSubSegment
+            items={COMPANIES_NAV}
+            view={section as "companies" | "companiesRegister" | "companiesMail"}
+            onViewChange={onSectionChange}
+          />
+        ) : null}
+        {isInfluencers(section) ? (
+          <NavSubSegment
+            items={INFLUENCERS_NAV}
+            view={
+              section as
+                | "influencersRegister"
+                | "influencersReview"
+                | "influencersAlloc"
+            }
             onViewChange={onSectionChange}
           />
         ) : null}
@@ -116,7 +168,6 @@ export function AdminConsoleShell({
           role="tablist"
           aria-label="운영 콘솔 메뉴"
         >
-          {/* 순서: 대시보드 → 성과 → 나머지 */}
           <button
             type="button"
             role="tab"
@@ -136,6 +187,31 @@ export function AdminConsoleShell({
             active={isPerf(section)}
             selectedId={
               isPerf(section) ? (section as "performance" | "performanceLookup") : undefined
+            }
+            onSelect={onSectionChange}
+          />
+          <NavHoverDropdown
+            label="회원사"
+            items={COMPANIES_NAV}
+            active={isCompanies(section)}
+            selectedId={
+              isCompanies(section)
+                ? (section as "companies" | "companiesRegister" | "companiesMail")
+                : undefined
+            }
+            onSelect={onSectionChange}
+          />
+          <NavHoverDropdown
+            label="인플루언서"
+            items={INFLUENCERS_NAV}
+            active={isInfluencers(section)}
+            selectedId={
+              isInfluencers(section)
+                ? (section as
+                    | "influencersRegister"
+                    | "influencersReview"
+                    | "influencersAlloc")
+                : undefined
             }
             onSelect={onSectionChange}
           />

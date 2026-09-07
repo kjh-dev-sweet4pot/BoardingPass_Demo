@@ -19,6 +19,7 @@ export async function PATCH(
     instagram_handle?: string;
     sns_url?: string | null;
     notes?: string | null;
+    region?: string | null;
   };
   try {
     body = await request.json();
@@ -43,16 +44,21 @@ export async function PATCH(
     );
   }
 
+  const patch: Record<string, unknown> = {
+    name,
+    instagram_handle: instagramHandle,
+    instagram_handle_normalized: instagramHandle,
+    sns_url: snsUrl || null,
+    notes: String(body.notes || "").trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+  if ("region" in body) {
+    patch.region = String(body.region || "").trim() || null;
+  }
+
   const { data, error } = await supabase
     .from("influencers")
-    .update({
-      name,
-      instagram_handle: instagramHandle,
-      instagram_handle_normalized: instagramHandle,
-      sns_url: snsUrl || null,
-      notes: String(body.notes || "").trim() || null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", id)
     .select("*")
     .maybeSingle();

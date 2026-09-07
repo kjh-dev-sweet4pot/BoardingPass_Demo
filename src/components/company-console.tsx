@@ -13,6 +13,8 @@ import {
   useBudgetGate,
 } from "@/components/company-budget-gate";
 import { CompanyCreatorPool } from "@/components/company-creator-pool";
+import { CompanyBudgetPerformanceTab } from "@/components/company-budget-performance-tab";
+import { CompanyHomeLanding } from "@/components/company-home-landing";
 import { CompanyProgressTab } from "@/components/company-progress-tab";
 import { isDemoCompany } from "@/lib/company";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
@@ -86,6 +88,32 @@ function snsUrl(url?: string | null) {
   return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 }
 
+/** 배정 상세 CTA용 — 발행 URL 우선, 없으면 제출 URL */
+function primaryContentLink(links: CreatorLink[]) {
+  const ranked = [...links].sort((a, b) => {
+    const aPub = (a.publish_url || "").trim() ? 1 : 0;
+    const bPub = (b.publish_url || "").trim() ? 1 : 0;
+    if (aPub !== bPub) return bPub - aPub;
+    const aUrl = (a.publish_url || a.url || "").trim() ? 1 : 0;
+    const bUrl = (b.publish_url || b.url || "").trim() ? 1 : 0;
+    if (aUrl !== bUrl) return bUrl - aUrl;
+    return (Number(b.views) || 0) - (Number(a.views) || 0);
+  });
+  for (const link of ranked) {
+    const href = snsUrl(link.publish_url || link.url);
+    if (!href) continue;
+    return { id: link.id, href, platform: link.platform };
+  }
+  return null;
+}
+
+function contentPlatformLabel(platform: CreatorLink["platform"] | string) {
+  if (platform === "tiktok") return "TikTok 콘텐츠 보기";
+  if (platform === "instagram") return "Instagram 콘텐츠 보기";
+  if (platform === "youtube") return "YouTube 콘텐츠 보기";
+  return "콘텐츠 보기";
+}
+
 function matchesSearch(item: AllocationWithRelations, q: string) {
   if (!q) return true;
   const hay = [
@@ -128,18 +156,54 @@ function linkChipClass(sum: AllocationLinkSummary) {
   return "bg-[#f0ece6] text-[#8a8074]";
 }
 
-type AllocSortKey = "visit" | "views" | "likes" | "comments";
+type AllocSortKey = "visit" | "followers" | "views" | "likes" | "comments";
 type SortDir = "asc" | "desc";
+type AllocPerf = { views: number; likes: number; comments: number };
+
+/** 배정 소속 콘텐츠 지표 합산 (조회 시점 누적값) */
+function sumAllocationLinkMetrics(
+  links: CreatorLink[] | null | undefined,
+): AllocPerf | null {
+  let views = 0;
+  let likes = 0;
+  let comments = 0;
+  let has = false;
+  for (const link of links || []) {
+    if (
+      link.views == null &&
+      link.likes == null &&
+      link.comments == null &&
+      !link.metrics_collected_at
+    ) {
+      continue;
+    }
+    has = true;
+    views += Number(link.views) || 0;
+    likes += Number(link.likes) || 0;
+    comments += Number(link.comments) || 0;
+  }
+  return has ? { views, likes, comments } : null;
+}
+
+function allocationFollowers(item: AllocationWithRelations) {
+  const n = Number(item.influencers?.followers);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
 
 function compareAllocRows(
   a: AllocationWithRelations,
   b: AllocationWithRelations,
   sort: { key: AllocSortKey; dir: SortDir },
-  insightMap: Map<string, { views: number; likes: number; comments: number }>,
+  insightMap: Map<string, AllocPerf>,
 ) {
   const sign = sort.dir === "asc" ? 1 : -1;
   if (sort.key === "visit") {
     return sign * visitKey(a).localeCompare(visitKey(b));
+  }
+  if (sort.key === "followers") {
+    const fa = allocationFollowers(a) ?? -1;
+    const fb = allocationFollowers(b) ?? -1;
+    return sign * (fa - fb);
   }
   const va = insightMap.get(a.id)?.[sort.key] ?? -1;
   const vb = insightMap.get(b.id)?.[sort.key] ?? -1;
@@ -188,8 +252,8 @@ function AllocSortTh({
 export function CompanyConsole({
   company,
   initialAllocations,
-  initialMonthInsights,
-  initialAllInsights,
+  initialMonthInsights: _initialMonthInsights,
+  initialAllInsights: _initialAllInsights,
   initialPerformanceData,
   sidebarActions,
 }: {
@@ -207,9 +271,7 @@ export function CompanyConsole({
 }) {
   const isDemo = isDemoCompany(company);
   const gate = useBudgetGate(company.id);
-  const [view, setView] = useState<CompanyConsoleView>(
-    isDemo ? "pool" : "publish",
-  );
+  const [view, setView] = useState<CompanyConsoleView>("home");
   // live: 배정은 진행현황·배정 탭 진입 시 지연 로드
   const [liveAllocations, setLiveAllocations] =
     useState<AllocationWithRelations[]>(initialAllocations);
@@ -301,35 +363,28 @@ export function CompanyConsole({
     return { total, visited, picked, linked };
   }, [scoped]);
 
-  const insights = useMemo(() => {
-    if (isDemo) return buildPublishDemoInsights(period);
-    return period === "month" ? initialMonthInsights : initialAllInsights;
-  }, [
-    isDemo,
-    initialAllInsights,
-    initialMonthInsights,
-    period,
-  ]);
-
   const insightByAllocId = useMemo(() => {
-    const map = new Map<
-      string,
-      { views: number; likes: number; comments: number }
-    >();
-    const posts = isDemo
-      ? buildPublishDemoInsights("all").posts
-      : initialAllInsights.posts;
-    for (const post of posts) {
-      if (post.allocationId) {
-        map.set(post.allocationId, {
-          views: post.views,
-          likes: post.likes,
-          comments: post.comments,
-        });
+    const map = new Map<string, AllocPerf>();
+    for (const item of items) {
+      const fromLinks = sumAllocationLinkMetrics(
+        (item.creator_links || []) as CreatorLink[],
+      );
+      if (fromLinks) map.set(item.id, fromLinks);
+    }
+    // 데모·레거시: 링크 스냅샷이 없을 때만 insights 폴백
+    if (isDemo) {
+      for (const post of buildPublishDemoInsights("all").posts) {
+        if (post.allocationId && !map.has(post.allocationId)) {
+          map.set(post.allocationId, {
+            views: post.views,
+            likes: post.likes,
+            comments: post.comments,
+          });
+        }
       }
     }
     return map;
-  }, [isDemo, initialAllInsights.posts]);
+  }, [items, isDemo]);
 
   function toggleAllocSort(key: AllocSortKey) {
     setAllocSort((prev) =>
@@ -458,7 +513,10 @@ export function CompanyConsole({
   }
 
   const sidebarFooter =
-    (view === "content" || view === "contentLookup") && performanceMeta ? (
+    (view === "content" ||
+      view === "contentLookup" ||
+      view === "budgetPerformance") &&
+    performanceMeta ? (
       <>
         <p>{performanceMeta.asOf} 조회 시점 기준</p>
         {performanceMeta.lastCollected ? (
@@ -505,7 +563,16 @@ export function CompanyConsole({
       sidebarFooter={sidebarFooter}
       mobileActions={mobileActions}
     >
-      {view === "pool" ? (
+      {view === "home" ? (
+        <CompanyHomeLanding
+          companyName={company.name}
+          companyId={company.id}
+          onOpenPerformance={() => setView("content")}
+          onOpenBudgetPerformance={() => setView("budgetPerformance")}
+          onOpenPublish={() => setView("publish")}
+          onOpenPool={() => setView("pool")}
+        />
+      ) : view === "pool" ? (
         <CompanyCreatorPool
           companyId={company.id}
           companyName={company.name}
@@ -529,6 +596,11 @@ export function CompanyConsole({
           }
           period={period}
           onPeriodChange={setPeriod}
+          onMetaChange={setPerformanceMeta}
+        />
+      ) : view === "budgetPerformance" ? (
+        <CompanyBudgetPerformanceTab
+          companyId={company.id}
           onMetaChange={setPerformanceMeta}
         />
       ) : view === "content" ? (
@@ -659,7 +731,7 @@ export function CompanyConsole({
             조건에 맞는 배정이 없습니다.
           </p>
         ) : (
-          <table className="min-w-[1020px] w-full border-collapse text-left text-sm">
+          <table className="min-w-[1140px] w-full border-collapse text-left text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs text-[var(--muted)]">
                 <AllocSortTh
@@ -674,6 +746,14 @@ export function CompanyConsole({
                 <th className="px-4 py-3 font-medium">상품 / 수량</th>
                 <th className="px-4 py-3 font-medium">진행 상태</th>
                 <th className="px-4 py-3 font-medium">링크</th>
+                <AllocSortTh
+                  label="팔로워"
+                  sortKey="followers"
+                  activeKey={allocSort.key}
+                  dir={allocSort.dir}
+                  onSort={toggleAllocSort}
+                  className="text-right"
+                />
                 <AllocSortTh
                   label="조회"
                   sortKey="views"
@@ -707,6 +787,7 @@ export function CompanyConsole({
                   item.creator_links || [],
                 );
                 const perf = insightByAllocId.get(item.id);
+                const followers = allocationFollowers(item);
                 return (
                   <tr
                     key={item.id}
@@ -757,6 +838,9 @@ export function CompanyConsole({
                         {ALLOCATION_LINK_LABEL[linkSum]}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[var(--muted)]">
+                      {followers != null ? formatMetric(followers) : "—"}
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       {perf ? (
                         <span className="font-semibold text-[var(--ink)]">
@@ -787,10 +871,7 @@ export function CompanyConsole({
             <CompanyInfPanel
               item={selected}
               related={related}
-              insight={
-                insights.posts.find((p) => p.allocationId === selected.id) ||
-                null
-              }
+              insight={insightByAllocId.get(selected.id) || null}
               onClose={() => setOpenId(null)}
               onSelect={(id) => setOpenId(id)}
               onOpenContent={(postId) => {
@@ -836,13 +917,7 @@ function CompanyInfPanel({
 }: {
   item: AllocationWithRelations;
   related: AllocationWithRelations[];
-  insight: {
-    id: string;
-    views: number;
-    likes: number;
-    comments: number;
-    source: "mock" | "apify";
-  } | null;
+  insight: AllocPerf | null;
   onClose: () => void;
   onSelect: (id: string) => void;
   onOpenContent: (postId: string) => void;
@@ -854,8 +929,10 @@ function CompanyInfPanel({
   const handle = formatHandle(item);
   const sns = snsUrl(item.influencers?.sns_url);
   const links = (item.creator_links || []) as CreatorLink[];
+  const content = primaryContentLink(links);
   const linkSum = summarizeAllocationLinks(links);
   const countryBadge = regionBadgeText(item.influencers?.region);
+  const followers = allocationFollowers(item);
 
   return (
     <div>
@@ -947,31 +1024,37 @@ function CompanyInfPanel({
         </div>
       </dl>
 
-      {insight ? (
+      {insight || followers != null ? (
         <div className="mt-5 rounded-[6px] border border-[var(--line)] px-4 py-4">
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-sm font-semibold">콘텐츠 성과</h4>
             <span className="text-[11px] text-[var(--muted)]">
-              {insight.source === "mock" ? "미리보기" : "수집"}
+              배정 콘텐츠 합산
             </span>
           </div>
-          <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <dl className="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+            <div>
+              <dt className="text-[11px] text-[var(--muted)]">팔로워</dt>
+              <dd className="mt-0.5 text-sm font-semibold tabular-nums">
+                {followers != null ? formatMetric(followers) : "—"}
+              </dd>
+            </div>
             <div>
               <dt className="text-[11px] text-[var(--muted)]">조회</dt>
               <dd className="mt-0.5 text-sm font-semibold tabular-nums">
-                {formatMetric(insight.views)}
+                {insight ? formatMetric(insight.views) : "—"}
               </dd>
             </div>
             <div>
               <dt className="text-[11px] text-[var(--muted)]">좋아요</dt>
               <dd className="mt-0.5 text-sm font-semibold tabular-nums">
-                {formatMetric(insight.likes)}
+                {insight ? formatMetric(insight.likes) : "—"}
               </dd>
             </div>
             <div>
               <dt className="text-[11px] text-[var(--muted)]">댓글</dt>
               <dd className="mt-0.5 text-sm font-semibold tabular-nums">
-                {formatMetric(insight.comments)}
+                {insight ? formatMetric(insight.comments) : "—"}
               </dd>
             </div>
           </dl>
@@ -984,18 +1067,20 @@ function CompanyInfPanel({
           <p className="text-sm text-[var(--muted)]">제출된 링크가 없습니다.</p>
         ) : (
           <ul className="space-y-2">
-            {links.map((link) => (
+            {links.map((link) => {
+              const href = snsUrl(link.publish_url || link.url) || link.url;
+              return (
               <li
                 key={link.id}
                 className="rounded-[6px] border border-[var(--line)] px-3 py-2.5 text-sm"
               >
                 <a
-                  href={link.url}
+                  href={href}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="break-all text-[var(--accent)] underline"
                 >
-                  {link.url}
+                  {href}
                 </a>
                 <p className="mt-1 text-xs text-[var(--muted)]">
                   {link.platform} ·{" "}
@@ -1011,26 +1096,37 @@ function CompanyInfPanel({
                   · {formatKst(link.submitted_at)}
                 </p>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>
 
       <div className="mt-5 flex flex-col gap-2">
+        {content ? (
+          <a
+            href={content.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center rounded-[6px] bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white"
+          >
+            {contentPlatformLabel(content.platform)}
+          </a>
+        ) : null}
         {sns ? (
           <a
             href={sns}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center rounded-[6px] bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white"
+            className="inline-flex items-center justify-center rounded-[6px] border border-[var(--line)] px-4 py-2.5 text-sm font-medium text-[var(--ink)]"
           >
-            Instagram 콘텐츠 보기
+            SNS 프로필 열기
           </a>
         ) : null}
-        {insight ? (
+        {content ? (
           <button
             type="button"
-            onClick={() => onOpenContent(insight.id)}
+            onClick={() => onOpenContent(content.id)}
             className="w-full rounded-[6px] border border-[var(--line)] px-3 py-2.5 text-sm font-medium"
           >
             콘텐츠 대시보드에서 보기
