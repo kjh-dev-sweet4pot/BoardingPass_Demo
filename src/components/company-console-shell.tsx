@@ -173,9 +173,9 @@ export function CompanyConsoleShell({
       </header>
 
       {sidebarFooter ? (
-        <p className="hidden border-b border-[var(--line)] bg-[var(--surface)] px-8 py-2 text-[11px] text-[var(--muted)] lg:block">
+        <div className="hidden border-b border-[var(--line)] bg-[var(--surface)] px-8 py-2 text-[11px] text-[var(--muted)] lg:block">
           {sidebarFooter}
-        </p>
+        </div>
       ) : null}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
