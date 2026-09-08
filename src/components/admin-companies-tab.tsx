@@ -66,9 +66,17 @@ function CompanyCsvImport({
 
   function downloadExcelTemplate() {
     const bytes = buildCompanyExcelTemplate();
-    const blob = new Blob([bytes], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
+    const blob = new Blob(
+      [
+        bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer,
+      ],
+      {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+    );
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "boardingpass-companies-template.xlsx";

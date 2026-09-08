@@ -37,6 +37,7 @@ export function PharConsole({
       ? initialTab
       : defaultPharTab(todayVisitors),
   );
+  const [counterAllocId, setCounterAllocId] = useState<string | null>(null);
   const [dateKey, setDateKey] = useState(() =>
     initialDate === "undated" || isValidYmd(initialDate || "")
       ? initialDate!
@@ -112,7 +113,7 @@ export function PharConsole({
         {(
           [
             ["calendar", "방문 달력"],
-            ["counter", "오늘 카운터"],
+            ["counter", "전체 리스트"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -137,7 +138,10 @@ export function PharConsole({
           items={liveItems}
           selectedKey={dateKey}
           onSelect={setDateKey}
-          onOpenCounter={() => setTab("counter")}
+          onOpenCounter={(allocId) => {
+            if (allocId) setCounterAllocId(allocId);
+            setTab("counter");
+          }}
         />
       ) : (
         <PharListWithModal
@@ -145,6 +149,7 @@ export function PharConsole({
           lockedStoreId={storeId}
           fillHeight
           embedInConsole
+          initialSelectedId={counterAllocId}
         />
       )}
     </div>

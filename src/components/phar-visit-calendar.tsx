@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { StateBadge } from "@/components/state-badge";
 import { todayYmdKst } from "@/lib/inf-visit";
 import {
@@ -22,39 +22,103 @@ import { formatMd, type AllocationWithRelations } from "@/lib/types";
 
 const UNDATED = "undated";
 
-function VisitorCard({ visitor }: { visitor: DayVisitor }) {
+function formatSnsHref(url?: string | null) {
+  const raw = (url || "").trim();
+  if (!raw) return null;
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
+function VisitorCard({
+  visitor,
+  selected,
+  onSelect,
+  onOpenDetail,
+}: {
+  visitor: DayVisitor;
+  selected?: boolean;
+  onSelect: () => void;
+  onOpenDetail: () => void;
+}) {
+  const inf = visitor.badgeItem.influencers;
+  const sns = formatSnsHref(inf?.sns_url);
   return (
-    <div className="flex items-start gap-3 border-b border-[var(--line)] px-3 py-3 last:border-b-0">
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8D5BE] text-sm font-bold text-[#3D1F0A]"
-        aria-hidden
+    <div
+      className={`border-b border-[var(--line)] last:border-b-0 ${
+        selected ? "bg-[var(--accent-soft)]" : ""
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        className={`flex w-full items-start gap-3 px-3 py-3 text-left ${
+          selected ? "" : "hover:bg-[var(--accent-soft)]/50"
+        }`}
       >
-        {visitor.initial}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-[var(--ink)]">
-          {visitor.name}
-        </p>
-        {visitor.handle ? (
-          <p className="truncate text-[11px] text-[var(--muted)]">
-            @{visitor.handle}
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8D5BE] text-sm font-bold text-[#3D1F0A]"
+          aria-hidden
+        >
+          {visitor.initial}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-[var(--ink)]">
+            {visitor.name}
           </p>
-        ) : null}
-        {visitor.products.map((p) => (
-          <p key={p.id} className="mt-0.5 text-[13px] text-[var(--ink)]">
-            {p.name}
-            {p.quantity > 1 ? (
-              <b className="ml-1 font-semibold">×{p.quantity}</b>
-            ) : null}
-          </p>
-        ))}
-        {visitor.campaignName ? (
-          <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-            {visitor.campaignName}
-          </p>
-        ) : null}
-      </div>
-      <StateBadge value={visitor.badgeStatus} />
+          {visitor.handle ? (
+            <p className="truncate text-[11px] text-[var(--muted)]">
+              @{visitor.handle}
+            </p>
+          ) : null}
+          {!selected
+            ? visitor.products.map((p) => (
+                <p key={p.id} className="mt-0.5 text-[13px] text-[var(--ink)]">
+                  {p.name}
+                  {p.quantity > 1 ? (
+                    <b className="ml-1 font-semibold">×{p.quantity}</b>
+                  ) : null}
+                </p>
+              ))
+            : null}
+        </div>
+        <StateBadge value={visitor.badgeStatus} />
+      </button>
+      {selected ? (
+        <div className="space-y-2 px-3 pb-3 pl-[3.75rem]">
+          {sns ? (
+            <a
+              href={sns}
+              target="_blank"
+              rel="noreferrer"
+              className="block truncate text-[12px] text-[var(--accent)] underline"
+            >
+              {sns}
+            </a>
+          ) : null}
+          {visitor.campaignName ? (
+            <p className="text-[12px] text-[var(--muted)]">{visitor.campaignName}</p>
+          ) : null}
+          <ul className="text-[13px] text-[var(--ink)]">
+            {visitor.products.map((p) => (
+              <li key={p.id}>
+                {p.name}{" "}
+                <b className="font-semibold">×{p.quantity}</b>
+              </li>
+            ))}
+          </ul>
+          {inf?.notes ? (
+            <p className="whitespace-pre-wrap text-[12px] text-[var(--muted)]">
+              {inf.notes}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={onOpenDetail}
+            className="w-full rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--accent)]"
+          >
+            리스트에서 상세 보기
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -68,9 +132,10 @@ export function PharVisitCalendar({
   items: AllocationWithRelations[];
   selectedKey: string;
   onSelect: (key: string) => void;
-  onOpenCounter: () => void;
+  onOpenCounter: (allocationId?: string) => void;
 }) {
   const today = todayYmdKst();
+  const [detailId, setDetailId] = useState<string | null>(null);
   const todayYm = today.slice(0, 7);
   const monthYm = selectedKey === UNDATED || !isValidYmd(selectedKey)
     ? todayYm
@@ -120,6 +185,7 @@ export function PharVisitCalendar({
     viewYmRef.current = next;
     if (next === todayYm) onSelect(today);
     else onSelect(`${next}-01`);
+    setDetailId(null);
   }
 
   const header =
@@ -128,8 +194,8 @@ export function PharVisitCalendar({
       : `${formatMd(selectedKey)} (${WEEKDAYS_KO[weekdayIndex(selectedKey)]}) · ${summary?.visitorCount ?? 0}명 / ${summary?.allocationCount ?? 0}건`;
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 min-[900px]:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-      <section className="flex min-h-0 flex-col gap-2.5 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
+    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)]">
+      <section className="flex min-h-0 flex-col gap-2 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
         <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
@@ -159,20 +225,7 @@ export function PharVisitCalendar({
           </button>
         </div>
 
-        <div
-          className="grid grid-cols-7 gap-1.5"
-          onTouchStart={(e) => {
-            swipeX.current = e.changedTouches[0]?.clientX ?? null;
-          }}
-          onTouchEnd={(e) => {
-            const start = swipeX.current;
-            swipeX.current = null;
-            if (start == null) return;
-            const dx = (e.changedTouches[0]?.clientX ?? start) - start;
-            if (dx > 56) goMonth(-1);
-            else if (dx < -56) goMonth(1);
-          }}
-        >
+        <div className="grid shrink-0 grid-cols-7 gap-1">
           {WEEKDAYS_KO.map((w, i) => (
             <div
               key={w}
@@ -187,6 +240,21 @@ export function PharVisitCalendar({
               {w}
             </div>
           ))}
+        </div>
+        <div
+          className="grid min-h-0 flex-1 grid-cols-7 auto-rows-fr gap-1"
+          onTouchStart={(e) => {
+            swipeX.current = e.changedTouches[0]?.clientX ?? null;
+          }}
+          onTouchEnd={(e) => {
+            const start = swipeX.current;
+            swipeX.current = null;
+            if (start == null) return;
+            const dx = (e.changedTouches[0]?.clientX ?? start) - start;
+            if (dx > 56) goMonth(-1);
+            else if (dx < -56) goMonth(1);
+          }}
+        >
           {cells.map((cell) => {
             const n = cell.summary?.visitorCount ?? 0;
             const alloc = cell.summary?.allocationCount ?? 0;
@@ -199,7 +267,7 @@ export function PharVisitCalendar({
               return (
                 <div
                   key={cell.ymd}
-                  className="flex min-h-[72px] flex-col rounded-[6px] border border-transparent p-1.5"
+                  className="flex min-h-0 flex-col rounded-[6px] border border-transparent p-1"
                 >
                   <span className="text-xs text-[#A07050]/40">{cell.num}</span>
                 </div>
@@ -209,10 +277,13 @@ export function PharVisitCalendar({
               <button
                 key={cell.ymd}
                 type="button"
-                onClick={() => onSelect(cell.ymd)}
+                onClick={() => {
+                  onSelect(cell.ymd);
+                  setDetailId(null);
+                }}
                 aria-label={`${cell.num}일 ${n}명`}
                 aria-pressed={selected}
-                className={`relative flex min-h-[72px] min-w-0 flex-col items-center rounded-[6px] border p-1.5 text-center transition ${
+                className={`relative flex min-h-0 min-w-0 flex-col items-center rounded-[6px] border p-1 text-center transition ${
                   isToday ? "border-2 border-[#6B3B1F]" : "border-[#E8D5BE]"
                 } ${selected ? "ring-[3px] ring-[#6B3B1F]/25" : ""}`}
                 style={{ background: heat.bg, color: heat.fg }}
@@ -308,17 +379,27 @@ export function PharVisitCalendar({
               이 날은 방문 예정이 없습니다.
             </p>
           ) : (
-            visitors.map((v) => <VisitorCard key={v.influencerId} visitor={v} />)
+            visitors.map((v) => (
+              <VisitorCard
+                key={v.influencerId}
+                visitor={v}
+                selected={v.influencerId === detailId}
+                onSelect={() =>
+                  setDetailId((id) => (id === v.influencerId ? null : v.influencerId))
+                }
+                onOpenDetail={() => onOpenCounter(v.badgeItem.id)}
+              />
+            ))
           )}
         </div>
         {selectedKey === today && (summary?.visitorCount ?? 0) > 0 ? (
           <div className="shrink-0 border-t border-[var(--line)] p-3">
             <button
               type="button"
-              onClick={onOpenCounter}
+              onClick={() => onOpenCounter()}
               className="w-full rounded-[6px] bg-[var(--accent)] px-3 py-2.5 text-sm font-bold text-white"
             >
-              카운터에서 응대하기
+              전체 리스트에서 응대하기
             </button>
           </div>
         ) : null}

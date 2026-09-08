@@ -213,6 +213,46 @@ export function defaultPharTab(
   return "calendar";
 }
 
+export function addDaysYmd(ymd: string, days: number) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return dt.toISOString().slice(0, 10);
+}
+
+/** 앞으로 빼둘 상품: 오늘부터 days일 수령 예정 (취소·반출완료 제외) */
+export function upcomingPlacement(
+  items: AllocationWithRelations[],
+  todayYmd: string,
+  days = 7,
+) {
+  const end = addDaysYmd(todayYmd, days - 1);
+  const byProduct = new Map<
+    string,
+    { name: string; qty: number; people: Set<string> }
+  >();
+  for (const item of items) {
+    if (item.status === "cancelled" || item.status === "picked_up") continue;
+    const d = item.visit_date;
+    if (!d || d < todayYmd || d > end) continue;
+    const name = item.products?.name || "상품";
+    const row = byProduct.get(name) || {
+      name,
+      qty: 0,
+      people: new Set<string>(),
+    };
+    row.qty += item.quantity;
+    row.people.add(item.influencer_id);
+    byProduct.set(name, row);
+  }
+  return [...byProduct.values()]
+    .map((r) => ({
+      name: r.name,
+      qty: r.qty,
+      visitorCount: r.people.size,
+    }))
+    .sort((a, b) => b.qty - a.qty);
+}
+
 export function monthHeatCells(
   monthYm: string,
   byDay: Map<string, VisitDaySummary>,
@@ -238,4 +278,5 @@ if (process.env.NODE_ENV !== "production") {
   console.assert(monthNavState("2027-03", "2026-09").canNext === false);
   const cells = monthHeatCells("2026-08", new Map());
   console.assert(cells[0]?.ymd === "2026-07-26");
+  console.assert(addDaysYmd("2026-09-08", 6) === "2026-09-14");
 }

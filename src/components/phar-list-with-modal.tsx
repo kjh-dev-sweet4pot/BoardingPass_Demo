@@ -1097,6 +1097,7 @@ export function PharListWithModal({
   storeList = [],
   companyList = [],
   embedInConsole = false,
+  initialSelectedId = null,
 }: {
   items: AllocationWithRelations[];
   /** 부모 높이에 맞춰 목록만 내부 스크롤 (운영 콘솔 등) */
@@ -1107,8 +1108,10 @@ export function PharListWithModal({
   allowAdminEdit?: boolean;
   storeList?: Store[];
   companyList?: Company[];
-  /** /phar 콘솔 안에 넣을 때: 전체화면 id 중복 방지, 기간 토글 숨김 */
+  /** /phar 콘솔 안에 넣을 때: 전체화면 id 중복 방지 */
   embedInConsole?: boolean;
+  /** 달력에서 넘어온 배정 — 우측 상세를 연다 */
+  initialSelectedId?: string | null;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
@@ -1126,17 +1129,23 @@ export function PharListWithModal({
   const [visitDate, setVisitDate] = useState("");
   const [status, setStatus] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
-  /** 지점(phar)은 기본 오늘만, Admin 전체 목록은 기본 전체 */
-  const [todayOnly, setTodayOnly] = useState(() => Boolean(lockedStoreId));
-  /** 지점 PC: 기본 미수령만 */
-  const [hidePickedUp, setHidePickedUp] = useState(() => Boolean(lockedStoreId));
+  /** 지점(phar) 콘솔은 전체 리스트, Admin 단독 카운터는 오늘만 */
+  const [todayOnly, setTodayOnly] = useState(
+    () => Boolean(lockedStoreId) && !embedInConsole,
+  );
+  /** 지점 PC: 콘솔은 전체, 단독 카운터는 미수령만 */
+  const [hidePickedUp, setHidePickedUp] = useState(
+    () => Boolean(lockedStoreId) && !embedInConsole,
+  );
   /** 지점 PC: 우측 패널용 선택 (allocation id) */
-  const [selectedAllocId, setSelectedAllocId] = useState<string | null>(null);
+  const [selectedAllocId, setSelectedAllocId] = useState<string | null>(
+    initialSelectedId,
+  );
   /** 지점 카운터: INF 수령 등 원격 변경을 반영하기 위한 목록 */
   const [liveItems, setLiveItems] = useState(items);
   /** 카운터 상단 현황: 오늘 / 이번달 / 전체 */
   const [statsPeriod, setStatsPeriod] = useState<"today" | "month" | "all">(
-    "today",
+    embedInConsole ? "all" : "today",
   );
   /** 현황 카드 클릭 필터: 합계 / 방문예정 / 방문완료 / 반출완료 */
   const [statsBucket, setStatsBucket] = useState<
@@ -1356,16 +1365,6 @@ export function PharListWithModal({
     }
     return { total, scheduled, visited, pickedUp };
   }, [liveItems, storeFilterId, today, monthKey, statsPeriod]);
-
-  const todayVisitorCount = useMemo(() => {
-    const ids = new Set<string>();
-    for (const item of liveItems) {
-      if (item.status === "cancelled") continue;
-      if (visitDateKey(item) !== today) continue;
-      ids.add(item.influencer_id);
-    }
-    return ids.size;
-  }, [liveItems, today]);
 
   const statsPeriodLabel =
     statsPeriod === "today"
@@ -1758,7 +1757,7 @@ export function PharListWithModal({
   if (simpleFilters) {
     const counterTall = fillHeight || isFullscreen;
     const counterGridClass =
-      "grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(240px,0.55fr)]";
+      "grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.9fr)]";
 
     return (
       <div
@@ -1791,7 +1790,7 @@ export function PharListWithModal({
             className={`${counterGridClass} ${counterTall ? "flex-1" : ""}`}
           >
             <div className="flex min-h-0 min-w-0 flex-col gap-3">
-              <div className="shrink-0 rounded-[6px] border border-[var(--accent)]/25 bg-[var(--accent-soft)]/70 p-3 shadow-sm sm:p-3.5">
+              <div className="shrink-0 rounded-[6px] border border-[var(--accent)]/25 bg-[var(--accent-soft)]/70 p-2.5 shadow-sm">
                 <div className="mb-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                   <div className="flex items-baseline gap-2">
                     <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
@@ -1801,14 +1800,6 @@ export function PharListWithModal({
                       {statsPeriodLabel}
                     </p>
                   </div>
-                  {embedInConsole ? (
-                    <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">
-                      오늘 {todayVisitorCount}명
-                      <span className="ml-1 text-xs font-medium text-[var(--muted)]">
-                        / {periodStats.total}건
-                      </span>
-                    </p>
-                  ) : (
                   <div
                     className="flex rounded-[6px] border border-[var(--line)] bg-[var(--surface)]/90 p-0.5"
                     role="group"
@@ -1836,7 +1827,6 @@ export function PharListWithModal({
                       </button>
                     ))}
                   </div>
-                  )}
                 </div>
 
                 <div
