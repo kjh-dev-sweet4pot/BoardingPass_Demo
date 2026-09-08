@@ -3,6 +3,7 @@ import { requireAdminManager, requireAnyAdmin } from "@/lib/access";
 import {
   COMPANY_MAIL_LOG_SELECT,
   COMPANY_MAIL_KINDS,
+  buildCompanyMailHtml,
   buildCompanyMailTemplate,
   isCompanyMailConfigured,
   probeResendMailAccount,
@@ -11,11 +12,18 @@ import {
   parseMailAddresses,
   resolveCompanyMailTo,
   sendCompanyMailViaResend,
+  SENDER_COMPANY,
 } from "@/lib/company-mail";
+import {
+  loadAdminMailProfile,
+  loadSignatureBytes,
+} from "@/lib/admin-mail-profile";
 import { CONTENT_FILES_BUCKET } from "@/lib/content-file-storage";
 import { docHtml, mailDocFilename, type CompanyDocKind } from "@/lib/company-docs";
-import { getAdminLoginId } from "@/lib/session";
+import { htmlToPdf } from "@/lib/html-to-pdf";
+import { ADMIN_USERNAME, getAdminLoginId } from "@/lib/session";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 const MAIL_ATTACH_MAX_BYTES = 8 * 1024 * 1024;
 
@@ -186,7 +194,20 @@ export async function POST(request: NextRequest) {
       const kind = d.kind as CompanyDocKind;
       const html = docHtml(kind, d.payload, false);
       const filename = mailDocFilename(kind, String(d.title || ""), d.payload);
-      const bytes = Buffer.from(html, "utf8");
+      let bytes: Buffer;
+      try {
+        bytes = await htmlToPdf(html);
+      } catch (err) {
+        return NextResponse.json(
+          {
+            error:
+              err instanceof Error
+                ? `PDF 변환 실패: ${err.message}`
+                : "문서를 PDF로 변환하지 못했습니다.",
+          },
+          { status: 500 },
+        );
+      }
       if (bytes.length > MAIL_ATTACH_MAX_BYTES) {
         return NextResponse.json(
           { error: `${filename} 첨부가 8MB를 넘습니다.` },
@@ -241,7 +262,26 @@ export async function POST(request: NextRequest) {
   let sentAt: string | null = null;
   let sendError: string | null = null;
   try {
-    await sendCompanyMailViaResend({ to, subject, body, attachments });
+    const loginId = (await getAdminLoginId()) || ADMIN_USERNAME;
+    const profileDb = hasServiceRoleKey() ? createServiceClient() : supabase;
+    const profile = await loadAdminMailProfile(profileDb, loginId);
+    let imageDataUrl: string | null = null;
+    if (profile.signaturePath) {
+      const sig = await loadSignatureBytes(profileDb, profile.signaturePath);
+      if (sig) {
+        imageDataUrl = `data:${sig.type};base64,${sig.bytes.toString("base64")}`;
+      }
+    }
+    const managerName = profile.displayName;
+    const html = buildCompanyMailHtml(body, { managerName, imageDataUrl });
+    const signedText = `${body.trim()}\n\n--\n${managerName ? `${managerName}\n` : ""}${SENDER_COMPANY}\n`;
+    await sendCompanyMailViaResend({
+      to,
+      subject,
+      body: signedText,
+      html,
+      attachments,
+    });
     sentAt = new Date().toISOString();
   } catch (err) {
     sendError = err instanceof Error ? err.message : "메일 발송 실패";

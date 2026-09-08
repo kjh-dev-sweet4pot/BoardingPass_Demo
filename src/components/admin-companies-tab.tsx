@@ -17,7 +17,7 @@ import {
 } from "@/lib/company-mail";
 import { AdminCompanyDocsPanel } from "@/components/admin-company-docs-tab";
 import { formatKrw } from "@/lib/creator-pool-mock";
-import type { CompanyDocRow } from "@/lib/company-docs";
+import { docHtml, type CompanyDocRow } from "@/lib/company-docs";
 import { type Company } from "@/lib/types";
 
 export type CompaniesSub = "companies" | "companiesRegister" | "companiesMail" | "companiesDocs";
@@ -685,6 +685,12 @@ function MailPanel({
   const [files, setFiles] = useState<File[]>([]);
   const [docs, setDocs] = useState<CompanyDocRow[]>([]);
   const [docIds, setDocIds] = useState<string[]>([]);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [managerName, setManagerName] = useState("");
+  const [savedManagerName, setSavedManagerName] = useState("");
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [sigFile, setSigFile] = useState<File | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [logs, setLogs] = useState<MailLog[]>([]);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [mailFrom, setMailFrom] = useState<string>("");
@@ -696,13 +702,27 @@ function MailPanel({
 
   const company = companies.find((c) => c.id === companyId) || null;
   const campaignName = campaigns.find((c) => c.id === campaignId)?.name || "";
+  const activePreviewId =
+    previewId && docIds.includes(previewId)
+      ? previewId
+      : docIds[docIds.length - 1] || null;
+  const previewDoc = docs.find((d) => d.id === activePreviewId) || null;
+  const previewHtml = previewDoc
+    ? docHtml(previewDoc.kind, previewDoc.payload, false)
+    : "";
 
   const applyTemplate = useCallback(
-    (nextKind: CompanyMailKind, nextCompany: Company | null, nextCampaign: string) => {
+    (
+      nextKind: CompanyMailKind,
+      nextCompany: Company | null,
+      nextCampaign: string,
+      nextManager: string,
+    ) => {
       const t = buildCompanyMailTemplate({
         kind: nextKind,
         companyName: nextCompany?.name || "",
         campaignName: nextCampaign,
+        managerName: nextManager,
       });
       setSubject(t.subject);
       setBody(t.body);
@@ -717,8 +737,31 @@ function MailPanel({
   useEffect(() => {
     const c = companies.find((x) => x.id === companyId) || null;
     setToEmails(c ? resolveCompanyMailTo(c) : "");
-    applyTemplate(kind, c, campaignName);
-  }, [companyId, companies, kind, campaignName, applyTemplate]);
+    // 수신은 회원사 변경 시에만 기본값. 계약서 체크 등으로 kind가 바뀌어도 유지.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
+
+  useEffect(() => {
+    const c = companies.find((x) => x.id === companyId) || null;
+    applyTemplate(kind, c, campaignName, savedManagerName);
+  }, [companyId, kind, campaignName, savedManagerName, applyTemplate, companies]);
+
+  useEffect(() => {
+    fetch("/api/admin/mail-profile", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        const p = j.profile as
+          | { displayName?: string; signatureUrl?: string | null }
+          | undefined;
+        const name = p?.displayName || "";
+        if (name) {
+          setManagerName(name);
+          setSavedManagerName(name);
+        }
+        if (p?.signatureUrl) setSignatureUrl(p.signatureUrl);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!companyId) {
@@ -726,6 +769,7 @@ function MailPanel({
       setCampaignId("");
       setDocs([]);
       setDocIds([]);
+      setPreviewId(null);
       return;
     }
     fetch(`/api/admin/campaigns?company_id=${encodeURIComponent(companyId)}`, {
@@ -744,10 +788,12 @@ function MailPanel({
       .then((j) => {
         setDocs(Array.isArray(j.docs) ? j.docs : []);
         setDocIds([]);
+        setPreviewId(null);
       })
       .catch(() => {
         setDocs([]);
         setDocIds([]);
+        setPreviewId(null);
       });
   }, [companyId]);
 
@@ -774,6 +820,32 @@ function MailPanel({
     void loadLogs();
   }, [loadLogs]);
 
+  async function saveMailProfile() {
+    if (!isManager) return;
+    setSavingProfile(true);
+    setError(null);
+    setOk(null);
+    try {
+      const fd = new FormData();
+      fd.set("display_name", managerName);
+      if (sigFile) fd.set("file", sigFile);
+      const res = await fetch("/api/admin/mail-profile", { method: "POST", body: fd });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || "서명 저장 실패");
+      const p = j.profile as { displayName?: string; signatureUrl?: string | null };
+      const name = p?.displayName || managerName;
+      setManagerName(name);
+      setSavedManagerName(name);
+      if (p?.signatureUrl) setSignatureUrl(p.signatureUrl);
+      setSigFile(null);
+      setOk("발신 이름·서명을 저장했습니다. 이후 메일에도 사용됩니다.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "서명 저장 실패");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (!isManager) return;
@@ -796,6 +868,7 @@ function MailPanel({
       setOk(j.warning ? `발송됨 · ${j.warning}` : "발송했습니다.");
       setFiles([]);
       setDocIds([]);
+      setPreviewId(null);
       await loadLogs();
     } catch (err) {
       setError(err instanceof Error ? err.message : "발송 실패");
@@ -805,13 +878,13 @@ function MailPanel({
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(440px,1.05fr)]">
+      <div className="space-y-6">
       <form onSubmit={send} className="owm-panel space-y-3 border border-[var(--line)] bg-[var(--surface)] p-5">
         <p className="text-sm font-semibold">메일 발송</p>
         <p className="text-[12.5px] leading-relaxed text-[var(--muted)]">
-          종류를 고르면 제목·본문이 채워집니다. 저장된 계약서·인보이스를 골라 바로 첨부할 수 있습니다.
-          수신자가 HTML을 열어 인쇄 → PDF 저장하면 됩니다. 컨텐츠 가이드라인은 해당 캠페인 파일이 있으면
-          함께 첨부합니다.
+          종류를 고르면 제목·본문이 채워집니다. 저장된 계약서·인보이스는 PDF로 첨부됩니다.
+          컨텐츠 가이드라인은 해당 캠페인 파일이 있으면 함께 첨부합니다.
         </p>
         {configured === false ? (
           <p className="text-xs text-[var(--danger)]">
@@ -893,6 +966,52 @@ function MailPanel({
             required
           />
         </Field>
+        <div className="rounded-[6px] border border-[var(--line)] p-3">
+          <p className="text-sm font-medium text-[var(--ink)]">발신 서명</p>
+          <p className="mt-0.5 text-[11px] text-[var(--muted)]">
+            회사명은 BrandSlam입니다. 매니저 이름·서명 사진은 한 번 저장하면 이후 메일에도
+            붙습니다. 매니저 계정이 생기면 로그인한 매니저 명의로 나갑니다.
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+            <Field label="매니저 이름">
+              <input
+                className={fieldClass}
+                value={managerName}
+                onChange={(e) => setManagerName(e.target.value)}
+                placeholder="예: 김슬램"
+              />
+            </Field>
+            <label className="text-sm text-[var(--muted)]">
+              서명 사진
+              <input
+                className="mt-1 block w-full text-xs"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setSigFile(e.target.files?.[0] || null)}
+              />
+            </label>
+          </div>
+          {signatureUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={signatureUrl}
+              alt="등록된 서명"
+              className="mt-2 h-16 w-auto rounded border border-[var(--line)] bg-white object-contain"
+            />
+          ) : (
+            <p className="mt-2 text-[11px] text-[var(--muted)]">아직 서명 사진이 없습니다.</p>
+          )}
+          {isManager ? (
+            <button
+              type="button"
+              className={`${secondaryBtnClass} mt-2`}
+              disabled={savingProfile}
+              onClick={() => void saveMailProfile()}
+            >
+              {savingProfile ? "저장 중…" : "서명 저장"}
+            </button>
+          ) : null}
+        </div>
         <div>
           <p className="mb-2 text-sm text-[var(--muted)]">저장된 계약서 · 인보이스</p>
           {docs.length === 0 ? (
@@ -913,9 +1032,14 @@ function MailPanel({
                         setDocIds((prev) =>
                           on ? [...prev, d.id] : prev.filter((id) => id !== d.id),
                         );
-                        if (!on) return;
-                        if (d.kind === "계약서") setKind("계약서");
-                        else if (d.kind === "인보이스" && kind === "계약서") setKind("청구서");
+                        if (on) {
+                          setPreviewId(d.id);
+                          if (d.kind === "계약서") setKind("계약서");
+                          else if (d.kind === "인보이스" && kind === "계약서")
+                            setKind("청구서");
+                        } else if (previewId === d.id) {
+                          setPreviewId(null);
+                        }
                       }}
                     />
                     <span>
@@ -952,7 +1076,7 @@ function MailPanel({
 
       <div className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-4">
         <p className="mb-3 text-sm font-semibold">발송 이력</p>
-        <ul className="max-h-[520px] space-y-2 overflow-auto text-sm">
+        <ul className="max-h-[280px] space-y-2 overflow-auto text-sm">
           {logs.length === 0 ? (
             <li className="text-[var(--muted)]">이력이 없습니다.</li>
           ) : (
@@ -975,6 +1099,45 @@ function MailPanel({
             ))
           )}
         </ul>
+      </div>
+      </div>
+
+      <div className="xl:sticky xl:top-3 xl:self-start">
+        <div className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-3">
+          <p className="mb-2 text-sm font-semibold">첨부 미리보기</p>
+          {docIds.length > 1 ? (
+            <div className="mb-2 flex flex-wrap gap-1">
+              {docs
+                .filter((d) => docIds.includes(d.id))
+                .map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setPreviewId(d.id)}
+                    className={`rounded-[6px] border px-2 py-1 text-[11px] ${
+                      d.id === activePreviewId
+                        ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                        : "border-[var(--line)] text-[var(--muted)]"
+                    }`}
+                  >
+                    {d.kind}
+                  </button>
+                ))}
+            </div>
+          ) : null}
+          {previewHtml ? (
+            <iframe
+              title="첨부 문서 미리보기"
+              className="h-[min(88vh,1100px)] w-full rounded-[6px] border border-[var(--line)] bg-[#d8d2c8]"
+              srcDoc={previewHtml}
+              sandbox="allow-same-origin"
+            />
+          ) : (
+            <p className="px-2 py-16 text-center text-sm text-[var(--muted)]">
+              왼쪽에서 계약서·인보이스를 선택하면 여기에 내용이 보입니다.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

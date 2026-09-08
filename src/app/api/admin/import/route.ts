@@ -10,7 +10,7 @@ import {
   type ParsedImportRow,
 } from "@/lib/csv-import";
 import { findDuplicateAllocation } from "@/lib/alloc-dup";
-import { isBranchStoreName } from "@/lib/store-name";
+import { canonicalBranchName, isBranchStoreName } from "@/lib/store-name";
 import {
   scheduleInfluencerProfileFetch,
 } from "@/lib/influencer-profile-image";
@@ -113,30 +113,30 @@ async function findOrCreateStore(
   if (!isBranchStoreName(trimmed)) {
     throw new Error("방문지점이 상품코드(숫자)입니다. 지점명을 넣어 주세요");
   }
-  const key = trimmed.toLowerCase();
-  const cached = cache.get(key);
+  const canon = canonicalBranchName(trimmed);
+  const cached = cache.get(canon);
   if (cached) return cached;
 
-  const { data: existing } = await supabase
-    .from("stores")
-    .select("id, name")
-    .ilike("name", trimmed)
-    .limit(1)
-    .maybeSingle();
-
-  if (existing?.id) {
-    cache.set(key, existing.id);
-    return existing.id as string;
+  if (!cache.has("*")) {
+    const { data: all } = await supabase.from("stores").select("id, name");
+    for (const row of all || []) {
+      if (!isBranchStoreName(row.name || "")) continue;
+      const c = canonicalBranchName(row.name);
+      if (!cache.has(c)) cache.set(c, row.id as string);
+    }
+    cache.set("*", "*");
   }
+  const hit = cache.get(canon);
+  if (hit && hit !== "*") return hit;
 
   const { data: created, error } = await supabase
     .from("stores")
-    .insert({ name: trimmed })
+    .insert({ name: canon })
     .select("id")
     .single();
 
   if (error || !created) throw new Error(error?.message || "매장 생성 실패");
-  cache.set(key, created.id);
+  cache.set(canon, created.id);
   return created.id as string;
 }
 

@@ -48,10 +48,6 @@ export function PharConsole({
   const pathname = usePathname();
 
   useEffect(() => {
-    setLiveItems(items);
-  }, [items]);
-
-  useEffect(() => {
     let cancelled = false;
     async function refresh() {
       try {
@@ -63,11 +59,15 @@ export function PharConsole({
         }
         if (!res.ok) return;
         const body = await res.json();
-        setLiveItems((body.allocations as AllocationWithRelations[]) || []);
+        const next = (body.allocations as AllocationWithRelations[]) || [];
+        setLiveItems((prev) =>
+          next.length === 0 && prev.length > 0 ? prev : next,
+        );
       } catch {
         // 다음 주기
       }
     }
+    void refresh();
     const id = window.setInterval(refresh, 15000);
     return () => {
       cancelled = true;

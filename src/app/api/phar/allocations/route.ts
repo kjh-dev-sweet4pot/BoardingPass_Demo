@@ -4,6 +4,7 @@ import {
   supabaseConfigError,
 } from "@/lib/supabase/api-client";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
+import { fetchPharAllocations } from "@/lib/phar-store-allocations";
 import {
   getStoreSessionId,
   isAdminSession,
@@ -35,20 +36,13 @@ export async function GET() {
     : await createApiClientIfConfigured();
   if (!supabase) return supabaseConfigError();
 
-  let query = supabase
-    .from("allocations")
-    .select("*, products(*), stores(*), influencers(*)")
-    .order("visit_date", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  if (!isAdmin && storeId) {
-    query = query.eq("store_id", storeId);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await fetchPharAllocations(
+    supabase,
+    isAdmin ? null : storeId,
+  );
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error }, { status: 500 });
   }
 
-  return NextResponse.json({ allocations: data || [] });
+  return NextResponse.json({ allocations: data });
 }

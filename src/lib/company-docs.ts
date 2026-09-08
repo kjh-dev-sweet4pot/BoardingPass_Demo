@@ -389,7 +389,7 @@ export function mailDocFilename(
       : "";
   const raw = (invoiceNo || title || kind).replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, "_");
   const base = raw.slice(0, 80) || kind;
-  return `${base}.html`;
+  return `${base}.pdf`;
 }
 
 if (process.env.RUN_COMPANY_DOCS_SELF_CHECK === "1") {
@@ -429,7 +429,7 @@ if (process.env.RUN_COMPANY_DOCS_SELF_CHECK === "1") {
   if (!loaded.includes("slam260908cd") || !loaded.includes(BRANDSLAM.account)) {
     throw new Error("contractHtml loaded invoice");
   }
-  if (mailDocFilename("인보이스", "x", inv) !== "slam260908cd.html") {
+  if (mailDocFilename("인보이스", "x", inv) !== "slam260908cd.pdf") {
     throw new Error("mailDocFilename");
   }
   console.log("company-docs self-check ok");

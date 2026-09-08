@@ -107,6 +107,37 @@ export type Campaign = {
   name: string | null;
   /** 캠페인 예산(원). 집행% = Accept 노출가 합 / budget_amount */
   budget_amount?: number | null;
+  /** 소속 시즌. null이면 시즌 미배정 */
+  season_id?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Season = {
+  id: string;
+  name: string;
+  starts_on: string;
+  ends_on: string;
+  accent_hex: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlacementGuideScope = "season" | "campaign";
+
+export type PlacementGuide = {
+  id: string;
+  scope: PlacementGuideScope;
+  season_id: string | null;
+  campaign_id: string | null;
+  store_id: string | null;
+  title: string;
+  body: string;
+  image_path: string | null;
+  priority: number;
+  starts_on: string;
+  ends_on: string;
   created_at: string;
   updated_at: string;
 };

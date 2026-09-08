@@ -43,36 +43,47 @@ function todayKst() {
   return new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
+export const SENDER_COMPANY = "BrandSlam";
+
+export function senderIntro(managerName?: string | null) {
+  const name = (managerName || "").trim();
+  return name
+    ? `안녕하세요. ${SENDER_COMPANY} ${name}입니다.`
+    : `안녕하세요. ${SENDER_COMPANY}입니다.`;
+}
+
 export function buildCompanyMailTemplate(input: {
   kind: CompanyMailKind;
   companyName: string;
   campaignName?: string | null;
+  managerName?: string | null;
 }) {
-  const company = input.companyName.trim() || "회원사";
+  const client = input.companyName.trim() || "회원사";
   const campaign = input.campaignName?.trim() || "";
   const campaignLine = campaign ? `캠페인: ${campaign}\n` : "";
   const date = todayKst();
+  const hello = senderIntro(input.managerName);
 
   const bodies: Record<CompanyMailKind, { subject: string; body: string }> = {
     계약서: {
-      subject: `[Boarding Pass] ${company} 계약서 송부`,
-      body: `${company} 담당자님께\n\n안녕하세요. Boarding Pass입니다.\n${campaignLine}계약서를 첨부하여 보내드립니다. 확인 후 회신 부탁드립니다.\n\n발송일: ${date}\n`,
+      subject: `[${SENDER_COMPANY}] ${client} 계약서 송부`,
+      body: `${client} 담당자님께\n\n${hello}\n${campaignLine}계약서를 첨부하여 보내드립니다. 내용 확인 후 회신 부탁드립니다.\n\n발송일: ${date}\n`,
     },
     견적서: {
-      subject: `[Boarding Pass] ${company} 견적서 송부`,
-      body: `${company} 담당자님께\n\n안녕하세요. Boarding Pass입니다.\n${campaignLine}견적서를 첨부하여 보내드립니다. 금액·범위 확인 후 회신 부탁드립니다.\n\n발송일: ${date}\n`,
+      subject: `[${SENDER_COMPANY}] ${client} 견적서 송부`,
+      body: `${client} 담당자님께\n\n${hello}\n${campaignLine}견적서를 첨부하여 보내드립니다. 금액·범위 확인 후 회신 부탁드립니다.\n\n발송일: ${date}\n`,
     },
     청구서: {
-      subject: `[Boarding Pass] ${company} 청구서 송부`,
-      body: `${company} 담당자님께\n\n안녕하세요. Boarding Pass입니다.\n${campaignLine}청구서를 첨부하여 보내드립니다. 입금 일정은 계약 조건을 따릅니다.\n\n발송일: ${date}\n`,
+      subject: `[${SENDER_COMPANY}] ${client} 청구서 송부`,
+      body: `${client} 담당자님께\n\n${hello}\n${campaignLine}청구서를 첨부하여 보내드립니다. 입금 일정은 계약 조건을 따릅니다.\n\n발송일: ${date}\n`,
     },
     "컨텐츠 가이드라인": {
-      subject: `[Boarding Pass] ${company} 컨텐츠 가이드라인`,
-      body: `${company} 담당자님께\n\n안녕하세요. Boarding Pass입니다.\n${campaignLine}콘텐츠 제작 시 참고할 가이드라인을 보내드립니다. 검수 결정은 운영자가 수행합니다.\n\n발송일: ${date}\n`,
+      subject: `[${SENDER_COMPANY}] ${client} 컨텐츠 가이드라인`,
+      body: `${client} 담당자님께\n\n${hello}\n${campaignLine}콘텐츠 제작 시 참고할 가이드라인을 보내드립니다. 검수 결정은 운영자가 수행합니다.\n\n발송일: ${date}\n`,
     },
     리포트: {
-      subject: `[Boarding Pass] ${company} 캠페인 리포트`,
-      body: `${company} 담당자님께\n\n안녕하세요. Boarding Pass입니다.\n${campaignLine}캠페인 성과 리포트를 보내드립니다. 지표는 조회 시점 기준 누적값입니다.\n\n발송일: ${date}\n`,
+      subject: `[${SENDER_COMPANY}] ${client} 캠페인 리포트`,
+      body: `${client} 담당자님께\n\n${hello}\n${campaignLine}캠페인 성과 리포트를 보내드립니다. 지표는 조회 시점 기준 누적값입니다.\n\n발송일: ${date}\n`,
     },
   };
   return bodies[input.kind];
@@ -87,17 +98,40 @@ export function escapeMailHtml(text: string) {
 }
 
 export function mailTextToHtml(text: string) {
-  return `<p style="white-space:pre-wrap;font-family:sans-serif;font-size:14px;line-height:1.6">${escapeMailHtml(text)}</p>`;
+  return `<p style="white-space:pre-wrap;font-family:sans-serif;font-size:14px;line-height:1.6;color:#222">${escapeMailHtml(text)}</p>`;
 }
 
-const DEFAULT_MAIL_FROM = "Brandslam <manager@slam-global.com>";
+export function mailSignatureHtml(input: {
+  managerName?: string | null;
+  imageDataUrl?: string | null;
+}) {
+  const name = (input.managerName || "").trim();
+  const img = input.imageDataUrl
+    ? `<img src="${input.imageDataUrl}" alt="" style="max-height:72px;max-width:220px;display:block;margin:0 0 10px"/>`
+    : "";
+  const who = name
+    ? `${escapeMailHtml(name)}<br/>${SENDER_COMPANY}`
+    : SENDER_COMPANY;
+  return `<div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e0d8;font-family:sans-serif;font-size:13px;line-height:1.5;color:#333">
+${img}<p style="margin:0">${who}</p>
+</div>`;
+}
+
+export function buildCompanyMailHtml(
+  body: string,
+  signature?: { managerName?: string | null; imageDataUrl?: string | null },
+) {
+  return `${mailTextToHtml(body)}${mailSignatureHtml(signature || {})}`;
+}
+
+const DEFAULT_MAIL_FROM = "BrandSlam <manager@slam-global.com>";
 
 export function getCompanyMailFrom() {
   const raw = process.env.COMPANY_MAIL_FROM?.trim() || "";
   if (!raw || /boardingpass\.local|resend\.dev|updates\.slam-global\.com/i.test(raw)) {
     return DEFAULT_MAIL_FROM;
   }
-  return raw.replace(/^Boarding Pass\b/i, "Brandslam");
+  return raw.replace(/^Boarding Pass\b/i, "BrandSlam").replace(/^Brandslam\b/, "BrandSlam");
 }
 
 function explainResendError(message: string) {
@@ -165,6 +199,7 @@ export async function sendCompanyMailViaResend(input: {
   to: string[];
   subject: string;
   body: string;
+  html?: string;
   attachments?: MailAttachment[];
 }) {
   const key = process.env.RESEND_API_KEY?.trim();
@@ -184,7 +219,7 @@ export async function sendCompanyMailViaResend(input: {
       to: input.to,
       subject: input.subject,
       text: input.body,
-      html: mailTextToHtml(input.body),
+      html: input.html || mailTextToHtml(input.body),
       attachments: input.attachments?.map((a) => ({
         filename: a.filename,
         content: a.content,
@@ -215,9 +250,22 @@ function assertCompanyMailTemplates() {
     kind: "견적서",
     companyName: "KnownBeauty",
     campaignName: "긴자점",
+    managerName: "김매니저",
   });
-  if (!t.subject.includes("KnownBeauty") || !t.body.includes("긴자점")) {
+  if (
+    !t.subject.includes("BrandSlam") ||
+    !t.subject.includes("KnownBeauty") ||
+    !t.body.includes("긴자점") ||
+    !t.body.includes("BrandSlam 김매니저")
+  ) {
     throw new Error("company-mail template failed");
+  }
+  const plain = buildCompanyMailTemplate({
+    kind: "계약서",
+    companyName: "A",
+  });
+  if (!plain.body.includes("안녕하세요. BrandSlam입니다.")) {
+    throw new Error("company-mail intro failed");
   }
   if (parseMailAddresses("a@b.co, c@d.co").length !== 2) {
     throw new Error("company-mail parse failed");

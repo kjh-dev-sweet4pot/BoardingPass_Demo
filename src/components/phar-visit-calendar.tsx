@@ -281,9 +281,9 @@ export function PharVisitCalendar({
                   onSelect(cell.ymd);
                   setDetailId(null);
                 }}
-                aria-label={`${cell.num}일 ${n}명`}
+                aria-label={`${cell.num}일 ${n}명 ${alloc}건`}
                 aria-pressed={selected}
-                className={`relative flex min-h-0 min-w-0 flex-col items-center rounded-[6px] border p-1 text-center transition ${
+                className={`relative flex min-h-0 min-w-0 flex-col items-center overflow-hidden rounded-[6px] border p-1 text-center transition ${
                   isToday ? "border-2 border-[#6B3B1F]" : "border-[#E8D5BE]"
                 } ${selected ? "ring-[3px] ring-[#6B3B1F]/25" : ""}`}
                 style={{ background: heat.bg, color: heat.fg }}
@@ -311,9 +311,9 @@ export function PharVisitCalendar({
                 <span className="mt-5 text-lg font-bold leading-none">
                   {n > 0 ? n : ""}
                 </span>
-                {n > 0 && alloc !== n ? (
-                  <span className="mt-0.5 text-[10px] opacity-80">{alloc}건</span>
-                ) : null}
+                <span className="mt-0.5 h-3.5 shrink-0 text-[10px] leading-none opacity-80">
+                  {n > 0 ? `${alloc}건` : ""}
+                </span>
               </button>
             );
           })}

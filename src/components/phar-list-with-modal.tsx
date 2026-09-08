@@ -8,7 +8,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { PHAR_COUNTER_ROOT_ID } from "@/components/phar-header-actions";
+import {
+  PHAR_COUNTER_ROOT_ID,
+  PharFloorBox,
+} from "@/components/phar-header-actions";
 import { StateBadge } from "@/components/state-badge";
 import { AdminAllocationEditForm } from "@/components/admin-allocation-edit";
 import {
@@ -1784,7 +1787,10 @@ export function PharListWithModal({
         ) : null}
 
         {liveItems.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
+          <div className="flex min-h-0 flex-col gap-3">
+            {embedInConsole ? <PharFloorBox items={liveItems} /> : null}
+            <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
+          </div>
         ) : (
           <div
             className={`${counterGridClass} ${counterTall ? "flex-1" : ""}`}
@@ -1918,6 +1924,8 @@ export function PharListWithModal({
                   </div>
                 </div>
               </div>
+
+              {embedInConsole ? <PharFloorBox items={liveItems} /> : null}
 
               <div
                 className={`relative min-h-0 ${

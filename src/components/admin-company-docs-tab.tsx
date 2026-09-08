@@ -647,7 +647,7 @@ export function AdminCompanyDocsPanel({
                     );
                   }}
                 >
-                  인보이스 불러오기
+                  인보이스 내용 적용하기
                 </button>
               </div>
               {savedInvoices.length === 0 ? (
