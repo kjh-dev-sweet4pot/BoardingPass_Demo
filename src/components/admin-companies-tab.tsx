@@ -15,10 +15,12 @@ import {
   resolveCompanyMailTo,
   type CompanyMailKind,
 } from "@/lib/company-mail";
+import { AdminCompanyDocsPanel } from "@/components/admin-company-docs-tab";
 import { formatKrw } from "@/lib/creator-pool-mock";
+import type { CompanyDocRow } from "@/lib/company-docs";
 import { type Company } from "@/lib/types";
 
-export type CompaniesSub = "companies" | "companiesRegister" | "companiesMail";
+export type CompaniesSub = "companies" | "companiesRegister" | "companiesMail" | "companiesDocs";
 
 type MailLog = {
   id: string;
@@ -673,6 +675,8 @@ function MailPanel({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [docs, setDocs] = useState<CompanyDocRow[]>([]);
+  const [docIds, setDocIds] = useState<string[]>([]);
   const [logs, setLogs] = useState<MailLog[]>([]);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [mailFrom, setMailFrom] = useState<string>("");
@@ -712,6 +716,8 @@ function MailPanel({
     if (!companyId) {
       setCampaigns([]);
       setCampaignId("");
+      setDocs([]);
+      setDocIds([]);
       return;
     }
     fetch(`/api/admin/campaigns?company_id=${encodeURIComponent(companyId)}`, {
@@ -723,6 +729,18 @@ function MailPanel({
         setCampaignId("");
       })
       .catch(() => setCampaigns([]));
+    fetch(`/api/admin/company-docs?company_id=${encodeURIComponent(companyId)}`, {
+      cache: "no-store",
+    })
+      .then((r) => r.json())
+      .then((j) => {
+        setDocs(Array.isArray(j.docs) ? j.docs : []);
+        setDocIds([]);
+      })
+      .catch(() => {
+        setDocs([]);
+        setDocIds([]);
+      });
   }, [companyId]);
 
   const loadLogs = useCallback(async () => {
@@ -762,12 +780,14 @@ function MailPanel({
       fd.set("to_emails", toEmails);
       fd.set("subject", subject);
       fd.set("body", body);
+      for (const id of docIds) fd.append("doc_ids", id);
       for (const f of files) fd.append("files", f);
       const res = await fetch("/api/admin/companies/mail", { method: "POST", body: fd });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || "발송 실패");
       setOk(j.warning ? `발송됨 · ${j.warning}` : "발송했습니다.");
       setFiles([]);
+      setDocIds([]);
       await loadLogs();
     } catch (err) {
       setError(err instanceof Error ? err.message : "발송 실패");
@@ -781,7 +801,9 @@ function MailPanel({
       <form onSubmit={send} className="owm-panel space-y-3 border border-[var(--line)] bg-[var(--surface)] p-5">
         <p className="text-sm font-semibold">메일 발송</p>
         <p className="text-[12.5px] leading-relaxed text-[var(--muted)]">
-          종류를 고르면 제목·본문이 채워집니다. 컨텐츠 가이드라인은 해당 캠페인 파일이 있으면 함께 첨부합니다.
+          종류를 고르면 제목·본문이 채워집니다. 저장된 계약서·인보이스를 골라 바로 첨부할 수 있습니다.
+          수신자가 HTML을 열어 인쇄 → PDF 저장하면 됩니다. 컨텐츠 가이드라인은 해당 캠페인 파일이 있으면
+          함께 첨부합니다.
         </p>
         {configured === false ? (
           <p className="text-xs text-[var(--danger)]">
@@ -863,7 +885,48 @@ function MailPanel({
             required
           />
         </Field>
-        <Field label="첨부 (PDF·이미지, 8MB 이하)">
+        <div>
+          <p className="mb-2 text-sm text-[var(--muted)]">저장된 계약서 · 인보이스</p>
+          {docs.length === 0 ? (
+            <p className="text-[12px] text-[var(--muted)]">
+              이 회원사에 저장된 문서가 없습니다. 계약·인보이스 탭에서 먼저 저장하세요.
+            </p>
+          ) : (
+            <ul className="max-h-44 space-y-1 overflow-auto rounded-[6px] border border-[var(--line)] p-2">
+              {docs.map((d) => (
+                <li key={d.id}>
+                  <label className="flex cursor-pointer items-start gap-2 text-[13px]">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={docIds.includes(d.id)}
+                      onChange={() => {
+                        const on = !docIds.includes(d.id);
+                        setDocIds((prev) =>
+                          on ? [...prev, d.id] : prev.filter((id) => id !== d.id),
+                        );
+                        if (!on) return;
+                        if (d.kind === "계약서") setKind("계약서");
+                        else if (d.kind === "인보이스" && kind === "계약서") setKind("청구서");
+                      }}
+                    />
+                    <span>
+                      <span className="font-medium">{d.kind}</span>{" "}
+                      {d.title}
+                      <span className="ml-1 text-[11px] text-[var(--muted)]">
+                        {d.issued_on || ""} · {d.status}
+                      </span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          {docIds.length ? (
+            <p className="mt-1 text-[11px] text-[var(--muted)]">{docIds.length}건 첨부</p>
+          ) : null}
+        </div>
+        <Field label="추가 첨부 (PDF·이미지, 8MB 이하)">
           <input
             className="text-sm"
             type="file"
@@ -979,6 +1042,9 @@ export function AdminCompaniesTab({
         ) : null}
         {sub === "companiesMail" ? (
           <MailPanel companies={list} isManager={isManager} presetCompanyId={mailCompanyId} />
+        ) : null}
+        {sub === "companiesDocs" ? (
+          <AdminCompanyDocsPanel companies={list} isManager={isManager} />
         ) : null}
       </div>
     </div>

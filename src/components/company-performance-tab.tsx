@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState, Fragment, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
-import { formatMetric } from "@/lib/content-insights";
+import { formatMetric, formatViews } from "@/lib/content-insights";
 import {
   creatorPlatformLabelOf,
   creatorSnsChannelOf,
+  resolveCreatorPlatform,
 } from "@/lib/creator-link";
 import { findPoolCreator, type PoolCreator } from "@/lib/creator-pool-mock";
 import type { ContentPeriod } from "@/lib/content-insights";
@@ -220,6 +221,10 @@ function InfoTip({ text }: { text: string }) {
   );
 }
 
+function xhsViews(url?: string | null) {
+  return resolveCreatorPlatform(url) === "xiaohongshu";
+}
+
 function ContentMetricsTip({
   views,
   likes,
@@ -227,6 +232,7 @@ function ContentMetricsTip({
   saves,
   shares,
   reposts,
+  viewsEstimated,
   children,
 }: {
   views: number;
@@ -235,6 +241,7 @@ function ContentMetricsTip({
   saves?: number | null;
   shares?: number | null;
   reposts?: number | null;
+  viewsEstimated?: boolean;
   children: ReactNode;
 }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -254,7 +261,7 @@ function ContentMetricsTip({
   }
 
   const rows: { label: string; value: string }[] = [
-    { label: "조회수", value: formatMetric(views) },
+    { label: "조회수", value: formatViews(views, viewsEstimated) },
     { label: "좋아요", value: formatMetric(likes) },
     { label: "댓글", value: formatMetric(comments) },
   ];
@@ -344,13 +351,20 @@ function topMetricValue(row: LinkRow, metric: TopMetric): number {
   return er(views, likes, comments);
 }
 
-function formatTopMetric(value: number, metric: TopMetric) {
+function formatTopMetric(
+  value: number,
+  metric: TopMetric,
+  estimated?: boolean,
+) {
   if (
     metric.kind === "likeRate" ||
     metric.kind === "commentRate" ||
     metric.kind === "er"
   ) {
     return `${fmtPct(value)}%`;
+  }
+  if (metric.kind === "views" || metric.kind === "earlyViews") {
+    return formatViews(value, estimated);
   }
   return formatMetric(value);
 }
@@ -411,6 +425,7 @@ function TopContentPanel({
                   saves={row.saves}
                   shares={row.shares}
                   reposts={row.reposts}
+                  viewsEstimated={xhsViews(row.link_url)}
                 >
                   <a
                     href={row.link_url || "#"}
@@ -431,13 +446,13 @@ function TopContentPanel({
                           .filter(Boolean)
                           .join(" · ")}
                         {showsViewsSubline(metric)
-                          ? ` · 조회 ${formatMetric(row.views ?? 0)}`
+                          ? ` · 조회 ${formatViews(row.views ?? 0, xhsViews(row.link_url))}`
                           : ""}
                       </span>
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block text-[13px] font-semibold tabular-nums text-[var(--accent)]">
-                        {formatTopMetric(value, metric)}
+                        {formatTopMetric(value, metric, xhsViews(row.link_url))}
                       </span>
                       <span className="text-[10.5px] text-[var(--muted)]">
                         {topMetricUnit(metric)}

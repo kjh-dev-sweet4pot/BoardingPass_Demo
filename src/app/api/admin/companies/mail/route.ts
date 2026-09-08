@@ -13,6 +13,7 @@ import {
   sendCompanyMailViaResend,
 } from "@/lib/company-mail";
 import { CONTENT_FILES_BUCKET } from "@/lib/content-file-storage";
+import { docHtml, mailDocFilename, type CompanyDocKind } from "@/lib/company-docs";
 import { getAdminLoginId } from "@/lib/session";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 
@@ -161,6 +162,41 @@ export async function POST(request: NextRequest) {
 
   const attachments: { filename: string; content: string }[] = [];
   const attachmentNames: string[] = [];
+
+  const docIds = [...new Set(form.getAll("doc_ids").map((v) => String(v).trim()).filter(Boolean))];
+  if (docIds.length) {
+    const { data: docs, error: docsErr } = await supabase
+      .from("company_docs")
+      .select("id, company_id, kind, title, payload")
+      .in("id", docIds);
+    if (docsErr) {
+      return NextResponse.json({ error: docsErr.message }, { status: 500 });
+    }
+    const found = docs || [];
+    if (found.length !== docIds.length) {
+      return NextResponse.json({ error: "선택한 문서를 찾을 수 없습니다." }, { status: 404 });
+    }
+    for (const d of found) {
+      if (d.company_id !== companyId) {
+        return NextResponse.json(
+          { error: "다른 회원사 문서는 첨부할 수 없습니다." },
+          { status: 400 },
+        );
+      }
+      const kind = d.kind as CompanyDocKind;
+      const html = docHtml(kind, d.payload, false);
+      const filename = mailDocFilename(kind, String(d.title || ""), d.payload);
+      const bytes = Buffer.from(html, "utf8");
+      if (bytes.length > MAIL_ATTACH_MAX_BYTES) {
+        return NextResponse.json(
+          { error: `${filename} 첨부가 8MB를 넘습니다.` },
+          { status: 400 },
+        );
+      }
+      attachments.push({ filename, content: bytes.toString("base64") });
+      attachmentNames.push(filename);
+    }
+  }
 
   const uploads = form.getAll("files").filter((f): f is File => f instanceof File);
   for (const file of uploads) {

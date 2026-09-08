@@ -3,8 +3,12 @@
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
-import { formatMetric, type ContentPeriod } from "@/lib/content-insights";
-import { creatorPlatformLabelOf, creatorSnsChannelOf } from "@/lib/creator-link";
+import { formatMetric, formatViews, type ContentPeriod } from "@/lib/content-insights";
+import {
+  creatorPlatformLabelOf,
+  creatorSnsChannelOf,
+  resolveCreatorPlatform,
+} from "@/lib/creator-link";
 import { findPoolCreator, type PoolCreator } from "@/lib/creator-pool-mock";
 import { formatMd, ymdKst } from "@/lib/types";
 
@@ -408,7 +412,10 @@ export function CompanyPerformanceLookupTab({
                               </span>
                               <span className="shrink-0 text-right text-[12px] tabular-nums">
                                 <span className="block font-semibold text-[var(--accent)]">
-                                  {formatMetric(link.views ?? 0)}
+                                  {formatViews(
+                                    link.views ?? 0,
+                                    resolveCreatorPlatform(url) === "xiaohongshu",
+                                  )}
                                 </span>
                                 <span className="text-[var(--muted)]">조회</span>
                               </span>

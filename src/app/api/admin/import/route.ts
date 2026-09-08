@@ -10,6 +10,7 @@ import {
   type ParsedImportRow,
 } from "@/lib/csv-import";
 import { findDuplicateAllocation } from "@/lib/alloc-dup";
+import { isBranchStoreName } from "@/lib/store-name";
 import {
   scheduleInfluencerProfileFetch,
 } from "@/lib/influencer-profile-image";
@@ -108,14 +109,18 @@ async function findOrCreateStore(
   name: string,
   cache: Map<string, string>,
 ) {
-  const key = name.trim().toLowerCase();
+  const trimmed = name.trim();
+  if (!isBranchStoreName(trimmed)) {
+    throw new Error("방문지점이 상품코드(숫자)입니다. 지점명을 넣어 주세요");
+  }
+  const key = trimmed.toLowerCase();
   const cached = cache.get(key);
   if (cached) return cached;
 
   const { data: existing } = await supabase
     .from("stores")
     .select("id, name")
-    .ilike("name", name)
+    .ilike("name", trimmed)
     .limit(1)
     .maybeSingle();
 
@@ -126,7 +131,7 @@ async function findOrCreateStore(
 
   const { data: created, error } = await supabase
     .from("stores")
-    .insert({ name })
+    .insert({ name: trimmed })
     .select("id")
     .single();
 

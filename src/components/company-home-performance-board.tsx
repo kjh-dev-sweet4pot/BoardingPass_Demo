@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
-import { formatMetric } from "@/lib/content-insights";
+import { formatMetric, formatViews } from "@/lib/content-insights";
+import { resolveCreatorPlatform } from "@/lib/creator-link";
 import {
   buildWeekSeries,
   regionLabel,
@@ -255,6 +256,7 @@ export function CompanyHomePerformanceBoard({
         views: number;
         likes: number;
         saves: number;
+        viewsEstimated: boolean;
         displayPrice: number | null;
         url: string | null;
         publishedAt: string | null;
@@ -270,6 +272,8 @@ export function CompanyHomePerformanceBoard({
       const views = Number(l.views) || 0;
       const likes = Number(l.likes) || 0;
       const saves = Number(l.saves) || 0;
+      const viewsEstimated =
+        resolveCreatorPlatform(l.link_url) === "xiaohongshu";
       const price = displayPriceOf(l.allocations);
       if (!prev) {
         map.set(id, {
@@ -281,6 +285,7 @@ export function CompanyHomePerformanceBoard({
           views,
           likes,
           saves,
+          viewsEstimated,
           displayPrice: price,
           url: l.link_url,
           publishedAt: l.published_at,
@@ -289,6 +294,7 @@ export function CompanyHomePerformanceBoard({
         prev.views += views;
         prev.likes += likes;
         prev.saves += saves;
+        prev.viewsEstimated = prev.viewsEstimated || viewsEstimated;
         if (
           price != null &&
           (prev.displayPrice == null || price > prev.displayPrice)
@@ -438,7 +444,7 @@ export function CompanyHomePerformanceBoard({
                     <div>
                       <p className="text-[10px] text-[var(--muted)]">조회수</p>
                       <p className="text-[13px] font-bold tabular-nums text-[var(--ink)]">
-                        {formatMetric(c.views)}
+                        {formatViews(c.views, c.viewsEstimated)}
                       </p>
                     </div>
                     <div>

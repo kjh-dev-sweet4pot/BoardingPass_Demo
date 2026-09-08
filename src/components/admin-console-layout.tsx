@@ -175,7 +175,8 @@ export function AdminConsoleLayout({
 
       {section === "companies" ||
       section === "companiesRegister" ||
-      section === "companiesMail" ? (
+      section === "companiesMail" ||
+      section === "companiesDocs" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AdminCompaniesTab
             companies={companyList}

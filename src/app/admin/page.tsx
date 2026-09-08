@@ -11,6 +11,7 @@ import {
   isMissingCompanyCrmColumn,
 } from "@/lib/company";
 import { createAuthedDbClient } from "@/lib/supabase/api-client";
+import { isBranchStoreName } from "@/lib/store-name";
 import { type AllocationWithRelations, type Company, type Product, type Store } from "@/lib/types";
 
 export default async function AdminPage({
@@ -61,7 +62,7 @@ export default async function AdminPage({
   }
 
   const list = (allocations as AllocationWithRelations[]) || [];
-  const storeList = (stores as Store[]) || [];
+  const storeList = ((stores as Store[]) || []).filter((s) => isBranchStoreName(s.name));
   const companyList = (companies as Company[]) || [];
   const productList = (products as Product[]) || [];
 

@@ -238,6 +238,11 @@ export function formatMetric(n: number) {
   return n.toLocaleString("ko-KR");
 }
 
+export function formatViews(n: number, estimated?: boolean) {
+  const s = formatMetric(n);
+  return estimated ? `~${s} 추정` : s;
+}
+
 export function engagementRate(views: number, likes: number, comments: number) {
   if (views <= 0) return 0;
   return ((likes + comments) / views) * 100;

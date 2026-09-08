@@ -1,6 +1,7 @@
 import { normalizeHandle } from "@/lib/auth";
 import { matchCompany, type CompanyMatchInput } from "@/lib/company";
 import { parseMoney } from "@/lib/money";
+import { isBranchStoreName } from "@/lib/store-name";
 
 export type ImportRowInput = {
   company?: string;
@@ -335,6 +336,8 @@ export function validateImportRow(
   if (!visit_date)
     errors.push("visit_date 형식 오류 (예: 2026-08-11, 2026.08.11, 26-08-11)");
   if (!store) errors.push("방문지점(store) 필요");
+  else if (!isBranchStoreName(store))
+    errors.push("방문지점이 상품코드(숫자)입니다. 지점명을 넣어 주세요");
   if (!product) errors.push("상품(product) 필요");
   if (!Number.isFinite(quantity) || quantity < 1) errors.push("수량 오류");
 
@@ -566,6 +569,19 @@ if (process.env.RUN_CSV_IMPORT_SELF_CHECK === "1") {
   });
   if (half.ok || !half.errors.some((e) => e.includes("둘 다"))) {
     throw new Error("validateImportRow pair rule failed");
+  }
+  const skuStore = validateImportRow(2, {
+    company: "옵티마",
+    snsid: "@a",
+    visit_date: "2026-08-20",
+    store: "21800",
+    product: "상품",
+    quantity: 1,
+    display_price: 100,
+    cost_amount: 80,
+  });
+  if (skuStore.ok || !skuStore.errors.some((e) => e.includes("상품코드"))) {
+    throw new Error("validateImportRow numeric store failed");
   }
   console.log("csv-import self-check ok");
 }

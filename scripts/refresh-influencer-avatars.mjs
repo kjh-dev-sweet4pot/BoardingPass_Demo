@@ -99,7 +99,7 @@ async function scrape(platform, url, handle) {
       ? `https://www.xiaohongshu.com/user/profile/${handle}`
       : null);
     if (!target) return null;
-    const isNote = /discovery\/item|\/explore\/|xhslink\.(com|cn)\/o\//i.test(target);
+    const isNote = /discovery\/item|\/explore\/|xhslink\.(com|cn)/i.test(target);
     if (isNote) {
       const items = await apify("atomus~xiaohongshu-scraper", {
         searchType: "note-detail",
@@ -196,39 +196,51 @@ function downloadImage(imageUrl) {
 
 async function main() {
   if (!token) throw new Error("APIFY_TOKEN 없음");
-  const { data: allocs, error } = await supabase
-    .from("allocations")
-    .select("influencer_id, influencers(id, name, instagram_handle, sns_url, profile_image_path)");
+  const { data: missing, error } = await supabase
+    .from("influencers")
+    .select("id, name, instagram_handle, sns_url, profile_image_path")
+    .is("profile_image_path", null);
   if (error) throw new Error(error.message);
 
-  const seen = new Set();
-  const missing = [];
-  for (const a of allocs || []) {
-    const inf = Array.isArray(a.influencers) ? a.influencers[0] : a.influencers;
-    if (!inf?.id || seen.has(inf.id) || inf.profile_image_path) continue;
-    seen.add(inf.id);
-    missing.push(inf);
+  const ids = (missing || []).map((m) => m.id);
+  const noteByInf = new Map();
+  if (ids.length) {
+    const { data: links } = await supabase
+      .from("creator_links")
+      .select("influencer_id, url, publish_url")
+      .in("influencer_id", ids);
+    for (const l of links || []) {
+      const u = (l.publish_url || l.url || "").trim();
+      if (!u || noteByInf.has(l.influencer_id)) continue;
+      if (/discovery\/item|\/explore\/|xhslink\.(com|cn)/i.test(u)) {
+        noteByInf.set(l.influencer_id, u);
+      }
+    }
   }
 
   const counts = { tiktok: 0, instagram: 0, xiaohongshu: 0, skip: 0 };
-  for (const inf of missing) {
+  for (const inf of missing || []) {
     const p = platformOf(inf.sns_url, inf.instagram_handle);
     if (counts[p] != null) counts[p]++;
     else counts.skip++;
   }
-  console.log({ allocatedMissing: missing.length, ...counts, dry: DRY });
+  console.log({ missing: (missing || []).length, ...counts, dry: DRY });
   if (DRY) return;
 
   let ok = 0;
   let fail = 0;
-  for (const inf of missing) {
+  for (const inf of missing || []) {
     const platform = platformOf(inf.sns_url, inf.instagram_handle);
     if (platform === "other") {
       fail++;
       continue;
     }
     try {
-      const scraped = await scrape(platform, inf.sns_url, inf.instagram_handle);
+      const scraped = await scrape(
+        platform,
+        noteByInf.get(inf.id) || inf.sns_url,
+        inf.instagram_handle,
+      );
       if (!scraped?.imageUrl) {
         fail++;
         console.warn("no-image", inf.name, platform);

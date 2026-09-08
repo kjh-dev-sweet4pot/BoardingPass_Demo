@@ -28,6 +28,37 @@ import { regionBadgeText } from "@/lib/region-display";
 
 type PickMap = Record<string, "selected" | "excluded">;
 
+type PoolSort =
+  | "followers-desc"
+  | "followers-asc"
+  | "name"
+  | "views-desc"
+  | "likes-desc";
+
+const POOL_SORT_LABEL: Record<PoolSort, string> = {
+  "followers-desc": "팔로워 많은순",
+  "followers-asc": "팔로워 적은순",
+  name: "이름순",
+  "views-desc": "조회수 많은순",
+  "likes-desc": "좋아요 많은순",
+};
+
+function sortPool(rows: PoolCreator[], sort: PoolSort) {
+  const copy = [...rows];
+  const byName = (a: PoolCreator, b: PoolCreator) =>
+    a.name.localeCompare(b.name, "ko");
+  copy.sort((a, b) => {
+    if (sort === "followers-desc") return b.followers - a.followers || byName(a, b);
+    if (sort === "followers-asc") return a.followers - b.followers || byName(a, b);
+    if (sort === "name") return byName(a, b);
+    if (sort === "views-desc") {
+      return (b.metrics.views ?? 0) - (a.metrics.views ?? 0) || byName(a, b);
+    }
+    return (b.metrics.likes ?? 0) - (a.metrics.likes ?? 0) || byName(a, b);
+  });
+  return copy;
+}
+
 // castingId로 관리 — key: pool creator id, value: castingId(담긴 경우) | "excluded"
 type CastingMap = Record<string, { castingId: string } | "excluded">;
 
@@ -55,6 +86,7 @@ export function CompanyCreatorPool({
   const [q, setQ] = useState("");
   const [hideOverlap, setHideOverlap] = useState(false);
   const [postedOnly, setPostedOnly] = useState(false);
+  const [sort, setSort] = useState<PoolSort>("followers-desc");
   const [requested, setRequested] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [picks, setPicks] = useState<PickMap>({});
@@ -158,7 +190,7 @@ export function CompanyCreatorPool({
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return pool.filter((row) => {
+    const rows = pool.filter((row) => {
       if (hideOverlap && row.overlap) return false;
       if (postedOnly && row.posts.length === 0) return false;
       if (market && row.market !== market) return false;
@@ -170,7 +202,8 @@ export function CompanyCreatorPool({
         (row.product || "").toLowerCase().includes(needle)
       );
     });
-  }, [pool, market, channel, q, hideOverlap, postedOnly]);
+    return sortPool(rows, sort);
+  }, [pool, market, channel, q, hideOverlap, postedOnly, sort]);
 
   const available = useMemo(
     () => filtered.filter((row) => picks[row.id] !== "selected"),
@@ -325,6 +358,21 @@ export function CompanyCreatorPool({
               setVisible(POOL_PAGE);
             }}
           />
+          <select
+            aria-label="정렬"
+            className="h-10 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
+            value={sort}
+            onChange={(e) => {
+              setSort(e.target.value as PoolSort);
+              setVisible(POOL_PAGE);
+            }}
+          >
+            {(Object.keys(POOL_SORT_LABEL) as PoolSort[]).map((key) => (
+              <option key={key} value={key}>
+                {POOL_SORT_LABEL[key]}
+              </option>
+            ))}
+          </select>
           <select
             className="h-10 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
             value={channel}
