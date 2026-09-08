@@ -126,6 +126,7 @@ function mapNote(item: AtomusNote, inputUrl?: string): XiaohongshuScraperResult 
     comments,
     saves,
     shares,
+    coverUrl: item.coverUrl || item.cover || item.images?.[0] || null,
     authorHandle:
       item.user?.red_id ||
       item.user?.nickname ||
