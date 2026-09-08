@@ -8,6 +8,7 @@ import {
 import {
   collectInstagramLinkThumbnail,
   collectTikTokLinkThumbnail,
+  collectXiaohongshuLinkThumbnail,
 } from "@/lib/collect-link-thumbnail";
 import { detectPlatform, validateCreatorUrl } from "@/lib/creator-link";
 import { getInfluencerSessionId } from "@/lib/session";
@@ -199,6 +200,11 @@ export async function POST(request: Request) {
   if (snsUrl && created.platform === "instagram") {
     after(async () => {
       await collectInstagramLinkThumbnail(supabase, created.id, snsUrl);
+    });
+  }
+  if (snsUrl && (created.platform === "xiaohongshu" || detectPlatform(snsUrl) === "xiaohongshu")) {
+    after(async () => {
+      await collectXiaohongshuLinkThumbnail(supabase, created.id, snsUrl);
     });
   }
 

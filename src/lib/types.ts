@@ -42,7 +42,7 @@ export type CreatorLink = {
   allocation_id: string;
   influencer_id: string;
   url: string;
-  platform: "instagram" | "tiktok" | "youtube" | "naver_blog" | "etc";
+  platform: "instagram" | "tiktok" | "xiaohongshu" | "youtube" | "naver_blog" | "etc";
   status: CreatorLinkStatus;
   content_status?: "제출" | "승인" | "발행완료" | "반려" | null;
   publish_url?: string | null;
@@ -172,6 +172,7 @@ export type AllocationWithRelations = Allocation & {
   companies?: Pick<Company, "id" | "name"> | null;
   /** 조인 시만 존재 (Inf 목록 등에서는 생략 가능) */
   influencers?: Influencer | null;
+  campaigns?: Pick<Campaign, "id" | "name"> | null;
   creator_links?: CreatorLink[];
 };
 

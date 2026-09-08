@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
+import { PharConsole } from "@/components/phar-console";
 import { PharHeaderActions } from "@/components/phar-header-actions";
-import { PharListWithModal } from "@/components/phar-list-with-modal";
 import { AppShell, Notice } from "@/components/ui";
 import { getStoreSessionId, clearStoreSession } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
@@ -13,6 +13,8 @@ export default async function PharPage({
   searchParams: Promise<{
     error?: string;
     message?: string;
+    tab?: string;
+    date?: string;
   }>;
 }) {
   const storeId = await getStoreSessionId();
@@ -64,10 +66,11 @@ export default async function PharPage({
       actions={<PharHeaderActions />}
     >
       <Notice error={params.error || error?.message} message={params.message} />
-      <PharListWithModal
+      <PharConsole
         items={list}
-        lockedStoreId={storeRow.id}
-        fillHeight
+        storeId={storeRow.id}
+        initialTab={params.tab}
+        initialDate={params.date}
       />
     </AppShell>
   );

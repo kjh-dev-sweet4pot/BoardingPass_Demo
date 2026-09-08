@@ -170,7 +170,7 @@ export function CompanyBudgetPerformanceTab({
         <div className="border-b border-[var(--line)] px-4 py-3">
           <h3 className="text-sm font-bold text-[var(--ink)]">배정별 노출가</h3>
           <p className="mt-0.5 text-[11.5px] text-[var(--muted)]">
-            미등록 노출가는 50만~100만으로 자동 책정됩니다
+            등록된 노출가만 합산합니다
           </p>
         </div>
         {data.rows.length === 0 ? (
@@ -215,7 +215,9 @@ export function CompanyBudgetPerformanceTab({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-bold tabular-nums text-[var(--ink)]">
-                      {formatBudgetKrw(row.displayPrice)}
+                      {row.displayPrice != null
+                        ? formatBudgetKrw(row.displayPrice)
+                        : "—"}
                     </td>
                   </tr>
                 ))}

@@ -1,3 +1,4 @@
+import { extractSnsHandle, resolveCreatorPlatform } from "@/lib/creator-link";
 import type { CreatorChannel, CreatorMarket, PoolCreator } from "@/lib/creator-pool-mock";
 
 type InfRow = {
@@ -16,11 +17,13 @@ function bareHandle(raw: string) {
 
 function channelFromUrl(url: string | null | undefined): CreatorChannel {
   const u = (url || "").toLowerCase();
-  if (u.includes("tiktok.com")) return "tiktok";
-  if (u.includes("youtube.com") || u.includes("youtu.be")) return "youtube";
-  if (u.includes("xiaohongshu") || u.includes("xhslink")) return "xiaohongshu";
   if (u.includes("douyin")) return "douyin";
   if (/(^|\/\/)(x|twitter)\.com\//.test(u)) return "x";
+  const p = resolveCreatorPlatform(url);
+  if (p === "tiktok") return "tiktok";
+  if (p === "xiaohongshu") return "xiaohongshu";
+  if (p === "youtube") return "youtube";
+  if (p === "instagram") return "instagram";
   return "instagram";
 }
 
@@ -37,12 +40,21 @@ export function poolCreatorFromInfluencer(
   inf: InfRow,
   opts?: { productName?: string | null },
 ): PoolCreator {
+  const sns =
+    (inf.sns_url || "").trim() ||
+    (/^https?:\/\//i.test(inf.instagram_handle || "")
+      ? (inf.instagram_handle || "").trim()
+      : "") ||
+    (/^https?:\/\//i.test(inf.instagram_handle_normalized || "")
+      ? (inf.instagram_handle_normalized || "").trim()
+      : "");
   const handle =
-    bareHandle(inf.instagram_handle_normalized || "") ||
-    bareHandle(inf.instagram_handle || "") ||
+    extractSnsHandle(inf.instagram_handle_normalized) ||
+    extractSnsHandle(inf.instagram_handle) ||
+    extractSnsHandle(sns) ||
     bareHandle(inf.id);
   const followers = Number(inf.followers) || 0;
-  const channel = channelFromUrl(inf.sns_url);
+  const channel = channelFromUrl(sns);
   return {
     id: inf.id,
     name: (inf.name || "").trim() || handle,
@@ -50,7 +62,7 @@ export function poolCreatorFromInfluencer(
     market: marketDefault(),
     region: inf.region ?? null,
     channel,
-    profileUrl: (inf.sns_url || "").trim() || null,
+    profileUrl: sns || null,
     priceKrw: 0,
     followers,
     overlap: null,

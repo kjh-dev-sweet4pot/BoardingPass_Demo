@@ -41,6 +41,25 @@ export type CompanyHomeInfluencerRow = {
   views: number;
 };
 
+export type CompanyHomeBudgetRound = {
+  label: string;
+  total: number;
+  status: "집행 완료" | "진행중";
+};
+
+/** ponytail: login_id 한 곳. 차수 테이블로 옮기면 이 상수 삭제 */
+export const TELOACT_BUDGET_ROUNDS: CompanyHomeBudgetRound[] = [
+  { label: "1차", total: 40_000_000, status: "집행 완료" },
+  { label: "2차", total: 60_000_000, status: "진행중" },
+];
+
+export function teloactHomeBudget() {
+  return {
+    ...summarizeBudget(100_000_000, 40_000_000, 0),
+    rounds: TELOACT_BUDGET_ROUNDS,
+  };
+}
+
 export type CompanyHomePayload = {
   asOf: string;
   budget: {
@@ -54,6 +73,7 @@ export type CompanyHomePayload = {
     remaining: number | null;
     /** committed / total */
     pct: number | null;
+    rounds?: CompanyHomeBudgetRound[];
   };
   content: { published: number; target: number | null };
   influencers: {
@@ -318,6 +338,7 @@ function pad2(n: number) {
 
 export function platformOf(url: string | null) {
   if (!url) return "기타";
+  if (/xiaohongshu|xhslink|rednote/i.test(url)) return "샤오홍슈";
   if (/tiktok/i.test(url)) return "틱톡";
   if (/instagram/i.test(url)) return "인스타그램";
   if (/youtube|youtu\.be/i.test(url)) return "유튜브";
@@ -613,6 +634,14 @@ function assertRankBestPosts() {
     bgt.pct !== 15
   ) {
     throw new Error("summarizeBudget committed failed");
+  }
+  const telo = teloactHomeBudget();
+  if (
+    telo.spent !== 40_000_000 ||
+    telo.rounds[0]?.status !== "집행 완료" ||
+    telo.rounds[1]?.status !== "진행중"
+  ) {
+    throw new Error("teloactHomeBudget failed");
   }
   const series = viewsByPublishDay(posts, "2026-09-03", 7);
   if (series.length !== 7 || series[4] !== 100) {

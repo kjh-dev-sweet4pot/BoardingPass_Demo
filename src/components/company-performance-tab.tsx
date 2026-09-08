@@ -5,6 +5,10 @@ import { createPortal } from "react-dom";
 import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
 import { formatMetric } from "@/lib/content-insights";
+import {
+  creatorPlatformLabelOf,
+  creatorSnsChannelOf,
+} from "@/lib/creator-link";
 import { findPoolCreator, type PoolCreator } from "@/lib/creator-pool-mock";
 import type { ContentPeriod } from "@/lib/content-insights";
 import { addDaysYmd, formatMd, ymdKst } from "@/lib/types";
@@ -96,7 +100,7 @@ function poolCreatorFromLink(row: LinkRow): PoolCreator {
   if (fromPool) return fromPool;
 
   const url = row.link_url || "";
-  const channel = /tiktok/i.test(url) ? ("tiktok" as const) : ("instagram" as const);
+  const channel = creatorSnsChannelOf(url);
   return {
     id,
     name: inf?.name || "—",
@@ -117,11 +121,7 @@ function poolCreatorFromLink(row: LinkRow): PoolCreator {
 }
 
 function platformLabel(url: string | null) {
-  if (!url) return "기타";
-  if (url.includes("tiktok")) return "TikTok";
-  if (url.includes("instagram")) return "Instagram";
-  if (url.includes("youtube") || url.includes("youtu.be")) return "YouTube";
-  return "기타";
+  return creatorPlatformLabelOf(url);
 }
 
 function er(views: number, likes: number, comments: number) {
@@ -1099,17 +1099,14 @@ export function CompanyPerformanceTab({
   const platformSegments = useMemo(() => {
     const map = new Map<string, number>();
     for (const l of links) {
-      const url = l.link_url || "";
-      const plat = url.includes("tiktok")
-        ? "TikTok"
-        : url.includes("instagram")
-          ? "Instagram"
-          : "기타";
+      const plat = creatorPlatformLabelOf(l.link_url);
       map.set(plat, (map.get(plat) ?? 0) + (l.views ?? 0));
     }
     const colors: Record<string, string> = {
       Instagram: "var(--accent)",
       TikTok: "#c08b5c",
+      샤오홍슈: "#e54d4c",
+      YouTube: "#c08b5c",
       기타: "#d9c3a5",
     };
     return [...map.entries()]

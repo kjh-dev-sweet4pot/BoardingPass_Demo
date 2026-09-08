@@ -3,6 +3,7 @@ import {
   CREATOR_LINK_PUBLIC_COLUMNS,
   collectInstagramLinkThumbnail,
   collectTikTokLinkThumbnail,
+  collectXiaohongshuLinkThumbnail,
 } from "@/lib/collect-link-thumbnail";
 import { getInfluencerSessionId } from "@/lib/session";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
@@ -95,18 +96,36 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: created, error } = await supabase
+  const platform = detectPlatform(linkUrl);
+  let { data: created, error } = await supabase
     .from("creator_links")
     .insert({
       allocation_id: allocationId,
       influencer_id: influencerId,
       url: linkUrl,
-      platform: detectPlatform(linkUrl),
+      platform,
       status: "submitted",
       thumbnail_status: "pending",
     })
     .select(CREATOR_LINK_PUBLIC_COLUMNS)
     .single();
+  if (error && /platform_check/i.test(error.message) && platform === "xiaohongshu") {
+    const retry = await supabase
+      .from("creator_links")
+      .insert({
+        allocation_id: allocationId,
+        influencer_id: influencerId,
+        url: linkUrl,
+        platform: "etc",
+        status: "submitted",
+        thumbnail_status: "pending",
+      })
+      .select(CREATOR_LINK_PUBLIC_COLUMNS)
+      .single();
+    created = retry.data;
+    error = retry.error;
+    if (created) created.platform = "xiaohongshu";
+  }
 
   if (error || !created) {
     return NextResponse.json(
@@ -124,6 +143,12 @@ export async function POST(request: Request) {
   if (created.platform === "instagram") {
     after(async () => {
       await collectInstagramLinkThumbnail(supabase, created.id, linkUrl);
+    });
+  }
+
+  if (created.platform === "xiaohongshu" || detectPlatform(linkUrl) === "xiaohongshu") {
+    after(async () => {
+      await collectXiaohongshuLinkThumbnail(supabase, created.id, linkUrl);
     });
   }
 

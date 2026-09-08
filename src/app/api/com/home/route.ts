@@ -10,6 +10,7 @@ import {
   rankBestPosts,
   rankInfluencers,
   summarizeBudget,
+  teloactHomeBudget,
   windowStartIso,
   wowPct,
   ymdKstNow,
@@ -91,11 +92,15 @@ export async function GET() {
     .eq("status", "Accept");
 
   let budget = summarizeBudget(budgetTotal, 0, 0);
-  try {
-    const bp = await buildBudgetPerformanceForCompany(supabase, company);
-    budget = summarizeBudget(bp.budgetTotal, bp.spent, bp.scheduled);
-  } catch {
-    /* 캠페인 합계만 유지 */
+  if (company.login_id === "telloact") {
+    budget = teloactHomeBudget();
+  } else {
+    try {
+      const bp = await buildBudgetPerformanceForCompany(supabase, company);
+      budget = summarizeBudget(bp.budgetTotal, bp.spent, bp.scheduled);
+    } catch {
+      /* 캠페인 합계만 유지 */
+    }
   }
 
   const { data: allocs } = await supabase

@@ -15,6 +15,13 @@ function resolveReferer(hostname: string) {
   ) {
     return "https://www.instagram.com/";
   }
+  if (
+    host.includes("xhscdn.com") ||
+    host.includes("xiaohongshu.com") ||
+    host.includes("xhslink.com")
+  ) {
+    return "https://www.xiaohongshu.com/";
+  }
   return null;
 }
 

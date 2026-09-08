@@ -1,6 +1,6 @@
 import { polishDemoMetrics } from "@/lib/demo-metrics";
 import { buildCreatorPool } from "@/lib/creator-pool-mock";
-import { CREATOR_PLATFORM_LABEL } from "@/lib/creator-link";
+import { creatorPlatformLabelOf, extractSnsHandle } from "@/lib/creator-link";
 import { creatorLinkHref } from "@/lib/publish-demo-data";
 import type { AllocationWithRelations, CreatorLink } from "@/lib/types";
 
@@ -108,7 +108,10 @@ function toProgressLink(
       url: creatorLinkHref(link) || null,
       hasFile: Boolean(link.submitted_file_path),
       fileKind: fileKindFromPath(link.submitted_file_path),
-      platform: CREATOR_PLATFORM_LABEL[link.platform] || link.platform,
+      platform: creatorPlatformLabelOf(
+        creatorLinkHref(link) || link.url,
+        link.platform,
+      ),
       submitted_at: link.submitted_at || null,
       reviewMemo: link.memo?.trim() || null,
       views: normalized(link.views),
@@ -132,7 +135,10 @@ function toProgressLink(
     url: creatorLinkHref(link) || null,
     hasFile: Boolean(link.submitted_file_path),
     fileKind: fileKindFromPath(link.submitted_file_path),
-    platform: CREATOR_PLATFORM_LABEL[link.platform] || link.platform,
+    platform: creatorPlatformLabelOf(
+      creatorLinkHref(link) || link.url,
+      link.platform,
+    ),
     submitted_at: link.submitted_at || null,
     reviewMemo: link.memo?.trim() || null,
     views: polished.views,
@@ -142,11 +148,10 @@ function toProgressLink(
 }
 
 function handleOf(item: AllocationWithRelations) {
-  const raw =
-    item.influencers?.instagram_handle_normalized ||
-    item.influencers?.instagram_handle ||
-    "";
-  const n = raw.replace(/^@+/, "").trim();
+  const n =
+    extractSnsHandle(item.influencers?.instagram_handle_normalized) ||
+    extractSnsHandle(item.influencers?.instagram_handle) ||
+    extractSnsHandle(item.influencers?.sns_url);
   return n ? `@${n}` : "—";
 }
 

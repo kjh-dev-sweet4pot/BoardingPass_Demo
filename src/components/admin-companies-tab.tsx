@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Field, fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
 import { COMPANY_CONTRACT_STAGES } from "@/lib/company";
 import {
+  companyCsvTemplate,
+  parseCompanyImportRows,
+  type CompanyCsvRow,
+} from "@/lib/company-csv";
+import { buildCompanyExcelTemplate } from "@/lib/company-xlsx-template";
+import {
   COMPANY_MAIL_KINDS,
   buildCompanyMailTemplate,
   resolveCompanyMailTo,
@@ -33,6 +39,207 @@ function fmtDt(iso: string) {
   return new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
+function CompanyCsvImport({
+  isManager,
+  onImported,
+}: {
+  isManager: boolean;
+  onImported: (companies: Company[]) => void;
+}) {
+  const [rows, setRows] = useState<CompanyCsvRow[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  function downloadCsvTemplate() {
+    const csv = `\uFEFF${companyCsvTemplate().replace(/\n/g, "\r\n")}`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "boardingpass-companies-template.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function downloadExcelTemplate() {
+    const bytes = buildCompanyExcelTemplate();
+    const blob = new Blob([bytes], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "boardingpass-companies-template.xlsx";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function onFile(file: File | undefined) {
+    setError(null);
+    setSuccess(null);
+    setRows([]);
+    setFileName("");
+    if (!file) return;
+    try {
+      const XLSX = await import("xlsx");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0] || ""];
+      if (!sheet) throw new Error("시트를 읽을 수 없습니다.");
+      const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+        defval: "",
+        raw: false,
+      });
+      const parsed = parseCompanyImportRows(records).filter(
+        (r) => r.name || r.login_id || r.password,
+      );
+      if (parsed.length === 0) throw new Error("등록할 행이 없습니다.");
+      setFileName(file.name);
+      setRows(parsed);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "파일을 읽지 못했습니다.");
+    }
+  }
+
+  async function onImport() {
+    if (!isManager) return;
+    const okRows = rows.filter((r) => r.ok);
+    if (okRows.length === 0) {
+      setError("유효한 행이 없습니다.");
+      return;
+    }
+    setImporting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch("/api/admin/companies/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rows: okRows.map((r) => ({
+            name: r.name,
+            login_id: r.login_id,
+            password: r.password,
+            contact: r.contact,
+            contact_email: r.contact_email,
+            aliases: r.aliases,
+            first_meet_on: r.first_meet_on,
+            planned_start_on: r.planned_start_on,
+            planned_end_on: r.planned_end_on,
+            contract_stage: r.contract_stage,
+            budget_amount: r.budget_amount,
+            spent_amount: r.spent_amount,
+            guideline_url: r.guideline_url,
+          })),
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "업로드 실패");
+      const created = (body.created || []) as Company[];
+      const failures = (body.failures || []) as { name: string; error: string }[];
+      onImported(created);
+      const failText =
+        failures.length > 0
+          ? ` · 실패 ${failures.length}건 (${failures
+              .slice(0, 3)
+              .map((f) => f.name || f.error)
+              .join(", ")}${failures.length > 3 ? "…" : ""})`
+          : "";
+      setSuccess(
+        `${created.length}개 회원사를 등록했습니다.${failText}`,
+      );
+      if (typeof body.warning === "string") setError(body.warning);
+      if (created.length > 0) setRows([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "업로드 실패");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  const okCount = rows.filter((r) => r.ok).length;
+
+  return (
+    <div className="owm-panel space-y-3 border border-[var(--line)] bg-[var(--surface)] p-5">
+      <p className="text-sm font-semibold">CSV 업로드</p>
+      <p className="text-xs text-[var(--muted)]">
+        name · login_id · password 필수. Excel 템플릿의 contract_stage는
+        목록에서 고릅니다. .csv · .xlsx
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={secondaryBtnClass} onClick={downloadCsvTemplate}>
+          CSV 템플릿
+        </button>
+        <button type="button" className={secondaryBtnClass} onClick={downloadExcelTemplate}>
+          Excel 템플릿
+        </button>
+        <label className={`${secondaryBtnClass} cursor-pointer`}>
+          파일 선택
+          <input
+            type="file"
+            accept=".csv,.xlsx,.xls,text/csv"
+            className="sr-only"
+            disabled={!isManager}
+            onChange={(e) => void onFile(e.target.files?.[0])}
+          />
+        </label>
+        {fileName ? (
+          <span className="self-center text-xs text-[var(--muted)]">{fileName}</span>
+        ) : null}
+      </div>
+      {rows.length > 0 ? (
+        <div className="overflow-auto">
+          <table className="min-w-full text-left text-xs">
+            <thead>
+              <tr className="text-[var(--muted)]">
+                <th className="px-2 py-1 font-medium">행</th>
+                <th className="px-2 py-1 font-medium">회원사</th>
+                <th className="px-2 py-1 font-medium">아이디</th>
+                <th className="px-2 py-1 font-medium">상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.rowNumber} className="border-t border-[var(--line)]">
+                  <td className="px-2 py-1">{r.rowNumber}</td>
+                  <td className="px-2 py-1">{r.name || "—"}</td>
+                  <td className="px-2 py-1">{r.login_id || "—"}</td>
+                  <td className="px-2 py-1">
+                    {r.ok ? (
+                      <span className="text-[var(--accent)]">가능</span>
+                    ) : (
+                      <span className="text-[var(--danger)]">{r.errors.join(" · ")}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
+      {success ? (
+        <p
+          role="status"
+          className="rounded-[6px] border border-[var(--line)] bg-[var(--accent-soft)] px-3 py-2 text-sm text-[var(--accent)]"
+        >
+          {success}
+        </p>
+      ) : null}
+      {rows.length > 0 ? (
+        <button
+          type="button"
+          className={primaryBtnClass}
+          disabled={!isManager || importing || okCount === 0}
+          onClick={() => void onImport()}
+        >
+          {importing ? "등록 중…" : `유효 ${okCount}건 등록`}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 function CompanyForm({
   companies,
   onSaved,
@@ -59,6 +266,7 @@ function CompanyForm({
   const [guidelineUrl, setGuidelineUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => setList(companies), [companies]);
@@ -83,6 +291,7 @@ function CompanyForm({
     setBudgetAmount("");
     setSpentAmount("");
     setGuidelineUrl("");
+    setSuccess(null);
   }
 
   function startEdit(company: Company) {
@@ -104,6 +313,7 @@ function CompanyForm({
       company.spent_amount != null ? String(company.spent_amount) : "",
     );
     setGuidelineUrl(company.guideline_url || "");
+    setSuccess(null);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -112,6 +322,7 @@ function CompanyForm({
     setSaving(true);
     setError(null);
     setWarning(null);
+    setSuccess(null);
     try {
       const payload = {
         name,
@@ -150,7 +361,13 @@ function CompanyForm({
           : [...prev, next].sort((a, b) => a.name.localeCompare(b.name, "ko"));
       });
       onSaved(next);
+      const wasEdit = Boolean(editingId);
       reset();
+      setSuccess(
+        wasEdit
+          ? `${next.name} 회원사 정보를 수정했습니다.`
+          : `${next.name} 회원사를 등록했습니다. 로그인 아이디는 ${next.login_id}입니다.`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 실패");
     } finally {
@@ -283,6 +500,14 @@ function CompanyForm({
 
         {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
         {warning ? <p className="text-xs text-[var(--accent)]">{warning}</p> : null}
+        {success ? (
+          <p
+            role="status"
+            className="rounded-[6px] border border-[var(--line)] bg-[var(--accent-soft)] px-3 py-2 text-sm text-[var(--accent)]"
+          >
+            {success}
+          </p>
+        ) : null}
         <div className="flex gap-2">
           <button className={primaryBtnClass} type="submit" disabled={saving || !isManager}>
             {saving ? "저장 중…" : editing ? "수정 저장" : "등록"}
@@ -725,18 +950,32 @@ export function AdminCompaniesTab({
           />
         ) : null}
         {sub === "companiesRegister" ? (
-          <CompanyForm
-            companies={list}
-            isManager={isManager}
-            onSaved={(c) =>
-              setList((prev) => {
-                const exists = prev.some((x) => x.id === c.id);
-                return exists
-                  ? prev.map((x) => (x.id === c.id ? c : x))
-                  : [...prev, c].sort((a, b) => a.name.localeCompare(b.name, "ko"));
-              })
-            }
-          />
+          <div className="space-y-6">
+            <CompanyCsvImport
+              isManager={isManager}
+              onImported={(added) =>
+                setList((prev) => {
+                  const map = new Map(prev.map((c) => [c.id, c]));
+                  for (const c of added) map.set(c.id, c);
+                  return [...map.values()].sort((a, b) =>
+                    a.name.localeCompare(b.name, "ko"),
+                  );
+                })
+              }
+            />
+            <CompanyForm
+              companies={list}
+              isManager={isManager}
+              onSaved={(c) =>
+                setList((prev) => {
+                  const exists = prev.some((x) => x.id === c.id);
+                  return exists
+                    ? prev.map((x) => (x.id === c.id ? c : x))
+                    : [...prev, c].sort((a, b) => a.name.localeCompare(b.name, "ko"));
+                })
+              }
+            />
+          </div>
         ) : null}
         {sub === "companiesMail" ? (
           <MailPanel companies={list} isManager={isManager} presetCompanyId={mailCompanyId} />

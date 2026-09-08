@@ -14,6 +14,7 @@ import {
   type CompanyHomeBestPost,
   type CompanyHomeInfluencerRow,
   type CompanyHomeNewsItem,
+  type CompanyHomeBudgetRound,
   type CompanyHomePayload,
   type HomeInsightLink,
 } from "@/lib/company-home";
@@ -188,6 +189,40 @@ function DonutCell({
     );
   }
   return <div className={cls}>{inner}</div>;
+}
+
+function BudgetRoundsCell({
+  rounds,
+  onClick,
+}: {
+  rounds: CompanyHomeBudgetRound[];
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-[88px] w-full flex-col justify-center gap-1.5 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 text-left"
+    >
+      <span className="text-[11px] text-[var(--muted)]">예산 집행</span>
+      {rounds.map((r) => (
+        <div key={r.label} className="flex items-baseline justify-between gap-2">
+          <span className="text-[13px] font-extrabold tabular-nums text-[var(--ink)]">
+            {r.label} {formatKrw(r.total)}원
+          </span>
+          <span
+            className={`shrink-0 text-[11px] font-semibold ${
+              r.status === "집행 완료"
+                ? "text-[var(--ink)]"
+                : "text-[var(--accent)]"
+            }`}
+          >
+            {r.status}
+          </span>
+        </div>
+      ))}
+    </button>
+  );
 }
 
 function StripPlain({
@@ -786,54 +821,72 @@ export function CompanyHomeLanding({
             <div className="mt-3 grid grid-cols-1 gap-3 px-5 sm:grid-cols-2 sm:px-8 xl:grid-cols-4">
               <KpiHoverTip
                 title="예산 집행"
-                rows={[
-                  {
-                    label: "캠페인 예산",
-                    value:
-                      budget?.total != null
-                        ? `${formatKrw(budget.total)}원`
-                        : "—",
-                  },
-                  {
-                    label: "실제 사용",
-                    value: `${formatKrw(budget?.spent ?? 0)}원`,
-                  },
-                  {
-                    label: "차감 예정",
-                    value: `${formatKrw(budget?.scheduled ?? 0)}원`,
-                  },
-                  {
-                    label: "집행 합계",
-                    value: `${formatKrw(budget?.committed ?? 0)}원`,
-                  },
-                  {
-                    label: "잔여",
-                    value:
-                      budget?.remaining != null
-                        ? `${formatKrw(budget.remaining)}원`
-                        : "—",
-                  },
-                  {
-                    label: "집행률",
-                    value:
-                      budget?.pct != null ? `${budget.pct}%` : "—",
-                  },
-                ]}
-                note="노출가 기준. 실제 사용은 발행완료, 차감 예정은 진행~발행 이전 배정입니다."
+                rows={
+                  budget?.rounds?.length
+                    ? budget.rounds.map((r) => ({
+                        label: r.label,
+                        value: `${formatKrw(r.total)}원 · ${r.status}`,
+                      }))
+                    : [
+                        {
+                          label: "캠페인 예산",
+                          value:
+                            budget?.total != null
+                              ? `${formatKrw(budget.total)}원`
+                              : "—",
+                        },
+                        {
+                          label: "실제 사용",
+                          value: `${formatKrw(budget?.spent ?? 0)}원`,
+                        },
+                        {
+                          label: "차감 예정",
+                          value: `${formatKrw(budget?.scheduled ?? 0)}원`,
+                        },
+                        {
+                          label: "집행 합계",
+                          value: `${formatKrw(budget?.committed ?? 0)}원`,
+                        },
+                        {
+                          label: "잔여",
+                          value:
+                            budget?.remaining != null
+                              ? `${formatKrw(budget.remaining)}원`
+                              : "—",
+                        },
+                        {
+                          label: "집행률",
+                          value:
+                            budget?.pct != null ? `${budget.pct}%` : "—",
+                        },
+                      ]
+                }
+                note={
+                  budget?.rounds?.length
+                    ? "1차는 집행 완료, 2차는 진행중. 노출가 합산과 별도입니다."
+                    : "노출가 기준. 실제 사용은 발행완료, 차감 예정은 진행~발행 이전 배정입니다."
+                }
               >
-                <DonutCell
-                  pct={budget?.pct ?? null}
-                  color="var(--ink)"
-                  label="예산 집행"
-                  caption={
-                    budget?.total != null
-                      ? `${formatKrw(budget.committed)} / ${formatKrw(budget.total)}원`
-                      : budget?.committed
-                        ? `${formatKrw(budget.committed)}원`
-                        : "—"
-                  }
-                  onClick={onOpenBudgetPerformance}
-                />
+                {budget?.rounds?.length ? (
+                  <BudgetRoundsCell
+                    rounds={budget.rounds}
+                    onClick={onOpenBudgetPerformance}
+                  />
+                ) : (
+                  <DonutCell
+                    pct={budget?.pct ?? null}
+                    color="var(--ink)"
+                    label="예산 집행"
+                    caption={
+                      budget?.total != null
+                        ? `${formatKrw(budget.committed)} / ${formatKrw(budget.total)}원`
+                        : budget?.committed
+                          ? `${formatKrw(budget.committed)}원`
+                          : "—"
+                    }
+                    onClick={onOpenBudgetPerformance}
+                  />
+                )}
               </KpiHoverTip>
               <KpiHoverTip
                 title="콘텐츠 발행"

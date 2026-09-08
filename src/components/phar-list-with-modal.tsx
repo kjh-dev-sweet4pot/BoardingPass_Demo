@@ -14,10 +14,9 @@ import { AdminAllocationEditForm } from "@/components/admin-allocation-edit";
 import {
   ALLOCATION_LINK_LABEL_ADMIN,
   CREATOR_LINK_STATUS_LABEL,
-  CREATOR_PLATFORM_LABEL,
+  creatorPlatformLabelOf,
   summarizeAllocationLinks,
 } from "@/lib/creator-link";
-import type { CreatorPlatform } from "@/lib/creator-link";
 import {
   ALLOCATION_STATUS_LABEL,
   allocationStatusDisplayLabel,
@@ -1097,6 +1096,7 @@ export function PharListWithModal({
   allowAdminEdit = false,
   storeList = [],
   companyList = [],
+  embedInConsole = false,
 }: {
   items: AllocationWithRelations[];
   /** 부모 높이에 맞춰 목록만 내부 스크롤 (운영 콘솔 등) */
@@ -1107,6 +1107,8 @@ export function PharListWithModal({
   allowAdminEdit?: boolean;
   storeList?: Store[];
   companyList?: Company[];
+  /** /phar 콘솔 안에 넣을 때: 전체화면 id 중복 방지, 기간 토글 숨김 */
+  embedInConsole?: boolean;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
@@ -1354,6 +1356,16 @@ export function PharListWithModal({
     }
     return { total, scheduled, visited, pickedUp };
   }, [liveItems, storeFilterId, today, monthKey, statsPeriod]);
+
+  const todayVisitorCount = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of liveItems) {
+      if (item.status === "cancelled") continue;
+      if (visitDateKey(item) !== today) continue;
+      ids.add(item.influencer_id);
+    }
+    return ids.size;
+  }, [liveItems, today]);
 
   const statsPeriodLabel =
     statsPeriod === "today"
@@ -1750,7 +1762,7 @@ export function PharListWithModal({
 
     return (
       <div
-        id={PHAR_COUNTER_ROOT_ID}
+        id={embedInConsole ? undefined : PHAR_COUNTER_ROOT_ID}
         ref={counterRootRef}
         className={`${
           counterTall ? "flex min-h-0 flex-1 flex-col" : ""
@@ -1789,6 +1801,14 @@ export function PharListWithModal({
                       {statsPeriodLabel}
                     </p>
                   </div>
+                  {embedInConsole ? (
+                    <p className="text-sm font-semibold tabular-nums text-[var(--ink)]">
+                      오늘 {todayVisitorCount}명
+                      <span className="ml-1 text-xs font-medium text-[var(--muted)]">
+                        / {periodStats.total}건
+                      </span>
+                    </p>
+                  ) : (
                   <div
                     className="flex rounded-[6px] border border-[var(--line)] bg-[var(--surface)]/90 p-0.5"
                     role="group"
@@ -1816,6 +1836,7 @@ export function PharListWithModal({
                       </button>
                     ))}
                   </div>
+                  )}
                 </div>
 
                 <div
@@ -1968,18 +1989,15 @@ export function PharListWithModal({
                                 {hidePickedUp
                                   ? "오늘 미수령 방문이 없습니다."
                                   : "오늘 방문인이 없습니다."}
+                                {hidePickedUp ? (
                                 <button
                                   type="button"
                                   className="mt-2 block w-full text-xs font-medium text-[var(--accent)] hover:underline"
-                                  onClick={() => {
-                                    if (hidePickedUp) setHidePickedUp(false);
-                                    else onStatsPeriodChange("all");
-                                  }}
+                                  onClick={() => setHidePickedUp(false)}
                                 >
-                                  {hidePickedUp
-                                    ? "완료 포함해 보기"
-                                    : "전체 날짜 보기"}
+                                  완료 포함해 보기
                                 </button>
+                                ) : null}
                               </td>
                             </tr>
                           ) : (
@@ -2630,7 +2648,7 @@ export function PharListWithModal({
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className="rounded-[6px] bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent)]">
-                                    {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform] ?? link.platform}
+                                    {creatorPlatformLabelOf(link.url, link.platform)}
                                   </span>
                                   <span className="text-[11px] text-[var(--muted)]">
                                     {CREATOR_LINK_STATUS_LABEL[link.status]}
@@ -2646,7 +2664,8 @@ export function PharListWithModal({
                                   {link.url}
                                 </a>
                                 {(link.platform === "tiktok" ||
-                                  link.platform === "instagram") &&
+                                  link.platform === "instagram" ||
+                                  link.platform === "xiaohongshu") &&
                                 (link.views != null ||
                                   link.likes != null ||
                                   link.comments != null) ? (
@@ -2669,7 +2688,8 @@ export function PharListWithModal({
                                 ) : null}
                               </div>
                               {(link.platform === "tiktok" ||
-                                link.platform === "instagram") &&
+                                link.platform === "instagram" ||
+                                link.platform === "xiaohongshu") &&
                               allowAdminEdit ? (
                                 <button
                                   type="button"

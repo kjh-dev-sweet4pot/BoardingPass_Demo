@@ -1,4 +1,4 @@
-import { type CreatorPlatform } from "@/lib/creator-link";
+import { resolveCreatorPlatform } from "@/lib/creator-link";
 import {
   aggregateContentInsights,
   type ContentPeriod,
@@ -70,7 +70,7 @@ export function buildMockContentInsights(
         ? links.map((link) => ({
             id: link.id,
             url: link.url,
-            platform: link.platform as CreatorPlatform,
+            platform: resolveCreatorPlatform(link.url, link.platform),
             linkId: link.id,
             postedAt:
               asYmd(link.submitted_at) ||

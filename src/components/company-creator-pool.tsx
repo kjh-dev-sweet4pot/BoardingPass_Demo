@@ -334,7 +334,7 @@ export function CompanyCreatorPool({
             }}
           >
             <option value="">플랫폼 전체</option>
-            {(["instagram", "tiktok"] as CreatorChannel[]).map((key) => (
+            {(["xiaohongshu", "instagram", "tiktok"] as CreatorChannel[]).map((key) => (
               <option key={key} value={key}>
                 {CHANNEL_LABEL[key]}
               </option>
@@ -398,9 +398,11 @@ export function CompanyCreatorPool({
             <span className="text-sm font-semibold text-[var(--ink)]">
               {selectedRows.length}명 선택
             </span>
-            <span className="text-sm text-[var(--muted)]">
-              예상 합계 ₩{formatKrw(budget)}
-            </span>
+            {budget > 0 ? (
+              <span className="text-sm text-[var(--muted)]">
+                예상 합계 ₩{formatKrw(budget)}
+              </span>
+            ) : null}
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -491,12 +493,14 @@ export function CompanyCreatorPool({
             {selectedRows.length}명 · Pending
           </span>
         </div>
-        <div className="mb-3.5">
-          <p className="text-[11px] text-[var(--muted)]">예상 합계</p>
-          <p className="mt-0.5 text-[22px] font-semibold tabular-nums text-[var(--ink)]">
-            ₩{formatKrw(budget)}
-          </p>
-        </div>
+        {budget > 0 ? (
+          <div className="mb-3.5">
+            <p className="text-[11px] text-[var(--muted)]">예상 합계</p>
+            <p className="mt-0.5 text-[22px] font-semibold tabular-nums text-[var(--ink)]">
+              ₩{formatKrw(budget)}
+            </p>
+          </div>
+        ) : null}
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
           {selectedRows.length === 0 ? (
             <p className="py-6 text-center text-sm text-[var(--muted)]">
@@ -512,7 +516,8 @@ export function CompanyCreatorPool({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[12.5px] font-semibold">{row.name}</p>
                   <p className="truncate text-[10.5px] text-[var(--muted)]">
-                    {formatFollowers(row.followers)} · ₩{formatKrw(row.priceKrw)}
+                    {formatFollowers(row.followers)}
+                    {row.priceKrw > 0 ? ` · ₩${formatKrw(row.priceKrw)}` : ""}
                   </p>
                 </div>
                 <button
@@ -684,12 +689,14 @@ function CreatorCard({
               {formatFollowers(row.followers)}
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-[10px] text-[var(--muted)]">단가</p>
-            <p className="text-xs font-semibold tabular-nums text-[var(--accent)]">
-              {formatKrw(row.priceKrw)}
-            </p>
-          </div>
+          {row.priceKrw > 0 ? (
+            <div className="text-right">
+              <p className="text-[10px] text-[var(--muted)]">단가</p>
+              <p className="text-xs font-semibold tabular-nums text-[var(--accent)]">
+                {formatKrw(row.priceKrw)}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {row.profileUrl ? (
@@ -871,12 +878,14 @@ function CreatorDetail({
             {formatFollowers(creator.followers)}
           </dd>
         </div>
-        <div>
-          <dt className="text-xs text-[var(--muted)]">집행 단가</dt>
-          <dd className="mt-1 font-semibold tabular-nums">
-            {formatKrw(creator.priceKrw)}원
-          </dd>
-        </div>
+        {creator.priceKrw > 0 ? (
+          <div>
+            <dt className="text-xs text-[var(--muted)]">집행 단가</dt>
+            <dd className="mt-1 font-semibold tabular-nums">
+              {formatKrw(creator.priceKrw)}원
+            </dd>
+          </div>
+        ) : null}
         <div className="sm:col-span-2">
           <dt className="text-xs text-[var(--muted)]">시딩 상품</dt>
           <dd className="mt-1 font-semibold">{creator.product || "—"}</dd>

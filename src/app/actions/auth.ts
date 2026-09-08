@@ -110,13 +110,21 @@ export async function signInCompany(formData: FormData) {
     );
   }
 
-  const { data: company, error } = await supabase
-    .from("companies")
-    .select("id, login_id, password_hash, is_active")
-    .eq("login_id", loginId)
-    .maybeSingle();
-
-  if (error) {
+  let company: {
+    id: string;
+    login_id: string;
+    password_hash: string;
+    is_active: boolean;
+  } | null = null;
+  try {
+    const { data, error } = await supabase
+      .from("companies")
+      .select("id, login_id, password_hash, is_active")
+      .eq("login_id", loginId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    company = data;
+  } catch {
     redirect(
       `/com/login?error=${encodeURIComponent("로그인 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.")}`,
     );

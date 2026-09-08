@@ -11,6 +11,10 @@ import {
   scrapeTikTokProfile,
   tiktokHandleFromUrl,
 } from "@/lib/apify-tiktok";
+import {
+  isXiaohongshuUrl,
+  scrapeXiaohongshuProfile,
+} from "@/lib/apify-xiaohongshu";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 export const INFLUENCER_AVATARS_BUCKET = "influencer-avatars";
@@ -74,6 +78,13 @@ function profileTarget(handle: string, snsUrl?: string | null) {
         bareHandle(handle);
       return { platform: "tiktok" as const, handle: h, url: raw };
     }
+    if (isXiaohongshuUrl(raw)) {
+      return {
+        platform: "xiaohongshu" as const,
+        handle: bareHandle(handle),
+        url: raw,
+      };
+    }
     const igHandle = bareHandle(instagramHandleFromUrl(raw) || handle);
     return {
       platform: "instagram" as const,
@@ -83,6 +94,13 @@ function profileTarget(handle: string, snsUrl?: string | null) {
   }
   const h = bareHandle(handle);
   if (!h) return null;
+  if (/^[0-9a-f]{24}$/i.test(h)) {
+    return {
+      platform: "xiaohongshu" as const,
+      handle: h,
+      url: `https://www.xiaohongshu.com/user/profile/${h}`,
+    };
+  }
   return {
     platform: "instagram" as const,
     handle: h,
@@ -102,6 +120,9 @@ function cdnReferer(imageUrl: string): string | null {
       host.includes("fbcdn.net")
     ) {
       return "https://www.instagram.com/";
+    }
+    if (host.includes("xhscdn.com") || host.includes("xiaohongshu.com")) {
+      return "https://www.xiaohongshu.com/";
     }
   } catch {
     /* ignore */
@@ -212,6 +233,9 @@ export async function scrapeProfileDetails(
   if (!target) return { imageUrl: null, followers: null, region: null };
   if (target.platform === "tiktok") {
     return scrapeTikTokProfile(target.handle);
+  }
+  if (target.platform === "xiaohongshu") {
+    return scrapeXiaohongshuProfile(target.url);
   }
   return scrapeInstagramProfile(target.url);
 }
