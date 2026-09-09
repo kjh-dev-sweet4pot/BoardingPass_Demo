@@ -34,12 +34,12 @@ const PERFORMANCE_ITEMS: NavDropdownItem<PerformanceView>[] = [
   { id: "budgetPerformance", label: "예산 성과", hint: "노출가 사용·차감 예정" },
 ];
 
-const MOBILE_TABS: { id: CompanyConsoleView; label: string }[] = [
-  { id: "home", label: "홈" },
-  { id: "pool", label: "크리에이터" },
-  { id: "publish", label: "진행 현황" },
-  { id: "alloc", label: "배정 현황" },
-  { id: "content", label: "성과" },
+const MOBILE_TABS: { id: CompanyConsoleView; label: string; full: string }[] = [
+  { id: "home", label: "홈", full: "홈" },
+  { id: "pool", label: "크리에이터", full: "크리에이터" },
+  { id: "publish", label: "진행", full: "진행 현황" },
+  { id: "alloc", label: "배정", full: "배정 현황" },
+  { id: "content", label: "성과", full: "성과" },
 ];
 
 function isPerformanceView(v: CompanyConsoleView): v is PerformanceView {
@@ -69,64 +69,38 @@ export function CompanyConsoleShell({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-3 lg:hidden">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-2.5 lg:hidden">
         <button
           type="button"
           onClick={() => onViewChange("home")}
-          className="flex min-w-0 items-center gap-2.5 text-left"
+          className="flex min-w-0 items-center gap-2 text-left"
           aria-label="요약 홈"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/owm-logo.webp"
             alt=""
-            className="h-8 w-8 object-contain"
+            className="h-7 w-7 object-contain"
             draggable={false}
           />
-          <p className="truncate text-base font-semibold text-[var(--ink)]">
+          <p className="truncate text-[15px] font-semibold text-[var(--ink)]">
             {companyName}
           </p>
         </button>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {sidebarActions}
           {mobileActions}
         </div>
       </div>
-      <div className="mb-2 flex shrink-0 flex-col gap-2 px-4 lg:hidden">
-        <div
-          className="flex w-full rounded-full border border-[var(--line)] bg-[var(--surface)] p-0.5"
-          role="tablist"
-        >
-          {MOBILE_TABS.map((tab) => {
-            const active =
-              tab.id === view ||
-              (tab.id === "content" && isPerformanceView(view));
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => onViewChange(tab.id)}
-                className={`flex-1 rounded-full px-2 py-2 text-xs font-semibold ${
-                  active
-                    ? "bg-[var(--accent)] !text-white"
-                    : "text-[var(--muted)]"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-        {isPerformanceView(view) ? (
+      {isPerformanceView(view) ? (
+        <div className="shrink-0 border-b border-[var(--line)] px-4 py-2 lg:hidden">
           <NavSubSegment
             items={PERFORMANCE_ITEMS}
             view={view}
             onViewChange={onViewChange}
           />
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <header className="hidden shrink-0 items-center gap-6 border-b border-[var(--line)] bg-[var(--surface)] px-8 py-3.5 lg:flex">
         <button
@@ -197,9 +171,38 @@ export function CompanyConsoleShell({
         </div>
       ) : null}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-0">
         {children}
       </div>
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] lg:hidden"
+        role="tablist"
+        aria-label="회원사 메뉴"
+      >
+        <div className="grid grid-cols-5">
+          {MOBILE_TABS.map((tab) => {
+            const active =
+              tab.id === view ||
+              (tab.id === "content" && isPerformanceView(view));
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-label={tab.full}
+                aria-selected={active}
+                onClick={() => onViewChange(tab.id)}
+                className={`flex min-h-12 flex-col items-center justify-center px-1 text-[11px] font-semibold ${
+                  active ? "text-[var(--accent)]" : "text-[var(--muted)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

@@ -584,10 +584,10 @@ export function CompanyProgressTab({
   }, [filteredCards]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-[26px] py-5">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-4 lg:px-[26px] lg:py-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
+          <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">
             진행 현황
           </h2>
         </div>
@@ -636,15 +636,15 @@ export function CompanyProgressTab({
         />
       ) : (
         <>
-          <div className="grid min-w-[720px] grid-cols-5 gap-3 overflow-x-auto lg:min-w-0">
+          <div className="flex flex-col gap-5 lg:grid lg:grid-cols-5 lg:gap-3">
             {KANBAN_COLUMNS.map((col) => {
               const items = grouped.get(col) ?? [];
               return (
-                <div
+                <section
                   key={col}
-                  className="flex min-w-[132px] flex-col gap-2 rounded-[6px] border border-transparent bg-transparent p-0"
+                  className="flex flex-col gap-2"
                 >
-                  <div className="flex items-center justify-between gap-1 px-0.5 pb-1">
+                  <div className="flex items-center justify-between gap-1 border-b border-[var(--line)] px-0.5 pb-1.5 lg:border-0 lg:pb-1">
                     <span className="text-[14px] font-bold text-[var(--ink)]">
                       {col}
                     </span>
@@ -653,7 +653,7 @@ export function CompanyProgressTab({
                     </span>
                   </div>
                   {items.length === 0 ? (
-                    <p className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-1 py-6 text-center text-[11px] text-[var(--muted)]">
+                    <p className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-1 py-4 text-center text-[11px] text-[var(--muted)] lg:py-6">
                       배정 없음
                     </p>
                   ) : (
@@ -665,7 +665,7 @@ export function CompanyProgressTab({
                       />
                     ))
                   )}
-                </div>
+                </section>
               );
             })}
           </div>

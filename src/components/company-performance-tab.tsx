@@ -1131,7 +1131,7 @@ export function CompanyPerformanceTab({
 
   if (loading) {
     return (
-      <div className="space-y-3 px-[28px] py-[26px]">
+      <div className="space-y-3 px-4 py-4 lg:px-[28px] lg:py-[26px]">
         <div className="h-10 animate-pulse rounded-[6px] bg-[var(--surface-hover)]" />
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
@@ -1143,10 +1143,10 @@ export function CompanyPerformanceTab({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-[28px] py-[26px]">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 py-4 lg:px-[28px] lg:py-[26px]">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
+          <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">
             성과 대시보드
           </h2>
         </div>

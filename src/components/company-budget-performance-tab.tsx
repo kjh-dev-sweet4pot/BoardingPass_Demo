@@ -94,9 +94,9 @@ export function CompanyBudgetPerformanceTab({
   const scheduledPct = Math.round((scheduled / total) * 100);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto px-[28px] py-[26px]">
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto px-4 py-4 lg:px-[28px] lg:py-[26px]">
       <div>
-        <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
+        <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">
           예산 성과
         </h2>
         <p className="mt-1 text-[13px] text-[var(--muted)]">

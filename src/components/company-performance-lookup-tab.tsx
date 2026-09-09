@@ -238,7 +238,7 @@ export function CompanyPerformanceLookupTab({
 
   if (loading) {
     return (
-      <div className="space-y-3 px-[28px] py-[26px]">
+      <div className="space-y-3 px-4 py-4 lg:px-[28px] lg:py-[26px]">
         <div className="h-10 animate-pulse rounded-[6px] bg-[var(--surface-hover)]" />
         <div className="h-64 animate-pulse rounded-[6px] bg-[var(--surface-hover)]" />
       </div>
@@ -246,9 +246,9 @@ export function CompanyPerformanceLookupTab({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-[28px] py-[26px]">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-4 lg:px-[28px] lg:py-[26px]">
       <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
-        <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
+        <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">
           성과 조회
         </h2>
         <div className="flex flex-wrap items-center gap-2.5">
