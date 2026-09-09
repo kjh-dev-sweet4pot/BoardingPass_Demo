@@ -1,4 +1,3 @@
-import { isDemoCompany } from "@/lib/company";
 import { ymdKstNow } from "@/lib/company-home";
 import { formatKrw } from "@/lib/creator-pool-mock";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -129,9 +128,7 @@ export async function buildBudgetPerformanceForCompany(
     ? companyBudget
     : campaignBudgetSum > 0
       ? campaignBudgetSum
-      : isDemoCompany(company)
-        ? 90_000_000
-        : null;
+      : null;
 
   const { data: allocs, error: allocErr } = await supabase
     .from("allocations")

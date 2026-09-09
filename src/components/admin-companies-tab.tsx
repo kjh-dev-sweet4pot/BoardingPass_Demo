@@ -25,9 +25,11 @@ export type CompaniesSub = "companies" | "companiesRegister" | "companiesMail" |
 type MailLog = {
   id: string;
   company_id: string;
+  campaign_id?: string | null;
   kind: string;
   to_emails: string[];
   subject: string;
+  body?: string | null;
   attachment_names: string[];
   sent_at: string | null;
   error: string | null;
@@ -692,6 +694,7 @@ function MailPanel({
   const [sigFile, setSigFile] = useState<File | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [logs, setLogs] = useState<MailLog[]>([]);
+  const [openLogId, setOpenLogId] = useState<string | null>(null);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [mailFrom, setMailFrom] = useState<string>("");
   const [resendHint, setResendHint] = useState<string>("");
@@ -1076,27 +1079,92 @@ function MailPanel({
 
       <div className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-4">
         <p className="mb-3 text-sm font-semibold">발송 이력</p>
-        <ul className="max-h-[280px] space-y-2 overflow-auto text-sm">
+        <ul className="max-h-[420px] space-y-2 overflow-auto text-sm">
           {logs.length === 0 ? (
             <li className="text-[var(--muted)]">이력이 없습니다.</li>
           ) : (
-            logs.map((log) => (
-              <li key={log.id} className="rounded-[6px] border border-[var(--line)] px-3 py-2">
-                <p className="font-medium">
-                  {log.kind}
-                  <span className="ml-2 text-[11px] font-normal text-[var(--muted)]">
-                    {log.sent_at ? "발송" : "실패"}
-                  </span>
-                </p>
-                <p className="truncate text-[12px] text-[var(--muted)]">{log.subject}</p>
-                <p className="text-[11px] text-[var(--muted)]">
-                  {log.to_emails.join(", ")} · {fmtDt(log.created_at)}
-                </p>
-                {log.error ? (
-                  <p className="text-[11px] text-[var(--danger)]">{log.error}</p>
-                ) : null}
-              </li>
-            ))
+            logs.map((log) => {
+              const open = openLogId === log.id;
+              const companyName =
+                companies.find((c) => c.id === log.company_id)?.name || "";
+              const campName =
+                campaigns.find((c) => c.id === log.campaign_id)?.name || "";
+              return (
+                <li
+                  key={log.id}
+                  className="rounded-[6px] border border-[var(--line)]"
+                >
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setOpenLogId(open ? null : log.id)}
+                    className="w-full px-3 py-2 text-left"
+                  >
+                    <p className="font-medium">
+                      {log.kind}
+                      <span className="ml-2 text-[11px] font-normal text-[var(--muted)]">
+                        {log.sent_at ? "발송" : "실패"}
+                      </span>
+                    </p>
+                    <p className="truncate text-[12px] text-[var(--muted)]">
+                      {log.subject}
+                    </p>
+                    <p className="text-[11px] text-[var(--muted)]">
+                      {log.to_emails.join(", ")} · {fmtDt(log.created_at)}
+                    </p>
+                  </button>
+                  {open ? (
+                    <div className="space-y-2 border-t border-[var(--line)] px-3 py-3 text-[12px]">
+                      {companyName ? (
+                        <p>
+                          <span className="text-[var(--muted)]">회원사 </span>
+                          {companyName}
+                        </p>
+                      ) : null}
+                      {campName ? (
+                        <p>
+                          <span className="text-[var(--muted)]">캠페인 </span>
+                          {campName}
+                        </p>
+                      ) : null}
+                      <p>
+                        <span className="text-[var(--muted)]">받는 사람 </span>
+                        {log.to_emails.join(", ") || "—"}
+                      </p>
+                      {log.created_by ? (
+                        <p>
+                          <span className="text-[var(--muted)]">발송자 </span>
+                          {log.created_by}
+                        </p>
+                      ) : null}
+                      <p>
+                        <span className="text-[var(--muted)]">제목 </span>
+                        {log.subject || "—"}
+                      </p>
+                      <div>
+                        <p className="mb-1 text-[var(--muted)]">본문</p>
+                        <pre className="whitespace-pre-wrap rounded-[6px] bg-[var(--accent-soft)]/50 px-2.5 py-2 font-sans text-[12px] leading-relaxed text-[var(--ink)]">
+                          {log.body?.trim() || "본문이 없습니다."}
+                        </pre>
+                      </div>
+                      {log.attachment_names?.length ? (
+                        <p>
+                          <span className="text-[var(--muted)]">첨부 </span>
+                          {log.attachment_names.join(", ")}
+                        </p>
+                      ) : null}
+                      {log.error ? (
+                        <p className="text-[var(--danger)]">{log.error}</p>
+                      ) : null}
+                    </div>
+                  ) : log.error ? (
+                    <p className="px-3 pb-2 text-[11px] text-[var(--danger)]">
+                      {log.error}
+                    </p>
+                  ) : null}
+                </li>
+              );
+            })
           )}
         </ul>
       </div>

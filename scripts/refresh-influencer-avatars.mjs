@@ -2,6 +2,7 @@
  * 배정된 인플루언서 중 프로필 사진 없는 건 Apify로 수집 → Storage.
  *   node scripts/refresh-influencer-avatars.mjs
  *   node scripts/refresh-influencer-avatars.mjs --dry-run
+ *   node scripts/refresh-influencer-avatars.mjs --company=rxme
  */
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync } from "fs";
@@ -9,6 +10,12 @@ import http from "node:http";
 import https from "node:https";
 
 const DRY = process.argv.includes("--dry-run");
+const PRODUCT = (
+  process.argv.find((a) => a.startsWith("--product=")) || ""
+).slice("--product=".length).trim().toLowerCase();
+const COMPANY = (
+  process.argv.find((a) => a.startsWith("--company=")) || ""
+).slice("--company=".length).trim().toLowerCase();
 const APIFY_BASE = "https://api.apify.com/v2";
 const BUCKET = "influencer-avatars";
 
@@ -194,13 +201,61 @@ function downloadImage(imageUrl) {
   });
 }
 
+async function fetchAllocs() {
+  const page = 1000;
+  const out = [];
+  for (let from = 0; ; from += page) {
+    let q = supabase
+      .from("allocations")
+      .select(
+        "id, company_id, influencer_id, products(name), influencers(id, name, instagram_handle, sns_url, profile_image_path, followers), companies(name, login_id)",
+      )
+      .range(from, from + page - 1);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    out.push(...(data || []));
+    if (!data || data.length < page) break;
+  }
+  return out;
+}
+
+function needsCollect(inf) {
+  const noPhoto = !inf.profile_image_path;
+  const noFollowers = inf.followers == null || Number(inf.followers) <= 0;
+  return noPhoto || noFollowers;
+}
+
 async function main() {
   if (!token) throw new Error("APIFY_TOKEN 없음");
-  const { data: missing, error } = await supabase
-    .from("influencers")
-    .select("id, name, instagram_handle, sns_url, profile_image_path")
-    .is("profile_image_path", null);
-  if (error) throw new Error(error.message);
+  const allocs = await fetchAllocs();
+  const byId = new Map();
+  for (const row of allocs) {
+    const infRaw = row.influencers;
+    const inf = Array.isArray(infRaw) ? infRaw[0] : infRaw;
+    if (!inf?.id) continue;
+    const productRaw = row.products;
+    const product = Array.isArray(productRaw) ? productRaw[0] : productRaw;
+    const productName = (product?.name || "").toLowerCase();
+    const company = Array.isArray(row.companies) ? row.companies[0] : row.companies;
+    const companyKey = `${company?.login_id || ""} ${company?.name || ""}`.toLowerCase();
+    const isCompany =
+      !COMPANY ||
+      company?.login_id?.toLowerCase() === COMPANY ||
+      (company?.name || "").toLowerCase().includes(COMPANY);
+    const isTargetProduct = !PRODUCT || productName.includes(PRODUCT);
+    if (!isCompany || !isTargetProduct) continue;
+    const prev = byId.get(inf.id);
+    if (!prev) {
+      byId.set(inf.id, {
+        ...inf,
+        force: Boolean(COMPANY || PRODUCT),
+        products: [product?.name].filter(Boolean),
+      });
+    } else if (product?.name && !prev.products.includes(product.name)) {
+      prev.products.push(product.name);
+    }
+  }
+  const missing = [...byId.values()].filter((inf) => inf.force || needsCollect(inf));
 
   const ids = (missing || []).map((m) => m.id);
   const noteByInf = new Map();
@@ -224,7 +279,13 @@ async function main() {
     if (counts[p] != null) counts[p]++;
     else counts.skip++;
   }
-  console.log({ missing: (missing || []).length, ...counts, dry: DRY });
+  console.log({
+    missing: (missing || []).length,
+    ...counts,
+    dry: DRY,
+    product: PRODUCT || null,
+    names: (missing || []).map((m) => `${m.name} @${m.instagram_handle || ""} [${(m.products || []).join(",")}]`),
+  });
   if (DRY) return;
 
   let ok = 0;

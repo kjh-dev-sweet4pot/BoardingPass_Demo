@@ -1,5 +1,10 @@
 import { normalizeHandle } from "@/lib/auth";
-import { matchCompany, type CompanyMatchInput } from "@/lib/company";
+import {
+  matchCompany,
+  normalizeCompanyKey,
+  type CompanyMatchInput,
+} from "@/lib/company";
+import { validateCreatorUrl } from "@/lib/creator-link";
 import { parseMoney } from "@/lib/money";
 import { isBranchStoreName } from "@/lib/store-name";
 
@@ -17,6 +22,8 @@ export type ImportRowInput = {
   display_price?: string | number;
   /** 원가. CSV 헤더: cost_amount / 원가 */
   cost_amount?: string | number;
+  /** 업로드 콘텐츠 URL. 콤마·줄바꿈으로 여러 개 */
+  content_url?: string;
 };
 
 export type ParsedImportRow = {
@@ -34,6 +41,7 @@ export type ParsedImportRow = {
   quantity: number;
   display_price: number | null;
   cost_amount: number | null;
+  content_urls: string[];
   errors: string[];
   ok: boolean;
 };
@@ -77,7 +85,46 @@ const HEADER_ALIASES: Record<string, keyof ImportRowInput> = {
   cost_price: "cost_amount",
   원가: "cost_amount",
   cost: "cost_amount",
+  content_url: "content_url",
+  content_urls: "content_url",
+  contents_url: "content_url",
+  contents_urls: "content_url",
+  콘텐츠: "content_url",
+  콘텐츠url: "content_url",
+  콘텐츠_url: "content_url",
+  업로드콘텐츠: "content_url",
+  업로드_콘텐츠: "content_url",
 };
+
+export function isContentUrlHeader(header: string) {
+  const key = header.trim().toLowerCase().replace(/\s+/g, "_");
+  return (
+    key === "content_url" ||
+    key === "content_urls" ||
+    key === "contents_url" ||
+    key === "contents_urls" ||
+    key === "콘텐츠" ||
+    key === "콘텐츠url" ||
+    key === "콘텐츠_url" ||
+    key === "업로드콘텐츠" ||
+    key === "업로드_콘텐츠" ||
+    /^content_urls?_?\d+$/.test(key) ||
+    /^콘텐츠_?\d+$/.test(key)
+  );
+}
+
+export function parseContentUrls(raw: string) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(/[\n\r|;]+|(?:\s*,\s*)/)) {
+    const url = part.trim();
+    if (!url) continue;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
 
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
@@ -271,7 +318,8 @@ function cellToString(value: unknown): string {
 export function rowsFromCsvMatrix(matrix: unknown[][]): ParsedImportRow[] {
   if (matrix.length < 2) return [];
 
-  const headers = mapHeaders(matrix[0].map((c) => cellToString(c)));
+  const headerRow = matrix[0].map((c) => cellToString(c));
+  const headers = mapHeaders(headerRow);
   const results: ParsedImportRow[] = [];
 
   for (let i = 1; i < matrix.length; i++) {
@@ -293,6 +341,18 @@ export function rowsFromCsvMatrix(matrix: unknown[][]): ParsedImportRow[] {
         raw[key] = cellToString(cell);
       }
     });
+    const extraContent = headerRow
+      .map((h, idx) =>
+        isContentUrlHeader(h) && headers[idx] !== "content_url"
+          ? cellToString(cells[idx])
+          : "",
+      )
+      .filter(Boolean);
+    if (extraContent.length) {
+      raw.content_url = [raw.content_url, ...extraContent]
+        .filter(Boolean)
+        .join("\n");
+    }
 
     // skip blank lines
     if (
@@ -309,7 +369,42 @@ export function rowsFromCsvMatrix(matrix: unknown[][]): ParsedImportRow[] {
     results.push(validateImportRow(i + 1, raw));
   }
 
-  return results;
+  return expandImportRowsByCompany(results);
+}
+
+/** `KnownBeauty, 23yearsold` → 회원사별 1행. 같은 이름은 한 번만. */
+export function splitCompanyNames(raw: string) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(/[,;，、]/)) {
+    const name = part.trim();
+    if (!name) continue;
+    const key = normalizeCompanyKey(name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
+export function expandImportRowsByCompany(rows: ParsedImportRow[]) {
+  const out: ParsedImportRow[] = [];
+  for (const row of rows) {
+    const names = splitCompanyNames(row.company_raw);
+    if (names.length <= 1) {
+      out.push(names[0] ? { ...row, company_raw: names[0] } : row);
+      continue;
+    }
+    for (const name of names) {
+      out.push({
+        ...row,
+        company_raw: name,
+        company_id: null,
+        company_name: null,
+      });
+    }
+  }
+  return out;
 }
 
 export function validateImportRow(
@@ -340,6 +435,12 @@ export function validateImportRow(
     errors.push("방문지점이 상품코드(숫자)입니다. 지점명을 넣어 주세요");
   if (!product) errors.push("상품(product) 필요");
   if (!Number.isFinite(quantity) || quantity < 1) errors.push("수량 오류");
+
+  const content_urls = parseContentUrls(String(raw.content_url || ""));
+  for (const url of content_urls) {
+    const urlError = validateCreatorUrl(url);
+    if (urlError) errors.push(`콘텐츠 링크: ${urlError}`);
+  }
 
   const displayRaw = parseMoney(raw.display_price);
   const costRaw = parseMoney(raw.cost_amount);
@@ -373,6 +474,7 @@ export function validateImportRow(
     quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
     display_price,
     cost_amount,
+    content_urls,
     errors,
     ok: errors.length === 0,
   };
@@ -493,17 +595,18 @@ export const IMPORT_TEMPLATE_HEADERS = [
   "quantity",
   "display_price",
   "cost_amount",
+  "content_url",
 ] as const;
 
 export const IMPORT_TEMPLATE_HEADER_LABEL =
-  "company(회원사), snsid, snsurl, name, visit_date, store, product, quantity, display_price(노출가), cost_amount(원가)";
+  "company(회원사, 콤마로 여러 곳), snsid, snsurl, name, visit_date, store, product, quantity, display_price(노출가), cost_amount(원가), content_url(콘텐츠)";
 
 function csvCell(value: string) {
   if (/[",\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
   return value;
 }
 
-/** 등록된 회원사명을 예시로 넣은 행. 콘텐츠 링크 컬럼은 넣지 않음. */
+/** 등록된 회원사명을 예시로 넣은 행. content_url은 나중에 채워도 됨. */
 export function buildImportTemplateRows(
   companies: { name: string; is_active?: boolean }[],
 ): string[][] {
@@ -521,6 +624,7 @@ export function buildImportTemplateRows(
           String(i === 0 ? 2 : 1),
           i === 0 ? "300000" : "250000",
           i === 0 ? "200000" : "150000",
+          "",
         ])
       : [
           [
@@ -534,6 +638,7 @@ export function buildImportTemplateRows(
             "2",
             "300000",
             "200000",
+            "",
           ],
         ];
   return [[...IMPORT_TEMPLATE_HEADERS], ...examples];
@@ -582,6 +687,31 @@ if (process.env.RUN_CSV_IMPORT_SELF_CHECK === "1") {
   });
   if (skuStore.ok || !skuStore.errors.some((e) => e.includes("상품코드"))) {
     throw new Error("validateImportRow numeric store failed");
+  }
+  if (
+    splitCompanyNames("KnownBeauty, 23yearsold;KnownBeauty").join("|") !==
+    "KnownBeauty|23yearsold"
+  ) {
+    throw new Error("splitCompanyNames failed");
+  }
+  const many = expandImportRowsByCompany([
+    validateImportRow(3, {
+      company: "A, B",
+      snsid: "@a",
+      visit_date: "2026-08-20",
+      store: "강남점",
+      product: "상품",
+      quantity: 1,
+    }),
+  ]);
+  if (many.length !== 2 || many[0].company_raw !== "A" || many[1].company_raw !== "B") {
+    throw new Error("expandImportRowsByCompany failed");
+  }
+  if (
+    parseContentUrls("https://a.co/1, https://a.co/2\nhttps://a.co/1").join("|") !==
+    "https://a.co/1|https://a.co/2"
+  ) {
+    throw new Error("parseContentUrls failed");
   }
   console.log("csv-import self-check ok");
 }

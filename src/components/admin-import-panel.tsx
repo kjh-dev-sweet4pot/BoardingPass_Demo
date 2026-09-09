@@ -33,6 +33,42 @@ const PROFILE_STATUS_LABEL: Record<ImportProfileFetchStatus, string> = {
   skipped: "기존 프로필",
 };
 
+function ImportTips() {
+  return (
+    <div
+      className="rounded-[6px] border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--ink)]"
+      role="note"
+    >
+      <p className="text-[11px] font-bold tracking-[0.16em] text-[var(--accent)] uppercase">
+        꼭 확인
+      </p>
+      <ul className="mt-2 list-disc space-y-2 pl-5 font-semibold leading-snug">
+        <li>
+          여러 회원사는{" "}
+          <mark className="bg-transparent font-extrabold text-[var(--accent)] underline decoration-2 underline-offset-2">
+            콤마로 나란히
+          </mark>{" "}
+          쓰면 행이 나뉩니다.
+        </li>
+        <li>
+          회원사가 일치하지 않으면 업로드 과정에서 회사를 고르면{" "}
+          <mark className="bg-transparent font-extrabold text-[var(--accent)] underline decoration-2 underline-offset-2">
+            별칭으로 추가
+          </mark>
+          됩니다.
+        </li>
+        <li>
+          나중에 올린 콘텐츠는 같은 파일의{" "}
+          <mark className="bg-transparent font-extrabold text-[var(--accent)] underline decoration-2 underline-offset-2">
+            content_url
+          </mark>{" "}
+          칸에 넣으면 기존 배정에 붙습니다. 여러 주소는 콤마나 줄바꿈으로 구분합니다.
+        </li>
+      </ul>
+    </div>
+  );
+}
+
 function profileStatusClass(status: ImportProfileFetchStatus) {
   if (status === "ok") return "text-[var(--accent)]";
   if (status === "failed") return "text-[var(--danger)]";
@@ -63,6 +99,7 @@ export function AdminImportPanel({
   const [resultError, setResultError] = useState<string | null>(null);
   const [companyList, setCompanyList] = useState(companies);
   const [aliasTarget, setAliasTarget] = useState<Record<number, string>>({});
+  const [aliasSource, setAliasSource] = useState<Record<number, string>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
   const [batches, setBatches] = useState<BatchListItem[]>([]);
@@ -159,6 +196,33 @@ export function AdminImportPanel({
     setFileName(null);
     setConfirmed(false);
     setReviewOpen(false);
+    setAliasTarget({});
+    setAliasSource({});
+  }
+
+  function assignCompany(index: number, companyId: string) {
+    const company = companyList.find((c) => c.id === companyId);
+    const current = rows[index];
+    setAliasTarget((prev) => ({ ...prev, [index]: companyId }));
+    if (current?.company_raw) {
+      setAliasSource((prev) => ({
+        ...prev,
+        [index]: prev[index] || current.company_raw,
+      }));
+    }
+    if (!company) return;
+    setRows((prev) =>
+      prev.map((r, i) =>
+        i === index
+          ? applyCompanyMatch({ ...r, company_raw: company.name }, companyList)
+          : r,
+      ),
+    );
+    setConfirmed(false);
+    const alias = aliasSource[index] || current.company_raw;
+    if (alias && alias !== company.name) {
+      void addAliasFor(companyId, alias);
+    }
   }
 
   async function onFileChange(file: File | null) {
@@ -216,6 +280,7 @@ export function AdminImportPanel({
         quantity: r.quantity,
         display_price: r.display_price ?? "",
         cost_amount: r.cost_amount ?? "",
+        content_url: (r.content_urls || []).join("\n"),
       })),
     };
 
@@ -241,10 +306,11 @@ export function AdminImportPanel({
         created: number;
         skipped: number;
         failed: number;
+        linked?: number;
         total: number;
       };
       setResultMessage(
-        `완료: ${s.total}행 중 생성 ${s.created} · 중복 건너뜀 ${s.skipped} · 실패 ${s.failed}`,
+        `완료: ${s.total}행 중 생성 ${s.created} · 콘텐츠 ${s.linked ?? 0} · 중복 건너뜀 ${s.skipped} · 실패 ${s.failed}`,
       );
       void loadBatches();
       router.refresh();
@@ -259,13 +325,12 @@ export function AdminImportPanel({
     }
   }
 
-  async function addAlias(row: ParsedImportRow) {
-    const companyId = aliasTarget[row.rowNumber];
-    if (!companyId || !row.company_raw) return;
+  async function addAliasFor(companyId: string, alias: string) {
+    if (!companyId || !alias) return;
     const res = await fetch(`/api/admin/companies/${companyId}/aliases`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ alias: row.company_raw }),
+      body: JSON.stringify({ alias }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -278,6 +343,14 @@ export function AdminImportPanel({
     );
     setCompanyList(nextList);
     setRows((prev) => prev.map((r) => applyCompanyMatch(r, nextList)));
+  }
+
+  async function addAlias(index: number) {
+    const row = rows[index];
+    const companyId = aliasTarget[index];
+    const alias = aliasSource[index] || row?.company_raw;
+    if (!row || !companyId || !alias) return;
+    await addAliasFor(companyId, alias);
   }
 
   async function refreshProfile(item: ImportBatchInfluencerRow, refetchFromApify: boolean) {
@@ -413,6 +486,9 @@ export function AdminImportPanel({
             <p className="mt-2 text-sm text-[var(--muted)]">
               업로드 → 내용 확인 → 확인 체크. 회원사(`company`) 필수.
             </p>
+            <div className="mt-3">
+              <ImportTips />
+            </div>
           </div>
         )}
 
@@ -421,10 +497,12 @@ export function AdminImportPanel({
             className={`px-5 pb-5 ${compact ? "border-t border-[var(--line)] pt-4" : "pt-4"}`}
           >
             {compact ? (
-              <p className="mb-4 text-sm text-[var(--muted)]">
-                업로드 → 내용 확인 → 확인 체크. 회원사(`company`) 필수. 콘텐츠
-                링크는 넣지 마세요.
-              </p>
+              <div className="mb-4 space-y-3">
+                <p className="text-sm text-[var(--muted)]">
+                  업로드 → 내용 확인 → 확인 체크.
+                </p>
+                <ImportTips />
+              </div>
             ) : null}
 
         {!hasCompanies ? (
@@ -664,6 +742,9 @@ export function AdminImportPanel({
                   <span className="text-[var(--accent)]">{stats.ok}</span> · 오류{" "}
                   <span className="text-[var(--danger)]">{stats.bad}</span>
                 </p>
+                <div className="mt-3">
+                  <ImportTips />
+                </div>
               </div>
               <button
                 type="button"
@@ -676,7 +757,7 @@ export function AdminImportPanel({
 
             <div className="overflow-auto p-5">
               <div className="overflow-x-auto border border-[var(--line)]">
-                <table className="min-w-[880px] w-full border-collapse text-left text-sm">
+                <table className="min-w-[1040px] w-full border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/40 text-xs text-[var(--muted)]">
                       <th className="px-3 py-2 font-medium">행</th>
@@ -690,13 +771,14 @@ export function AdminImportPanel({
                       <th className="px-3 py-2 font-medium text-right">수량</th>
                       <th className="px-3 py-2 font-medium text-right">노출가</th>
                       <th className="px-3 py-2 font-medium text-right">원가</th>
+                      <th className="px-3 py-2 font-medium">콘텐츠</th>
                       <th className="px-3 py-2 font-medium">오류</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row) => (
+                    {rows.map((row, idx) => (
                       <tr
-                        key={row.rowNumber}
+                        key={`${row.rowNumber}-${row.snsid}-${row.company_raw}-${idx}`}
                         className={`border-b border-[var(--line)] last:border-b-0 ${
                           row.ok ? "" : "bg-red-50/60"
                         }`}
@@ -717,17 +799,12 @@ export function AdminImportPanel({
                         </td>
                         <td className="px-3 py-2">
                           <div>{row.company_name || row.company_raw || "—"}</div>
-                          {row.unmatchedCompany ? (
+                          {row.unmatchedCompany || aliasSource[idx] ? (
                             <div className="mt-1 flex flex-wrap items-center gap-1">
                               <select
                                 className="h-7 rounded border border-[var(--line)] px-1 text-xs"
-                                value={aliasTarget[row.rowNumber] || ""}
-                                onChange={(e) =>
-                                  setAliasTarget((prev) => ({
-                                    ...prev,
-                                    [row.rowNumber]: e.target.value,
-                                  }))
-                                }
+                                value={aliasTarget[idx] || ""}
+                                onChange={(e) => assignCompany(idx, e.target.value)}
                               >
                                 <option value="">회원사 선택</option>
                                 {companyList.map((c) => (
@@ -736,13 +813,18 @@ export function AdminImportPanel({
                                   </option>
                                 ))}
                               </select>
+                              {aliasTarget[idx] ? (
                               <button
                                 type="button"
                                 className="text-xs font-semibold text-[var(--accent)]"
-                                onClick={() => void addAlias(row)}
+                                onClick={() => void addAlias(idx)}
                               >
                                 별칭 추가
+                                {aliasSource[idx]
+                                  ? ` (${aliasSource[idx]})`
+                                  : ""}
                               </button>
+                              ) : null}
                             </div>
                           ) : null}
                         </td>
@@ -766,6 +848,15 @@ export function AdminImportPanel({
                         <td className="px-3 py-2 text-right tabular-nums">
                           {row.cost_amount != null
                             ? row.cost_amount.toLocaleString("ko-KR")
+                            : "—"}
+                        </td>
+                        <td className="max-w-[220px] px-3 py-2 text-xs text-[var(--accent)]">
+                          {(row.content_urls || []).length
+                            ? (row.content_urls || [])
+                                .map((u) =>
+                                  u.length > 42 ? `${u.slice(0, 40)}…` : u,
+                                )
+                                .join(" · ")
                             : "—"}
                         </td>
                         <td className="px-3 py-2 text-xs text-[var(--danger)]">

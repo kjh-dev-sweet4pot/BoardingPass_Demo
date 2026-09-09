@@ -575,7 +575,6 @@ export function CompanyConsole({
           companyName={company.name}
           companyId={company.id}
           onOpenPerformance={() => setView("content")}
-          onOpenBudgetPerformance={() => setView("budgetPerformance")}
           onOpenPublish={() => setView("publish")}
           onOpenPool={() => setView("pool")}
         />

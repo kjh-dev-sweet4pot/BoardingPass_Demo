@@ -1,4 +1,3 @@
-import { isDemoCompany } from "@/lib/company";
 import { formatMetric } from "@/lib/content-insights";
 
 export type CompanyHomeNewsKind =
@@ -40,6 +39,120 @@ export type CompanyHomeInfluencerRow = {
   followers: number;
   views: number;
 };
+
+export type CompanyHomeVisitRow = {
+  id: string;
+  name: string;
+  handle: string;
+  visitDate: string;
+  product: string;
+  snsUrl: string | null;
+};
+
+export type CompanyHomeVisits = {
+  asOf: string;
+  upcoming: CompanyHomeVisitRow[];
+  done: CompanyHomeVisitRow[];
+};
+
+export function addDaysYmd(ymd: string, days: number) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+export function visitProfileHref(row: Pick<CompanyHomeVisitRow, "handle" | "snsUrl">) {
+  const u = (row.snsUrl || "").trim();
+  if (/^https?:\/\//i.test(u)) return u;
+  const h = (row.handle || "").replace(/^@+/, "").trim();
+  if (!h || h === "—" || /[^\w.]/.test(h)) return null;
+  return `https://www.instagram.com/${h}/`;
+}
+
+/** 실제 수령과 무관. 오늘부터 30일 이내 예정 / 지난 30일 완료. 인원당 1행. */
+export function splitHomeVisits(
+  rows: {
+    id: string;
+    name: string;
+    handle: string;
+    visitDate: string | null;
+    product: string;
+    snsUrl?: string | null;
+  }[],
+  asOf: string,
+  windowDays = 30,
+): CompanyHomeVisits {
+  type Acc = {
+    id: string;
+    name: string;
+    handle: string;
+    snsUrl: string | null;
+    dates: string[];
+    products: string[];
+  };
+  const until = addDaysYmd(asOf, windowDays);
+  const from = addDaysYmd(asOf, -windowDays);
+  const byInf = new Map<string, Acc>();
+  for (const r of rows) {
+    const d = (r.visitDate || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+    const snsUrl = (r.snsUrl || "").trim() || null;
+    const prev = byInf.get(r.id);
+    if (!prev) {
+      byInf.set(r.id, {
+        id: r.id,
+        name: r.name,
+        handle: r.handle,
+        snsUrl,
+        dates: [d],
+        products: r.product ? [r.product] : [],
+      });
+      continue;
+    }
+    prev.dates.push(d);
+    if (!prev.snsUrl && snsUrl) prev.snsUrl = snsUrl;
+    if (r.product && !prev.products.includes(r.product)) {
+      prev.products.push(r.product);
+    }
+  }
+  const upcoming: CompanyHomeVisitRow[] = [];
+  const done: CompanyHomeVisitRow[] = [];
+  for (const p of byInf.values()) {
+    const dates = [...new Set(p.dates)].sort();
+    const future = dates.filter((d) => d >= asOf && d <= until);
+    const past = dates.filter((d) => d >= from && d < asOf);
+    const product = p.products.join(", ");
+    if (future.length) {
+      upcoming.push({
+        id: p.id,
+        name: p.name,
+        handle: p.handle,
+        visitDate: future[0]!,
+        product,
+        snsUrl: p.snsUrl,
+      });
+    } else if (past.length) {
+      done.push({
+        id: p.id,
+        name: p.name,
+        handle: p.handle,
+        visitDate: past[past.length - 1]!,
+        product,
+        snsUrl: p.snsUrl,
+      });
+    }
+  }
+  upcoming.sort(
+    (a, b) =>
+      a.visitDate.localeCompare(b.visitDate) || a.name.localeCompare(b.name, "ko"),
+  );
+  done.sort(
+    (a, b) =>
+      a.visitDate.localeCompare(b.visitDate) || a.name.localeCompare(b.name, "ko"),
+  );
+  return { asOf, upcoming, done };
+}
 
 export type CompanyHomeBudgetRound = {
   label: string;
@@ -94,6 +207,7 @@ export type CompanyHomePayload = {
     all: CompanyHomeBestPost[];
   };
   news: CompanyHomeNewsItem[];
+  visits: CompanyHomeVisits;
 };
 
 export function ymdKstNow() {
@@ -139,13 +253,6 @@ export function summarizeBudget(
   const remaining = Math.max(0, total - committed);
   const pct = Math.round((committed / total) * 1000) / 10;
   return { total, spent, scheduled, committed, remaining, pct };
-}
-
-export function addDaysYmd(ymd: string, delta: number) {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const dt = new Date(Date.UTC(y!, m! - 1, d!));
-  dt.setUTCDate(dt.getUTCDate() + delta);
-  return dt.toISOString().slice(0, 10);
 }
 
 export function publishYmd(iso: string | null) {
@@ -470,68 +577,6 @@ export function displayHandle(handle: string) {
   return handle.replace(/^@+/, "").trim() || handle;
 }
 
-/** 데모 회원사: 계약·입금·할인 등 운영 뉴스를 시연용으로 채움 */
-export function buildDemoCompanyNews(companyName: string): CompanyHomeNewsItem[] {
-  return [
-    {
-      id: "demo-budget",
-      at: "2026-08-31T14:00:00+09:00",
-      kind: "예산",
-      title: `확보 예산 9,000만원`,
-      body: `${companyName} · 닥터 리앤장·크리에이터 · Rxme 계약 확정`,
-    },
-    {
-      id: "demo-deposit-rxme",
-      at: "2026-08-31T11:00:00+09:00",
-      kind: "입금",
-      title: "Rxme 입금 확인",
-      body: "1,000만원 · 원브랜드 가이드 제작 중",
-    },
-    {
-      id: "demo-deposit-dr",
-      at: "2026-08-30T18:00:00+09:00",
-      kind: "입금",
-      title: "닥터 리앤장 입금 확인",
-      body: "3,000만원 · PPL 컨셉안 전달 완료 · 가이드 제작 중",
-    },
-    {
-      id: "demo-discount",
-      at: "2026-08-30T16:00:00+09:00",
-      kind: "할인",
-      title: "패키지 할인 5% 적용",
-      body: "다캠페인 묶음 · 노출가 기준 조정 · 운영관리자 확정",
-    },
-    {
-      id: "demo-schedule",
-      at: "2026-08-30T15:00:00+09:00",
-      kind: "일정",
-      title: "9/6 방문 마케팅 시작",
-      body: "목표 발행 54건 · 명동 80% · 북촌 20%",
-    },
-    {
-      id: "demo-review",
-      at: "2026-08-28T10:00:00+09:00",
-      kind: "검토",
-      title: "헤브블루 온보딩 진행",
-      body: "예산 2,000–3,000만원 · 계약 예정 · 검토 중",
-    },
-    {
-      id: "demo-contract",
-      at: "2026-08-27T09:00:00+09:00",
-      kind: "계약",
-      title: "최초 계약 체결",
-      body: `${companyName} Boarding Pass 이용 계약 · 콘텐츠 가이드라인 공유`,
-    },
-    {
-      id: "demo-perf",
-      at: "2026-08-28T09:00:00+09:00",
-      kind: "성과",
-      title: "명동 오픈 캠페인 반영",
-      body: "발행 콘텐츠 성과 지표 수집 시작",
-    },
-  ];
-}
-
 export function buildDerivedNews(input: {
   companyName: string;
   campaigns: { id: string; name: string | null; status: string; budget_amount: number | null; created_at: string }[];
@@ -545,21 +590,8 @@ export function buildDerivedNews(input: {
       at: c.created_at,
       kind: "계약",
       title: c.name?.trim() || "캠페인 등록",
-      body: `상태 ${c.status}${
-        c.budget_amount != null
-          ? ` · 예산 ${c.budget_amount.toLocaleString("ko-KR")}원`
-          : ""
-      }`,
+      body: `상태 ${c.status}`,
     });
-    if (c.budget_amount != null && c.budget_amount > 0) {
-      items.push({
-        id: `budget-${c.id}`,
-        at: c.created_at,
-        kind: "예산",
-        title: `예산 ${(c.budget_amount / 10_000).toLocaleString("ko-KR")}만원`,
-        body: `${c.name || "캠페인"} · 집행 한도 설정`,
-      });
-    }
   }
   if (input.acceptCount > 0) {
     items.push({
@@ -567,7 +599,7 @@ export function buildDerivedNews(input: {
       at: new Date().toISOString(),
       kind: "섭외",
       title: `섭외 확정 ${input.acceptCount}건`,
-      body: `${input.companyName} · Accept 기준 노출가 합산으로 예산 사용`,
+      body: `${input.companyName} · 섭외 Accept 확정`,
     });
   }
   if (input.publishedCount > 0) {
@@ -698,6 +730,51 @@ function assertRankBestPosts() {
   ]);
   if (ranked[0]!.id !== "y") throw new Error("rankInfluencers failed");
 
+  const visits = splitHomeVisits(
+    [
+      {
+        id: "a",
+        name: "A",
+        handle: "@a",
+        visitDate: "2026-09-08",
+        product: "p1",
+      },
+      {
+        id: "a",
+        name: "A",
+        handle: "@a",
+        visitDate: "2026-09-20",
+        product: "p2",
+      },
+      {
+        id: "b",
+        name: "B",
+        handle: "@b",
+        visitDate: "2026-09-01",
+        product: "p",
+      },
+      {
+        id: "c",
+        name: "C",
+        handle: "@c",
+        visitDate: "2026-07-01",
+        product: "p",
+      },
+    ],
+    "2026-09-09",
+  );
+  if (
+    visits.upcoming.length !== 1 ||
+    visits.upcoming[0]!.id !== "a" ||
+    visits.upcoming[0]!.visitDate !== "2026-09-20" ||
+    visits.done.length !== 1 ||
+    visits.done[0]!.id !== "b"
+  ) {
+    throw new Error("splitHomeVisits failed");
+  }
+  if (visitProfileHref({ handle: "@foo", snsUrl: null }) !== "https://www.instagram.com/foo/") {
+    throw new Error("visitProfileHref failed");
+  }
   if (weekOfMonth(1) !== 1 || weekOfMonth(8) !== 2 || weekOfMonth(31) !== 5) {
     throw new Error("weekOfMonth failed");
   }

@@ -38,7 +38,7 @@ function tierFromFollowers(n: number): PoolCreator["tier"] {
 /** CSV·배정으로 들어온 인플루언서 → 크리에이터 풀 카드용 */
 export function poolCreatorFromInfluencer(
   inf: InfRow,
-  opts?: { productName?: string | null },
+  opts?: { productName?: string | null; visitYmd?: string | null },
 ): PoolCreator {
   const sns =
     (inf.sns_url || "").trim() ||
@@ -70,6 +70,7 @@ export function poolCreatorFromInfluencer(
     product: opts?.productName ?? null,
     posts: [],
     uploadYmd: null,
+    visitYmd: opts?.visitYmd ?? null,
     metrics: {
       views: null,
       likes: null,

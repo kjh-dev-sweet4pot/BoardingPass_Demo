@@ -3,14 +3,13 @@ import { isDemoCompany } from "@/lib/company";
 import { fetchInsights } from "@/app/api/com/insights/route";
 import { buildBudgetPerformanceForCompany } from "@/lib/company-budget-performance";
 import {
-  buildDemoCompanyNews,
   buildDerivedNews,
   buildViewsCurvePoints,
   cumulativeViewsSeriesFromMetrics,
   rankBestPosts,
   rankInfluencers,
+  splitHomeVisits,
   summarizeBudget,
-  teloactHomeBudget,
   windowStartIso,
   wowPct,
   ymdKstNow,
@@ -78,12 +77,7 @@ export async function GET() {
     const n = typeof c.budget_amount === "number" ? c.budget_amount : 0;
     return sum + (Number.isFinite(n) ? n : 0);
   }, 0);
-  const budgetTotal =
-    totalBudget > 0
-      ? totalBudget
-      : isDemoCompany(company)
-        ? 90_000_000
-        : null;
+  const budgetTotal = totalBudget > 0 ? totalBudget : null;
 
   const { data: castings } = await supabase
     .from("castings")
@@ -92,21 +86,17 @@ export async function GET() {
     .eq("status", "Accept");
 
   let budget = summarizeBudget(budgetTotal, 0, 0);
-  if (company.login_id === "telloact") {
-    budget = teloactHomeBudget();
-  } else {
-    try {
-      const bp = await buildBudgetPerformanceForCompany(supabase, company);
-      budget = summarizeBudget(bp.budgetTotal, bp.spent, bp.scheduled);
-    } catch {
-      /* 캠페인 합계만 유지 */
-    }
+  try {
+    const bp = await buildBudgetPerformanceForCompany(supabase, company);
+    budget = summarizeBudget(bp.budgetTotal, bp.spent, bp.scheduled);
+  } catch {
+    /* 캠페인 합계만 유지 */
   }
 
   const { data: allocs } = await supabase
     .from("allocations")
     .select(
-      "id, influencer_id, status, rollup_status, target_content_count, influencers(id, name, instagram_handle_normalized, instagram_handle, followers), products(id, name)",
+      "id, influencer_id, status, rollup_status, target_content_count, visit_date, influencers(id, name, instagram_handle_normalized, instagram_handle, sns_url, followers), products(id, name)",
     )
     .eq("company_id", companyId);
 
@@ -280,14 +270,30 @@ export async function GET() {
     /* posts 스냅샷 유지 */
   }
 
-  const news = isDemoCompany(company)
-    ? buildDemoCompanyNews(company.name)
-    : buildDerivedNews({
-        companyName: company.name,
-        campaigns: campaignRows,
-        acceptCount: (castings || []).length,
-        publishedCount: posts.length,
-      });
+  const news = buildDerivedNews({
+    companyName: company.name,
+    campaigns: campaignRows,
+    acceptCount: (castings || []).length,
+    publishedCount: posts.length,
+  });
+
+  const visits = splitHomeVisits(
+    activeAllocs.map((a) => {
+      const inf = Array.isArray(a.influencers) ? a.influencers[0] : a.influencers;
+      const product = Array.isArray(a.products) ? a.products[0] : a.products;
+      const handleRaw =
+        inf?.instagram_handle_normalized || inf?.instagram_handle || "";
+      return {
+        id: inf?.id || a.influencer_id,
+        name: inf?.name || "인플루언서",
+        handle: handleRaw ? `@${String(handleRaw).replace(/^@+/, "")}` : "—",
+        visitDate: a.visit_date ? String(a.visit_date).slice(0, 10) : null,
+        product: product?.name || "",
+        snsUrl: inf?.sns_url ? String(inf.sns_url) : null,
+      };
+    }),
+    asOf,
+  );
 
   const payload: CompanyHomePayload = {
     asOf,
@@ -313,6 +319,7 @@ export async function GET() {
       all: rankBestPosts(posts, null),
     },
     news,
+    visits,
   };
 
   return NextResponse.json(payload);

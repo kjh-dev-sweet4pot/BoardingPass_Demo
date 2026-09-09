@@ -179,7 +179,7 @@ const COMPANY_CANON = [
   },
   {
     name: "닥터리앤장",
-    login_id: "doctorianjang",
+    login_id: "drlienjang",
     aliases: ["닥터리엔장", "닥터리앤장", "리엔장", "달터리앤장", "닥터리엔장"],
   },
   { name: "옵티팜", login_id: "optipharm", aliases: ["옵티팜"] },

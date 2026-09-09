@@ -573,6 +573,13 @@ export function CompanyProgressTab({
       const list = map.get(card.status);
       if (list) list.push(card);
     }
+    for (const list of map.values()) {
+      list.sort((a, b) => {
+        const da = a.visitDates[0] || a.updatedAt;
+        const db = b.visitDates[0] || b.updatedAt;
+        return da.localeCompare(db) || a.name.localeCompare(b.name, "ko");
+      });
+    }
     return map;
   }, [filteredCards]);
 
@@ -652,7 +659,7 @@ export function CompanyProgressTab({
                   ) : (
                     items.map((card) => (
                       <KanbanCard
-                        key={card.id}
+                        key={`${card.status}-${card.influencerId}`}
                         card={card}
                         onClick={() => setSelected(card)}
                       />

@@ -36,6 +36,8 @@ export type PoolCreator = {
   product: string | null;
   posts: CreatorPost[];
   uploadYmd: string | null;
+  /** 가장 늦은 방문일 YYYY-MM-DD */
+  visitYmd?: string | null;
   metrics: {
     views: number | null;
     likes: number | null;
