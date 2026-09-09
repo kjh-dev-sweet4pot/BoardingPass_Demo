@@ -12,7 +12,6 @@ import {
   OVERLAP_LABEL,
   POOL_PAGE,
   POST_PLATFORM_LABEL,
-  TIER_LABEL,
   VISIT_CONTENT_GUIDE_URL,
   type CreatorChannel,
   type CreatorMarket,
@@ -391,11 +390,11 @@ function CreatorCard({
     >
       <div className="relative">
         <CreatorPhoto creator={row} />
-        <span className="absolute top-2 right-2 max-w-[calc(100%-0.75rem)] truncate rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] shadow-sm">
-          {countryBadge
-            ? `${TIER_LABEL[row.tier]} · ${countryBadge}`
-            : TIER_LABEL[row.tier]}
-        </span>
+        {countryBadge ? (
+          <span className="absolute top-2 right-2 max-w-[calc(100%-0.75rem)] truncate rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] shadow-sm">
+            {countryBadge}
+          </span>
+        ) : null}
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5 p-3">
@@ -495,9 +494,6 @@ function CreatorDetail({
               ) : null}
               <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
                 {CHANNEL_LABEL[creator.channel]}
-              </span>
-              <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs font-medium text-[var(--accent)]">
-                {TIER_LABEL[creator.tier]}
               </span>
               {creator.overlap ? (
                 <span className="rounded-full bg-[#f8e4e4] px-2 py-0.5 text-xs font-medium text-[#9b2c2c]">

@@ -86,6 +86,24 @@ async function apify(actor, body, timeout = 180, memory = 512) {
   return Array.isArray(raw) ? raw : [];
 }
 
+async function expandXhsShortUrl(url) {
+  if (!/xhslink\.(cn|com)/i.test(url || "")) return url;
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      headers: { "user-agent": "Mozilla/5.0" },
+    });
+    const finalUrl = res.url || "";
+    const encoded = finalUrl.match(/redirectPath=([^&]+)/)?.[1];
+    const dest = encoded ? decodeURIComponent(encoded) : finalUrl;
+    const id = dest.match(/\/user\/profile\/([0-9a-f]{24})/i)?.[1];
+    if (id) return `https://www.xiaohongshu.com/user/profile/${id}`;
+    return dest.startsWith("http") ? dest : url;
+  } catch {
+    return url;
+  }
+}
+
 async function scrape(platform, url, handle) {
   if (platform === "tiktok") {
     const username = ttHandle(url, handle);
@@ -102,9 +120,11 @@ async function scrape(platform, url, handle) {
     return { imageUrl, followers: typeof fans === "number" ? fans : null };
   }
   if (platform === "xiaohongshu") {
-    const target = url || (handle && /^[0-9a-f]{24}$/i.test(handle)
-      ? `https://www.xiaohongshu.com/user/profile/${handle}`
-      : null);
+    const target = await expandXhsShortUrl(
+      url || (handle && /^[0-9a-f]{24}$/i.test(handle)
+        ? `https://www.xiaohongshu.com/user/profile/${handle}`
+        : null),
+    );
     if (!target) return null;
     const isNote = /discovery\/item|\/explore\/|xhslink\.(com|cn)/i.test(target);
     if (isNote) {

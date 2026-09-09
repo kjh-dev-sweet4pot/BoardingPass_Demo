@@ -149,7 +149,7 @@ export function splitHomeVisits(
   );
   done.sort(
     (a, b) =>
-      a.visitDate.localeCompare(b.visitDate) || a.name.localeCompare(b.name, "ko"),
+      b.visitDate.localeCompare(a.visitDate) || a.name.localeCompare(b.name, "ko"),
   );
   return { asOf, upcoming, done };
 }
@@ -760,6 +760,13 @@ function assertRankBestPosts() {
         visitDate: "2026-07-01",
         product: "p",
       },
+      {
+        id: "d",
+        name: "D",
+        handle: "@d",
+        visitDate: "2026-09-06",
+        product: "p",
+      },
     ],
     "2026-09-09",
   );
@@ -767,8 +774,9 @@ function assertRankBestPosts() {
     visits.upcoming.length !== 1 ||
     visits.upcoming[0]!.id !== "a" ||
     visits.upcoming[0]!.visitDate !== "2026-09-20" ||
-    visits.done.length !== 1 ||
-    visits.done[0]!.id !== "b"
+    visits.done.length !== 2 ||
+    visits.done[0]!.id !== "d" ||
+    visits.done[1]!.id !== "b"
   ) {
     throw new Error("splitHomeVisits failed");
   }

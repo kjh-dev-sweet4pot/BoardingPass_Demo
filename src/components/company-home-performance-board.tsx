@@ -304,7 +304,7 @@ export function CompanyHomeVisitBoard({ visits }: { visits: CompanyHomeVisits })
               {b.rows.length}명
             </p>
           </div>
-          <ul className="m-0 max-h-[220px] list-none space-y-0.5 overflow-auto p-0">
+          <ul className="m-0 max-h-[360px] list-none space-y-0.5 overflow-auto p-0">
             {b.rows.length === 0 ? (
               <li className="px-1 py-4 text-[12px] text-[var(--muted)]">{b.empty}</li>
             ) : (
