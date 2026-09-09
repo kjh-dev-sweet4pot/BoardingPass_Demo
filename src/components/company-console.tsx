@@ -628,9 +628,9 @@ export function CompanyConsole({
           배정 불러오는 중…
         </div>
       ) : (
-      <div className="grid min-h-0 flex-1 gap-4 overflow-auto px-8 py-6 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.85fr)]">
+      <div className="grid min-h-0 flex-1 gap-4 overflow-auto px-4 py-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.85fr)] lg:px-8 lg:py-6">
         <div className="flex min-h-0 flex-col gap-3">
-      <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
+      <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">
         배정 현황
       </h2>
 
@@ -737,7 +737,49 @@ export function CompanyConsole({
             조건에 맞는 배정이 없습니다.
           </p>
         ) : (
-          <table className="min-w-[1140px] w-full border-collapse text-left text-sm">
+          <>
+          <ul className="m-0 list-none divide-y divide-[var(--line)] p-0 lg:hidden">
+            {filtered.map((item) => {
+              const date = visitKey(item);
+              const linkSum = summarizeAllocationLinks(item.creator_links || []);
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenId((id) => (id === item.id ? null : item.id))
+                    }
+                    className={`flex w-full flex-col gap-1 px-4 py-3 text-left ${
+                      item.id === openId ? "bg-[var(--accent-soft)]" : ""
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="min-w-0 truncate font-semibold text-[var(--ink)]">
+                        {item.influencers?.name || "—"}
+                      </span>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusChipClass(item)}`}
+                      >
+                        {statusChipLabel(item)}
+                      </span>
+                    </div>
+                    <p className="truncate text-[12px] text-[var(--accent)]">
+                      {formatHandle(item)}
+                    </p>
+                    <p className="text-[12px] text-[var(--muted)]">
+                      {formatVisitLabel(date)}
+                      {date === today ? " · 오늘" : ""} ·{" "}
+                      {item.stores?.name || "—"} · {item.quantity}개
+                    </p>
+                    <p className="text-[11px] text-[var(--muted)]">
+                      {ALLOCATION_LINK_LABEL[linkSum]}
+                    </p>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <table className="hidden min-w-[1140px] w-full border-collapse text-left text-sm lg:table">
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)] text-xs text-[var(--muted)]">
                 <AllocSortTh
@@ -867,12 +909,17 @@ export function CompanyConsole({
               })}
             </tbody>
           </table>
+          </>
         )}
       </div>
 
         </div>
 
-        <aside className="min-h-[50vh] min-w-0 overflow-y-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-6 lg:min-h-0">
+        <aside
+          className={`min-w-0 overflow-y-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 lg:min-h-0 lg:p-6 ${
+            selected ? "min-h-[40vh]" : "hidden min-h-[50vh] lg:block"
+          }`}
+        >
           {selected ? (
             <CompanyInfPanel
               item={selected}
@@ -886,7 +933,7 @@ export function CompanyConsole({
               }}
             />
           ) : (
-            <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-4 text-center">
+            <div className="hidden h-full min-h-[240px] flex-col items-center justify-center gap-4 text-center lg:flex">
               <div>
                 <p className="text-base font-medium text-[var(--ink)]">
                   행을 선택하면 상세가 여기에 표시됩니다
