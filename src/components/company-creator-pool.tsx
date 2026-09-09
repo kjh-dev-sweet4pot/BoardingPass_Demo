@@ -20,6 +20,7 @@ import {
 
 const contentGuideLinkClass =
   "inline-flex items-center gap-1.5 rounded-[6px] border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-2 text-xs font-bold text-[var(--accent)] shadow-sm transition hover:bg-[var(--accent)] hover:!text-white";
+import { formatViews } from "@/lib/content-insights";
 import { polishDemoMetrics } from "@/lib/demo-metrics";
 import { isDemoCompany } from "@/lib/company";
 import { regionBadgeText } from "@/lib/region-display";
@@ -360,6 +361,7 @@ export function CompanyCreatorPool({
           <div className="max-h-[90vh] w-full max-w-md overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5">
             <CreatorDetail
               creator={selected}
+              isMock={poolSource === "mock"}
               onClose={() => setOpenId(null)}
             />
           </div>
@@ -425,14 +427,37 @@ function CreatorCard({
           {row.product || "시딩 상품 미기재"}
         </p>
 
-        <div className="mt-auto flex items-end justify-between gap-2 pt-1">
+        <div className="mt-auto grid grid-cols-3 gap-1.5 pt-1">
           <div>
             <p className="text-[10px] text-[var(--muted)]">팔로워</p>
             <p className="text-xs font-semibold tabular-nums">
               {formatFollowers(row.followers)}
             </p>
           </div>
+          <div>
+            <p className="text-[10px] text-[var(--muted)]">평균 조회</p>
+            <p className="text-xs font-semibold tabular-nums">
+              {row.metrics.views != null
+                ? formatViews(row.metrics.views, row.viewsEstimated)
+                : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-[var(--muted)]">평균 좋아요</p>
+            <p className="text-xs font-semibold tabular-nums">
+              {row.metrics.likes != null ? formatMetric(row.metrics.likes) : "—"}
+            </p>
+          </div>
         </div>
+        <p className="text-[10px] leading-4 text-[var(--muted)]">
+          {row.avgPostCount
+            ? row.avgFromProfile
+              ? `최근 게시 ${row.avgPostCount}건 평균`
+              : `최근 발행 ${row.avgPostCount}건 평균`
+            : row.metrics.views != null
+              ? "성과 평균"
+              : "발행 콘텐츠 없음"}
+        </p>
 
         {row.profileUrl ? (
           <a
@@ -452,9 +477,11 @@ function CreatorCard({
 
 function CreatorDetail({
   creator,
+  isMock,
   onClose,
 }: {
   creator: PoolCreator;
+  isMock: boolean;
   onClose: () => void;
 }) {
   const brief = getCreatorBrief(creator);
@@ -535,17 +562,26 @@ function CreatorDetail({
           <dd className="mt-1 font-semibold">{creator.product || "—"}</dd>
         </div>
         <div>
-          <dt className="text-xs text-[var(--muted)]">조회</dt>
+          <dt className="text-xs text-[var(--muted)]">평균 조회</dt>
           <dd className="mt-1 font-semibold tabular-nums">
-            {formatMetric(metrics.views)}
+            {metrics.views
+              ? formatViews(metrics.views, creator.viewsEstimated)
+              : "—"}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[var(--muted)]">좋아요</dt>
+          <dt className="text-xs text-[var(--muted)]">평균 좋아요</dt>
           <dd className="mt-1 font-semibold tabular-nums">
-            {formatMetric(metrics.likes)}
+            {metrics.likes ? formatMetric(metrics.likes) : "—"}
           </dd>
         </div>
+        {creator.avgPostCount ? (
+          <p className="sm:col-span-2 text-[11px] text-[var(--muted)]">
+            {creator.avgFromProfile
+              ? `최근 게시 ${creator.avgPostCount}건 기준`
+              : `최근 발행 ${creator.avgPostCount}건 기준`}
+          </p>
+        ) : null}
       </dl>
 
       <div className="mt-5">
@@ -587,6 +623,7 @@ function CreatorDetail({
         </ul>
       </div>
 
+      {isMock ? (
       <div className="mt-5 rounded-[6px] border border-[var(--line)] px-4 py-4">
         <h4 className="text-sm font-semibold">{brief.guideTitle}</h4>
         <ul className="mt-3 space-y-2 text-sm leading-5 text-[var(--ink)]">
@@ -607,6 +644,7 @@ function CreatorDetail({
           <span aria-hidden>↗</span>
         </a>
       </div>
+      ) : null}
 
       <div className="mt-5">
         <h4 className="text-sm font-semibold">방문 · 제작 일정</h4>

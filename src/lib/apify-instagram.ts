@@ -1,4 +1,5 @@
 import { apifyErrorMessage } from "@/lib/apify-errors";
+import { parsePostedAtIso } from "@/lib/metrics-schedule";
 import { regionFromCountryLabel } from "@/lib/region-display";
 
 /** 게시물 지표: patient_discovery (저장·공유·리포스트 포함) */
@@ -34,6 +35,8 @@ export interface InstagramScraperResult {
   sharesCount?: number | null;
   /** 리포스트. 소스 미제공 시 undefined */
   repostsCount?: number | null;
+  /** SNS 업로드 시각 */
+  postedAt?: string | null;
 }
 
 type PatientDiscoveryItem = {
@@ -128,6 +131,7 @@ function mapPatientDiscoveryItem(
     savesCount: availableCount(metrics.save_count, avail.save_count),
     sharesCount: availableCount(metrics.share_count, avail.share_count),
     repostsCount: numOrNull(metrics.repost_count),
+    postedAt: parsePostedAtIso(item.taken_at_date),
   };
 }
 

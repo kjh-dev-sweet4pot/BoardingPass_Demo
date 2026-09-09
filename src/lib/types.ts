@@ -50,6 +50,8 @@ export type CreatorLink = {
   verification_failed?: boolean;
   memo: string | null;
   submitted_at: string;
+  /** SNS 업로드 시각 (Apify). 검수 제출일과 별개 */
+  published_at?: string | null;
   updated_at: string;
   thumbnail_status?: ThumbnailStatus;
   thumbnail_source_url?: string | null;

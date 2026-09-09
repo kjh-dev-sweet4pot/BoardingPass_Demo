@@ -6,6 +6,7 @@ import { formatMetric, formatViews } from "@/lib/content-insights";
 import { resolveCreatorPlatform } from "@/lib/creator-link";
 import {
   buildWeekSeries,
+  groupByDay,
   regionLabel,
   shareSegmentsByPlatform,
   shareSegmentsByRegion,
@@ -16,6 +17,7 @@ import {
   visitProfileHref,
 } from "@/lib/company-home";
 import { resolvePoolCreator } from "@/lib/creator-pool-mock";
+import { formatMd } from "@/lib/types";
 
 function CumulativeChart({ points }: { points: WeekPoint[] }) {
   if (points.length === 0) {
@@ -223,7 +225,13 @@ function ShareDonut({
   );
 }
 
-function VisitPerson({ row }: { row: CompanyHomeVisitRow }) {
+function VisitPerson({
+  row,
+  kind,
+}: {
+  row: CompanyHomeVisitRow;
+  kind: "upcoming" | "done";
+}) {
   const href = visitProfileHref(row);
   const photo = (
     <CreatorPhoto
@@ -234,27 +242,34 @@ function VisitPerson({ row }: { row: CompanyHomeVisitRow }) {
         url: row.snsUrl,
         product: row.product,
       })}
-      size="avatar"
+      size="thumb"
+      className="!h-9 !w-9 shrink-0 !rounded-full"
     />
   );
   const body = (
     <>
       {photo}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12px] font-semibold text-[var(--ink)]">
+        <span className="block truncate text-[13px] font-bold leading-snug text-[var(--ink)]">
           {row.name}
         </span>
-        <span className="block truncate text-[10.5px] text-[var(--muted)]">
-          {row.handle}
+        <span className="mt-0.5 block truncate text-[11px] leading-snug text-[var(--muted)]">
+          {row.product || row.handle}
         </span>
       </span>
-      <span className="shrink-0 text-[11px] tabular-nums text-[var(--muted)]">
-        {row.visitDate.slice(5)}
+      <span
+        className={
+          kind === "done"
+            ? "shrink-0 rounded-full bg-[#E7F3EA] px-1.5 py-0.5 text-[10px] font-semibold text-[#2f6b3c]"
+            : "shrink-0 rounded-full bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--accent)]"
+        }
+      >
+        {kind === "done" ? "방문" : "예정"}
       </span>
     </>
   );
   const cls =
-    "flex w-full items-center gap-2 rounded-[6px] px-1.5 py-1.5 text-left hover:bg-[var(--surface-hover)]";
+    "flex w-full items-center gap-2 rounded-[6px] py-1.5 text-left hover:bg-[var(--accent-soft)]/50";
   if (!href) {
     return <div className={cls}>{body}</div>;
   }
@@ -279,16 +294,18 @@ export function CompanyHomeVisitBoard({
 }) {
   const blocks = [
     {
+      kind: "upcoming" as const,
       title: "한달 이내 방문 예정",
       rows: visits.upcoming,
       empty: "한달 이내 예정이 없습니다.",
     },
     {
+      kind: "done" as const,
       title: "한달 이내 방문 완료",
       rows: visits.done,
       empty: "한달 이내 완료가 없습니다.",
     },
-  ] as const;
+  ];
   return (
     <aside className="flex w-full shrink-0 flex-col gap-3 self-start xl:w-[280px]">
       <div>
@@ -315,23 +332,35 @@ export function CompanyHomeVisitBoard({
           key={b.title}
           className="rounded-[10px] border border-[var(--line)] bg-[var(--surface)] p-3"
         >
-          <div className="mb-1.5 flex items-baseline justify-between gap-2 px-0.5">
+          <div className="mb-2 flex items-baseline justify-between gap-2 px-0.5">
             <p className="text-[13px] font-semibold text-[var(--ink)]">{b.title}</p>
             <p className="text-[11px] tabular-nums text-[var(--muted)]">
               {b.rows.length}명
             </p>
           </div>
-          <ul className="m-0 max-h-[360px] list-none space-y-0.5 overflow-auto p-0">
-            {b.rows.length === 0 ? (
-              <li className="px-1 py-4 text-[12px] text-[var(--muted)]">{b.empty}</li>
-            ) : (
-              b.rows.map((r) => (
-                <li key={`${b.title}-${r.id}`}>
-                  <VisitPerson row={r} />
-                </li>
-              ))
-            )}
-          </ul>
+          {b.rows.length === 0 ? (
+            <p className="px-0.5 py-4 text-[12px] text-[var(--muted)]">{b.empty}</p>
+          ) : (
+            <div className="max-h-[360px] overflow-auto">
+              {groupByDay(b.rows, (r) => r.visitDate).map(([day, rows]) => (
+                <section key={`${b.title}-${day}`} className="mb-2 last:mb-0">
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <p className="shrink-0 text-[12px] font-semibold text-[var(--ink)]">
+                      {formatMd(day)}
+                    </p>
+                    <span className="h-px min-w-0 flex-1 bg-[var(--line)]" />
+                  </div>
+                  <ul className="m-0 list-none p-0">
+                    {rows.map((r) => (
+                      <li key={`${b.title}-${r.id}-${day}`}>
+                        <VisitPerson row={r} kind={b.kind} />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </aside>

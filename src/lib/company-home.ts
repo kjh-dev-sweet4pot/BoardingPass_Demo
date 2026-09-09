@@ -1,14 +1,32 @@
 import { formatMetric } from "@/lib/content-insights";
+import { canonicalBranchName } from "@/lib/store-name";
 
-export type CompanyHomeNewsKind =
-  | "계약"
-  | "예산"
-  | "입금"
-  | "할인"
-  | "일정"
-  | "검토"
-  | "성과"
-  | "섭외";
+export type CompanyHomeNewsKind = "일정" | "성과";
+
+export type CompanyHomeNewsDetail =
+  | {
+      type: "visit";
+      name: string;
+      store: string;
+      visitDate: string;
+      product: string;
+      contentLabel: string;
+      followers: number;
+      influencerId: string;
+      handle: string;
+      profileUrl: string | null;
+    }
+  | {
+      type: "publish";
+      name: string;
+      product: string;
+      day: string;
+      influencerId: string;
+      handle: string;
+      followers: number;
+      profileUrl: string | null;
+      contentUrl: string | null;
+    };
 
 export type CompanyHomeNewsItem = {
   id: string;
@@ -16,6 +34,7 @@ export type CompanyHomeNewsItem = {
   kind: CompanyHomeNewsKind;
   title: string;
   body: string;
+  detail?: CompanyHomeNewsDetail;
 };
 
 export type CompanyHomeBestPost = {
@@ -278,7 +297,7 @@ export function viewsByPublishDay(
   return keys.map((k) => map.get(k) || 0);
 }
 
-/** 성과 탭 curvePoints와 동일 산식. */
+/** 성과 탭 curvePoints와 동일 산식. D+0 → 현재. D+0 값 없어도 됨. */
 export function buildViewsCurvePoints(
   links: { id: string; published_at: string | null }[],
   metrics: {
@@ -286,6 +305,7 @@ export function buildViewsCurvePoints(
     collected_at: string;
     views: number | null;
   }[],
+  nowMs = Date.now(),
 ): { day: number; views: number }[] {
   let minTs: number | null = null;
   for (const l of links) {
@@ -294,36 +314,38 @@ export function buildViewsCurvePoints(
     if (!Number.isFinite(ts)) continue;
     if (minTs == null || ts < minTs) minTs = ts;
   }
-  if (minTs == null || metrics.length === 0) return [];
+  if (minTs == null) return [];
 
   const startTs = minTs;
-  const times = [
-    ...new Set(
-      metrics
-        .map((m) => m.collected_at)
-        .filter((t) => new Date(t).getTime() >= startTs),
-    ),
-  ].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-  if (times.length < 2) return [];
+  const endTs = Math.max(nowMs, startTs);
 
-  const daily = new Map<number, number>();
-  for (const t of times) {
-    const tMs = new Date(t).getTime();
+  function viewsAt(tMs: number) {
     const latest = new Map<string, number>();
     for (const m of metrics) {
       const cMs = new Date(m.collected_at).getTime();
-      if (cMs > tMs) continue;
+      if (!Number.isFinite(cMs) || cMs < startTs || cMs > tMs) continue;
       const v = Number(m.views) || 0;
       const prev = latest.get(m.creator_link_id);
       if (prev == null || v > prev) latest.set(m.creator_link_id, v);
     }
     let views = 0;
     for (const v of latest.values()) views += v;
-    const elapsed = Math.max(0, (tMs - startTs) / 86400000);
-    const key =
-      elapsed < 1 ? Math.round(elapsed * 48) / 48 : Math.floor(elapsed);
-    daily.set(key, views);
+    return views;
   }
+
+  function dayKey(tMs: number) {
+    const elapsed = Math.max(0, (tMs - startTs) / 86_400_000);
+    return elapsed < 1 ? Math.round(elapsed * 48) / 48 : elapsed;
+  }
+
+  const daily = new Map<number, number>();
+  daily.set(0, viewsAt(startTs));
+  for (const m of metrics) {
+    const tMs = new Date(m.collected_at).getTime();
+    if (!Number.isFinite(tMs) || tMs < startTs || tMs > endTs) continue;
+    daily.set(dayKey(tMs), viewsAt(tMs));
+  }
+  daily.set(dayKey(endTs), viewsAt(endTs));
 
   const raw = [...daily.entries()]
     .sort((a, b) => a[0] - b[0])
@@ -333,6 +355,55 @@ export function buildViewsCurvePoints(
     if (i === 0 || i === raw.length - 1) return true;
     return p.views !== raw[i - 1]!.views;
   });
+}
+
+/** 조회수 추이 SVG — 꺾은선/계단이 아니라 단조 큐빅 곡선. */
+export function monotoneCurvePath(pts: { x: number; y: number }[]) {
+  if (pts.length === 0) return "";
+  const fmt = (n: number) => n.toFixed(1);
+  if (pts.length === 1) return `M${fmt(pts[0]!.x)},${fmt(pts[0]!.y)}`;
+  if (pts.length === 2) {
+    const a = pts[0]!;
+    const b = pts[1]!;
+    const mx = (a.x + b.x) / 2;
+    return `M${fmt(a.x)},${fmt(a.y)} C${fmt(mx)},${fmt(a.y)} ${fmt(mx)},${fmt(b.y)} ${fmt(b.x)},${fmt(b.y)}`;
+  }
+  const n = pts.length;
+  const dx: number[] = [];
+  const m: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const h = pts[i + 1]!.x - pts[i]!.x;
+    dx[i] = h;
+    m[i] = h === 0 ? 0 : (pts[i + 1]!.y - pts[i]!.y) / h;
+  }
+  const t: number[] = [m[0]!];
+  for (let i = 1; i < n - 1; i++) {
+    t[i] = m[i - 1]! * m[i]! <= 0 ? 0 : (m[i - 1]! + m[i]!) / 2;
+  }
+  t[n - 1] = m[n - 2]!;
+  for (let i = 0; i < n - 1; i++) {
+    if (Math.abs(m[i]!) < 1e-12) {
+      t[i] = 0;
+      t[i + 1] = 0;
+      continue;
+    }
+    const a = t[i]! / m[i]!;
+    const b = t[i + 1]! / m[i]!;
+    const s = a * a + b * b;
+    if (s > 9) {
+      const q = 3 / Math.sqrt(s);
+      t[i] = q * a * m[i]!;
+      t[i + 1] = q * b * m[i]!;
+    }
+  }
+  let d = `M${fmt(pts[0]!.x)},${fmt(pts[0]!.y)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = pts[i]!;
+    const p1 = pts[i + 1]!;
+    const h = dx[i]!;
+    d += ` C${fmt(p0.x + h / 3)},${fmt(p0.y + (t[i]! * h) / 3)} ${fmt(p1.x - h / 3)},${fmt(p1.y - (t[i + 1]! * h) / 3)} ${fmt(p1.x)},${fmt(p1.y)}`;
+  }
+  return d;
 }
 
 /** 성과 탭과 동일: content_metrics 시점별 링크 최신 조회 합 (최근 N일). */
@@ -577,49 +648,140 @@ export function displayHandle(handle: string) {
   return handle.replace(/^@+/, "").trim() || handle;
 }
 
-export function buildDerivedNews(input: {
-  companyName: string;
-  campaigns: { id: string; name: string | null; status: string; budget_amount: number | null; created_at: string }[];
-  acceptCount: number;
-  publishedCount: number;
-}): CompanyHomeNewsItem[] {
-  const items: CompanyHomeNewsItem[] = [];
-  for (const c of input.campaigns.slice(0, 5)) {
-    items.push({
-      id: `camp-${c.id}`,
-      at: c.created_at,
-      kind: "계약",
-      title: c.name?.trim() || "캠페인 등록",
-      body: `상태 ${c.status}`,
-    });
-  }
-  if (input.acceptCount > 0) {
-    items.push({
-      id: "accept-rollup",
-      at: new Date().toISOString(),
-      kind: "섭외",
-      title: `섭외 확정 ${input.acceptCount}건`,
-      body: `${input.companyName} · 섭외 Accept 확정`,
-    });
-  }
-  if (input.publishedCount > 0) {
-    items.push({
-      id: "pub-rollup",
-      at: new Date().toISOString(),
-      kind: "성과",
-      title: `발행완료 ${input.publishedCount}건`,
-      body: "조회·좋아요·댓글 지표 수집 중",
-    });
-  }
-  return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 20);
+export function visitStoreNewsLabel(store: string) {
+  const n = canonicalBranchName(store);
+  if (!n) return "매장";
+  return /점$/.test(n) ? n : `${n}점`;
 }
 
-export function newsKindTone(kind: CompanyHomeNewsKind) {
-  if (kind === "입금" || kind === "예산") return "text-[var(--accent)]";
-  if (kind === "성과") return "text-[#2f6b3c]";
-  if (kind === "할인") return "text-[#8a4b12]";
-  if (kind === "검토") return "text-[#6b5a45]";
-  return "text-[var(--muted)]";
+export function visitTimelineTitle(store: string, name: string) {
+  const who = name.trim() || "인플루언서";
+  return `${who} ${visitStoreNewsLabel(store)} 방문`;
+}
+
+export function daysAgoLabel(ymd: string, asOf: string) {
+  const a = Date.parse(`${ymd.slice(0, 10)}T00:00:00+09:00`);
+  const b = Date.parse(`${asOf.slice(0, 10)}T00:00:00+09:00`);
+  const n = Math.round((b - a) / 86_400_000);
+  if (!Number.isFinite(n) || n <= 0) return "오늘";
+  if (n === 1) return "1일 전";
+  return `${n}일 전`;
+}
+
+export function groupByDay<T>(rows: T[], dayOf: (row: T) => string) {
+  const map = new Map<string, T[]>();
+  for (const row of rows) {
+    const day = dayOf(row).slice(0, 10);
+    const list = map.get(day) || [];
+    list.push(row);
+    map.set(day, list);
+  }
+  return [...map.entries()];
+}
+
+export function buildDerivedNews(input: {
+  asOf?: string;
+  visits?: {
+    id: string;
+    influencerId?: string;
+    name: string;
+    store: string;
+    visitDate: string;
+    handle?: string;
+    snsUrl?: string | null;
+    product?: string;
+    followers?: number;
+    published?: boolean;
+  }[];
+  uploads?: {
+    id: string;
+    influencerId?: string;
+    name: string;
+    handle?: string;
+    at: string;
+    url: string | null;
+    product?: string;
+    followers?: number;
+  }[];
+}): CompanyHomeNewsItem[] {
+  const items: CompanyHomeNewsItem[] = [];
+  const asOf = input.asOf || ymdKstNow();
+  const from = addDaysYmd(asOf, -30);
+  for (const v of input.visits || []) {
+    const d = (v.visitDate || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+    if (d >= asOf || d < from) continue;
+    const who = v.name.trim() || "인플루언서";
+    const storeLabel = visitStoreNewsLabel(v.store);
+    const handle = v.handle || "";
+    const product = (v.product || "").trim();
+    const contentLabel = v.published ? "발행완료" : "콘텐츠 대기";
+    items.push({
+      id: `visit-${v.id}`,
+      at: `${d}T23:59:00+09:00`,
+      kind: "일정",
+      title: visitTimelineTitle(v.store, who),
+      body: `${product || "상품"} · ${contentLabel}`,
+      detail: {
+        type: "visit",
+        name: who,
+        store: storeLabel,
+        visitDate: d,
+        product: product || "—",
+        contentLabel,
+        followers: Number(v.followers) || 0,
+        influencerId: v.influencerId || v.id,
+        handle,
+        profileUrl: visitProfileHref({
+          handle,
+          snsUrl: v.snsUrl || null,
+        }),
+      },
+    });
+  }
+  for (const u of input.uploads || []) {
+    const raw = (u.at || "").trim();
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(raw.slice(0, 10))
+      ? raw.slice(0, 10)
+      : asOf;
+    if (day > asOf || day < from) continue;
+    const who = u.name.trim() || "인플루언서";
+    const handle = u.handle || "";
+    const product = (u.product || "").trim();
+    const at = raw && raw.length >= 10 ? raw : `${day}T12:00:00+09:00`;
+    items.push({
+      id: `pub-${u.id}`,
+      at,
+      kind: "성과",
+      title: `${who} 발행 완료`,
+      body: product ? `${product} · 조회·좋아요 수집 중` : "조회·좋아요 수집 중",
+      detail: {
+        type: "publish",
+        name: who,
+        product: product || "—",
+        day,
+        influencerId: u.influencerId || u.id,
+        handle,
+        followers: Number(u.followers) || 0,
+        profileUrl: visitProfileHref({ handle, snsUrl: null }),
+        contentUrl: (u.url || "").trim() || null,
+      },
+    });
+  }
+  return items.sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** 방문만 최신 8건이면 발행이 안 보인다. 둘 다 남긴다. */
+export function pickNewsFeed(items: CompanyHomeNewsItem[], limit = 8) {
+  const visits = items.filter((i) => i.detail?.type === "visit");
+  const pubs = items.filter((i) => i.detail?.type === "publish");
+  if (pubs.length === 0) return visits.slice(0, limit);
+  if (visits.length === 0) return pubs.slice(0, limit);
+  const pTake = Math.min(pubs.length, Math.max(2, Math.ceil(limit / 2)));
+  const vTake = Math.min(visits.length, limit - pTake);
+  return [...visits.slice(0, vTake), ...pubs.slice(0, pTake)].sort((a, b) =>
+    b.at.localeCompare(a.at),
+  );
 }
 
 export function formatHomeViews(n: number) {
@@ -675,6 +837,65 @@ function assertRankBestPosts() {
   ) {
     throw new Error("teloactHomeBudget failed");
   }
+  if (visitTimelineTitle("OWM 명동점", "서하얀") !== "서하얀 명동점 방문") {
+    throw new Error("visitTimelineTitle failed");
+  }
+  if (daysAgoLabel("2026-09-07", "2026-09-09") !== "2일 전") {
+    throw new Error("daysAgoLabel failed");
+  }
+  const visitNews = buildDerivedNews({
+    asOf: "2026-09-09",
+    visits: [
+      {
+        id: "1",
+        name: "서하얀",
+        store: "명동",
+        visitDate: "2026-09-08",
+        handle: "@seohayan",
+        snsUrl: "https://instagram.com/seohayan",
+        product: "닥터리앤장",
+      },
+      { id: "2", name: "미래", store: "강남점", visitDate: "2026-09-09" },
+      { id: "3", name: "옛", store: "부산", visitDate: "2026-07-01" },
+    ],
+    uploads: [
+      {
+        id: "u1",
+        name: "서하얀",
+        at: "2026-09-08T14:00:00+09:00",
+        url: "https://www.instagram.com/p/abc",
+      },
+      {
+        id: "u2",
+        name: "옛",
+        at: "2026-07-01T14:00:00+09:00",
+        url: "https://x.com/old",
+      },
+    ],
+  });
+  if (
+    visitNews.length !== 2 ||
+    visitNews[0]!.detail?.type !== "visit" ||
+    visitNews[0]!.title !== "서하얀 명동점 방문" ||
+    visitNews[1]!.detail?.type !== "publish" ||
+    visitNews[1]!.title !== "서하얀 발행 완료"
+  ) {
+    throw new Error("buildDerivedNews visit/publish failed");
+  }
+  const undated = buildDerivedNews({
+    asOf: "2026-09-09",
+    uploads: [{ id: "u0", name: "발행자", at: "", url: "https://x.com/p" }],
+  });
+  if (undated.length !== 1 || undated[0]!.title !== "발행자 발행 완료") {
+    throw new Error("buildDerivedNews undated publish failed");
+  }
+  const mixed = pickNewsFeed([
+    ...Array.from({ length: 8 }, (_, i) => visitNews[0]!),
+    visitNews[1]!,
+  ]);
+  if (!mixed.some((i) => i.detail?.type === "publish")) {
+    throw new Error("pickNewsFeed dropped publish");
+  }
   const series = viewsByPublishDay(posts, "2026-09-03", 7);
   if (series.length !== 7 || series[4] !== 100) {
     throw new Error("viewsByPublishDay failed");
@@ -720,9 +941,35 @@ function assertRankBestPosts() {
         views: 20,
       },
     ],
+    Date.parse("2026-09-09T00:00:00+09:00"),
   );
-  if (curve.length < 2 || curve[curve.length - 1]!.views !== 60) {
+  if (
+    curve[0]?.day !== 0 ||
+    curve[0]?.views !== 0 ||
+    curve[curve.length - 1]!.views !== 60 ||
+    (curve[curve.length - 1]!.day ?? 0) < 7
+  ) {
     throw new Error("buildViewsCurvePoints failed");
+  }
+  const emptyStart = buildViewsCurvePoints(
+    [{ id: "a", published_at: "2026-09-01T00:00:00+09:00" }],
+    [],
+    Date.parse("2026-09-03T00:00:00+09:00"),
+  );
+  if (
+    emptyStart.length !== 2 ||
+    emptyStart[0]!.views !== 0 ||
+    emptyStart[1]!.day < 1
+  ) {
+    throw new Error("buildViewsCurvePoints d0-to-now failed");
+  }
+  const path = monotoneCurvePath([
+    { x: 0, y: 10 },
+    { x: 10, y: 20 },
+    { x: 20, y: 20 },
+  ]);
+  if (!path.startsWith("M") || !path.includes(" C")) {
+    throw new Error("monotoneCurvePath failed");
   }
   const ranked = rankInfluencers([
     { id: "x", name: "x", handle: "@x", product: "p", followers: 9, views: 0 },

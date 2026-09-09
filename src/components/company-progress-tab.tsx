@@ -18,6 +18,7 @@ import type { AllocationWithRelations } from "@/lib/types";
 
 /** 회원사 칸반: 수령완료·제작중은 한 열로 본다. */
 const BOARD_COLUMNS = ["대기", "수령완료", "검수중", "발행완료"] as const;
+const COL_PAGE = 9;
 
 function boardColumn(status: KanbanColumn): (typeof BOARD_COLUMNS)[number] {
   if (status === "제작중") return "수령완료";
@@ -535,10 +536,17 @@ export function CompanyProgressTab({
   const [selected, setSelected] = useState<ProgressKanbanCard | null>(null);
   const [allocations, setAllocations] = useState(initialAllocations);
   const [refreshing, setRefreshing] = useState(false);
+  const [colLimit, setColLimit] = useState<
+    Partial<Record<(typeof BOARD_COLUMNS)[number], number>>
+  >({});
 
   useEffect(() => {
     setAllocations(initialAllocations);
   }, [initialAllocations]);
+
+  useEffect(() => {
+    setColLimit({});
+  }, [productFilter, searchQ, allocations]);
 
   async function reload() {
     if (!live) return;
@@ -650,6 +658,9 @@ export function CompanyProgressTab({
           <div className="flex flex-col gap-5 lg:grid lg:grid-cols-4 lg:gap-3">
             {BOARD_COLUMNS.map((col) => {
               const items = grouped.get(col) ?? [];
+              const limit = colLimit[col] ?? COL_PAGE;
+              const shown = items.slice(0, limit);
+              const rest = items.length - shown.length;
               return (
                 <section
                   key={col}
@@ -668,13 +679,29 @@ export function CompanyProgressTab({
                       배정 없음
                     </p>
                   ) : (
-                    items.map((card) => (
-                      <KanbanCard
-                        key={`${card.status}-${card.influencerId}`}
-                        card={card}
-                        onClick={() => setSelected(card)}
-                      />
-                    ))
+                    <>
+                      {shown.map((card) => (
+                        <KanbanCard
+                          key={`${card.status}-${card.influencerId}`}
+                          card={card}
+                          onClick={() => setSelected(card)}
+                        />
+                      ))}
+                      {rest > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setColLimit((s) => ({
+                              ...s,
+                              [col]: limit + COL_PAGE,
+                            }))
+                          }
+                          className="w-full rounded-[6px] border border-[var(--line)] bg-[var(--surface)] py-2 text-[12.5px] font-semibold text-[var(--accent)]"
+                        >
+                          {Math.min(COL_PAGE, rest)}개 더 보기
+                        </button>
+                      ) : null}
+                    </>
                   )}
                 </section>
               );

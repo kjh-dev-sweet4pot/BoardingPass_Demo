@@ -19,9 +19,11 @@ function sizeClass(size: CreatorPhotoSize) {
 export function CreatorPhoto({
   creator,
   size = "card",
+  className,
 }: {
   creator: PoolCreator;
   size?: CreatorPhotoSize;
+  className?: string;
 }) {
   const candidates = useMemo(
     () => creatorAvatarCandidates(creator),
@@ -39,7 +41,7 @@ export function CreatorPhoto({
   const src = exhausted
     ? null
     : candidates[Math.min(idx, candidates.length - 1)];
-  const box = sizeClass(size);
+  const box = `${sizeClass(size)} ${className ?? ""}`.trim();
   const compact = size === "avatar" || size === "thumb";
 
   return (

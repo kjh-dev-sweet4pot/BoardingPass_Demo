@@ -847,7 +847,7 @@ const SectionHeaderRow = forwardRef<
       className={
         accent
           ? "border-y border-[var(--accent)] bg-[var(--accent-soft)]"
-          : "border-y border-[var(--line)] bg-[#eef2f0]"
+          : "border-y border-[var(--line)] bg-[var(--background)]"
       }
     >
       <td colSpan={colSpan} className="px-4 py-2.5">

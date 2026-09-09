@@ -9,32 +9,20 @@ import {
   CompanyHomeVisitBoard,
 } from "@/components/company-home-performance-board";
 import {
+  daysAgoLabel,
   displayHandle,
   formatHomeViews,
-  newsKindTone,
+  groupByDay,
+  pickNewsFeed,
+  monotoneCurvePath,
   type CompanyHomeBestPost,
   type CompanyHomeInfluencerRow,
   type CompanyHomeNewsItem,
   type CompanyHomePayload,
   type HomeInsightLink,
 } from "@/lib/company-home";
-import { resolvePoolCreator } from "@/lib/creator-pool-mock";
-
-function fmtNewsWhen(iso: string) {
-  const d = new Date(iso);
-  const md = d.toLocaleDateString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "numeric",
-    day: "numeric",
-  });
-  const hm = d.toLocaleTimeString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  return `${md} ${hm}`;
-}
+import { formatFollowers, resolvePoolCreator } from "@/lib/creator-pool-mock";
+import { formatMd } from "@/lib/types";
 
 function isNewsFresh(iso: string) {
   return Date.now() - new Date(iso).getTime() < 24 * 60 * 60 * 1000;
@@ -254,9 +242,7 @@ function HomeViewsCurve({ points }: { points: { day: number; views: number }[] }
     x: pad.l + (p.day / maxDay) * (W - pad.l - pad.r),
     y: pad.t + (1 - p.views / maxViews) * (H - pad.t - pad.b),
   }));
-  const line = pts
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(" ");
+  const line = monotoneCurvePath(pts);
   const last = pts[pts.length - 1]!;
   const first = pts[0]!;
   const area = `${line} L${last.x.toFixed(1)},${H - pad.b} L${first.x.toFixed(1)},${H - pad.b} Z`;
@@ -264,7 +250,14 @@ function HomeViewsCurve({ points }: { points: { day: number; views: number }[] }
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="h-[52px] w-full" aria-hidden>
       <path d={area} fill="var(--accent)" opacity={0.1} />
-      <path d={line} fill="none" stroke="var(--accent)" strokeWidth={1.8} />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       <circle cx={last.x} cy={last.y} r={2.2} fill="var(--accent)" />
       <text x={pad.l} y={H - 1} fill="var(--muted)" fontSize={8}>
         {formatCurveAxis(0, useHours)}
@@ -588,63 +581,340 @@ function RankCard({
   );
 }
 
+function NewsFace({
+  id,
+  name,
+  handle,
+  url,
+  size,
+}: {
+  id: string;
+  name: string;
+  handle: string;
+  url?: string | null;
+  size: "sm" | "lg";
+}) {
+  return (
+    <CreatorPhoto
+      creator={resolvePoolCreator({ id, name, handle, url })}
+      size="thumb"
+      className={
+        size === "lg"
+          ? "!h-14 !w-14 shrink-0 !rounded-full"
+          : "!h-9 !w-9 shrink-0 !rounded-full"
+      }
+    />
+  );
+}
+
+function newsGhostBtnClass(ok: boolean) {
+  return `inline-flex h-8 items-center justify-center rounded-[6px] border border-[var(--line)] text-[12px] font-semibold ${
+    ok ? "" : "text-[var(--muted)]"
+  }`;
+}
+
+function NewsDetailPanel({
+  item,
+  asOf,
+  onOpenPerformance,
+  onOpenProgress,
+}: {
+  item: CompanyHomeNewsItem;
+  asOf: string;
+  onOpenPerformance?: () => void;
+  onOpenProgress?: () => void;
+}) {
+  const d = item.detail;
+  if (d?.type !== "visit" && d?.type !== "publish") {
+    return (
+      <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3.5 shadow-lg">
+        <p className="text-[13px] font-bold">{item.title}</p>
+        <p className="mt-1 text-[12px] text-[var(--muted)]">{item.body}</p>
+      </div>
+    );
+  }
+  const visit = d.type === "visit";
+  const handle = displayHandle(d.handle);
+  const leftHref = visit ? d.profileUrl : d.contentUrl;
+  const rows: [string, string, string?][] = visit
+    ? [
+        ["방문일", `${d.visitDate} (${daysAgoLabel(d.visitDate, asOf)})`],
+        ["매장", d.store],
+        ["캠페인", d.product],
+        ["콘텐츠", d.contentLabel, "text-[#6b5a45]"],
+      ]
+    : [
+        ["발행일", `${d.day} (${daysAgoLabel(d.day, asOf)})`],
+        ["캠페인", d.product],
+        ["콘텐츠", "발행완료", "text-[#2f6b3c]"],
+      ];
+  return (
+    <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3.5 shadow-lg">
+      <div className="flex items-start gap-2.5">
+        <NewsFace
+          id={d.influencerId}
+          name={d.name}
+          handle={d.handle}
+          url={d.profileUrl}
+          size="lg"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-bold leading-tight text-[var(--ink)]">
+            {d.name}
+          </p>
+          <p className="mt-0.5 truncate text-[11px] leading-tight text-[var(--muted)]">
+            {handle ? `@${handle}` : ""}
+            {d.followers > 0 ? ` · ${formatFollowers(d.followers)} 팔로워` : ""}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+            visit
+              ? "bg-[#E7F3EA] text-[#2f6b3c]"
+              : "bg-[#E8F0FC] text-[#1F5FD8]"
+          }`}
+        >
+          {visit ? "방문" : "발행"}
+        </span>
+      </div>
+      <dl className="mt-3 grid grid-cols-[3.25rem_1fr] gap-x-3 gap-y-1 text-[12px] leading-tight">
+        {rows.map(([k, v, cls]) => (
+          <Fragment key={k}>
+            <dt className="text-[var(--muted)]">{k}</dt>
+            <dd className={`text-right ${cls || ""}`}>{v}</dd>
+          </Fragment>
+        ))}
+      </dl>
+      <div className="mt-3 grid grid-cols-2 gap-1.5">
+        {leftHref ? (
+          <a
+            href={leftHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={newsGhostBtnClass(true)}
+          >
+            {visit ? "프로필" : "컨텐츠 보기"}
+          </a>
+        ) : (
+          <span className={newsGhostBtnClass(false)}>
+            {visit ? "프로필" : "컨텐츠 보기"}
+          </span>
+        )}
+        <button
+          type="button"
+          className="inline-flex h-8 items-center justify-center rounded-[6px] bg-[var(--accent)] text-[12px] font-semibold text-white"
+          onClick={() =>
+            visit ? onOpenProgress?.() : onOpenPerformance?.()
+          }
+        >
+          {visit ? "진행 현황에서 보기" : "성과 바로가기"}
+        </button>
+      </div>
+      <p className="mt-2.5 text-[10.5px] leading-snug text-[var(--muted)]">
+        {visit
+          ? "발행되면 성과 탭에서 조회수를 볼 수 있습니다."
+          : "조회·좋아요는 성과 탭에서 확인할 수 있습니다."}
+      </p>
+    </div>
+  );
+}
+
 function NewsSidebar({
   items,
+  asOf,
   insightLinks,
   insightsLoading,
+  onOpenPerformance,
+  onOpenProgress,
 }: {
   items: CompanyHomeNewsItem[];
+  asOf: string;
   insightLinks: HomeInsightLink[];
   insightsLoading: boolean;
+  onOpenPerformance?: () => void;
+  onOpenProgress?: () => void;
 }) {
-  const shown = items.slice(0, 8);
+  const shown = pickNewsFeed(items);
+  const groups = useMemo(() => groupByDay(shown, (i) => i.at), [shown]);
+  const hideTimer = useRef<number | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [tipPos, setTipPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+  const hover = shown.find((n) => n.id === hoverId) || null;
+
+  useEffect(() => setMounted(true), []);
+  useEffect(
+    () => () => {
+      if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    },
+    [],
+  );
+
+  function cancelHide() {
+    if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    hideTimer.current = null;
+  }
+
+  function scheduleHide() {
+    cancelHide();
+    hideTimer.current = window.setTimeout(() => {
+      setHoverId(null);
+      setTipPos(null);
+    }, 160);
+  }
+
+  function placeHover(id: string, el?: HTMLElement | null) {
+    cancelHide();
+    const r = el?.getBoundingClientRect();
+    if (!r) return;
+    const width = Math.min(320, window.innerWidth - 24);
+    const gap = 10;
+    let left = r.left - width - gap;
+    if (left < 8) left = 8;
+    let top = r.top;
+    const estH = 280;
+    if (top + estH > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - estH - 8);
+    }
+    setHoverId(id);
+    setTipPos({ top, left, width });
+  }
+
   return (
     <aside className="flex w-full flex-col gap-3 self-start xl:w-[300px] xl:shrink-0">
-      <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-4">
-        <h3 className="text-sm font-bold text-[var(--ink)]">Live 뉴스</h3>
-        <p className="mb-2.5 mt-0.5 text-[11.5px] text-[var(--muted)]">
-          업로드 · 방문 · 운영 · 최대 8건
+      <div>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 className="text-[18px] font-bold tracking-tight text-[var(--ink)]">
+            소식
+          </h2>
+          {onOpenProgress ? (
+            <button
+              type="button"
+              onClick={onOpenProgress}
+              className="text-[12.5px] font-semibold text-[var(--accent)] hover:underline"
+            >
+              전체 보기 →
+            </button>
+          ) : null}
+        </div>
+        <p className="mt-0.5 text-[12px] text-[var(--muted)]">
+          방문 · 발행 · 운영
         </p>
+      </div>
+      <div
+        className="rounded-[10px] border border-[var(--line)] bg-[var(--surface)] p-3"
+        onMouseLeave={scheduleHide}
+      >
         {shown.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">아직 뉴스가 없습니다.</p>
+          <p className="text-sm text-[var(--muted)]">아직 소식이 없습니다.</p>
         ) : (
-          <ul className="m-0 max-h-[360px] list-none overflow-auto p-0">
-            {shown.map((item, i) => {
-              const fresh = isNewsFresh(item.at);
+          <div className="max-h-[360px] overflow-auto">
+            {groups.map(([day, rows]) => {
+              const fresh = rows.some((r) => isNewsFresh(r.at));
               return (
-                <li
-                  key={item.id}
-                  className={`relative border-[var(--line)] py-2 pl-3.5 ${
-                    i === 0 ? "border-t-0" : "border-t"
-                  }`}
-                >
-                  <span
-                    className={`absolute left-0 top-3.5 h-[5px] w-[5px] rounded-full ${
-                      fresh ? "bp-news-dot bg-[#1F5FD8]" : "bg-[var(--line)]"
-                    }`}
-                  />
-                  <p className="flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
-                    <b className="font-semibold text-[var(--ink)]">
-                      {fmtNewsWhen(item.at)}
-                    </b>
-                    <span className={newsKindTone(item.kind)}>{item.kind}</span>
-                  </p>
-                  <p
-                    className={`my-0.5 text-[12.5px] font-bold leading-snug ${
-                      fresh ? "bp-news-title text-[#1F5FD8]" : "text-[var(--ink)]"
-                    }`}
-                  >
-                    {item.title}
-                  </p>
-                  <p className="line-clamp-2 text-[11px] leading-snug text-[var(--muted)]">
-                    {item.body}
-                  </p>
-                </li>
+                <section key={day} className="mb-2 last:mb-0">
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <p className="shrink-0 text-[12px] font-semibold text-[var(--ink)]">
+                      {formatMd(day)}
+                    </p>
+                    <span className="h-px min-w-0 flex-1 bg-[var(--line)]" />
+                    {fresh ? (
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#1F5FD8]" />
+                    ) : null}
+                  </div>
+                  <ul className="m-0 list-none p-0">
+                    {rows.map((item) => {
+                      const visit =
+                        item.detail?.type === "visit" ? item.detail : null;
+                      const pub =
+                        item.detail?.type === "publish" ? item.detail : null;
+                      return (
+                        <li key={item.id}>
+                          <button
+                            type="button"
+                            className={`flex w-full items-center gap-2 rounded-[6px] py-1.5 text-left hover:bg-[var(--surface-hover)] ${
+                              hoverId === item.id
+                                ? "bg-[var(--surface-hover)]"
+                                : ""
+                            }`}
+                            onMouseEnter={(e) =>
+                              placeHover(item.id, e.currentTarget)
+                            }
+                            onFocus={(e) =>
+                              placeHover(item.id, e.currentTarget)
+                            }
+                            onClick={(e) =>
+                              placeHover(item.id, e.currentTarget)
+                            }
+                          >
+                            {visit ? (
+                              <NewsFace
+                                id={visit.influencerId}
+                                name={visit.name}
+                                handle={visit.handle}
+                                url={visit.profileUrl}
+                                size="sm"
+                              />
+                            ) : (
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-[#E8F0FC] text-[10px] font-bold text-[#1F5FD8]">
+                                발행
+                              </div>
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[13px] font-bold leading-snug text-[var(--ink)]">
+                                {item.title}
+                              </span>
+                              <span className="mt-0.5 block truncate text-[11px] leading-snug text-[var(--muted)]">
+                                {item.body}
+                              </span>
+                            </span>
+                            {pub ? (
+                              <span className="shrink-0 rounded-full bg-[#E8F0FC] px-1.5 py-0.5 text-[10px] font-semibold text-[#1F5FD8]">
+                                발행
+                              </span>
+                            ) : (
+                              <span className="shrink-0 rounded-full bg-[#E7F3EA] px-1.5 py-0.5 text-[10px] font-semibold text-[#2f6b3c]">
+                                방문
+                              </span>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
               );
             })}
-          </ul>
+          </div>
         )}
       </div>
+      {mounted && hover && tipPos
+        ? createPortal(
+            <div
+              className="owm-theme fixed z-[200] !bg-transparent"
+              style={{
+                top: tipPos.top,
+                left: tipPos.left,
+                width: tipPos.width,
+                background: "transparent",
+              }}
+              onMouseEnter={cancelHide}
+              onMouseLeave={scheduleHide}
+            >
+              <NewsDetailPanel
+                item={hover}
+                asOf={asOf}
+                onOpenPerformance={onOpenPerformance}
+                onOpenProgress={onOpenProgress}
+              />
+            </div>,
+            document.body,
+          )
+        : null}
       <CompanyHomeShareDonuts links={insightLinks} loading={insightsLoading} />
     </aside>
   );
@@ -790,11 +1060,11 @@ export function CompanyHomeLanding({
                     value: `${content?.published ?? 0}건`,
                   },
                   {
-                    label: "목표",
+                    label: "배정",
                     value:
                       content?.target != null
                         ? `${content.target}건`
-                        : "미설정",
+                        : "없음",
                   },
                   {
                     label: "진행률",
@@ -804,7 +1074,7 @@ export function CompanyHomeLanding({
                         : "—",
                   },
                 ]}
-                note="발행완료 콘텐츠 건수 / 배정 목표 콘텐츠 수 합계입니다."
+                note="발행완료 배정 건수 / 전체 배정 건수입니다."
               >
                 <DonutCell
                   pct={
@@ -942,8 +1212,11 @@ export function CompanyHomeLanding({
               />
               <NewsSidebar
                 items={data.news}
+                asOf={data.asOf}
                 insightLinks={insightLinks}
                 insightsLoading={insightsLoading}
+                onOpenPerformance={onOpenPerformance}
+                onOpenProgress={onOpenPublish}
               />
             </div>
 

@@ -5,6 +5,7 @@ import {
   runCollectionJob,
 } from "@/lib/collect-content-metrics";
 import {
+  canCollectPostedAt,
   isCampaignCollectActive,
   isCollectionDue,
   publishAnchorIso,
@@ -93,9 +94,14 @@ export async function runMetricsScheduler(
       const campaignStatus = alloc?.campaigns?.status;
       if (!isCampaignCollectActive(campaignStatus)) continue;
 
+      const url = (row.publish_url || row.url || "").trim();
+      const needsPostedAt =
+        !row.published_at && canCollectPostedAt(url, row.platform);
       const anchor = publishAnchorIso(row);
-      if (!anchor) continue;
-      if (!isCollectionDue(anchor, row.metrics_collected_at)) continue;
+      if (!needsPostedAt) {
+        if (!anchor) continue;
+        if (!isCollectionDue(anchor, row.metrics_collected_at)) continue;
+      }
       if (await hasActiveJob(supabase, row.id)) continue;
 
       try {

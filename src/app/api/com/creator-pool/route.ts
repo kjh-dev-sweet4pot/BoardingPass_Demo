@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getCompanySessionId } from "@/lib/session";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
-import { poolCreatorFromInfluencer } from "@/lib/com-creator-pool";
+import { poolCreatorFromInfluencer, type ProfileAvgMetrics } from "@/lib/com-creator-pool";
+import profileMetrics from "@/lib/data/pool-profile-metrics.json";
 
 async function getClient() {
   if (hasServiceRoleKey()) return createServiceClient();
@@ -26,7 +27,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("allocations")
     .select(
-      "id, product_id, created_at, visit_date, products(name), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url, followers, region)",
+      "id, product_id, created_at, visit_date, products(name), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url, followers, region), creator_links(url, publish_url, platform, status, content_status, submitted_at, views, likes, comments, saves)",
     )
     .eq("company_id", companyId)
     .order("created_at", { ascending: false });
@@ -37,7 +38,12 @@ export async function GET() {
 
   const best = new Map<
     string,
-    { inf: Parameters<typeof poolCreatorFromInfluencer>[0]; product: string | null; visitYmd: string }
+    {
+      inf: Parameters<typeof poolCreatorFromInfluencer>[0];
+      product: string | null;
+      visitYmd: string;
+      links: NonNullable<(typeof data)[number]["creator_links"]>;
+    }
   >();
   for (const row of data ?? []) {
     const infRaw = row.influencers;
@@ -46,19 +52,34 @@ export async function GET() {
     const productRaw = row.products;
     const product = Array.isArray(productRaw) ? productRaw[0] : productRaw;
     const visitYmd = row.visit_date ? String(row.visit_date).slice(0, 10) : "";
+    const rowLinks = Array.isArray(row.creator_links)
+      ? row.creator_links
+      : row.creator_links
+        ? [row.creator_links]
+        : [];
     const prev = best.get(inf.id);
-    if (!prev || visitYmd > prev.visitYmd) {
+    if (!prev) {
       best.set(inf.id, {
         inf,
-        product: product?.name ?? prev?.product ?? null,
+        product: product?.name ?? null,
         visitYmd,
+        links: rowLinks,
       });
+      continue;
+    }
+    prev.links.push(...rowLinks);
+    if (visitYmd > prev.visitYmd) {
+      prev.visitYmd = visitYmd;
+      prev.product = product?.name ?? prev.product;
     }
   }
-  const creators = [...best.values()].map(({ inf, product, visitYmd }) =>
+  const profileById = profileMetrics as Record<string, ProfileAvgMetrics>;
+  const creators = [...best.values()].map(({ inf, product, visitYmd, links }) =>
     poolCreatorFromInfluencer(inf, {
       productName: product,
       visitYmd: visitYmd || null,
+      links,
+      profileAvg: profileById[inf.id] ?? null,
     }),
   );
 

@@ -4,6 +4,7 @@ import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase
 import { getCompanySessionId } from "@/lib/session";
 import { resolveCreatorPlatform } from "@/lib/creator-link";
 import { estimateXiaohongshuViews } from "@/lib/xiaohongshu-views";
+import { padMetricsBeforeFirstCollect } from "@/lib/content-metrics-ramp";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type InsightsPayload = {
@@ -62,6 +63,7 @@ export async function fetchInsights(
     publish_url: string | null;
     status: string;
     submitted_at: string | null;
+    published_at: string | null;
     views: number | null;
     likes: number | null;
     comments: number | null;
@@ -75,7 +77,7 @@ export async function fetchInsights(
     const { data, error: linksErr } = await supabase
       .from("creator_links")
       .select(
-        "id, url, publish_url, status, submitted_at, views, likes, comments, saves, shares, reposts, metrics_collected_at, allocation_id",
+        "id, url, publish_url, status, submitted_at, published_at, views, likes, comments, saves, shares, reposts, metrics_collected_at, allocation_id",
       )
       .in("allocation_id", part)
       .or(
@@ -104,7 +106,7 @@ export async function fetchInsights(
       id: l.id,
       link_url,
       status: l.status,
-      published_at: l.submitted_at || null,
+      published_at: l.published_at || l.submitted_at || null,
       views,
       likes: l.likes,
       comments: l.comments,
@@ -123,7 +125,13 @@ export async function fetchInsights(
   );
 
   const linkIds = links.map((l) => l.id);
-  const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
+  const posted = rawLinks
+    .map((l) => l.published_at)
+    .filter((s): s is string => Boolean(s))
+    .sort();
+  const since =
+    posted[0] ||
+    new Date(Date.now() - days * 86400 * 1000).toISOString();
   const metrics: {
     creator_link_id: string;
     collected_at: string;
@@ -164,7 +172,12 @@ export async function fetchInsights(
     };
   });
 
-  return { links, metrics: metricRows, collectedAt, source: "apify" };
+  return {
+    links,
+    metrics: padMetricsBeforeFirstCollect(links, metricRows),
+    collectedAt,
+    source: "apify",
+  };
 }
 
 /**

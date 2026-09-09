@@ -79,12 +79,6 @@ export async function GET() {
   }, 0);
   const budgetTotal = totalBudget > 0 ? totalBudget : null;
 
-  const { data: castings } = await supabase
-    .from("castings")
-    .select("id")
-    .eq("company_id", companyId)
-    .eq("status", "Accept");
-
   let budget = summarizeBudget(budgetTotal, 0, 0);
   try {
     const bp = await buildBudgetPerformanceForCompany(supabase, company);
@@ -96,7 +90,7 @@ export async function GET() {
   const { data: allocs } = await supabase
     .from("allocations")
     .select(
-      "id, influencer_id, status, rollup_status, target_content_count, visit_date, influencers(id, name, instagram_handle_normalized, instagram_handle, sns_url, followers), products(id, name)",
+      "id, influencer_id, status, rollup_status, target_content_count, visit_date, influencers(id, name, instagram_handle_normalized, instagram_handle, sns_url, followers), products(id, name), stores(id, name)",
     )
     .eq("company_id", companyId);
 
@@ -107,18 +101,23 @@ export async function GET() {
   const allocIds = [...allocMap.keys()];
 
   let posts: CompanyHomeBestPost[] = [];
+  const publishedAllocIds = new Set<string>();
   if (allocIds.length > 0) {
-    const { data: links } = await supabase
+    const { data: links, error: linksErr } = await supabase
       .from("creator_links")
       .select(
-        "id, url, publish_url, submitted_at, views, likes, comments, allocation_id",
+        "id, url, publish_url, submitted_at, published_at, views, likes, comments, allocation_id",
       )
       .in("allocation_id", allocIds)
       .or(
         "content_status.eq.발행완료,publish_url.not.is.null,and(content_status.is.null,status.eq.approved)",
       );
+    if (linksErr) {
+      return NextResponse.json({ error: linksErr.message }, { status: 500 });
+    }
 
     posts = (links || []).map((l) => {
+      if (l.allocation_id) publishedAllocIds.add(String(l.allocation_id));
       const alloc = allocMap.get(l.allocation_id);
       const inf = Array.isArray(alloc?.influencers)
         ? alloc?.influencers[0]
@@ -144,7 +143,7 @@ export async function GET() {
         views: Number(l.views) || 0,
         likes: Number(l.likes) || 0,
         comments: Number(l.comments) || 0,
-        publishedAt: l.submitted_at || null,
+        publishedAt: l.published_at || l.submitted_at || null,
       };
     });
   }
@@ -182,11 +181,10 @@ export async function GET() {
   const weekSince = windowStartIso(7, asOf);
   const monthSince = windowStartIso(30, asOf);
 
-  const published = posts.length;
-  const targetSum = activeAllocs.reduce((s, a) => {
-    const n = Number(a.target_content_count);
-    return s + (Number.isFinite(n) && n > 0 ? n : 0);
-  }, 0);
+  const published = activeAllocs.filter((a) =>
+    publishedAllocIds.has(a.id),
+  ).length;
+  const targetSum = activeAllocs.length;
 
   const viewsByInf = new Map<string, number>();
   for (const p of posts) {
@@ -271,10 +269,35 @@ export async function GET() {
   }
 
   const news = buildDerivedNews({
-    companyName: company.name,
-    campaigns: campaignRows,
-    acceptCount: (castings || []).length,
-    publishedCount: posts.length,
+    asOf,
+    visits: activeAllocs.map((a) => {
+      const inf = Array.isArray(a.influencers) ? a.influencers[0] : a.influencers;
+      const store = Array.isArray(a.stores) ? a.stores[0] : a.stores;
+      const product = Array.isArray(a.products) ? a.products[0] : a.products;
+      const handleRaw =
+        inf?.instagram_handle_normalized || inf?.instagram_handle || "";
+      return {
+        id: a.id,
+        influencerId: inf?.id || a.influencer_id || a.id,
+        name: inf?.name || "인플루언서",
+        store: store?.name || "",
+        visitDate: a.visit_date ? String(a.visit_date).slice(0, 10) : "",
+        handle: handleRaw ? `@${String(handleRaw).replace(/^@+/, "")}` : "",
+        snsUrl: inf?.sns_url ? String(inf.sns_url) : null,
+        product: product?.name || "",
+        followers: Number(inf?.followers) || 0,
+        published: publishedAllocIds.has(a.id),
+      };
+    }),
+    uploads: posts.map((p) => ({
+      id: p.id,
+      influencerId: p.influencerId,
+      name: p.name,
+      handle: p.handle,
+      at: p.publishedAt || "",
+      url: p.url,
+      product: p.product,
+    })),
   });
 
   const visits = splitHomeVisits(
