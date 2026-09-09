@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from "crypto";
+import { getJwtSecret } from "@/lib/supabase/env";
 
 export type AppAuthRole =
   | "company"
@@ -24,7 +25,7 @@ export function signSessionJwt(
   claims: AppAuthClaims,
   expiresInSec = 60 * 60 * 12,
 ) {
-  const secret = process.env.SUPABASE_JWT_SECRET?.trim();
+  const secret = getJwtSecret();
   if (!secret) return null;
 
   const now = Math.floor(Date.now() / 1000);

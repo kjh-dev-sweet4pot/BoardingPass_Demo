@@ -7,6 +7,7 @@ import { isAdminManagerSession } from "@/lib/session";
 import { normalizeHandle } from "@/lib/auth";
 import { normalizeVisitDate, parseProductAndQty } from "@/lib/csv-import";
 import { findDuplicateAllocation } from "@/lib/alloc-dup";
+import { canonicalBranchName, isBranchStoreName } from "@/lib/store-name";
 import { scheduleInfluencerProfileFetch } from "@/lib/influencer-profile-image";
 
 async function ensureAdminManager() {
@@ -47,6 +48,8 @@ export async function createManualAllocation(formData: FormData) {
 
   if (!snsid) fail("인스타그램 핸들(snsid)을 입력하세요.");
   if (!storeIdRaw && !storeName) fail("방문지점을 선택하세요.");
+  if (storeName && !isBranchStoreName(storeName))
+    fail("방문지점이 상품코드(숫자)입니다. 지점명을 넣어 주세요.");
   if (!productName) fail("상품을 입력하세요.");
   if (!companyId) fail("회원사를 선택하세요.");
   if (!visit_date) fail("방문 예정일을 입력하세요.");
@@ -100,18 +103,17 @@ export async function createManualAllocation(formData: FormData) {
     if (error || !store) fail("선택한 지점을 찾을 수 없습니다.");
     storeId = store.id;
   } else {
-    const { data: existingStore } = await supabase
-      .from("stores")
-      .select("id")
-      .ilike("name", storeName)
-      .limit(1)
-      .maybeSingle();
+    const canon = canonicalBranchName(storeName);
+    const { data: storeRows } = await supabase.from("stores").select("id, name");
+    const existingStore = (storeRows || []).find(
+      (s) => canonicalBranchName(s.name || "") === canon,
+    );
     if (existingStore?.id) {
       storeId = existingStore.id;
     } else {
       const { data: created, error } = await supabase
         .from("stores")
-        .insert({ name: storeName })
+        .insert({ name: canon })
         .select("id")
         .single();
       if (error || !created) fail(error?.message || "매장 생성 실패");

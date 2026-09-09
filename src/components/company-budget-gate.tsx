@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatKrw } from "@/lib/creator-pool-mock";
 
 /** 데모 온보딩 게이트: 예산 입금 확인 전 대시보드 잠금. */
-export const DEMO_BUDGET_KRW = 30_000_000;
 
 function storageKey(companyId: string) {
   return `bp-com-budget-unlocked:${companyId}`;
@@ -56,8 +54,8 @@ export function CompanyBudgetGate({
         <dl className="mt-6 grid gap-3 rounded-[6px] bg-[var(--accent-soft)]/60 px-4 py-4 sm:grid-cols-2">
           <div>
             <dt className="text-xs text-[var(--muted)]">확정 예산</dt>
-            <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--accent)]">
-              {formatKrw(DEMO_BUDGET_KRW)}원
+            <dd className="mt-1 text-xl font-semibold text-[var(--accent)]">
+              확인 전
             </dd>
           </div>
           <div>
@@ -69,7 +67,7 @@ export function CompanyBudgetGate({
         <ol className="mt-6 space-y-2 text-sm text-[var(--ink)]">
           <li className="flex gap-2">
             <span className="font-semibold text-[var(--accent)]">1.</span>
-            집행 예산 확정 ({formatKrw(DEMO_BUDGET_KRW)}원)
+            집행 예산 확정
           </li>
           <li className="flex gap-2">
             <span className="font-semibold text-[var(--accent)]">2.</span>

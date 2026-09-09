@@ -36,6 +36,8 @@ export type PoolCreator = {
   product: string | null;
   posts: CreatorPost[];
   uploadYmd: string | null;
+  /** 가장 늦은 방문일 YYYY-MM-DD */
+  visitYmd?: string | null;
   metrics: {
     views: number | null;
     likes: number | null;
@@ -75,6 +77,7 @@ export const TIER_LABEL: Record<PoolCreator["tier"], string> = {
 export const POST_PLATFORM_LABEL: Record<string, string> = {
   instagram: "Instagram",
   tiktok: "TikTok",
+  xiaohongshu: "샤오홍슈",
   x: "X",
   lips: "LIPS",
   youtube: "YouTube",
@@ -179,9 +182,11 @@ export function resolvePoolCreator(opts: {
     name: opts.name,
   });
   if (fromPool) return fromPool;
-  const channel = /tiktok/i.test(opts.url || "")
-    ? ("tiktok" as const)
-    : ("instagram" as const);
+  const channel = /xiaohongshu|xhslink|rednote/i.test(opts.url || "")
+    ? ("xiaohongshu" as const)
+    : /tiktok/i.test(opts.url || "")
+      ? ("tiktok" as const)
+      : ("instagram" as const);
   return {
     id: opts.id,
     name: opts.name,

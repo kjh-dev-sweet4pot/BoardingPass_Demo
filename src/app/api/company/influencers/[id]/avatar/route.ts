@@ -11,8 +11,8 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const companyId = await getCompanySessionId();
-  const admin = !companyId && (await isAdminSession());
+  const admin = await isAdminSession();
+  const companyId = admin ? null : await getCompanySessionId();
   if (!companyId && !admin) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }

@@ -8,6 +8,12 @@ import {
 } from "@/lib/apify-instagram";
 import { isTikTokUrl } from "@/lib/tiktok-oembed";
 import { findResultForUrl, scrapeTikTokPosts, extractThumbnailUrl } from "@/lib/apify-tiktok";
+import {
+  extractXiaohongshuThumbnailUrl,
+  findXiaohongshuResultForUrl,
+  isXiaohongshuUrl,
+  scrapeXiaohongshuPosts,
+} from "@/lib/apify-xiaohongshu";
 
 type ThumbStatus = "pending" | "ok" | "failed";
 
@@ -87,6 +93,50 @@ export async function collectInstagramLinkThumbnail(
         saves: result.savesCount ?? null,
         shares: result.sharesCount ?? null,
         reposts: result.repostsCount ?? null,
+        metrics_collected_at: now,
+        updated_at: now,
+      })
+      .eq("id", linkId);
+
+    if (error) throw new Error(error.message);
+  } catch {
+    await supabase
+      .from("creator_links")
+      .update({
+        thumbnail_status: "failed" satisfies ThumbStatus,
+        thumbnail_fetched_at: now,
+        updated_at: now,
+      })
+      .eq("id", linkId);
+  }
+}
+
+export async function collectXiaohongshuLinkThumbnail(
+  supabase: SupabaseClient,
+  linkId: string,
+  pageUrl: string,
+) {
+  if (!isXiaohongshuUrl(pageUrl)) return;
+
+  const now = new Date().toISOString();
+
+  try {
+    const items = await scrapeXiaohongshuPosts([pageUrl]);
+    const result = findXiaohongshuResultForUrl(items, pageUrl);
+    if (!result) throw new Error("Apify returned no matching result");
+
+    const { error } = await supabase
+      .from("creator_links")
+      .update({
+        thumbnail_status: "ok" satisfies ThumbStatus,
+        thumbnail_source_url: extractXiaohongshuThumbnailUrl(result),
+        thumbnail_fetched_at: now,
+        views: result.views,
+        likes: result.likes,
+        comments: result.comments,
+        saves: result.saves,
+        shares: result.shares,
+        reposts: null,
         metrics_collected_at: now,
         updated_at: now,
       })

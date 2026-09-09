@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { InfLocaleEnsure, useInfLocale } from "@/components/inf-locale-provider";
 import {
   CREATOR_PLATFORM_LABEL,
+  creatorPlatformLabelOf,
   summarizeAllocationLinks,
   type CreatorPlatform,
 } from "@/lib/creator-link";
@@ -546,7 +547,7 @@ function LinkList({
           </a>
           <div className="mt-1 flex items-center justify-between gap-2 text-xs text-[var(--muted)]">
             <span>
-              {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform]} ·{" "}
+              {creatorPlatformLabelOf(link.url, link.platform)} ·{" "}
               {statusLabel(link.status, t)}
               {link.status === "rejected" && link.memo ? ` · ${link.memo}` : ""}
             </span>

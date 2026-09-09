@@ -3,8 +3,8 @@
 import { useState } from "react";
 import {
   CREATOR_LINK_STATUS_LABEL,
-  CREATOR_PLATFORM_LABEL,
-  type CreatorPlatform,
+  creatorPlatformLabelOf,
+  resolveCreatorPlatform,
 } from "@/lib/creator-link";
 import { type CreatorLink } from "@/lib/types";
 
@@ -35,7 +35,17 @@ function fmt(n: number | null | undefined) {
 function MetricsBadge({ link, onRefresh }: { link: ReviewRow; onRefresh: (id: string) => void }) {
   const [refreshing, setRefreshing] = useState(false);
 
-  if (link.platform !== "tiktok" && link.platform !== "instagram") return null;
+  const platform = resolveCreatorPlatform(
+    link.publish_url || link.url,
+    link.platform,
+  );
+  if (
+    platform !== "tiktok" &&
+    platform !== "instagram" &&
+    platform !== "xiaohongshu"
+  ) {
+    return null;
+  }
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -286,8 +296,10 @@ export function AdminLinkReview() {
                       </a>
                     ) : null}
                     <p className="mt-1 text-xs text-[var(--muted)]">
-                      {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform] ||
-                        link.platform}{" "}
+                      {creatorPlatformLabelOf(
+                        link.publish_url || link.url,
+                        link.platform,
+                      )}{" "}
                       · {CREATOR_LINK_STATUS_LABEL[link.status]}
                     </p>
 

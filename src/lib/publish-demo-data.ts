@@ -243,6 +243,7 @@ export function buildProgressPoolAllocations(): AllocationWithRelations[] {
 
 function asPlatform(p: string): CreatorPlatform {
   if (p === "tiktok") return "tiktok";
+  if (p === "xiaohongshu") return "xiaohongshu";
   if (p === "youtube") return "youtube";
   if (p === "x" || p === "twitter" || p === "lips") return "etc";
   return "instagram";

@@ -5,11 +5,14 @@ import { requireAdminManager } from "@/lib/access";
 import { createAdminDbClient } from "@/lib/supabase/api-client";
 import {
   applyCompanyMatch,
+  expandImportRowsByCompany,
   validateImportRow,
   type ImportRowInput,
   type ParsedImportRow,
 } from "@/lib/csv-import";
 import { findDuplicateAllocation } from "@/lib/alloc-dup";
+import { detectPlatform } from "@/lib/creator-link";
+import { canonicalBranchName, isBranchStoreName } from "@/lib/store-name";
 import {
   scheduleInfluencerProfileFetch,
 } from "@/lib/influencer-profile-image";
@@ -103,35 +106,83 @@ async function findOrCreateInfluencer(
   return ref;
 }
 
+async function attachImportLinks(
+  supabase: AdminSupabase,
+  allocationId: string,
+  influencerId: string,
+  urls: string[],
+) {
+  if (urls.length === 0) return 0;
+  const { data: existing } = await supabase
+    .from("creator_links")
+    .select("url, publish_url")
+    .eq("allocation_id", allocationId);
+  const have = new Set(
+    (existing || []).flatMap((l) =>
+      [l.url, l.publish_url].filter((u): u is string => Boolean(u && String(u).trim())),
+    ),
+  );
+  let added = 0;
+  for (const url of urls) {
+    if (have.has(url)) continue;
+    const platform = detectPlatform(url);
+    const payload = {
+      allocation_id: allocationId,
+      influencer_id: influencerId,
+      url,
+      publish_url: url,
+      platform,
+      status: "approved",
+      content_status: "발행완료",
+      thumbnail_status: "pending",
+    };
+    let { error } = await supabase.from("creator_links").insert(payload);
+    if (error && /platform_check/i.test(error.message) && platform === "xiaohongshu") {
+      const retry = await supabase
+        .from("creator_links")
+        .insert({ ...payload, platform: "etc" });
+      error = retry.error;
+    }
+    if (error) throw new Error(`콘텐츠 링크 저장 실패: ${error.message}`);
+    have.add(url);
+    added += 1;
+  }
+  return added;
+}
+
 async function findOrCreateStore(
   supabase: AdminSupabase,
   name: string,
   cache: Map<string, string>,
 ) {
-  const key = name.trim().toLowerCase();
-  const cached = cache.get(key);
+  const trimmed = name.trim();
+  if (!isBranchStoreName(trimmed)) {
+    throw new Error("방문지점이 상품코드(숫자)입니다. 지점명을 넣어 주세요");
+  }
+  const canon = canonicalBranchName(trimmed);
+  const cached = cache.get(canon);
   if (cached) return cached;
 
-  const { data: existing } = await supabase
-    .from("stores")
-    .select("id, name")
-    .ilike("name", name)
-    .limit(1)
-    .maybeSingle();
-
-  if (existing?.id) {
-    cache.set(key, existing.id);
-    return existing.id as string;
+  if (!cache.has("*")) {
+    const { data: all } = await supabase.from("stores").select("id, name");
+    for (const row of all || []) {
+      if (!isBranchStoreName(row.name || "")) continue;
+      const c = canonicalBranchName(row.name);
+      if (!cache.has(c)) cache.set(c, row.id as string);
+    }
+    cache.set("*", "*");
   }
+  const hit = cache.get(canon);
+  if (hit && hit !== "*") return hit;
 
   const { data: created, error } = await supabase
     .from("stores")
-    .insert({ name })
+    .insert({ name: canon })
     .select("id")
     .single();
 
   if (error || !created) throw new Error(error?.message || "매장 생성 실패");
-  cache.set(key, created.id);
+  cache.set(canon, created.id);
   return created.id as string;
 }
 
@@ -199,9 +250,9 @@ export async function POST(request: Request) {
     .from("companies")
     .select("id, name, aliases, is_active");
 
-  const parsed = rawRows.map((row, idx) =>
-    applyCompanyMatch(validateImportRow(idx + 2, row), companies || []),
-  );
+  const parsed = expandImportRowsByCompany(
+    rawRows.map((row, idx) => validateImportRow(idx + 2, row)),
+  ).map((row) => applyCompanyMatch(row, companies || []));
   const valid = parsed.filter((r) => r.ok);
   if (valid.length === 0) {
     return NextResponse.json(
@@ -221,6 +272,7 @@ export async function POST(request: Request) {
   let created = 0;
   let skipped = 0;
   let failed = 0;
+  let linked = 0;
 
   const adminRole = await getAdminRole();
   let batchId: string | null = null;
@@ -328,12 +380,27 @@ export async function POST(request: Request) {
       });
 
       if (dupId) {
-        skipped++;
-        results.push({
-          rowNumber: row.rowNumber,
-          ok: true,
-          action: "skipped_duplicate",
-        });
+        const added = await attachImportLinks(
+          supabase,
+          dupId,
+          influencer.id,
+          row.content_urls || [],
+        );
+        if (added > 0) {
+          linked += added;
+          results.push({
+            rowNumber: row.rowNumber,
+            ok: true,
+            action: "links_added",
+          });
+        } else {
+          skipped++;
+          results.push({
+            rowNumber: row.rowNumber,
+            ok: true,
+            action: "skipped_duplicate",
+          });
+        }
         continue;
       }
 
@@ -373,6 +440,15 @@ export async function POST(request: Request) {
         }
       }
 
+      if ((row.content_urls || []).length) {
+        linked += await attachImportLinks(
+          supabase,
+          allocation.id,
+          influencer.id,
+          row.content_urls || [],
+        );
+      }
+
       created++;
       results.push({
         rowNumber: row.rowNumber,
@@ -410,6 +486,7 @@ export async function POST(request: Request) {
       created,
       skipped,
       failed,
+      linked,
     },
     results,
   });

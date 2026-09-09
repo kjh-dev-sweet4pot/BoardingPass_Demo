@@ -28,6 +28,7 @@ export const PUBLISH_KIND_LABEL: Record<PublishKind, string> = {
 export const PUBLISH_PLATFORM_LABEL: Record<string, string> = {
   instagram: "Instagram",
   tiktok: "TikTok",
+  xiaohongshu: "샤오홍슈",
   x: "X",
   lips: "LIPS",
   youtube: "YouTube",

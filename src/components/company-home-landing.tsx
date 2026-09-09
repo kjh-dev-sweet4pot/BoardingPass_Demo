@@ -6,6 +6,7 @@ import { CreatorPhoto } from "@/components/creator-photo";
 import {
   CompanyHomePerformanceBoard,
   CompanyHomeShareDonuts,
+  CompanyHomeVisitBoard,
 } from "@/components/company-home-performance-board";
 import {
   displayHandle,
@@ -17,7 +18,7 @@ import {
   type CompanyHomePayload,
   type HomeInsightLink,
 } from "@/lib/company-home";
-import { formatKrw, resolvePoolCreator } from "@/lib/creator-pool-mock";
+import { resolvePoolCreator } from "@/lib/creator-pool-mock";
 
 function fmtNewsWhen(iso: string) {
   const d = new Date(iso);
@@ -653,14 +654,12 @@ export function CompanyHomeLanding({
   companyName,
   companyId,
   onOpenPerformance,
-  onOpenBudgetPerformance,
   onOpenPublish,
   onOpenPool,
 }: {
   companyName: string;
   companyId: string;
   onOpenPerformance?: () => void;
-  onOpenBudgetPerformance?: () => void;
   onOpenPublish?: () => void;
   onOpenPool?: () => void;
 }) {
@@ -755,7 +754,6 @@ export function CompanyHomeLanding({
     window.setTimeout(() => setFlashMonthly(false), 900);
   }
 
-  const budget = data?.budget;
   const content = data?.content;
   const inf = data?.influencers;
   const weekViews = data?.weekViews;
@@ -781,60 +779,9 @@ export function CompanyHomeLanding({
         {data ? (
           <>
             <p className="px-5 pt-3 text-[11.5px] text-[var(--muted)] sm:px-8">
-              {companyName} · {data.asOf} 조회 시점 기준 · 예산은 노출가 실제 사용·차감 예정
+              {companyName} · {data.asOf} 조회 시점 기준
             </p>
-            <div className="mt-3 grid grid-cols-1 gap-3 px-5 sm:grid-cols-2 sm:px-8 xl:grid-cols-4">
-              <KpiHoverTip
-                title="예산 집행"
-                rows={[
-                  {
-                    label: "캠페인 예산",
-                    value:
-                      budget?.total != null
-                        ? `${formatKrw(budget.total)}원`
-                        : "—",
-                  },
-                  {
-                    label: "실제 사용",
-                    value: `${formatKrw(budget?.spent ?? 0)}원`,
-                  },
-                  {
-                    label: "차감 예정",
-                    value: `${formatKrw(budget?.scheduled ?? 0)}원`,
-                  },
-                  {
-                    label: "집행 합계",
-                    value: `${formatKrw(budget?.committed ?? 0)}원`,
-                  },
-                  {
-                    label: "잔여",
-                    value:
-                      budget?.remaining != null
-                        ? `${formatKrw(budget.remaining)}원`
-                        : "—",
-                  },
-                  {
-                    label: "집행률",
-                    value:
-                      budget?.pct != null ? `${budget.pct}%` : "—",
-                  },
-                ]}
-                note="노출가 기준. 실제 사용은 발행완료, 차감 예정은 진행~발행 이전 배정입니다."
-              >
-                <DonutCell
-                  pct={budget?.pct ?? null}
-                  color="var(--ink)"
-                  label="예산 집행"
-                  caption={
-                    budget?.total != null
-                      ? `${formatKrw(budget.committed)} / ${formatKrw(budget.total)}원`
-                      : budget?.committed
-                        ? `${formatKrw(budget.committed)}원`
-                        : "—"
-                  }
-                  onClick={onOpenBudgetPerformance}
-                />
-              </KpiHoverTip>
+            <div className="mt-3 grid grid-cols-1 gap-3 px-5 sm:grid-cols-2 sm:px-8 xl:grid-cols-3">
               <KpiHoverTip
                 title="콘텐츠 발행"
                 rows={[
@@ -989,6 +936,7 @@ export function CompanyHomeLanding({
                   onOpenMore={onOpenPerformance}
                 />
               </div>
+              <CompanyHomeVisitBoard visits={data.visits} />
               <NewsSidebar
                 items={data.news}
                 insightLinks={insightLinks}

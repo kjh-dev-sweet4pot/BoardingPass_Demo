@@ -5,6 +5,12 @@ import {
   scrapeInstagramPosts,
 } from "@/lib/apify-instagram";
 import { findResultForUrl, scrapeTikTokPosts } from "@/lib/apify-tiktok";
+import {
+  findXiaohongshuResultForUrl,
+  scrapeXiaohongshuPosts,
+} from "@/lib/apify-xiaohongshu";
+import { detectPlatform } from "@/lib/creator-link";
+import { estimateXiaohongshuViews } from "@/lib/xiaohongshu-views";
 import { nextRetryAt } from "@/lib/metrics-schedule";
 
 export type ScrapedMetrics = {
@@ -47,6 +53,9 @@ export async function scrapeLinkMetrics(
   url: string,
   platform: string,
 ): Promise<ScrapedMetrics> {
+  const fromUrl = detectPlatform(url);
+  if (fromUrl !== "etc") platform = fromUrl;
+
   if (platform === "tiktok") {
     const items = await scrapeTikTokPosts([url]);
     const result = findResultForUrl(items, url);
@@ -81,7 +90,22 @@ export async function scrapeLinkMetrics(
     };
   }
 
-  throw new Error("TikTok/Instagram 링크만 지표 수집을 지원합니다.");
+  if (platform === "xiaohongshu") {
+    const items = await scrapeXiaohongshuPosts([url]);
+    const result = findXiaohongshuResultForUrl(items, url);
+    if (!result) throw new Error("Apify에서 샤오홍슈 결과를 찾지 못했습니다.");
+    return {
+      views: estimateXiaohongshuViews(result),
+      likes: result.likes,
+      comments: result.comments,
+      saves: result.saves,
+      shares: result.shares,
+      reposts: null,
+      authorHandle: result.authorHandle?.replace(/^@+/, "").trim() || null,
+    };
+  }
+
+  throw new Error("TikTok/Instagram/샤오홍슈 링크만 지표 수집을 지원합니다.");
 }
 
 async function markJob(

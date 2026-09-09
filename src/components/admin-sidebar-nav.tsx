@@ -15,6 +15,7 @@ export type AdminSection =
   | "companies"
   | "companiesRegister"
   | "companiesMail"
+  | "companiesDocs"
   | "influencersRegister"
   | "influencersReview"
   | "influencersAlloc"
@@ -25,10 +26,11 @@ const AFTER_PERF: { id: "campaigns"; label: string }[] = [
 ];
 
 export const COMPANIES_NAV: NavDropdownItem<
-  "companies" | "companiesRegister" | "companiesMail"
+  "companies" | "companiesRegister" | "companiesMail" | "companiesDocs"
 >[] = [
   { id: "companies", label: "목록", hint: "회원사 조회" },
   { id: "companiesRegister", label: "등록", hint: "회원사 개설" },
+  { id: "companiesDocs", label: "계약·인보이스", hint: "양식 작성·인쇄" },
   { id: "companiesMail", label: "메일 발송", hint: "계약서·견적서·가이드라인" },
 ];
 
@@ -58,7 +60,7 @@ function isPerf(s: AdminSection) {
 }
 
 function isCompanies(s: AdminSection) {
-  return s === "companies" || s === "companiesRegister" || s === "companiesMail";
+  return s === "companies" || s === "companiesRegister" || s === "companiesMail" || s === "companiesDocs";
 }
 
 function isInfluencers(s: AdminSection) {
@@ -131,7 +133,7 @@ export function AdminConsoleShell({
         {isCompanies(section) ? (
           <NavSubSegment
             items={COMPANIES_NAV}
-            view={section as "companies" | "companiesRegister" | "companiesMail"}
+            view={section as "companies" | "companiesRegister" | "companiesMail" | "companiesDocs"}
             onViewChange={onSectionChange}
           />
         ) : null}
@@ -196,7 +198,7 @@ export function AdminConsoleShell({
             active={isCompanies(section)}
             selectedId={
               isCompanies(section)
-                ? (section as "companies" | "companiesRegister" | "companiesMail")
+                ? (section as "companies" | "companiesRegister" | "companiesMail" | "companiesDocs")
                 : undefined
             }
             onSelect={onSectionChange}

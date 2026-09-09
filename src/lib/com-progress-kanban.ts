@@ -1,6 +1,6 @@
 import { polishDemoMetrics } from "@/lib/demo-metrics";
 import { buildCreatorPool } from "@/lib/creator-pool-mock";
-import { CREATOR_PLATFORM_LABEL } from "@/lib/creator-link";
+import { creatorPlatformLabelOf, extractSnsHandle } from "@/lib/creator-link";
 import { creatorLinkHref } from "@/lib/publish-demo-data";
 import type { AllocationWithRelations, CreatorLink } from "@/lib/types";
 
@@ -42,6 +42,7 @@ export type ProgressKanbanCard = {
   publishedCount: number;
   targetCount: number;
   updatedAt: string;
+  visitDates: string[];
   links: ProgressLink[];
   submittedLinks: ProgressLink[];
   approvedLinks: ProgressLink[];
@@ -108,7 +109,10 @@ function toProgressLink(
       url: creatorLinkHref(link) || null,
       hasFile: Boolean(link.submitted_file_path),
       fileKind: fileKindFromPath(link.submitted_file_path),
-      platform: CREATOR_PLATFORM_LABEL[link.platform] || link.platform,
+      platform: creatorPlatformLabelOf(
+        creatorLinkHref(link) || link.url,
+        link.platform,
+      ),
       submitted_at: link.submitted_at || null,
       reviewMemo: link.memo?.trim() || null,
       views: normalized(link.views),
@@ -132,7 +136,10 @@ function toProgressLink(
     url: creatorLinkHref(link) || null,
     hasFile: Boolean(link.submitted_file_path),
     fileKind: fileKindFromPath(link.submitted_file_path),
-    platform: CREATOR_PLATFORM_LABEL[link.platform] || link.platform,
+    platform: creatorPlatformLabelOf(
+      creatorLinkHref(link) || link.url,
+      link.platform,
+    ),
     submitted_at: link.submitted_at || null,
     reviewMemo: link.memo?.trim() || null,
     views: polished.views,
@@ -142,11 +149,10 @@ function toProgressLink(
 }
 
 function handleOf(item: AllocationWithRelations) {
-  const raw =
-    item.influencers?.instagram_handle_normalized ||
-    item.influencers?.instagram_handle ||
-    "";
-  const n = raw.replace(/^@+/, "").trim();
+  const n =
+    extractSnsHandle(item.influencers?.instagram_handle_normalized) ||
+    extractSnsHandle(item.influencers?.instagram_handle) ||
+    extractSnsHandle(item.influencers?.sns_url);
   return n ? `@${n}` : "—";
 }
 
@@ -176,10 +182,12 @@ export function buildKanbanFromAllocations(
     const target = item.target_content_count ?? Math.max(1, rawLinks.length || 1);
     const publishedCount = publishedLinks.length;
 
+    const visitDate = item.visit_date?.slice(0, 10) || "";
+    const visitDates = /^\d{4}-\d{2}-\d{2}$/.test(visitDate) ? [visitDate] : [];
     const updatedAt =
+      visitDates[0] ||
       rawLinks[0]?.submitted_at?.slice(0, 10) ||
       item.picked_up_at?.slice(0, 10) ||
-      item.visit_date?.slice(0, 10) ||
       item.updated_at?.slice(0, 10) ||
       "—";
 
@@ -195,6 +203,7 @@ export function buildKanbanFromAllocations(
       publishedCount,
       targetCount: target,
       updatedAt,
+      visitDates,
       links,
       submittedLinks,
       approvedLinks,
@@ -203,7 +212,113 @@ export function buildKanbanFromAllocations(
     });
   }
 
-  return cards;
+  return mergeKanbanByInfluencer(cards);
+}
+
+function uniqJoin(parts: string[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    const t = p.trim();
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out.join(", ");
+}
+
+function formatVisitDates(dates: string[]) {
+  if (dates.length === 0) return "—";
+  if (dates.length === 1) return dates[0]!;
+  return `${dates[0]} 외 ${dates.length - 1}`;
+}
+
+/** 같은 칸·같은 인플루언서는 1장. 방문일·상품만 합친다. */
+export function mergeKanbanByInfluencer(cards: ProgressKanbanCard[]) {
+  const map = new Map<string, ProgressKanbanCard>();
+  for (const card of cards) {
+    const key = `${card.status}:${card.influencerId}`;
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, {
+        ...card,
+        links: [...card.links],
+        submittedLinks: [...card.submittedLinks],
+        approvedLinks: [...card.approvedLinks],
+        rejectedLinks: [...card.rejectedLinks],
+        publishedLinks: [...card.publishedLinks],
+        visitDates: [...card.visitDates],
+      });
+      continue;
+    }
+    prev.publishedCount += card.publishedCount;
+    prev.targetCount += card.targetCount;
+    prev.productName = uniqJoin([prev.productName, card.productName]);
+    prev.campaignName = uniqJoin([prev.campaignName, card.campaignName]);
+    prev.links.push(...card.links);
+    prev.submittedLinks.push(...card.submittedLinks);
+    prev.approvedLinks.push(...card.approvedLinks);
+    prev.rejectedLinks.push(...card.rejectedLinks);
+    prev.publishedLinks.push(...card.publishedLinks);
+    prev.visitDates = [...new Set([...prev.visitDates, ...card.visitDates])].sort();
+    if (prev.visitDates.length) {
+      prev.updatedAt = formatVisitDates(prev.visitDates);
+    }
+    if (!prev.profileUrl && card.profileUrl) prev.profileUrl = card.profileUrl;
+  }
+  return [...map.values()];
+}
+
+if (process.env.RUN_KANBAN_SELF_CHECK === "1") {
+  const merged = mergeKanbanByInfluencer([
+    {
+      id: "1",
+      campaignName: "s1",
+      productName: "p1",
+      status: "대기",
+      influencerId: "inf",
+      name: "A",
+      handle: "@a",
+      profileUrl: null,
+      publishedCount: 0,
+      targetCount: 1,
+      updatedAt: "2026-09-13",
+      visitDates: ["2026-09-13"],
+      links: [],
+      submittedLinks: [],
+      approvedLinks: [],
+      rejectedLinks: [],
+      publishedLinks: [],
+    },
+    {
+      id: "2",
+      campaignName: "s2",
+      productName: "p2",
+      status: "대기",
+      influencerId: "inf",
+      name: "A",
+      handle: "@a",
+      profileUrl: null,
+      publishedCount: 0,
+      targetCount: 1,
+      updatedAt: "2026-09-14",
+      visitDates: ["2026-09-14"],
+      links: [],
+      submittedLinks: [],
+      approvedLinks: [],
+      rejectedLinks: [],
+      publishedLinks: [],
+    },
+  ]);
+  if (
+    merged.length !== 1 ||
+    merged[0]!.targetCount !== 2 ||
+    merged[0]!.productName !== "p1, p2" ||
+    merged[0]!.updatedAt !== "2026-09-13 외 1"
+  ) {
+    throw new Error("mergeKanbanByInfluencer failed");
+  }
+  console.log("com-progress-kanban self-check ok");
 }
 
 export function productOptionsFromAllocations(items: AllocationWithRelations[]) {

@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
 import {
   buildCreatorPool,
   CHANNEL_LABEL,
   formatFollowers,
-  formatKrw,
   formatMetric,
   getCreatorBrief,
   isLiveInfluencerId,
@@ -26,10 +25,45 @@ import { polishDemoMetrics } from "@/lib/demo-metrics";
 import { isDemoCompany } from "@/lib/company";
 import { regionBadgeText } from "@/lib/region-display";
 
-type PickMap = Record<string, "selected" | "excluded">;
+type PoolSort =
+  | "followers-desc"
+  | "visit-desc"
+  | "followers-asc"
+  | "name"
+  | "views-desc"
+  | "likes-desc";
 
-// castingId로 관리 — key: pool creator id, value: castingId(담긴 경우) | "excluded"
-type CastingMap = Record<string, { castingId: string } | "excluded">;
+const POOL_SORT_LABEL: Record<PoolSort, string> = {
+  "followers-desc": "팔로워 많은순",
+  "visit-desc": "최신 방문 순",
+  "followers-asc": "팔로워 적은순",
+  name: "이름순",
+  "views-desc": "조회수 많은순",
+  "likes-desc": "좋아요 많은순",
+};
+
+function visitKey(row: PoolCreator) {
+  return (row.visitYmd || "").slice(0, 10);
+}
+
+function sortPool(rows: PoolCreator[], sort: PoolSort) {
+  const copy = [...rows];
+  const byName = (a: PoolCreator, b: PoolCreator) =>
+    a.name.localeCompare(b.name, "ko");
+  copy.sort((a, b) => {
+    if (sort === "followers-desc") return b.followers - a.followers || byName(a, b);
+    if (sort === "visit-desc") {
+      return visitKey(b).localeCompare(visitKey(a)) || byName(a, b);
+    }
+    if (sort === "followers-asc") return a.followers - b.followers || byName(a, b);
+    if (sort === "name") return byName(a, b);
+    if (sort === "views-desc") {
+      return (b.metrics.views ?? 0) - (a.metrics.views ?? 0) || byName(a, b);
+    }
+    return (b.metrics.likes ?? 0) - (a.metrics.likes ?? 0) || byName(a, b);
+  });
+  return copy;
+}
 
 export function CompanyCreatorPool({
   companyId,
@@ -55,13 +89,8 @@ export function CompanyCreatorPool({
   const [q, setQ] = useState("");
   const [hideOverlap, setHideOverlap] = useState(false);
   const [postedOnly, setPostedOnly] = useState(false);
-  const [requested, setRequested] = useState(false);
+  const [sort, setSort] = useState<PoolSort>("followers-desc");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [picks, setPicks] = useState<PickMap>({});
-  const [castings, setCastings] = useState<CastingMap>({});
-  const [replaceId, setReplaceId] = useState<string | null>(null);
-  const [cartOpen, setCartOpen] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
 
   // 데모(company)만 목업. 그 외(aaa 포함)는 배정 DB → 크리에이터 풀.
   useEffect(() => {
@@ -105,60 +134,9 @@ export function CompanyCreatorPool({
     };
   }, [companyId, isDemo]);
 
-  // 기존 castings 로드 (handle 기준 매핑)
-  useEffect(() => {
-    if (pool.length === 0) return;
-    fetch("/api/com/castings")
-      .then((r) => r.json())
-      .then((rows: Array<{ id: string; status: string; influencers?: { instagram_handle_normalized?: string; instagram_handle?: string } }>) => {
-        if (!Array.isArray(rows)) return;
-        const map: CastingMap = {};
-        const nextPicks: PickMap = {};
-        for (const row of rows) {
-          const handle = (
-            row.influencers?.instagram_handle_normalized ||
-            row.influencers?.instagram_handle ||
-            ""
-          ).replace(/^@+/, "").toLowerCase();
-          const poolRow = pool.find(
-            (p) => p.handle.replace(/^@+/, "").toLowerCase() === handle,
-          );
-          if (poolRow && row.status !== "결렬") {
-            map[poolRow.id] = { castingId: row.id };
-            nextPicks[poolRow.id] = "selected";
-          }
-        }
-        setCastings(map);
-        setPicks((prev) => ({ ...prev, ...nextPicks }));
-      })
-      .catch(() => {});
-  }, [companyId, pool]);
-
-  // 담기 → API POST (campaign_id는 임시로 null 허용 시까지 skip, 추후 T10에서 연결)
-  async function addCasting(poolId: string) {
-    const row = pool.find((r) => r.id === poolId);
-    if (!row) return;
-    // castings에는 campaign_id 필수이므로, 없으면 낙관적 UI만 업데이트
-    setPicks((prev) => ({ ...prev, [poolId]: "selected" }));
-    setCartOpen(true);
-  }
-
-  async function removeCasting(poolId: string) {
-    const entry = castings[poolId];
-    if (entry && entry !== "excluded" && "castingId" in entry) {
-      await fetch("/api/com/castings", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ casting_id: entry.castingId }),
-      });
-      setCastings((prev) => { const c = { ...prev }; delete c[poolId]; return c; });
-    }
-    setPicks((prev) => { const c = { ...prev }; delete c[poolId]; return c; });
-  }
-
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return pool.filter((row) => {
+    const rows = pool.filter((row) => {
       if (hideOverlap && row.overlap) return false;
       if (postedOnly && row.posts.length === 0) return false;
       if (market && row.market !== market) return false;
@@ -170,28 +148,14 @@ export function CompanyCreatorPool({
         (row.product || "").toLowerCase().includes(needle)
       );
     });
-  }, [pool, market, channel, q, hideOverlap, postedOnly]);
+    return sortPool(rows, sort);
+  }, [pool, market, channel, q, hideOverlap, postedOnly, sort]);
 
-  const available = useMemo(
-    () => filtered.filter((row) => picks[row.id] !== "selected"),
-    [filtered, picks],
-  );
-  const shown = available.slice(0, visible);
-  const hasMore = visible < available.length;
+  const shown = filtered.slice(0, visible);
+  const hasMore = visible < filtered.length;
   const selected = openId
     ? (pool.find((r) => r.id === openId) ?? null)
     : null;
-
-  const selectedRows = useMemo(
-    () => pool.filter((r) => picks[r.id] === "selected"),
-    [pool, picks],
-  );
-  const excludedCount = useMemo(
-    () => Object.values(picks).filter((v) => v === "excluded").length,
-    [picks],
-  );
-  const budget = selectedRows.reduce((sum, r) => sum + r.priceKrw, 0);
-  const cartRef = useRef<HTMLElement>(null);
 
   const activeFilterChips = useMemo(() => {
     const chips: { key: string; label: string; clear: () => void }[] = [];
@@ -230,68 +194,14 @@ export function CompanyCreatorPool({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (replaceId) setReplaceId(null);
-        else setOpenId(null);
-      }
+      if (e.key === "Escape") setOpenId(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [replaceId]);
-
-  function focusCart() {
-    setCartOpen(true);
-    cartRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-
-  function setPick(id: string, next: "selected" | "excluded" | null) {
-    setSubmitted(false);
-    if (next === "selected") {
-      addCasting(id);
-    } else if (next === null) {
-      removeCasting(id);
-    } else {
-      // excluded
-      removeCasting(id);
-      setPicks((prev) => ({ ...prev, [id]: "excluded" }));
-    }
-  }
-
-  function clearCart() {
-    setSubmitted(false);
-    const selectedIds = Object.entries(picks)
-      .filter(([, v]) => v === "selected")
-      .map(([k]) => k);
-    for (const id of selectedIds) removeCasting(id);
-  }
-
-  function submitCart() {
-    if (selectedRows.length === 0) return;
-    setSubmitted(true);
-    setCartOpen(true);
-  }
-
-  function onRowActivate(row: PoolCreator) {
-    if (replaceId) {
-      if (row.id === replaceId) {
-        setReplaceId(null);
-        return;
-      }
-      setPicks((prev) => {
-        const copy = { ...prev };
-        delete copy[replaceId];
-        copy[row.id] = "selected";
-        return copy;
-      });
-      setReplaceId(null);
-      setOpenId(row.id);
-      return;
-    }
-    setOpenId((id) => (id === row.id ? null : row.id));
-  }
+  }, []);
 
   return (
-    <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_372px]">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-col gap-4 overflow-auto px-6 py-6">
         <div>
           <h2 className="text-[32px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)]">
@@ -326,6 +236,21 @@ export function CompanyCreatorPool({
             }}
           />
           <select
+            aria-label="정렬"
+            className="h-10 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
+            value={sort}
+            onChange={(e) => {
+              setSort(e.target.value as PoolSort);
+              setVisible(POOL_PAGE);
+            }}
+          >
+            {(Object.keys(POOL_SORT_LABEL) as PoolSort[]).map((key) => (
+              <option key={key} value={key}>
+                {POOL_SORT_LABEL[key]}
+              </option>
+            ))}
+          </select>
+          <select
             className="h-10 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 text-sm"
             value={channel}
             onChange={(e) => {
@@ -334,7 +259,7 @@ export function CompanyCreatorPool({
             }}
           >
             <option value="">플랫폼 전체</option>
-            {(["instagram", "tiktok"] as CreatorChannel[]).map((key) => (
+            {(["xiaohongshu", "instagram", "tiktok"] as CreatorChannel[]).map((key) => (
               <option key={key} value={key}>
                 {CHANNEL_LABEL[key]}
               </option>
@@ -393,39 +318,6 @@ export function CompanyCreatorPool({
           </div>
         ) : null}
 
-        {selectedRows.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5">
-            <span className="text-sm font-semibold text-[var(--ink)]">
-              {selectedRows.length}명 선택
-            </span>
-            <span className="text-sm text-[var(--muted)]">
-              예상 합계 ₩{formatKrw(budget)}
-            </span>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={clearCart}
-                className="h-9 rounded-[6px] px-3 text-sm font-medium text-[var(--muted)] hover:text-[var(--ink)]"
-              >
-                선택 해제
-              </button>
-              <button
-                type="button"
-                onClick={focusCart}
-                className="h-9 rounded-[6px] bg-[var(--accent)] px-3 text-sm font-semibold !text-white"
-              >
-                장바구니 담기
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {replaceId ? (
-          <p className="rounded-[6px] border border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--accent)]">
-            교체 모드: 대신 넣을 크리에이터를 선택하세요 (Esc 취소)
-          </p>
-        ) : null}
-
         <div className="min-h-0 flex-1 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3">
           {poolLoading ? (
             <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
@@ -444,23 +336,8 @@ export function CompanyCreatorPool({
                   key={row.id}
                   row={row}
                   active={row.id === openId}
-                  pick={picks[row.id] || null}
-                  replacing={replaceId === row.id}
-                  onActivate={() => onRowActivate(row)}
-                  onSelectToggle={() =>
-                    setPick(
-                      row.id,
-                      picks[row.id] === "selected" ? null : "selected",
-                    )
-                  }
-                  onExclude={() =>
-                    setPick(
-                      row.id,
-                      picks[row.id] === "excluded" ? null : "excluded",
-                    )
-                  }
-                  onReplace={() =>
-                    setReplaceId((id) => (id === row.id ? null : row.id))
+                  onActivate={() =>
+                    setOpenId((id) => (id === row.id ? null : row.id))
                   }
                 />
               ))}
@@ -479,99 +356,12 @@ export function CompanyCreatorPool({
         ) : null}
       </div>
 
-      <aside
-        ref={cartRef}
-        className={`flex min-h-0 flex-col border-[var(--line)] bg-[var(--surface)] px-[18px] py-[22px] lg:border-l ${
-          cartOpen ? "ring-2 ring-[var(--accent)]/25 ring-inset" : ""
-        }`}
-      >
-        <div className="mb-2 flex items-baseline justify-between">
-          <span className="text-[13.5px] font-semibold">장바구니</span>
-          <span className="text-[11.5px] text-[var(--muted)]">
-            {selectedRows.length}명 · Pending
-          </span>
-        </div>
-        <div className="mb-3.5">
-          <p className="text-[11px] text-[var(--muted)]">예상 합계</p>
-          <p className="mt-0.5 text-[22px] font-semibold tabular-nums text-[var(--ink)]">
-            ₩{formatKrw(budget)}
-          </p>
-        </div>
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-          {selectedRows.length === 0 ? (
-            <p className="py-6 text-center text-sm text-[var(--muted)]">
-              담은 크리에이터가 없습니다.
-            </p>
-          ) : (
-            selectedRows.map((row) => (
-              <div
-                key={row.id}
-                className="flex items-center gap-2 rounded-[6px] border border-[#f0e6d8] p-2.5"
-              >
-                <CreatorPhoto creator={row} size="avatar" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[12.5px] font-semibold">{row.name}</p>
-                  <p className="truncate text-[10.5px] text-[var(--muted)]">
-                    {formatFollowers(row.followers)} · ₩{formatKrw(row.priceKrw)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPick(row.id, null)}
-                  className="text-[11px] text-[var(--danger)]"
-                >
-                  제외
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-        <p className="mt-3 border-t border-[#f0e6d8] pt-3 text-[11.5px] leading-relaxed text-[var(--muted)]">
-          담기 시 섭외가 <b className="text-[var(--accent)]">Pending</b>으로 생성됩니다.
-          협의·확정은 운영자가 진행합니다.
-        </p>
-        <div className="mt-3 flex flex-col gap-2">
-          <button
-            type="button"
-            disabled={selectedRows.length === 0 || submitted}
-            onClick={submitCart}
-            className="flex h-10 items-center justify-center rounded-[6px] bg-[var(--accent)] px-3.5 text-[13px] font-semibold !text-white disabled:opacity-40"
-          >
-            {submitted ? "제출 완료" : "섭외 요청 보내기"}
-          </button>
-          <button
-            type="button"
-            disabled={selectedRows.length === 0}
-            onClick={() => selectedRows[0] && setReplaceId(selectedRows[0].id)}
-            className="flex h-10 items-center justify-center rounded-[6px] border border-[var(--line)] text-[13px] text-[var(--accent)] disabled:opacity-40"
-          >
-            동일 구간에서 교체
-          </button>
-        </div>
-      </aside>
-
       {selected && openId ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 sm:items-center">
           <div className="max-h-[90vh] w-full max-w-md overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5">
             <CreatorDetail
               creator={selected}
-              pick={picks[selected.id] || null}
               onClose={() => setOpenId(null)}
-              onSelect={() =>
-                setPick(
-                  selected.id,
-                  picks[selected.id] === "selected" ? null : "selected",
-                )
-              }
-              onExclude={() =>
-                setPick(
-                  selected.id,
-                  picks[selected.id] === "excluded" ? null : "excluded",
-                )
-              }
-              onReplace={() =>
-                setReplaceId((id) => (id === selected.id ? null : selected.id))
-              }
             />
           </div>
         </div>
@@ -580,64 +370,28 @@ export function CompanyCreatorPool({
   );
 }
 
-function tierBandLabel(followers: number) {
-  if (followers < 10000) return "나노";
-  if (followers <= 100000) return "마이크로";
-  return "매크로";
-}
-
 function CreatorCard({
   row,
   active,
-  pick,
-  replacing,
   onActivate,
-  onSelectToggle,
-  onExclude,
-  onReplace,
 }: {
   row: PoolCreator;
   active: boolean;
-  pick: "selected" | "excluded" | null;
-  replacing: boolean;
   onActivate: () => void;
-  onSelectToggle: () => void;
-  onExclude: () => void;
-  onReplace: () => void;
 }) {
   const countryBadge = regionBadgeText(row.region);
   return (
     <article
       className={`flex cursor-pointer flex-col overflow-hidden rounded-[6px] border bg-[var(--surface)] transition ${
-        pick === "excluded"
-          ? "border-[#e8b4b4] opacity-70"
-          : pick === "selected" || active || replacing
-            ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/30"
-            : "border-[var(--line)] hover:border-[var(--accent)]/40"
+        active
+          ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/30"
+          : "border-[var(--line)] hover:border-[var(--accent)]/40"
       }`}
       onClick={onActivate}
     >
       <div className="relative">
         <CreatorPhoto creator={row} />
-        <label
-          className="absolute top-2 left-2 flex h-7 w-7 items-center justify-center rounded-[6px] bg-white/90 shadow-sm"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <input
-            type="checkbox"
-            checked={pick === "selected"}
-            disabled={pick === "excluded"}
-            onChange={onSelectToggle}
-            aria-label={`${row.name} 장바구니 담기`}
-            className="h-3.5 w-3.5 accent-[var(--accent)]"
-          />
-        </label>
-        {pick === "selected" ? (
-          <span className="absolute bottom-2 left-2 rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold !text-white shadow-sm">
-            담김
-          </span>
-        ) : null}
-        <span className="absolute top-2 right-2 max-w-[calc(100%-2.5rem)] truncate rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] shadow-sm">
+        <span className="absolute top-2 right-2 max-w-[calc(100%-0.75rem)] truncate rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)] shadow-sm">
           {countryBadge
             ? `${TIER_LABEL[row.tier]} · ${countryBadge}`
             : TIER_LABEL[row.tier]}
@@ -666,11 +420,6 @@ function CreatorCard({
               {OVERLAP_LABEL[row.overlap]}
             </span>
           ) : null}
-          {pick === "excluded" ? (
-            <span className="rounded-full bg-[#f0ece6] px-1.5 py-0.5 text-[10px] font-medium text-[#8a8074]">
-              제외
-            </span>
-          ) : null}
         </div>
 
         <p className="line-clamp-2 min-h-[2rem] text-[11px] leading-4 text-[var(--muted)]">
@@ -682,12 +431,6 @@ function CreatorCard({
             <p className="text-[10px] text-[var(--muted)]">팔로워</p>
             <p className="text-xs font-semibold tabular-nums">
               {formatFollowers(row.followers)}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] text-[var(--muted)]">단가</p>
-            <p className="text-xs font-semibold tabular-nums text-[var(--accent)]">
-              {formatKrw(row.priceKrw)}
             </p>
           </div>
         </div>
@@ -703,46 +446,6 @@ function CreatorCard({
             SNS 프로필
           </a>
         ) : null}
-
-        <div
-          className="flex gap-1"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={onSelectToggle}
-            disabled={pick === "excluded"}
-            className={`flex-1 rounded-[6px] border px-1.5 py-1 text-[10px] font-medium ${
-              pick === "selected"
-                ? "border-[var(--accent)] bg-[var(--accent)] !text-white"
-                : "border-[var(--line)] text-[var(--muted)]"
-            }`}
-          >
-            {pick === "selected" ? "담김" : "담기"}
-          </button>
-          <button
-            type="button"
-            onClick={onExclude}
-            className={`flex-1 rounded-[6px] border px-1.5 py-1 text-[10px] font-medium ${
-              pick === "excluded"
-                ? "border-[#9b2c2c] bg-[#f8e4e4] text-[#9b2c2c]"
-                : "border-[var(--line)] text-[var(--muted)]"
-            }`}
-          >
-            제외
-          </button>
-          <button
-            type="button"
-            onClick={onReplace}
-            className={`flex-1 rounded-[6px] border px-1.5 py-1 text-[10px] font-medium ${
-              replacing
-                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                : "border-[var(--line)] text-[var(--muted)]"
-            }`}
-          >
-            교체
-          </button>
-        </div>
       </div>
     </article>
   );
@@ -750,18 +453,10 @@ function CreatorCard({
 
 function CreatorDetail({
   creator,
-  pick,
   onClose,
-  onSelect,
-  onExclude,
-  onReplace,
 }: {
   creator: PoolCreator;
-  pick: "selected" | "excluded" | null;
   onClose: () => void;
-  onSelect: () => void;
-  onExclude: () => void;
-  onReplace: () => void;
 }) {
   const brief = getCreatorBrief(creator);
   const countryBadge = regionBadgeText(creator.region);
@@ -832,49 +527,11 @@ function CreatorDetail({
         </a>
       ) : null}
 
-      <div className="mb-5 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onSelect}
-          className={`rounded-[6px] px-3 py-2 text-sm font-semibold ${
-            pick === "selected"
-              ? "bg-[var(--accent)] !text-white"
-              : "border border-[var(--line)]"
-          }`}
-        >
-          {pick === "selected" ? "장바구니에 담김" : "장바구니 담기"}
-        </button>
-        <button
-          type="button"
-          onClick={onExclude}
-          className={`rounded-[6px] border px-3 py-2 text-sm font-semibold ${
-            pick === "excluded"
-              ? "border-[#9b2c2c] bg-[#f8e4e4] text-[#9b2c2c]"
-              : "border-[var(--line)]"
-          }`}
-        >
-          제외
-        </button>
-        <button
-          type="button"
-          onClick={onReplace}
-          className="rounded-[6px] border border-[var(--line)] px-3 py-2 text-sm font-semibold"
-        >
-          교체
-        </button>
-      </div>
-
-      <dl className="grid gap-3 rounded-[6px] bg-[var(--accent-soft)]/50 px-4 py-4 sm:grid-cols-2">
+      <dl className="mb-0 grid gap-3 rounded-[6px] bg-[var(--accent-soft)]/50 px-4 py-4 sm:grid-cols-2">
         <div>
           <dt className="text-xs text-[var(--muted)]">팔로워</dt>
           <dd className="mt-1 font-semibold tabular-nums">
             {formatFollowers(creator.followers)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-[var(--muted)]">집행 단가</dt>
-          <dd className="mt-1 font-semibold tabular-nums">
-            {formatKrw(creator.priceKrw)}원
           </dd>
         </div>
         <div className="sm:col-span-2">

@@ -26,7 +26,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("allocations")
     .select(
-      "id, product_id, created_at, products(name), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url, followers, region)",
+      "id, product_id, created_at, visit_date, products(name), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url, followers, region)",
     )
     .eq("company_id", companyId)
     .order("created_at", { ascending: false });
@@ -35,21 +35,32 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const seen = new Set<string>();
-  const creators = [];
+  const best = new Map<
+    string,
+    { inf: Parameters<typeof poolCreatorFromInfluencer>[0]; product: string | null; visitYmd: string }
+  >();
   for (const row of data ?? []) {
     const infRaw = row.influencers;
     const inf = Array.isArray(infRaw) ? infRaw[0] : infRaw;
-    if (!inf?.id || seen.has(inf.id)) continue;
-    seen.add(inf.id);
+    if (!inf?.id) continue;
     const productRaw = row.products;
     const product = Array.isArray(productRaw) ? productRaw[0] : productRaw;
-    creators.push(
-      poolCreatorFromInfluencer(inf, {
-        productName: product?.name ?? null,
-      }),
-    );
+    const visitYmd = row.visit_date ? String(row.visit_date).slice(0, 10) : "";
+    const prev = best.get(inf.id);
+    if (!prev || visitYmd > prev.visitYmd) {
+      best.set(inf.id, {
+        inf,
+        product: product?.name ?? prev?.product ?? null,
+        visitYmd,
+      });
+    }
   }
+  const creators = [...best.values()].map(({ inf, product, visitYmd }) =>
+    poolCreatorFromInfluencer(inf, {
+      productName: product,
+      visitYmd: visitYmd || null,
+    }),
+  );
 
   return NextResponse.json({ creators, source: "allocations" as const });
 }

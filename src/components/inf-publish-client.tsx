@@ -3,9 +3,8 @@
 import { useMemo, useState } from "react";
 import { InfLocaleEnsure, useInfLocale } from "@/components/inf-locale-provider";
 import {
-  CREATOR_PLATFORM_LABEL,
+  creatorPlatformLabelOf,
   validateCreatorUrl,
-  type CreatorPlatform,
 } from "@/lib/creator-link";
 import {
   formatVisitDateLocalized,
@@ -210,9 +209,16 @@ function InfPublishClientInner({
                     {link.publish_url}
                   </a>
                 ) : null}
-                {link?.platform && link.platform !== "etc" ? (
+                {link &&
+                creatorPlatformLabelOf(
+                  link.publish_url || link.url,
+                  link.platform,
+                ) !== "기타" ? (
                   <p className="mt-1 text-xs text-[var(--muted)]">
-                    {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform]}
+                    {creatorPlatformLabelOf(
+                      link.publish_url || link.url,
+                      link.platform,
+                    )}
                   </p>
                 ) : null}
               </div>

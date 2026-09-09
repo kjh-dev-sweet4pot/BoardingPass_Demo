@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  formatBudgetKrw,
-  type BudgetPerformancePayload,
-} from "@/lib/company-budget-performance";
+import { type BudgetPerformancePayload } from "@/lib/company-budget-performance";
 
 function Bar({
   spentPct,
@@ -90,8 +87,11 @@ export function CompanyBudgetPerformanceTab({
 
   if (!data) return null;
 
-  const spentPct = data.spentPct ?? 0;
-  const scheduledPct = data.scheduledPct ?? 0;
+  const done = data.rows.filter((r) => r.kind === "완료").length;
+  const scheduled = data.rows.filter((r) => r.kind === "예정").length;
+  const total = data.rows.length || 1;
+  const spentPct = Math.round((done / total) * 100);
+  const scheduledPct = Math.round((scheduled / total) * 100);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto px-[28px] py-[26px]">
@@ -100,78 +100,35 @@ export function CompanyBudgetPerformanceTab({
           예산 성과
         </h2>
         <p className="mt-1 text-[13px] text-[var(--muted)]">
-          캠페인 예산 합 기준 · 노출가만 표시 · {data.asOf} 조회 시점 기준
+          배정 진행 현황 · {data.asOf} 조회 시점 기준
         </p>
       </div>
 
       <div className="rounded-[10px] border border-[var(--line)] bg-[var(--surface)] p-5">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
-            <p className="text-[12px] text-[var(--muted)]">전체 예산</p>
+            <p className="text-[12px] text-[var(--muted)]">배정</p>
             <p className="text-[22px] font-extrabold tabular-nums text-[var(--ink)]">
-              {data.budgetTotal != null
-                ? formatBudgetKrw(data.budgetTotal)
-                : "—"}
+              {data.rows.length}건
             </p>
           </div>
           <div className="flex flex-wrap gap-4 text-[12.5px]">
             <span className="inline-flex items-center gap-1.5 text-[var(--ink)]">
               <i className="h-2.5 w-2.5 rounded-sm bg-[var(--ink)]" />
-              실제 사용 {formatBudgetKrw(data.spent)}
-              {data.spentPct != null ? ` (${data.spentPct}%)` : ""}
+              발행완료 {done}건
             </span>
             <span className="inline-flex items-center gap-1.5 text-[var(--accent)]">
               <i className="h-2.5 w-2.5 rounded-sm bg-[var(--accent)] opacity-70" />
-              차감 예정 {formatBudgetKrw(data.scheduled)}
-              {data.scheduledPct != null ? ` (${data.scheduledPct}%)` : ""}
+              진행중 {scheduled}건
             </span>
           </div>
         </div>
         <Bar spentPct={spentPct} scheduledPct={scheduledPct} />
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-[var(--muted)]">
-          <span>
-            집행·예정 합{" "}
-            <b className="tabular-nums text-[var(--ink)]">
-              {formatBudgetKrw(data.committed)}
-            </b>
-            {data.committedPct != null ? ` (${data.committedPct}%)` : ""}
-          </span>
-          <span>
-            잔여{" "}
-            <b className="tabular-nums text-[var(--ink)]">
-              {data.remaining != null ? formatBudgetKrw(data.remaining) : "—"}
-            </b>
-          </span>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-[10px] border border-[var(--line)] bg-[var(--surface)] p-4">
-          <p className="text-[12px] text-[var(--muted)]">실제 진행 완료</p>
-          <p className="mt-1 text-[20px] font-extrabold tabular-nums text-[var(--ink)]">
-            {formatBudgetKrw(data.spent)}
-          </p>
-          <p className="mt-0.5 text-[11.5px] text-[var(--muted)]">
-            발행완료 배정 · 노출가 합
-          </p>
-        </div>
-        <div className="rounded-[10px] border border-[var(--line)] bg-[var(--surface)] p-4">
-          <p className="text-[12px] text-[var(--muted)]">차감 예정</p>
-          <p className="mt-1 text-[20px] font-extrabold tabular-nums text-[var(--accent)]">
-            {formatBudgetKrw(data.scheduled)}
-          </p>
-          <p className="mt-0.5 text-[11.5px] text-[var(--muted)]">
-            진행~발행 이전 배정 · 노출가 합
-          </p>
-        </div>
       </div>
 
       <div className="overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--surface)]">
         <div className="border-b border-[var(--line)] px-4 py-3">
-          <h3 className="text-sm font-bold text-[var(--ink)]">배정별 노출가</h3>
-          <p className="mt-0.5 text-[11.5px] text-[var(--muted)]">
-            미등록 노출가는 50만~100만으로 자동 책정됩니다
-          </p>
+          <h3 className="text-sm font-bold text-[var(--ink)]">배정</h3>
         </div>
         {data.rows.length === 0 ? (
           <p className="px-4 py-8 text-sm text-[var(--muted)]">
@@ -186,7 +143,6 @@ export function CompanyBudgetPerformanceTab({
                   <th className="px-4 py-2.5 font-medium">상품</th>
                   <th className="px-4 py-2.5 font-medium">단계</th>
                   <th className="px-4 py-2.5 font-medium">구분</th>
-                  <th className="px-4 py-2.5 text-right font-medium">노출가</th>
                 </tr>
               </thead>
               <tbody>
@@ -213,9 +169,6 @@ export function CompanyBudgetPerformanceTab({
                       >
                         {row.kind === "완료" ? "실제 진행 완료" : "차감 예정"}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-bold tabular-nums text-[var(--ink)]">
-                      {formatBudgetKrw(row.displayPrice)}
                     </td>
                   </tr>
                 ))}

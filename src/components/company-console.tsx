@@ -27,6 +27,8 @@ import {
 import { formatMetric } from "@/lib/content-insights";
 import {
   ALLOCATION_LINK_LABEL,
+  creatorPlatformLabelOf,
+  resolveCreatorPlatform,
   summarizeAllocationLinks,
   type AllocationLinkSummary,
 } from "@/lib/creator-link";
@@ -107,10 +109,15 @@ function primaryContentLink(links: CreatorLink[]) {
   return null;
 }
 
-function contentPlatformLabel(platform: CreatorLink["platform"] | string) {
+function contentPlatformLabel(
+  href: string | null | undefined,
+  stored?: CreatorLink["platform"] | string,
+) {
+  const platform = resolveCreatorPlatform(href, stored);
   if (platform === "tiktok") return "TikTok 콘텐츠 보기";
   if (platform === "instagram") return "Instagram 콘텐츠 보기";
   if (platform === "youtube") return "YouTube 콘텐츠 보기";
+  if (platform === "xiaohongshu") return "샤오홍슈 콘텐츠 보기";
   return "콘텐츠 보기";
 }
 
@@ -304,7 +311,7 @@ export function CompanyConsole({
 
   useEffect(() => {
     if (isDemo) return;
-    if (view !== "publish" && view !== "alloc") return;
+    if (view !== "publish" && view !== "alloc" && view !== "home") return;
     if (loadedCompanyIdRef.current === company.id) return;
 
     let cancelled = false;
@@ -568,7 +575,6 @@ export function CompanyConsole({
           companyName={company.name}
           companyId={company.id}
           onOpenPerformance={() => setView("content")}
-          onOpenBudgetPerformance={() => setView("budgetPerformance")}
           onOpenPublish={() => setView("publish")}
           onOpenPool={() => setView("pool")}
         />
@@ -1083,7 +1089,7 @@ function CompanyInfPanel({
                   {href}
                 </a>
                 <p className="mt-1 text-xs text-[var(--muted)]">
-                  {link.platform} ·{" "}
+                  {creatorPlatformLabelOf(href, link.platform)} ·{" "}
                   {
                     ALLOCATION_LINK_LABEL[
                       link.status === "approved"
@@ -1110,7 +1116,7 @@ function CompanyInfPanel({
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center rounded-[6px] bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold !text-white"
           >
-            {contentPlatformLabel(content.platform)}
+            {contentPlatformLabel(content.href, content.platform)}
           </a>
         ) : null}
         {sns ? (

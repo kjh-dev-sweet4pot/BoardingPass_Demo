@@ -30,6 +30,7 @@ export function AdminCompanyPanel({
   const [guidelineUrl, setGuidelineUrl] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const editing = useMemo(
@@ -73,6 +74,7 @@ export function AdminCompanyPanel({
     setBudgetAmount("");
     setSpentAmount("");
     setGuidelineUrl("");
+    setSuccess(null);
   }
 
   function startEdit(company: Company) {
@@ -94,6 +96,7 @@ export function AdminCompanyPanel({
       company.spent_amount != null ? String(company.spent_amount) : "",
     );
     setGuidelineUrl(company.guideline_url || "");
+    setSuccess(null);
     setOpen(true);
   }
 
@@ -101,6 +104,7 @@ export function AdminCompanyPanel({
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setSuccess(null);
     try {
       const payload = {
         name,
@@ -143,7 +147,13 @@ export function AdminCompanyPanel({
           ? prev.map((c) => (c.id === next.id ? next : c))
           : [...prev, next].sort((a, b) => a.name.localeCompare(b.name, "ko"));
       });
+      const wasEdit = Boolean(editingId);
       resetForm();
+      setSuccess(
+        wasEdit
+          ? `${next.name} 회원사 정보를 수정했습니다.`
+          : `${next.name} 회원사를 등록했습니다. 로그인 아이디는 ${next.login_id}입니다.`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장 실패");
     } finally {
@@ -340,6 +350,14 @@ export function AdminCompanyPanel({
               onChange={(e) => setGuidelineUrl(e.target.value)}
             />
             {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
+            {success ? (
+              <p
+                role="status"
+                className="rounded-[6px] border border-[var(--line)] bg-[var(--accent-soft)] px-3 py-2 text-sm text-[var(--accent)]"
+              >
+                {success}
+              </p>
+            ) : null}
             <div className="flex gap-2">
               <button className={primaryBtnClass} type="submit" disabled={saving}>
                 {saving ? "저장 중…" : editing ? "수정 저장" : "등록"}

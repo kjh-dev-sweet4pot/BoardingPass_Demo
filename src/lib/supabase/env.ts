@@ -1,9 +1,15 @@
 function cleanEnv(value?: string) {
   if (!value) return "";
-  return value
+  const trimmed = value
     .trim()
     .replace(/^["']|["']$/g, "")
     .replace(/\r?\n/g, "");
+  // .env 줄 끝 ` — 주석` 이 키에 붙으면 fetch Authorization 헤더가 깨진다
+  const jwt = trimmed.match(
+    /^(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/,
+  );
+  if (jwt) return jwt[1];
+  return trimmed.split(/[\s#—–]/)[0] || "";
 }
 
 export function getSupabaseEnv() {

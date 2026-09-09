@@ -2,25 +2,20 @@
 
 import { useMemo, useState } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
-import { formatMetric } from "@/lib/content-insights";
+import { formatMetric, formatViews } from "@/lib/content-insights";
+import { resolveCreatorPlatform } from "@/lib/creator-link";
 import {
   buildWeekSeries,
   regionLabel,
   shareSegmentsByPlatform,
   shareSegmentsByRegion,
+  type CompanyHomeVisitRow,
+  type CompanyHomeVisits,
   type HomeInsightLink,
   type WeekPoint,
+  visitProfileHref,
 } from "@/lib/company-home";
-import { formatKrw, resolvePoolCreator } from "@/lib/creator-pool-mock";
-
-function displayPriceOf(alloc: HomeInsightLink["allocations"]) {
-  if (!alloc?.allocation_pricing) return null;
-  const row = Array.isArray(alloc.allocation_pricing)
-    ? alloc.allocation_pricing[0]
-    : alloc.allocation_pricing;
-  const n = Number(row?.display_price);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
+import { resolvePoolCreator } from "@/lib/creator-pool-mock";
 
 function CumulativeChart({ points }: { points: WeekPoint[] }) {
   if (points.length === 0) {
@@ -228,6 +223,104 @@ function ShareDonut({
   );
 }
 
+function VisitPerson({ row }: { row: CompanyHomeVisitRow }) {
+  const href = visitProfileHref(row);
+  const photo = (
+    <CreatorPhoto
+      creator={resolvePoolCreator({
+        id: row.id,
+        name: row.name,
+        handle: row.handle,
+        url: row.snsUrl,
+        product: row.product,
+      })}
+      size="avatar"
+    />
+  );
+  const body = (
+    <>
+      {photo}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[12px] font-semibold text-[var(--ink)]">
+          {row.name}
+        </span>
+        <span className="block truncate text-[10.5px] text-[var(--muted)]">
+          {row.handle}
+        </span>
+      </span>
+      <span className="shrink-0 text-[11px] tabular-nums text-[var(--muted)]">
+        {row.visitDate.slice(5)}
+      </span>
+    </>
+  );
+  const cls =
+    "flex w-full items-center gap-2 rounded-[6px] px-1.5 py-1.5 text-left hover:bg-[var(--surface-hover)]";
+  if (!href) {
+    return <div className={cls}>{body}</div>;
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`${cls} focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]`}
+    >
+      {body}
+    </a>
+  );
+}
+
+export function CompanyHomeVisitBoard({ visits }: { visits: CompanyHomeVisits }) {
+  const blocks = [
+    {
+      title: "한달 이내 방문 예정",
+      rows: visits.upcoming,
+      empty: "한달 이내 예정이 없습니다.",
+    },
+    {
+      title: "한달 이내 방문 완료",
+      rows: visits.done,
+      empty: "한달 이내 완료가 없습니다.",
+    },
+  ] as const;
+  return (
+    <aside className="flex w-full shrink-0 flex-col gap-3 self-start xl:w-[280px]">
+      <div>
+        <h2 className="text-[18px] font-bold tracking-tight text-[var(--ink)]">
+          방문
+        </h2>
+        <p className="mt-0.5 text-[12px] text-[var(--muted)]">
+          {visits.asOf} 기준 · 방문일 순 · 프로필 클릭
+        </p>
+      </div>
+      {blocks.map((b) => (
+        <div
+          key={b.title}
+          className="rounded-[10px] border border-[var(--line)] bg-[var(--surface)] p-3"
+        >
+          <div className="mb-1.5 flex items-baseline justify-between gap-2 px-0.5">
+            <p className="text-[13px] font-semibold text-[var(--ink)]">{b.title}</p>
+            <p className="text-[11px] tabular-nums text-[var(--muted)]">
+              {b.rows.length}명
+            </p>
+          </div>
+          <ul className="m-0 max-h-[220px] list-none space-y-0.5 overflow-auto p-0">
+            {b.rows.length === 0 ? (
+              <li className="px-1 py-4 text-[12px] text-[var(--muted)]">{b.empty}</li>
+            ) : (
+              b.rows.map((r) => (
+                <li key={`${b.title}-${r.id}`}>
+                  <VisitPerson row={r} />
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      ))}
+    </aside>
+  );
+}
+
 export function CompanyHomePerformanceBoard({
   links,
   loading,
@@ -255,7 +348,7 @@ export function CompanyHomePerformanceBoard({
         views: number;
         likes: number;
         saves: number;
-        displayPrice: number | null;
+        viewsEstimated: boolean;
         url: string | null;
         publishedAt: string | null;
       }
@@ -270,7 +363,8 @@ export function CompanyHomePerformanceBoard({
       const views = Number(l.views) || 0;
       const likes = Number(l.likes) || 0;
       const saves = Number(l.saves) || 0;
-      const price = displayPriceOf(l.allocations);
+      const viewsEstimated =
+        resolveCreatorPlatform(l.link_url) === "xiaohongshu";
       if (!prev) {
         map.set(id, {
           id,
@@ -281,7 +375,7 @@ export function CompanyHomePerformanceBoard({
           views,
           likes,
           saves,
-          displayPrice: price,
+          viewsEstimated,
           url: l.link_url,
           publishedAt: l.published_at,
         });
@@ -289,12 +383,7 @@ export function CompanyHomePerformanceBoard({
         prev.views += views;
         prev.likes += likes;
         prev.saves += saves;
-        if (
-          price != null &&
-          (prev.displayPrice == null || price > prev.displayPrice)
-        ) {
-          prev.displayPrice = price;
-        }
+        prev.viewsEstimated = prev.viewsEstimated || viewsEstimated;
         if ((l.published_at || "") > (prev.publishedAt || "")) {
           prev.publishedAt = l.published_at;
           prev.url = l.link_url;
@@ -438,7 +527,7 @@ export function CompanyHomePerformanceBoard({
                     <div>
                       <p className="text-[10px] text-[var(--muted)]">조회수</p>
                       <p className="text-[13px] font-bold tabular-nums text-[var(--ink)]">
-                        {formatMetric(c.views)}
+                        {formatViews(c.views, c.viewsEstimated)}
                       </p>
                     </div>
                     <div>
@@ -454,13 +543,6 @@ export function CompanyHomePerformanceBoard({
                       </p>
                     </div>
                   </div>
-                  {c.displayPrice != null ? (
-                    <div className="mt-2.5 flex justify-end">
-                      <span className="rounded-full bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white">
-                        {formatKrw(c.displayPrice)}원
-                      </span>
-                    </div>
-                  ) : null}
                 </article>
               ))}
             </div>

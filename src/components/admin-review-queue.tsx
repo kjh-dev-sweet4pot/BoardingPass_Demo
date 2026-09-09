@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { primaryBtnClass, secondaryBtnClass } from "@/components/ui";
+import { creatorPlatformLabelOf } from "@/lib/creator-link";
 import { parseTikTokVideoId } from "@/lib/tiktok-oembed";
 
 type Guideline = { id: string; title: string | null; body: string | null; file_path: string | null };
@@ -573,8 +574,11 @@ function CollectionLogList({
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--muted)]">
                   {when}
-                  {log.creator_links?.platform
-                    ? ` · ${log.creator_links.platform}`
+                  {log.creator_links
+                    ? ` · ${creatorPlatformLabelOf(
+                        log.creator_links.publish_url || log.creator_links.url,
+                        log.creator_links.platform,
+                      )}`
                     : ""}
                 </p>
                 {log.error_message ? (

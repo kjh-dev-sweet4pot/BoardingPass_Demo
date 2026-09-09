@@ -1,4 +1,3 @@
-import { isDemoCompany } from "@/lib/company";
 import { ymdKstNow } from "@/lib/company-home";
 import { formatKrw } from "@/lib/creator-pool-mock";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -13,8 +12,8 @@ export type BudgetPerformanceRow = {
   product: string;
   stage: string;
   kind: BudgetSpendKind;
-  /** 노출가 */
-  displayPrice: number;
+  /** 노출가. 없으면 합산·표시하지 않음 */
+  displayPrice: number | null;
 };
 
 export type BudgetPerformancePayload = {
@@ -32,11 +31,6 @@ export type BudgetPerformancePayload = {
   committedPct: number | null;
   rows: BudgetPerformanceRow[];
 };
-
-/** 50만~100만 노출가 (원 단위 정수) */
-export function randomDisplayPrice() {
-  return 500_000 + Math.floor(Math.random() * 500_001);
-}
 
 export function isPublishedComplete(opts: {
   rollupStatus: string | null | undefined;
@@ -61,8 +55,10 @@ export function summarizeBudgetPerformance(
   let spent = 0;
   let scheduled = 0;
   for (const r of rows) {
-    if (r.kind === "완료") spent += r.displayPrice;
-    else scheduled += r.displayPrice;
+    const price = r.displayPrice ?? 0;
+    if (price <= 0) continue;
+    if (r.kind === "완료") spent += price;
+    else scheduled += price;
   }
   const committed = spent + scheduled;
   const remaining =
@@ -99,10 +95,7 @@ function stageLabel(opts: {
   return "진행중";
 }
 
-/**
- * 홈·예산 성과 탭 공통.
- * 노출가만. 없으면 50~100만 시드. (R3)
- */
+/** 홈·예산 성과 탭 공통. 노출가만. 없으면 합산에서 제외. (R3) */
 export async function buildBudgetPerformanceForCompany(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
@@ -135,9 +128,7 @@ export async function buildBudgetPerformanceForCompany(
     ? companyBudget
     : campaignBudgetSum > 0
       ? campaignBudgetSum
-      : isDemoCompany(company)
-        ? 90_000_000
-        : null;
+      : null;
 
   const { data: allocs, error: allocErr } = await supabase
     .from("allocations")
@@ -169,25 +160,9 @@ export async function buildBudgetPerformanceForCompany(
 
     const pricing = raw.allocation_pricing;
     const priceRow = Array.isArray(pricing) ? pricing[0] : pricing;
-    let displayPrice = Number(priceRow?.display_price);
-    if (!Number.isFinite(displayPrice) || displayPrice <= 0) {
-      displayPrice = randomDisplayPrice();
-      // ponytail: 시드는 서버 service_role. 천장 — 운영자 확정가가 덮어씀.
-      const { error: priceErr } = await supabase
-        .from("allocation_pricing")
-        .upsert(
-          {
-            allocation_id: raw.id,
-            company_id: companyId,
-            display_price: displayPrice,
-            accepted_at: new Date().toISOString(),
-          },
-          { onConflict: "allocation_id" },
-        );
-      if (priceErr) {
-        console.warn("[budget-performance] price seed failed", priceErr.message);
-      }
-    }
+    const parsed = Number(priceRow?.display_price);
+    const displayPrice =
+      Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 
     const inf = Array.isArray(raw.influencers)
       ? raw.influencers[0]
@@ -218,15 +193,13 @@ export async function buildBudgetPerformanceForCompany(
 
   rows.sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === "완료" ? -1 : 1;
-    return b.displayPrice - a.displayPrice;
+    return (b.displayPrice ?? 0) - (a.displayPrice ?? 0);
   });
 
   return summarizeBudgetPerformance(budgetTotal, rows, ymdKstNow());
 }
 
 if (process.env.RUN_BUDGET_PERF_SELF_CHECK === "1") {
-  const p = randomDisplayPrice();
-  if (p < 500_000 || p > 1_000_000) throw new Error("randomDisplayPrice range");
   if (
     !isPublishedComplete({
       rollupStatus: "발행완료",

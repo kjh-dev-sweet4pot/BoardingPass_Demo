@@ -3,7 +3,12 @@
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
-import { formatMetric, type ContentPeriod } from "@/lib/content-insights";
+import { formatMetric, formatViews, type ContentPeriod } from "@/lib/content-insights";
+import {
+  creatorPlatformLabelOf,
+  creatorSnsChannelOf,
+  resolveCreatorPlatform,
+} from "@/lib/creator-link";
 import { findPoolCreator, type PoolCreator } from "@/lib/creator-pool-mock";
 import { formatMd, ymdKst } from "@/lib/types";
 
@@ -43,13 +48,14 @@ function er(v: number, l: number, c: number) {
 }
 
 function photoOf(row: InfluencerRow): PoolCreator {
+  const channel = creatorSnsChannelOf(row.links[0]?.link_url);
   return (
     findPoolCreator({ id: row.id, handle: row.handle, name: row.name }) || {
       id: row.id,
       name: row.name,
       handle: row.handle,
       market: "jp",
-      channel: "instagram",
+      channel,
       profileUrl: null,
       followers: 0,
       priceKrw: 0,
@@ -384,11 +390,7 @@ export function CompanyPerformanceLookupTab({
                       .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
                       .map((link) => {
                         const url = link.link_url || "";
-                        const plat = url.includes("tiktok")
-                          ? "TikTok"
-                          : url.includes("instagram")
-                            ? "Instagram"
-                            : "기타";
+                        const plat = creatorPlatformLabelOf(url);
                         return (
                           <li key={link.id}>
                             <a
@@ -410,7 +412,10 @@ export function CompanyPerformanceLookupTab({
                               </span>
                               <span className="shrink-0 text-right text-[12px] tabular-nums">
                                 <span className="block font-semibold text-[var(--accent)]">
-                                  {formatMetric(link.views ?? 0)}
+                                  {formatViews(
+                                    link.views ?? 0,
+                                    resolveCreatorPlatform(url) === "xiaohongshu",
+                                  )}
                                 </span>
                                 <span className="text-[var(--muted)]">조회</span>
                               </span>

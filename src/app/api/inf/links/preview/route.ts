@@ -7,6 +7,11 @@ import {
   scrapeInstagramPosts,
 } from "@/lib/apify-instagram";
 import { findResultForUrl, scrapeTikTokPosts, extractThumbnailUrl } from "@/lib/apify-tiktok";
+import {
+  extractXiaohongshuThumbnailUrl,
+  findXiaohongshuResultForUrl,
+  scrapeXiaohongshuPosts,
+} from "@/lib/apify-xiaohongshu";
 import { fetchTikTokOEmbed } from "@/lib/tiktok-oembed";
 import { getInfluencerSessionId } from "@/lib/session";
 
@@ -30,7 +35,7 @@ export async function POST(request: Request) {
   }
 
   const platform = detectPlatform(url);
-  if (platform !== "tiktok" && platform !== "instagram") {
+  if (platform !== "tiktok" && platform !== "instagram" && platform !== "xiaohongshu") {
     return NextResponse.json({
       preview: {
         platform,
@@ -39,6 +44,34 @@ export async function POST(request: Request) {
         unsupported: true,
       },
     });
+  }
+
+  if (platform === "xiaohongshu") {
+    try {
+      const items = await scrapeXiaohongshuPosts([url]);
+      const result = findXiaohongshuResultForUrl(items, url);
+      if (!result) {
+        throw new Error("샤오홍슈 미리보기 결과를 찾지 못했습니다.");
+      }
+      return NextResponse.json({
+        preview: {
+          platform,
+          profileName: result.authorHandle,
+          thumbnailUrl: extractXiaohongshuThumbnailUrl(result),
+          unsupported: false,
+        },
+      });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "미리보기 정보를 불러오지 못했습니다.",
+        },
+        { status: 500 },
+      );
+    }
   }
 
   if (platform === "instagram") {

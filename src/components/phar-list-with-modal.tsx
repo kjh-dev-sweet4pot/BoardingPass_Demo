@@ -8,16 +8,18 @@ import {
   useRef,
   useState,
 } from "react";
-import { PHAR_COUNTER_ROOT_ID } from "@/components/phar-header-actions";
+import {
+  PHAR_COUNTER_ROOT_ID,
+  PharFloorBox,
+} from "@/components/phar-header-actions";
 import { StateBadge } from "@/components/state-badge";
 import { AdminAllocationEditForm } from "@/components/admin-allocation-edit";
 import {
   ALLOCATION_LINK_LABEL_ADMIN,
   CREATOR_LINK_STATUS_LABEL,
-  CREATOR_PLATFORM_LABEL,
+  creatorPlatformLabelOf,
   summarizeAllocationLinks,
 } from "@/lib/creator-link";
-import type { CreatorPlatform } from "@/lib/creator-link";
 import {
   ALLOCATION_STATUS_LABEL,
   allocationStatusDisplayLabel,
@@ -1097,6 +1099,8 @@ export function PharListWithModal({
   allowAdminEdit = false,
   storeList = [],
   companyList = [],
+  embedInConsole = false,
+  initialSelectedId = null,
 }: {
   items: AllocationWithRelations[];
   /** 부모 높이에 맞춰 목록만 내부 스크롤 (운영 콘솔 등) */
@@ -1107,6 +1111,10 @@ export function PharListWithModal({
   allowAdminEdit?: boolean;
   storeList?: Store[];
   companyList?: Company[];
+  /** /phar 콘솔 안에 넣을 때: 전체화면 id 중복 방지 */
+  embedInConsole?: boolean;
+  /** 달력에서 넘어온 배정 — 우측 상세를 연다 */
+  initialSelectedId?: string | null;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailPayload | null>(null);
@@ -1124,17 +1132,23 @@ export function PharListWithModal({
   const [visitDate, setVisitDate] = useState("");
   const [status, setStatus] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
-  /** 지점(phar)은 기본 오늘만, Admin 전체 목록은 기본 전체 */
-  const [todayOnly, setTodayOnly] = useState(() => Boolean(lockedStoreId));
-  /** 지점 PC: 기본 미수령만 */
-  const [hidePickedUp, setHidePickedUp] = useState(() => Boolean(lockedStoreId));
+  /** 지점(phar) 콘솔은 전체 리스트, Admin 단독 카운터는 오늘만 */
+  const [todayOnly, setTodayOnly] = useState(
+    () => Boolean(lockedStoreId) && !embedInConsole,
+  );
+  /** 지점 PC: 콘솔은 전체, 단독 카운터는 미수령만 */
+  const [hidePickedUp, setHidePickedUp] = useState(
+    () => Boolean(lockedStoreId) && !embedInConsole,
+  );
   /** 지점 PC: 우측 패널용 선택 (allocation id) */
-  const [selectedAllocId, setSelectedAllocId] = useState<string | null>(null);
+  const [selectedAllocId, setSelectedAllocId] = useState<string | null>(
+    initialSelectedId,
+  );
   /** 지점 카운터: INF 수령 등 원격 변경을 반영하기 위한 목록 */
   const [liveItems, setLiveItems] = useState(items);
   /** 카운터 상단 현황: 오늘 / 이번달 / 전체 */
   const [statsPeriod, setStatsPeriod] = useState<"today" | "month" | "all">(
-    "today",
+    embedInConsole ? "all" : "today",
   );
   /** 현황 카드 클릭 필터: 합계 / 방문예정 / 방문완료 / 반출완료 */
   const [statsBucket, setStatsBucket] = useState<
@@ -1746,11 +1760,11 @@ export function PharListWithModal({
   if (simpleFilters) {
     const counterTall = fillHeight || isFullscreen;
     const counterGridClass =
-      "grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1.9fr)_minmax(240px,0.55fr)]";
+      "grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.9fr)]";
 
     return (
       <div
-        id={PHAR_COUNTER_ROOT_ID}
+        id={embedInConsole ? undefined : PHAR_COUNTER_ROOT_ID}
         ref={counterRootRef}
         className={`${
           counterTall ? "flex min-h-0 flex-1 flex-col" : ""
@@ -1773,13 +1787,16 @@ export function PharListWithModal({
         ) : null}
 
         {liveItems.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
+          <div className="flex min-h-0 flex-col gap-3">
+            {embedInConsole ? <PharFloorBox items={liveItems} /> : null}
+            <p className="text-sm text-[var(--muted)]">배정이 없습니다.</p>
+          </div>
         ) : (
           <div
             className={`${counterGridClass} ${counterTall ? "flex-1" : ""}`}
           >
             <div className="flex min-h-0 min-w-0 flex-col gap-3">
-              <div className="shrink-0 rounded-[6px] border border-[var(--accent)]/25 bg-[var(--accent-soft)]/70 p-3 shadow-sm sm:p-3.5">
+              <div className="shrink-0 rounded-[6px] border border-[var(--accent)]/25 bg-[var(--accent-soft)]/70 p-2.5 shadow-sm">
                 <div className="mb-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                   <div className="flex items-baseline gap-2">
                     <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
@@ -1908,6 +1925,8 @@ export function PharListWithModal({
                 </div>
               </div>
 
+              {embedInConsole ? <PharFloorBox items={liveItems} /> : null}
+
               <div
                 className={`relative min-h-0 ${
                   counterTall
@@ -1968,18 +1987,15 @@ export function PharListWithModal({
                                 {hidePickedUp
                                   ? "오늘 미수령 방문이 없습니다."
                                   : "오늘 방문인이 없습니다."}
+                                {hidePickedUp ? (
                                 <button
                                   type="button"
                                   className="mt-2 block w-full text-xs font-medium text-[var(--accent)] hover:underline"
-                                  onClick={() => {
-                                    if (hidePickedUp) setHidePickedUp(false);
-                                    else onStatsPeriodChange("all");
-                                  }}
+                                  onClick={() => setHidePickedUp(false)}
                                 >
-                                  {hidePickedUp
-                                    ? "완료 포함해 보기"
-                                    : "전체 날짜 보기"}
+                                  완료 포함해 보기
                                 </button>
+                                ) : null}
                               </td>
                             </tr>
                           ) : (
@@ -2630,7 +2646,7 @@ export function PharListWithModal({
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className="rounded-[6px] bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent)]">
-                                    {CREATOR_PLATFORM_LABEL[link.platform as CreatorPlatform] ?? link.platform}
+                                    {creatorPlatformLabelOf(link.url, link.platform)}
                                   </span>
                                   <span className="text-[11px] text-[var(--muted)]">
                                     {CREATOR_LINK_STATUS_LABEL[link.status]}
@@ -2646,7 +2662,8 @@ export function PharListWithModal({
                                   {link.url}
                                 </a>
                                 {(link.platform === "tiktok" ||
-                                  link.platform === "instagram") &&
+                                  link.platform === "instagram" ||
+                                  link.platform === "xiaohongshu") &&
                                 (link.views != null ||
                                   link.likes != null ||
                                   link.comments != null) ? (
@@ -2669,7 +2686,8 @@ export function PharListWithModal({
                                 ) : null}
                               </div>
                               {(link.platform === "tiktok" ||
-                                link.platform === "instagram") &&
+                                link.platform === "instagram" ||
+                                link.platform === "xiaohongshu") &&
                               allowAdminEdit ? (
                                 <button
                                   type="button"

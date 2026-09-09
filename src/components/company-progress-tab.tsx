@@ -12,6 +12,7 @@ import {
   type ProgressKanbanCard,
   type ProgressLink,
 } from "@/lib/com-progress-kanban";
+import { creatorSnsChannelOf } from "@/lib/creator-link";
 import { findPoolCreator, type CreatorPost, type PoolCreator } from "@/lib/creator-pool-mock";
 import type { AllocationWithRelations } from "@/lib/types";
 
@@ -23,7 +24,7 @@ function postsFromLinks(card: ProgressKanbanCard): CreatorPost[] {
     if (!http || seen.has(http)) continue;
     seen.add(http);
     out.push({
-      platform: /tiktok/i.test(link.platform) ? "tiktok" : "instagram",
+      platform: creatorSnsChannelOf(http, link.platform),
       url: http,
     });
   }
@@ -39,7 +40,11 @@ function poolCreatorForCard(card: ProgressKanbanCard): PoolCreator {
   if (fromPool) return fromPool;
 
   const posts = postsFromLinks(card);
-  const channel = posts.some((p) => p.platform === "tiktok") ? "tiktok" : "instagram";
+  const channel = posts.some((p) => p.platform === "xiaohongshu")
+    ? "xiaohongshu"
+    : posts.some((p) => p.platform === "tiktok")
+      ? "tiktok"
+      : "instagram";
 
   return {
     id: card.influencerId,
@@ -568,6 +573,13 @@ export function CompanyProgressTab({
       const list = map.get(card.status);
       if (list) list.push(card);
     }
+    for (const list of map.values()) {
+      list.sort((a, b) => {
+        const da = a.visitDates[0] || a.updatedAt;
+        const db = b.visitDates[0] || b.updatedAt;
+        return da.localeCompare(db) || a.name.localeCompare(b.name, "ko");
+      });
+    }
     return map;
   }, [filteredCards]);
 
@@ -647,7 +659,7 @@ export function CompanyProgressTab({
                   ) : (
                     items.map((card) => (
                       <KanbanCard
-                        key={card.id}
+                        key={`${card.status}-${card.influencerId}`}
                         card={card}
                         onClick={() => setSelected(card)}
                       />
