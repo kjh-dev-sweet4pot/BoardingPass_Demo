@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   applyCompanyMatch,
@@ -19,7 +19,55 @@ import {
 } from "@/lib/import-batch-log";
 import { InfluencerAvatar } from "@/components/influencer-avatar";
 import { primaryBtnClass, secondaryBtnClass } from "@/components/ui";
+import {
+  importDupChanges,
+  type ImportDupChange,
+} from "@/lib/import-dup";
 import { type Company } from "@/lib/types";
+
+type DupMode = "add" | "replace" | "skip";
+
+type DupMatch = {
+  allocationId: string;
+  exact: boolean;
+  visit_date: string | null;
+  store: string;
+  product: string;
+  quantity: number;
+  name?: string;
+  display_price?: number | null;
+  cost_amount?: number | null;
+  content_urls?: string[];
+  status: string;
+  statusLabel: string;
+};
+
+function dupChangeMap(changes: ImportDupChange[]) {
+  return new Map(changes.map((c) => [c.field, c]));
+}
+
+function PreviewCell({
+  children,
+  change,
+  align = "left",
+}: {
+  children: ReactNode;
+  change?: ImportDupChange;
+  align?: "left" | "right";
+}) {
+  return (
+    <div className={align === "right" ? "text-right" : ""}>
+      <div className={change ? "font-semibold text-[var(--danger)]" : ""}>
+        {children}
+      </div>
+      {change ? (
+        <p className="mt-0.5 text-[10px] leading-4 text-[var(--muted)]">
+          기존 {change.from}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 type BatchListItem = ImportBatchRow & {
   uploaded_at_label: string;
@@ -56,6 +104,13 @@ function ImportTips() {
             별칭으로 추가
           </mark>
           됩니다.
+        </li>
+        <li>
+          이미 있는 인플루언서는{" "}
+          <mark className="bg-transparent font-extrabold text-[var(--accent)] underline decoration-2 underline-offset-2">
+            추가 · 대치 · 건너뛰기
+          </mark>
+          를 고를 수 있습니다. 대치는 방문일·지점·수량처럼 바뀐 칸만 덮고, 수령·발행 상태는 유지합니다.
         </li>
         <li>
           나중에 올린 콘텐츠는 같은 파일의{" "}
@@ -108,6 +163,9 @@ export function AdminImportPanel({
   const [refetchingId, setRefetchingId] = useState<string | null>(null);
   const [avatarKeys, setAvatarKeys] = useState<Record<string, number>>({});
   const [avatarBroken, setAvatarBroken] = useState<Record<string, boolean>>({});
+  const [dupMatches, setDupMatches] = useState<(DupMatch | null)[]>([]);
+  const [dupMode, setDupMode] = useState<Record<number, DupMode>>({});
+  const [dupLoading, setDupLoading] = useState(false);
   const hasCompanies = companyList.some((c) => c.is_active);
 
   const loadBatches = useCallback(async () => {
@@ -156,6 +214,70 @@ export function AdminImportPanel({
     const ok = rows.filter((r) => r.ok).length;
     return { total: rows.length, ok, bad: rows.length - ok };
   }, [rows]);
+  const dupCount = dupMatches.filter(Boolean).length;
+
+  function toImportPayload(list: ParsedImportRow[], modes: Record<number, DupMode>) {
+    return list.map((r, idx) => ({
+      company: r.company_raw,
+      snsid: r.snsid,
+      snsurl: r.snsurl || "",
+      name: r.name,
+      visit_date: r.visit_date,
+      store: r.store,
+      product: r.product,
+      quantity: r.quantity,
+      display_price: r.display_price ?? "",
+      cost_amount: r.cost_amount ?? "",
+      content_url: (r.content_urls || []).join("\n"),
+      dup_mode: modes[idx] || (dupMatches[idx] ? "replace" : "add"),
+    }));
+  }
+
+  function applyAllDupModes(mode: DupMode) {
+    setDupMode((prev) => {
+      const next = { ...prev };
+      dupMatches.forEach((hit, idx) => {
+        if (hit) next[idx] = mode;
+      });
+      return next;
+    });
+  }
+
+  async function refreshDupMatches(list: ParsedImportRow[]) {
+    const ok = list.filter((r) => r.ok);
+    if (ok.length === 0) {
+      setDupMatches(list.map(() => null));
+      setDupMode({});
+      return;
+    }
+    setDupLoading(true);
+    try {
+      const res = await fetch("/api/admin/import/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: toImportPayload(list, {}) }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "중복 조회 실패");
+      const matches = (body.matches || []) as (DupMatch | null)[];
+      setDupMatches(matches);
+      setDupMode((prev) => {
+        const next: Record<number, DupMode> = {};
+        matches.forEach((hit, idx) => {
+          if (!hit) return;
+          next[idx] = prev[idx] || "replace";
+        });
+        return next;
+      });
+    } catch (err: unknown) {
+      setDupMatches(list.map(() => null));
+      setResultError(
+        err instanceof Error ? err.message : "중복 인원을 조회하지 못했습니다.",
+      );
+    } finally {
+      setDupLoading(false);
+    }
+  }
 
   function downloadCsvTemplate() {
     const csv = `\uFEFF${buildImportCsvTemplate(companyList).replace(/\n/g, "\r\n")}`;
@@ -198,6 +320,8 @@ export function AdminImportPanel({
     setReviewOpen(false);
     setAliasTarget({});
     setAliasSource({});
+    setDupMatches([]);
+    setDupMode({});
   }
 
   function assignCompany(index: number, companyId: string) {
@@ -211,13 +335,15 @@ export function AdminImportPanel({
       }));
     }
     if (!company) return;
-    setRows((prev) =>
-      prev.map((r, i) =>
+    setRows((prev) => {
+      const next = prev.map((r, i) =>
         i === index
           ? applyCompanyMatch({ ...r, company_raw: company.name }, companyList)
           : r,
-      ),
-    );
+      );
+      void refreshDupMatches(next);
+      return next;
+    });
     setConfirmed(false);
     const alias = aliasSource[index] || current.company_raw;
     if (alias && alias !== company.name) {
@@ -247,6 +373,7 @@ export function AdminImportPanel({
       setFileName(file.name);
       setReviewOpen(true);
       setConfirmed(false);
+      void refreshDupMatches(parsed);
     } catch (err: unknown) {
       setParseError(
         err instanceof Error ? err.message : "파일을 읽지 못했습니다.",
@@ -269,19 +396,7 @@ export function AdminImportPanel({
     if (valid.length === 0 || !confirmed || importing) return;
 
     const payload = {
-      rows: valid.map((r) => ({
-        company: r.company_raw,
-        snsid: r.snsid,
-        snsurl: r.snsurl || "",
-        name: r.name,
-        visit_date: r.visit_date,
-        store: r.store,
-        product: r.product,
-        quantity: r.quantity,
-        display_price: r.display_price ?? "",
-        cost_amount: r.cost_amount ?? "",
-        content_url: (r.content_urls || []).join("\n"),
-      })),
+      rows: toImportPayload(rows, dupMode).filter((_, i) => rows[i]?.ok),
     };
 
     setReviewOpen(false);
@@ -306,11 +421,12 @@ export function AdminImportPanel({
         created: number;
         skipped: number;
         failed: number;
+        replaced?: number;
         linked?: number;
         total: number;
       };
       setResultMessage(
-        `완료: ${s.total}행 중 생성 ${s.created} · 콘텐츠 ${s.linked ?? 0} · 중복 건너뜀 ${s.skipped} · 실패 ${s.failed}`,
+        `완료: ${s.total}행 중 생성 ${s.created} · 대치 ${s.replaced ?? 0} · 콘텐츠 ${s.linked ?? 0} · 건너뜀 ${s.skipped} · 실패 ${s.failed}`,
       );
       void loadBatches();
       router.refresh();
@@ -741,7 +857,44 @@ export function AdminImportPanel({
                   {fileName} · 전체 {stats.total} · 유효{" "}
                   <span className="text-[var(--accent)]">{stats.ok}</span> · 오류{" "}
                   <span className="text-[var(--danger)]">{stats.bad}</span>
+                  {dupCount > 0 ? (
+                    <>
+                      {" "}
+                      · 중복{" "}
+                      <span className="text-[var(--ink)]">{dupCount}</span>
+                    </>
+                  ) : null}
                 </p>
+                {dupLoading ? (
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    기존 배정과 비교하는 중…
+                  </p>
+                ) : null}
+                {dupCount > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="text-xs text-[var(--accent)] underline"
+                      onClick={() => applyAllDupModes("replace")}
+                    >
+                      중복 전부 대치
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-[var(--accent)] underline"
+                      onClick={() => applyAllDupModes("add")}
+                    >
+                      중복 전부 추가
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-[var(--accent)] underline"
+                      onClick={() => applyAllDupModes("skip")}
+                    >
+                      중복 전부 건너뛰기
+                    </button>
+                  </div>
+                ) : null}
                 <div className="mt-3">
                   <ImportTips />
                 </div>
@@ -757,11 +910,12 @@ export function AdminImportPanel({
 
             <div className="overflow-auto p-5">
               <div className="overflow-x-auto border border-[var(--line)]">
-                <table className="min-w-[1040px] w-full border-collapse text-left text-sm">
+                <table className="min-w-[1180px] w-full border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b border-[var(--line)] bg-[var(--accent-soft)]/40 text-xs text-[var(--muted)]">
                       <th className="px-3 py-2 font-medium">행</th>
                       <th className="px-3 py-2 font-medium">상태</th>
+                      <th className="px-3 py-2 font-medium">중복</th>
                       <th className="px-3 py-2 font-medium">회원사</th>
                       <th className="px-3 py-2 font-medium">이름</th>
                       <th className="px-3 py-2 font-medium">snsid</th>
@@ -776,11 +930,42 @@ export function AdminImportPanel({
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row, idx) => (
+                    {rows.map((row, idx) => {
+                      const hit = dupMatches[idx];
+                      const changes = hit
+                        ? importDupChanges(
+                            {
+                              visit_date: hit.visit_date,
+                              store_name: hit.store,
+                              product_name: hit.product,
+                              quantity: hit.quantity,
+                              influencer_name: hit.name || "",
+                              display_price: hit.display_price ?? null,
+                              cost_amount: hit.cost_amount ?? null,
+                              content_urls: hit.content_urls || [],
+                            },
+                            {
+                              visit_date: row.visit_date,
+                              store: row.store,
+                              product: row.product,
+                              quantity: row.quantity,
+                              name: row.name,
+                              display_price: row.display_price,
+                              cost_amount: row.cost_amount,
+                              content_urls: row.content_urls,
+                            },
+                          )
+                        : [];
+                      const byField = dupChangeMap(changes);
+                      return (
                       <tr
                         key={`${row.rowNumber}-${row.snsid}-${row.company_raw}-${idx}`}
                         className={`border-b border-[var(--line)] last:border-b-0 ${
                           row.ok ? "" : "bg-red-50/60"
+                        } ${
+                          row.ok && changes.length
+                            ? "bg-[var(--accent-soft)]/35"
+                            : ""
                         }`}
                       >
                         <td className="px-3 py-2 tabular-nums text-[var(--muted)]">
@@ -796,6 +981,43 @@ export function AdminImportPanel({
                           >
                             {row.ok ? "OK" : "오류"}
                           </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          {dupMatches[idx] ? (
+                            <div className="min-w-[168px] space-y-1">
+                              <select
+                                className="h-7 w-full rounded border border-[var(--line)] px-1 text-xs"
+                                value={dupMode[idx] || "replace"}
+                                onChange={(e) =>
+                                  setDupMode((prev) => ({
+                                    ...prev,
+                                    [idx]: e.target.value as DupMode,
+                                  }))
+                                }
+                              >
+                                <option value="replace">대치</option>
+                                <option value="add">추가</option>
+                                <option value="skip">건너뛰기</option>
+                              </select>
+                              <p className="text-[10px] leading-4 text-[var(--muted)]">
+                                기존 {hit!.statusLabel}
+                                {hit!.exact ? " · 동일키" : ""}
+                              </p>
+                              {changes.length ? (
+                                <p className="text-[10px] leading-4 font-medium text-[var(--danger)]">
+                                  변경 {changes.map((c) => c.label).join(" · ")}
+                                </p>
+                              ) : (
+                                <p className="text-[10px] leading-4 text-[var(--muted)]">
+                                  칸 동일
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-[var(--muted)]">
+                              {row.ok ? "신규" : "—"}
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2">
                           <div>{row.company_name || row.company_raw || "—"}</div>
@@ -828,42 +1050,71 @@ export function AdminImportPanel({
                             </div>
                           ) : null}
                         </td>
-                        <td className="px-3 py-2">{row.name || "—"}</td>
+                        <td className="px-3 py-2">
+                          <PreviewCell change={byField.get("name")}>
+                            {row.name || "—"}
+                          </PreviewCell>
+                        </td>
                         <td className="px-3 py-2 text-[var(--accent)]">
                           {row.snsid ? `@${row.snsid}` : "—"}
                         </td>
                         <td className="px-3 py-2 tabular-nums">
-                          {row.visit_date || "—"}
+                          <PreviewCell change={byField.get("visit_date")}>
+                            {row.visit_date || "—"}
+                          </PreviewCell>
                         </td>
-                        <td className="px-3 py-2">{row.store || "—"}</td>
-                        <td className="px-3 py-2">{row.product || "—"}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {row.quantity}
+                        <td className="px-3 py-2">
+                          <PreviewCell change={byField.get("store")}>
+                            {row.store || "—"}
+                          </PreviewCell>
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {row.display_price != null
-                            ? row.display_price.toLocaleString("ko-KR")
-                            : "—"}
+                        <td className="px-3 py-2">
+                          <PreviewCell change={byField.get("product")}>
+                            {row.product || "—"}
+                          </PreviewCell>
                         </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {row.cost_amount != null
-                            ? row.cost_amount.toLocaleString("ko-KR")
-                            : "—"}
+                        <td className="px-3 py-2 tabular-nums">
+                          <PreviewCell change={byField.get("quantity")} align="right">
+                            {row.quantity}
+                          </PreviewCell>
+                        </td>
+                        <td className="px-3 py-2 tabular-nums">
+                          <PreviewCell
+                            change={byField.get("display_price")}
+                            align="right"
+                          >
+                            {row.display_price != null
+                              ? row.display_price.toLocaleString("ko-KR")
+                              : "—"}
+                          </PreviewCell>
+                        </td>
+                        <td className="px-3 py-2 tabular-nums">
+                          <PreviewCell
+                            change={byField.get("cost_amount")}
+                            align="right"
+                          >
+                            {row.cost_amount != null
+                              ? row.cost_amount.toLocaleString("ko-KR")
+                              : "—"}
+                          </PreviewCell>
                         </td>
                         <td className="max-w-[220px] px-3 py-2 text-xs text-[var(--accent)]">
-                          {(row.content_urls || []).length
-                            ? (row.content_urls || [])
-                                .map((u) =>
-                                  u.length > 42 ? `${u.slice(0, 40)}…` : u,
-                                )
-                                .join(" · ")
-                            : "—"}
+                          <PreviewCell change={byField.get("content_url")}>
+                            {(row.content_urls || []).length
+                              ? (row.content_urls || [])
+                                  .map((u) =>
+                                    u.length > 42 ? `${u.slice(0, 40)}…` : u,
+                                  )
+                                  .join(" · ")
+                              : "—"}
+                          </PreviewCell>
                         </td>
                         <td className="px-3 py-2 text-xs text-[var(--danger)]">
                           {row.errors.join(", ") || "—"}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -886,10 +1137,16 @@ export function AdminImportPanel({
                 <button
                   type="button"
                   className={primaryBtnClass}
-                  disabled={importing || !confirmed || stats.ok === 0}
+                  disabled={
+                    importing || dupLoading || !confirmed || stats.ok === 0
+                  }
                   onClick={commitImport}
                 >
-                  {importing ? "반영 중…" : `확인 후 DB 반영 (${stats.ok}건)`}
+                  {importing
+                    ? "반영 중…"
+                    : dupLoading
+                      ? "중복 조회 중…"
+                      : `확인 후 DB 반영 (${stats.ok}건)`}
                 </button>
                 <button
                   type="button"

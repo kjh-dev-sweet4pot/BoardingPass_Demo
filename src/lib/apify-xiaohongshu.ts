@@ -5,6 +5,7 @@
  */
 import { apifyErrorMessage } from "@/lib/apify-errors";
 import { detectPlatform } from "@/lib/creator-link";
+import { parsePostedAtIso } from "@/lib/metrics-schedule";
 import { estimateXiaohongshuViews } from "@/lib/xiaohongshu-views";
 
 const ACTOR_ID = "atomus~xiaohongshu-scraper";
@@ -22,6 +23,7 @@ export type XiaohongshuScraperResult = {
   shares: number | null;
   coverUrl: string | null;
   authorHandle: string | null;
+  postedAt: string | null;
 };
 
 function getApifyToken(): string {
@@ -102,6 +104,9 @@ type AtomusNote = {
   images?: string[];
   user?: { nickname?: string; red_id?: string; user_id?: string };
   author?: { nickname?: string; userId?: string };
+  timestamp?: unknown;
+  time?: unknown;
+  publishTime?: unknown;
 };
 
 function mapNote(item: AtomusNote, inputUrl?: string): XiaohongshuScraperResult {
@@ -134,6 +139,9 @@ function mapNote(item: AtomusNote, inputUrl?: string): XiaohongshuScraperResult 
       item.user?.user_id ||
       item.author?.userId ||
       null,
+    postedAt: parsePostedAtIso(
+      item.timestamp ?? item.time ?? item.publishTime,
+    ),
   };
 }
 
@@ -258,6 +266,76 @@ export async function scrapeXiaohongshuProfile(
       typeof fans === "number" && Number.isFinite(fans) ? Math.round(fans) : null,
     region: item.ip_location || item.location || null,
   };
+}
+
+type XhsProfilePost = {
+  url?: string;
+  timestamp?: number;
+  liked_count?: unknown;
+  comments_count?: unknown;
+  collected_count?: unknown;
+  shared_count?: unknown;
+  view_count?: unknown;
+};
+
+export async function scrapeXiaohongshuRecentNotes(
+  profileUrl: string,
+  take = 3,
+): Promise<
+  {
+    url: string;
+    views: number;
+    likes: number;
+    comments: number;
+    saves: number;
+    viewsEstimated: boolean;
+  }[]
+> {
+  const token = getApifyToken();
+  const target = profileUrl.trim();
+  if (!target) throw new Error("샤오홍슈 프로필 URL이 없습니다.");
+  const res = await fetch(
+    `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=512&timeout=180`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        searchType: "profile",
+        userUrls: [target],
+        includePosts: true,
+      }),
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(await apifyErrorMessage(res.status, text));
+  }
+  const items = (await res.json()) as Array<{ posts?: XhsProfilePost[] }>;
+  const posts = [...(items[0]?.posts || [])].sort(
+    (a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0),
+  );
+  return posts.slice(0, take).map((p) => {
+    const likes = pickCount(p.liked_count) ?? 0;
+    const comments = pickCount(p.comments_count) ?? 0;
+    const saves = pickCount(p.collected_count);
+    const shares = pickCount(p.shared_count);
+    const measured = pickCount(p.view_count);
+    const views = estimateXiaohongshuViews({
+      views: measured,
+      likes,
+      comments,
+      saves,
+      shares,
+    });
+    return {
+      url: typeof p.url === "string" ? p.url : "",
+      views,
+      likes,
+      comments,
+      saves: saves ?? 0,
+      viewsEstimated: !(measured != null && measured > 0 && views === measured),
+    };
+  });
 }
 
 if (process.env.RUN_XHS_SELF_CHECK === "1") {

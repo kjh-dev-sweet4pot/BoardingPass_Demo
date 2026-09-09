@@ -237,9 +237,33 @@ async function applyMetrics(linkIds, metrics) {
 
 async function main() {
   if (!token) throw new Error("APIFY_TOKEN 없음");
-  const { data: links, error } = await supabase
-    .from("creator_links")
-    .select("id, url, publish_url, platform");
+  const loginArg = process.argv.find((a) => a.startsWith("--login="));
+  const loginId = loginArg ? loginArg.slice("--login=".length).trim() : "";
+  let query = supabase.from("creator_links").select("id, url, publish_url, platform");
+  if (loginId) {
+    const { data: co, error: coErr } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("login_id", loginId)
+      .maybeSingle();
+    if (coErr) throw new Error(coErr.message);
+    if (!co?.id) throw new Error(`회원사 없음: ${loginId}`);
+    const { data: allocs, error: allocErr } = await supabase
+      .from("allocations")
+      .select("id")
+      .eq("company_id", co.id);
+    if (allocErr) throw new Error(allocErr.message);
+    const allocIds = (allocs || []).map((a) => a.id);
+    if (allocIds.length === 0) {
+      console.log({ login: loginId, links: 0 });
+      return;
+    }
+    query = supabase
+      .from("creator_links")
+      .select("id, url, publish_url, platform")
+      .in("allocation_id", allocIds);
+  }
+  const { data: links, error } = await query;
   if (error) throw new Error(error.message);
 
   const groups = new Map();
@@ -258,6 +282,7 @@ async function main() {
   for (const g of groups.values()) byPlat[g.platform].push(g);
 
   console.log({
+    login: loginId || "all",
     links: (links || []).length,
     unique: groups.size,
     tiktok: byPlat.tiktok.length,

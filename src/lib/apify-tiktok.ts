@@ -44,6 +44,9 @@ export interface TikTokScraperResult {
     followers?: number;
     following?: number;
   };
+  /** unix seconds */
+  createTime?: number;
+  createTimeISO?: string;
 }
 
 /** 결과에서 가장 안정적인 썸네일 URL 추출 */

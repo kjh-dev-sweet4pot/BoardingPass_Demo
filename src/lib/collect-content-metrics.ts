@@ -11,7 +11,7 @@ import {
 } from "@/lib/apify-xiaohongshu";
 import { detectPlatform } from "@/lib/creator-link";
 import { estimateXiaohongshuViews } from "@/lib/xiaohongshu-views";
-import { nextRetryAt } from "@/lib/metrics-schedule";
+import { nextRetryAt, parsePostedAtIso } from "@/lib/metrics-schedule";
 
 export type ScrapedMetrics = {
   views: number;
@@ -24,6 +24,7 @@ export type ScrapedMetrics = {
   /** 리포스트(주로 IG). 없으면 null */
   reposts: number | null;
   authorHandle: string | null;
+  postedAt: string | null;
 };
 
 export type CollectLinkRow = {
@@ -72,6 +73,7 @@ export async function scrapeLinkMetrics(
       shares: typeof result.shareCount === "number" ? result.shareCount : null,
       reposts: null,
       authorHandle,
+      postedAt: parsePostedAtIso(result.createTimeISO ?? result.createTime),
     };
   }
 
@@ -87,6 +89,7 @@ export async function scrapeLinkMetrics(
       shares: result.sharesCount ?? null,
       reposts: result.repostsCount ?? null,
       authorHandle: result.ownerUsername?.replace(/^@+/, "").trim() || null,
+      postedAt: result.postedAt ?? null,
     };
   }
 
@@ -102,6 +105,7 @@ export async function scrapeLinkMetrics(
       shares: result.shares,
       reposts: null,
       authorHandle: result.authorHandle?.replace(/^@+/, "").trim() || null,
+      postedAt: result.postedAt ?? null,
     };
   }
 
@@ -170,6 +174,18 @@ export async function collectLinkMetrics(
   try {
     const metrics = await scrapeLinkMetrics(url, link.platform);
     const collectedAt = new Date().toISOString();
+    const linkPatch: Record<string, unknown> = {
+      views: metrics.views,
+      likes: metrics.likes,
+      comments: metrics.comments,
+      saves: metrics.saves,
+      shares: metrics.shares,
+      reposts: metrics.reposts,
+      metrics_collected_at: collectedAt,
+      verification_failed: false,
+      updated_at: collectedAt,
+    };
+    if (metrics.postedAt) linkPatch.published_at = metrics.postedAt;
 
     const { error: metricErr } = await supabase.from("content_metrics").upsert(
       {
@@ -188,17 +204,7 @@ export async function collectLinkMetrics(
 
     const { error: linkErr } = await supabase
       .from("creator_links")
-      .update({
-        views: metrics.views,
-        likes: metrics.likes,
-        comments: metrics.comments,
-        saves: metrics.saves,
-        shares: metrics.shares,
-        reposts: metrics.reposts,
-        metrics_collected_at: collectedAt,
-        verification_failed: false,
-        updated_at: collectedAt,
-      })
+      .update(linkPatch)
       .eq("id", link.id);
     if (linkErr) throw new Error(linkErr.message);
 

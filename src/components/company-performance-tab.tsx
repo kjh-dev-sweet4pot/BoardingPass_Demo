@@ -13,6 +13,7 @@ import {
 import { findPoolCreator, type PoolCreator } from "@/lib/creator-pool-mock";
 import type { ContentPeriod } from "@/lib/content-insights";
 import { addDaysYmd, formatMd, ymdKst } from "@/lib/types";
+import { buildViewsCurvePoints, monotoneCurvePath } from "@/lib/company-home";
 
 type LinkRow = {
   id: string;
@@ -159,7 +160,7 @@ const METRIC_WHY = {
   product:
     "상품 단위로 조회·좋아요·ER을 합산합니다. 상품별 캠페인 효율을 비교합니다.",
   curve:
-    "필터된 콘텐츠 중 가장 먼저 업로드된 시점을 D+0으로 잡고, 이후 경과일별 조회 합(콘텐츠당 당일 최대값)입니다.",
+    "필터된 콘텐츠 중 가장 먼저 업로드된 시점을 D+0으로 잡고, 현재까지 경과일 곡선입니다. D+0에 수집값이 없으면 0에서 이어집니다.",
   platformShare:
     "플랫폼별 조회수 비중입니다. 채널 기여도를 한눈에 봅니다.",
   company:
@@ -532,7 +533,7 @@ function ViewsCurve({ points }: { points: { day: number; views: number }[] }) {
   if (points.length < 2) {
     return (
       <p className="mt-6 py-8 text-center text-sm text-[var(--muted)]">
-        첫 업로드 이후 수집 시각이 2회 이상이면 곡선이 표시됩니다.
+        업로드일이 있으면 D+0부터 현재까지 곡선이 표시됩니다.
       </p>
     );
   }
@@ -548,9 +549,7 @@ function ViewsCurve({ points }: { points: { day: number; views: number }[] }) {
     y: pad.t + (1 - p.views / maxViews) * (H - pad.t - pad.b),
   }));
 
-  const line = pts
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(" ");
+  const line = monotoneCurvePath(pts);
   const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${H - pad.b} L${pts[0].x.toFixed(1)},${H - pad.b} Z`;
 
   return (
@@ -559,7 +558,14 @@ function ViewsCurve({ points }: { points: { day: number; views: number }[] }) {
         <line key={y} x1={pad.l} y1={y} x2={W - pad.r} y2={y} stroke="#efe4d6" strokeWidth={1} />
       ))}
       <path d={area} fill="var(--accent)" opacity={0.07} />
-      <path d={line} fill="none" stroke="var(--accent)" strokeWidth={2.5} />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       <text x={8} y={24} fill="var(--muted)" fontSize={9.5}>
         {formatMetric(maxViews)}
       </text>
@@ -955,45 +961,18 @@ export function CompanyPerformanceTab({
     };
   }, [links, metrics]);
 
-  const curvePoints = useMemo(() => {
-    if (!timelineStartIso || metrics.length === 0) return [];
-    const startTs = new Date(timelineStartIso).getTime();
-    const times = [
-      ...new Set(
-        metrics
-          .map((m) => m.collected_at)
-          .filter((t) => new Date(t).getTime() >= startTs),
+  const curvePoints = useMemo(
+    () =>
+      buildViewsCurvePoints(
+        links.map((l) => ({ id: l.id, published_at: l.published_at })),
+        metrics.map((m) => ({
+          creator_link_id: m.creator_link_id,
+          collected_at: m.collected_at,
+          views: m.views,
+        })),
       ),
-    ].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    if (times.length < 2) return [];
-
-    // 일(D+) 버킷으로 묶어 같은 날 재수집·평탄 구간을 줄임
-    const daily = new Map<number, number>();
-    for (const t of times) {
-      const tMs = new Date(t).getTime();
-      const latest = new Map<string, number>();
-      for (const m of metrics) {
-        const cMs = new Date(m.collected_at).getTime();
-        if (cMs > tMs) continue;
-        const prev = latest.get(m.creator_link_id);
-        if (prev == null || m.views > prev) latest.set(m.creator_link_id, m.views);
-      }
-      const views = [...latest.values()].reduce((sum, v) => sum + v, 0);
-      const elapsed = Math.max(0, (tMs - startTs) / 86400000);
-      const key = elapsed < 1 ? Math.round(elapsed * 48) / 48 : Math.floor(elapsed);
-      daily.set(key, views);
-    }
-
-    const raw = [...daily.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([day, views]) => ({ day, views }));
-
-    // 조회수가 같은 중간 점 제거 → 평탄 구간 축소
-    return raw.filter((p, i) => {
-      if (i === 0 || i === raw.length - 1) return true;
-      return p.views !== raw[i - 1].views;
-    });
-  }, [metrics, timelineStartIso]);
+    [links, metrics],
+  );
   const platformErRows = useMemo(() => {
     const map = new Map<
       string,

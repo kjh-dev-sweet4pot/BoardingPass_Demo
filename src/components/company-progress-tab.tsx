@@ -7,14 +7,26 @@ import { StateBadge, type StateBadgeValue } from "@/components/state-badge";
 import { formatMetric } from "@/lib/content-insights";
 import {
   buildKanbanFromAllocations,
-  KANBAN_COLUMNS,
   productOptionsFromAllocations,
+  type KanbanColumn,
   type ProgressKanbanCard,
   type ProgressLink,
 } from "@/lib/com-progress-kanban";
 import { creatorSnsChannelOf } from "@/lib/creator-link";
 import { findPoolCreator, type CreatorPost, type PoolCreator } from "@/lib/creator-pool-mock";
 import type { AllocationWithRelations } from "@/lib/types";
+
+/** 회원사 칸반: 수령완료·제작중은 한 열로 본다. */
+const BOARD_COLUMNS = ["대기", "수령완료", "검수중", "발행완료"] as const;
+const COL_PAGE = 9;
+
+function boardColumn(status: KanbanColumn): (typeof BOARD_COLUMNS)[number] {
+  if (status === "제작중") return "수령완료";
+  if (status === "수령완료" || status === "대기" || status === "검수중" || status === "발행완료") {
+    return status;
+  }
+  return "대기";
+}
 
 function postsFromLinks(card: ProgressKanbanCard): CreatorPost[] {
   const seen = new Set<string>();
@@ -524,10 +536,17 @@ export function CompanyProgressTab({
   const [selected, setSelected] = useState<ProgressKanbanCard | null>(null);
   const [allocations, setAllocations] = useState(initialAllocations);
   const [refreshing, setRefreshing] = useState(false);
+  const [colLimit, setColLimit] = useState<
+    Partial<Record<(typeof BOARD_COLUMNS)[number], number>>
+  >({});
 
   useEffect(() => {
     setAllocations(initialAllocations);
   }, [initialAllocations]);
+
+  useEffect(() => {
+    setColLimit({});
+  }, [productFilter, searchQ, allocations]);
 
   async function reload() {
     if (!live) return;
@@ -568,9 +587,9 @@ export function CompanyProgressTab({
 
   const grouped = useMemo(() => {
     const map = new Map<string, ProgressKanbanCard[]>();
-    for (const col of KANBAN_COLUMNS) map.set(col, []);
+    for (const col of BOARD_COLUMNS) map.set(col, []);
     for (const card of filteredCards) {
-      const list = map.get(card.status);
+      const list = map.get(boardColumn(card.status));
       if (list) list.push(card);
     }
     for (const list of map.values()) {
@@ -636,9 +655,12 @@ export function CompanyProgressTab({
         />
       ) : (
         <>
-          <div className="flex flex-col gap-5 lg:grid lg:grid-cols-5 lg:gap-3">
-            {KANBAN_COLUMNS.map((col) => {
+          <div className="flex flex-col gap-5 lg:grid lg:grid-cols-4 lg:gap-3">
+            {BOARD_COLUMNS.map((col) => {
               const items = grouped.get(col) ?? [];
+              const limit = colLimit[col] ?? COL_PAGE;
+              const shown = items.slice(0, limit);
+              const rest = items.length - shown.length;
               return (
                 <section
                   key={col}
@@ -657,13 +679,29 @@ export function CompanyProgressTab({
                       배정 없음
                     </p>
                   ) : (
-                    items.map((card) => (
-                      <KanbanCard
-                        key={`${card.status}-${card.influencerId}`}
-                        card={card}
-                        onClick={() => setSelected(card)}
-                      />
-                    ))
+                    <>
+                      {shown.map((card) => (
+                        <KanbanCard
+                          key={`${card.status}-${card.influencerId}`}
+                          card={card}
+                          onClick={() => setSelected(card)}
+                        />
+                      ))}
+                      {rest > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setColLimit((s) => ({
+                              ...s,
+                              [col]: limit + COL_PAGE,
+                            }))
+                          }
+                          className="w-full rounded-[6px] border border-[var(--line)] bg-[var(--surface)] py-2 text-[12.5px] font-semibold text-[var(--accent)]"
+                        >
+                          {Math.min(COL_PAGE, rest)}개 더 보기
+                        </button>
+                      ) : null}
+                    </>
                   )}
                 </section>
               );
@@ -673,9 +711,8 @@ export function CompanyProgressTab({
           <div className="flex flex-wrap gap-6 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-[18px] py-3 text-[11.5px] leading-relaxed text-[var(--muted)]">
             <span>
               배정 상태는 롤업 결과입니다 — 등록만{" "}
-              <b className="text-[var(--accent)]">대기</b> · 방문{" "}
-              <b className="text-[var(--accent)]">수령완료</b> · 수령 후 제출 전{" "}
-              <b className="text-[var(--accent)]">제작중</b> · 제출 후{" "}
+              <b className="text-[var(--accent)]">대기</b> · 수령 후 제출 전{" "}
+              <b className="text-[var(--accent)]">수령완료</b> · 제출 후{" "}
               <b className="text-[var(--accent)]">검수중</b> · 목표 도달{" "}
               <b className="text-[var(--accent)]">발행완료</b>.
             </span>

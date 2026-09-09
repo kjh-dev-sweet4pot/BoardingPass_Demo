@@ -11,6 +11,14 @@ import {
   type ParsedImportRow,
 } from "@/lib/csv-import";
 import { findDuplicateAllocation } from "@/lib/alloc-dup";
+import {
+  allocationReplacePatch,
+  dupIndexKey,
+  loadImportDupMap,
+  parseImportDupMode,
+  pickImportDup,
+  type ImportDupMode,
+} from "@/lib/import-dup";
 import { detectPlatform } from "@/lib/creator-link";
 import { canonicalBranchName, isBranchStoreName } from "@/lib/store-name";
 import {
@@ -39,6 +47,7 @@ type InfluencerUpsert = {
   isNew: boolean;
   needsProfile: boolean;
   name: string;
+  dbName: string;
   handle: string;
   snsUrl: string;
 };
@@ -76,6 +85,7 @@ async function findOrCreateInfluencer(
         existing.followers == null ||
         !existing.region,
       name: row.name || existing.name || row.snsid,
+      dbName: String(existing.name || ""),
       handle: row.snsid,
       snsUrl: row.snsurl || existing.sns_url || "",
     };
@@ -99,6 +109,7 @@ async function findOrCreateInfluencer(
     isNew: true,
     needsProfile: true,
     name: row.name || row.snsid,
+    dbName: row.name || row.snsid,
     handle: row.snsid,
     snsUrl: row.snsurl || "",
   };
@@ -226,7 +237,7 @@ export async function POST(request: Request) {
   if ("error" in db) return db.error;
   const supabaseClient = db.supabase;
 
-  let body: { rows?: ImportRowInput[] };
+  let body: { rows?: (ImportRowInput & { dup_mode?: string })[] };
   try {
     body = await request.json();
   } catch {
@@ -250,9 +261,18 @@ export async function POST(request: Request) {
     .from("companies")
     .select("id, name, aliases, is_active");
 
-  const parsed = expandImportRowsByCompany(
-    rawRows.map((row, idx) => validateImportRow(idx + 2, row)),
-  ).map((row) => applyCompanyMatch(row, companies || []));
+  const parsed: ParsedImportRow[] = [];
+  const dupModes: ImportDupMode[] = [];
+  rawRows.forEach((row, idx) => {
+    const mode = parseImportDupMode(row.dup_mode);
+    const expanded = expandImportRowsByCompany([
+      validateImportRow(idx + 2, row),
+    ]);
+    for (const item of expanded) {
+      parsed.push(applyCompanyMatch(item, companies || []));
+      dupModes.push(mode);
+    }
+  });
   const valid = parsed.filter((r) => r.ok);
   if (valid.length === 0) {
     return NextResponse.json(
@@ -271,8 +291,14 @@ export async function POST(request: Request) {
 
   let created = 0;
   let skipped = 0;
+  let replaced = 0;
   let failed = 0;
   let linked = 0;
+
+  const dupMap = await loadImportDupMap(
+    supabase,
+    parsed.map((r) => r.snsid),
+  );
 
   const adminRole = await getAdminRole();
   let batchId: string | null = null;
@@ -341,7 +367,9 @@ export async function POST(request: Request) {
     }
   }
 
-  for (const row of parsed) {
+  for (let i = 0; i < parsed.length; i++) {
+    const row = parsed[i]!;
+    const dupMode = dupModes[i] || "replace";
     if (!row.ok) {
       failed++;
       results.push({
@@ -353,6 +381,28 @@ export async function POST(request: Request) {
     }
 
     try {
+      if (!row.company_id) {
+        throw new Error("회원사 매칭에 실패했습니다.");
+      }
+
+      const pickedEarly = pickImportDup(
+        dupMap.byKey.get(dupIndexKey(row.snsid, row.company_id)) || [],
+        {
+          product: row.product,
+          store: row.store,
+          visitDate: row.visit_date,
+        },
+      );
+      if (pickedEarly && dupMode === "skip") {
+        skipped++;
+        results.push({
+          rowNumber: row.rowNumber,
+          ok: true,
+          action: "skipped_duplicate",
+        });
+        continue;
+      }
+
       const influencer = await findOrCreateInfluencer(
         supabase,
         row,
@@ -367,40 +417,98 @@ export async function POST(request: Request) {
         productCache,
       );
 
-      if (!row.company_id) {
-        throw new Error("회원사 매칭에 실패했습니다.");
-      }
-
-      const dupId = await findDuplicateAllocation(supabase, {
-        influencerId: influencer.id,
-        productId,
-        storeId,
-        visitDate: row.visit_date,
-        companyId: row.company_id,
-      });
-
-      if (dupId) {
-        const added = await attachImportLinks(
-          supabase,
-          dupId,
-          influencer.id,
-          row.content_urls || [],
-        );
-        if (added > 0) {
-          linked += added;
-          results.push({
-            rowNumber: row.rowNumber,
-            ok: true,
-            action: "links_added",
+      if (pickedEarly && dupMode === "replace") {
+        const hit = pickedEarly.hit;
+        const patch = allocationReplacePatch(hit, {
+          visit_date: row.visit_date,
+          quantity: row.quantity,
+          store_id: storeId,
+          product_id: productId,
+          company_id: row.company_id,
+        });
+        if (Object.keys(patch).length) {
+          const nextStore = String(patch.store_id ?? hit.store_id);
+          const nextProduct = String(patch.product_id ?? hit.product_id);
+          const nextVisit = String(patch.visit_date ?? hit.visit_date ?? "");
+          const nextCompany =
+            (patch.company_id as string | undefined) ?? hit.company_id;
+          const clash = await findDuplicateAllocation(supabase, {
+            influencerId: influencer.id,
+            productId: nextProduct,
+            storeId: nextStore,
+            visitDate: nextVisit,
+            companyId: nextCompany,
+            excludeId: hit.id,
           });
-        } else {
-          skipped++;
-          results.push({
-            rowNumber: row.rowNumber,
-            ok: true,
-            action: "skipped_duplicate",
-          });
+          if (clash) {
+            throw new Error(
+              "대치 결과가 다른 배정과 겹칩니다. 이 행은 추가로 선택하세요.",
+            );
+          }
+          patch.updated_at = new Date().toISOString();
+          const { error: updErr } = await supabase
+            .from("allocations")
+            .update(patch)
+            .eq("id", hit.id);
+          if (updErr) throw new Error(updErr.message);
         }
+
+        if (row.name && row.name !== influencer.dbName) {
+          await supabase
+            .from("influencers")
+            .update({ name: row.name, updated_at: new Date().toISOString() })
+            .eq("id", influencer.id);
+          influencer.name = row.name;
+          influencer.dbName = row.name;
+        }
+
+        if (row.display_price != null && row.cost_amount != null) {
+          const { data: priceRow } = await supabase
+            .from("allocation_pricing")
+            .select("id, display_price, cost_amount")
+            .eq("allocation_id", hit.id)
+            .maybeSingle();
+          if (!priceRow) {
+            const { error: priceErr } = await supabase
+              .from("allocation_pricing")
+              .insert({
+                allocation_id: hit.id,
+                company_id: row.company_id,
+                display_price: row.display_price,
+                cost_amount: row.cost_amount,
+                accepted_at: new Date().toISOString(),
+              });
+            if (priceErr) throw new Error(`가격 저장 실패: ${priceErr.message}`);
+          } else if (
+            Number(priceRow.display_price) !== row.display_price ||
+            Number(priceRow.cost_amount) !== row.cost_amount
+          ) {
+            const { error: priceErr } = await supabase
+              .from("allocation_pricing")
+              .update({
+                display_price: row.display_price,
+                cost_amount: row.cost_amount,
+              })
+              .eq("id", priceRow.id);
+            if (priceErr) throw new Error(`가격 저장 실패: ${priceErr.message}`);
+          }
+        }
+
+        if ((row.content_urls || []).length) {
+          linked += await attachImportLinks(
+            supabase,
+            hit.id,
+            influencer.id,
+            row.content_urls || [],
+          );
+        }
+
+        replaced++;
+        results.push({
+          rowNumber: row.rowNumber,
+          ok: true,
+          action: "replaced",
+        });
         continue;
       }
 
@@ -485,6 +593,7 @@ export async function POST(request: Request) {
       total: parsed.length,
       created,
       skipped,
+      replaced,
       failed,
       linked,
     },

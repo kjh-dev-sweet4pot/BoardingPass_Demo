@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, IBM_Plex_Sans_KR } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
@@ -20,6 +20,10 @@ const sans = IBM_Plex_Sans_KR({
 export const metadata: Metadata = {
   title: "Boarding Pass",
   description: "인플루언서 매장 방문 · 상품 수령 확인",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#f1ece4",
 };
 
 export default function RootLayout({

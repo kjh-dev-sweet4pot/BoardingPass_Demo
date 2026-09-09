@@ -45,6 +45,11 @@ export type PoolCreator = {
     saves: number | null;
     shares: number | null;
   };
+  /** 평균에 쓴 최근 발행 건수 (0이면 카드에 성과 없음) */
+  avgPostCount?: number;
+  /** true면 캠페인 발행이 아니라 SNS 최근 게시 평균 */
+  avgFromProfile?: boolean;
+  viewsEstimated?: boolean;
   category: string | null;
 };
 
