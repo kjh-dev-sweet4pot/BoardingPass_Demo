@@ -270,7 +270,13 @@ function VisitPerson({ row }: { row: CompanyHomeVisitRow }) {
   );
 }
 
-export function CompanyHomeVisitBoard({ visits }: { visits: CompanyHomeVisits }) {
+export function CompanyHomeVisitBoard({
+  visits,
+  onOpenProgress,
+}: {
+  visits: CompanyHomeVisits;
+  onOpenProgress?: () => void;
+}) {
   const blocks = [
     {
       title: "한달 이내 방문 예정",
@@ -286,9 +292,20 @@ export function CompanyHomeVisitBoard({ visits }: { visits: CompanyHomeVisits })
   return (
     <aside className="flex w-full shrink-0 flex-col gap-3 self-start xl:w-[280px]">
       <div>
-        <h2 className="text-[18px] font-bold tracking-tight text-[var(--ink)]">
-          방문
-        </h2>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 className="text-[18px] font-bold tracking-tight text-[var(--ink)]">
+            방문
+          </h2>
+          {onOpenProgress ? (
+            <button
+              type="button"
+              onClick={onOpenProgress}
+              className="text-[12.5px] font-semibold text-[var(--accent)] hover:underline"
+            >
+              진행현황 전체 보기 →
+            </button>
+          ) : null}
+        </div>
         <p className="mt-0.5 text-[12px] text-[var(--muted)]">
           {visits.asOf} 기준 · 방문일 순 · 프로필 클릭
         </p>

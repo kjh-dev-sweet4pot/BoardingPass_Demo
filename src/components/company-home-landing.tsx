@@ -936,7 +936,10 @@ export function CompanyHomeLanding({
                   onOpenMore={onOpenPerformance}
                 />
               </div>
-              <CompanyHomeVisitBoard visits={data.visits} />
+              <CompanyHomeVisitBoard
+                visits={data.visits}
+                onOpenProgress={onOpenPublish}
+              />
               <NewsSidebar
                 items={data.news}
                 insightLinks={insightLinks}
