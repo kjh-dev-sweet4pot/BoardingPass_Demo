@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { isDemoCompany } from "@/lib/company";
-import { fetchInsights } from "@/app/api/com/insights/route";
-import { buildBudgetPerformanceForCompany } from "@/lib/company-budget-performance";
+import {
+  chunkIds,
+  fetchMetricsForLinks,
+} from "@/app/api/com/insights/route";
+import { isPublishedComplete } from "@/lib/company-budget-performance";
+import { resolveCreatorPlatform } from "@/lib/creator-link";
 import {
   buildDerivedNews,
   buildHomeForecast,
@@ -21,6 +25,7 @@ import {
   type HomeInsightLink,
 } from "@/lib/company-home";
 import profileMetrics from "@/lib/data/pool-profile-metrics.json";
+import { estimateXiaohongshuViews } from "@/lib/xiaohongshu-views";
 import { getCompanySessionId } from "@/lib/session";
 import {
   createApiClientIfConfigured,
@@ -32,6 +37,14 @@ async function getClient() {
   if (hasServiceRoleKey()) return createServiceClient();
   return createApiClientIfConfigured();
 }
+
+function one<T>(v: T | T[] | null | undefined): T | undefined {
+  if (v == null) return undefined;
+  return Array.isArray(v) ? v[0] : v;
+}
+
+const PUBLISHED_OR =
+  "content_status.eq.발행완료,publish_url.not.is.null,and(content_status.is.null,status.eq.approved)";
 
 /**
  * GET /api/com/home
@@ -67,88 +80,178 @@ export async function GET() {
     );
   }
 
-  const { data: campaigns, error: campErr } = await supabase
-    .from("campaigns")
-    .select("id, name, status, budget_amount, created_at")
-    .eq("company_id", companyId)
-    .order("created_at", { ascending: false });
-  if (campErr) {
-    return NextResponse.json({ error: campErr.message }, { status: 500 });
-  }
+  const companyBudget = Number(company.budget_amount);
+  const hasCompanyBudget =
+    Number.isFinite(companyBudget) && companyBudget > 0;
 
-  const campaignRows = campaigns || [];
-  const totalBudget = campaignRows.reduce((sum, c) => {
-    const n = typeof c.budget_amount === "number" ? c.budget_amount : 0;
-    return sum + (Number.isFinite(n) ? n : 0);
-  }, 0);
-  const budgetTotal = totalBudget > 0 ? totalBudget : null;
-
-  let budget = summarizeBudget(budgetTotal, 0, 0);
-  try {
-    const bp = await buildBudgetPerformanceForCompany(supabase, company);
-    budget = summarizeBudget(bp.budgetTotal, bp.spent, bp.scheduled);
-  } catch {
-    /* 캠페인 합계만 유지 */
-  }
-
-  const { data: allocs } = await supabase
+  const allocPromise = supabase
     .from("allocations")
     .select(
-      "id, influencer_id, status, rollup_status, target_content_count, visit_date, influencers(id, name, instagram_handle_normalized, instagram_handle, sns_url, followers), products(id, name), stores(id, name)",
+      "id, influencer_id, status, rollup_status, target_content_count, visit_date, influencers(id, name, instagram_handle_normalized, instagram_handle, sns_url, followers, region), products(id, name), stores(id, name), allocation_pricing(display_price)",
     )
     .eq("company_id", companyId);
 
-  const allocMap = new Map((allocs || []).map((a) => [a.id, a]));
-  const activeAllocs = (allocs || []).filter(
+  const campPromise = hasCompanyBudget
+    ? Promise.resolve({ sum: 0, error: null as string | null })
+    : supabase
+        .from("campaigns")
+        .select("budget_amount")
+        .eq("company_id", companyId)
+        .then((r) => {
+          if (r.error) return { sum: 0, error: r.error.message };
+          let sum = 0;
+          for (const c of r.data || []) {
+            const n = Number(c.budget_amount);
+            if (Number.isFinite(n)) sum += n;
+          }
+          return { sum, error: null as string | null };
+        });
+
+  const [allocRes, camp] = await Promise.all([allocPromise, campPromise]);
+
+  if (camp.error) {
+    return NextResponse.json({ error: camp.error }, { status: 500 });
+  }
+  if (allocRes.error) {
+    return NextResponse.json({ error: allocRes.error.message }, { status: 500 });
+  }
+
+  const campaignBudgetSum = camp.sum;
+  const budgetTotal = hasCompanyBudget
+    ? companyBudget
+    : campaignBudgetSum > 0
+      ? campaignBudgetSum
+      : null;
+
+  const allocs = allocRes.data || [];
+  const allocMap = new Map(allocs.map((a) => [a.id, a]));
+  const activeAllocs = allocs.filter(
     (a) => a.status !== "cancelled" && a.rollup_status !== "취소",
   );
-  const allocIds = [...allocMap.keys()];
+  const allocIds = allocs.map((a) => a.id);
+
+  type LinkRow = {
+    id: string;
+    url: string | null;
+    publish_url: string | null;
+    submitted_at: string | null;
+    published_at: string | null;
+    views: number | null;
+    likes: number | null;
+    comments: number | null;
+    saves: number | null;
+    shares: number | null;
+    allocation_id: string;
+  };
+  const rawLinks: LinkRow[] = [];
+  if (allocIds.length > 0) {
+    const pages = await Promise.all(
+      chunkIds(allocIds).map((part) =>
+        supabase
+          .from("creator_links")
+          .select(
+            "id, url, publish_url, submitted_at, published_at, views, likes, comments, saves, shares, allocation_id",
+          )
+          .in("allocation_id", part)
+          .or(PUBLISHED_OR),
+      ),
+    );
+    for (const { data, error } of pages) {
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      rawLinks.push(...((data || []) as LinkRow[]));
+    }
+  }
+
+  const publishedByAlloc = new Map<string, LinkRow[]>();
+  for (const l of rawLinks) {
+    const list = publishedByAlloc.get(l.allocation_id) || [];
+    list.push(l);
+    publishedByAlloc.set(l.allocation_id, list);
+  }
+
+  let spent = 0;
+  let scheduled = 0;
+  for (const a of activeAllocs) {
+    const complete = isPublishedComplete({
+      rollupStatus: a.rollup_status,
+      targetContentCount: a.target_content_count,
+      links: (publishedByAlloc.get(a.id) || []).map((l) => ({
+        content_status: "발행완료",
+        publish_url: l.publish_url,
+      })),
+    });
+    const pricing = one(a.allocation_pricing);
+    const parsed = Number(pricing?.display_price);
+    const price = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    if (complete) spent += price;
+    else scheduled += price;
+  }
+  const budget = summarizeBudget(budgetTotal, spent, scheduled);
+
+  const publishedAllocIds = new Set(publishedByAlloc.keys());
 
   let posts: CompanyHomeBestPost[] = [];
-  const publishedAllocIds = new Set<string>();
-  if (allocIds.length > 0) {
-    const { data: links, error: linksErr } = await supabase
-      .from("creator_links")
-      .select(
-        "id, url, publish_url, submitted_at, published_at, views, likes, comments, allocation_id",
-      )
-      .in("allocation_id", allocIds)
-      .or(
-        "content_status.eq.발행완료,publish_url.not.is.null,and(content_status.is.null,status.eq.approved)",
-      );
-    if (linksErr) {
-      return NextResponse.json({ error: linksErr.message }, { status: 500 });
-    }
+  let homeLinks: HomeInsightLink[] = [];
 
-    posts = (links || []).map((l) => {
-      if (l.allocation_id) publishedAllocIds.add(String(l.allocation_id));
-      const alloc = allocMap.get(l.allocation_id);
-      const inf = Array.isArray(alloc?.influencers)
-        ? alloc?.influencers[0]
-        : alloc?.influencers;
-      const product = Array.isArray(alloc?.products)
-        ? alloc?.products[0]
-        : alloc?.products;
-      const handleRaw =
-        inf?.instagram_handle_normalized || inf?.instagram_handle || "";
-      const handle = handleRaw
-        ? `@${String(handleRaw).replace(/^@+/, "")}`
-        : "—";
-      return {
-        id: l.id,
-        influencerId:
-          inf?.id ||
-          (alloc as { influencer_id?: string } | undefined)?.influencer_id ||
-          l.id,
-        url: (l.publish_url || l.url || "").trim() || null,
-        handle,
-        name: inf?.name || "인플루언서",
-        product: product?.name || "상품",
-        views: Number(l.views) || 0,
-        likes: Number(l.likes) || 0,
-        comments: Number(l.comments) || 0,
-        publishedAt: l.published_at || l.submitted_at || null,
-      };
+  for (const l of rawLinks) {
+    const alloc = allocMap.get(l.allocation_id);
+    const inf = one(alloc?.influencers);
+    const product = one(alloc?.products);
+    const handleRaw =
+      inf?.instagram_handle_normalized || inf?.instagram_handle || "";
+    const handle = handleRaw
+      ? `@${String(handleRaw).replace(/^@+/, "")}`
+      : "—";
+    const link_url = (l.publish_url || l.url || "").trim() || null;
+    const views =
+      resolveCreatorPlatform(link_url) === "xiaohongshu"
+        ? estimateXiaohongshuViews({
+            views: l.views,
+            likes: l.likes,
+            comments: l.comments,
+            saves: l.saves,
+            shares: l.shares,
+          })
+        : Number(l.views) || 0;
+    const influencerId =
+      inf?.id ||
+      (alloc as { influencer_id?: string } | undefined)?.influencer_id ||
+      l.id;
+    posts.push({
+      id: l.id,
+      influencerId,
+      url: link_url,
+      handle,
+      name: inf?.name || "인플루언서",
+      product: product?.name || "상품",
+      views,
+      likes: Number(l.likes) || 0,
+      comments: Number(l.comments) || 0,
+      publishedAt: l.published_at || l.submitted_at || null,
+    });
+    homeLinks.push({
+      id: l.id,
+      link_url,
+      published_at: l.published_at || l.submitted_at || null,
+      views,
+      likes: l.likes,
+      saves: l.saves,
+      allocations: {
+        influencer_id: alloc?.influencer_id,
+        influencers: inf
+          ? {
+              id: inf.id,
+              name: inf.name || "인플루언서",
+              instagram_handle_normalized: inf.instagram_handle_normalized,
+              instagram_handle: inf.instagram_handle,
+              region: inf.region,
+            }
+          : null,
+        products: product ? { id: product.id, name: product.name } : null,
+        allocation_pricing: one(alloc?.allocation_pricing) ?? null,
+      },
     });
   }
 
@@ -179,6 +282,21 @@ export async function GET() {
         publishedAt: l.published_at || null,
       };
     });
+    homeLinks = (demo.links || []).map((l) => ({
+      id: l.id,
+      link_url: l.link_url,
+      published_at: l.published_at || null,
+      views: l.views,
+      likes: l.likes,
+      saves: l.saves,
+      allocations: l.allocations
+        ? {
+            influencer_id: l.allocations.influencer_id,
+            influencers: l.allocations.influencers,
+            products: l.allocations.products,
+          }
+        : null,
+    }));
   }
 
   const asOf = ymdKstNow();
@@ -197,10 +315,10 @@ export async function GET() {
 
   const infRows = new Map<string, CompanyHomeInfluencerRow>();
   for (const a of activeAllocs) {
-    const inf = Array.isArray(a.influencers) ? a.influencers[0] : a.influencers;
+    const inf = one(a.influencers);
     const id = inf?.id || a.influencer_id;
     if (!id || infRows.has(id)) continue;
-    const product = Array.isArray(a.products) ? a.products[0] : a.products;
+    const product = one(a.products);
     const handleRaw =
       inf?.instagram_handle_normalized || inf?.instagram_handle || "";
     infRows.set(id, {
@@ -226,28 +344,15 @@ export async function GET() {
 
   const ranking = rankInfluencers([...infRows.values()]);
 
-  // 성과 탭과 동일 소스: creator_links.views 합 + content_metrics 곡선
-  let weekViewTotal = posts.reduce((s, p) => s + (p.views || 0), 0);
+  let weekViewTotal = homeLinks.reduce((s, l) => s + (Number(l.views) || 0), 0);
   let weekSeries: number[] = Array.from({ length: 7 }, () => 0);
   weekSeries[6] = weekViewTotal;
   let weekWow: number | null = null;
   let weekCurve: { day: number; views: number }[] = [];
-  let homeLinks: HomeInsightLink[] = [];
   try {
-    const insights = await fetchInsights(supabase, companyId, { days: 90 });
-    homeLinks = (insights.links || []) as HomeInsightLink[];
-    const linkTotal = homeLinks.reduce(
-      (s, l) => s + (Number(l.views) || 0),
-      0,
-    );
-    if (linkTotal > 0 || homeLinks.length > 0) {
-      weekViewTotal = linkTotal;
-    }
-    const metrics = (insights.metrics || []) as {
-      creator_link_id: string;
-      collected_at: string;
-      views: number | null;
-    }[];
+    const metrics = await fetchMetricsForLinks(supabase, homeLinks, {
+      days: 90,
+    });
     weekCurve = buildViewsCurvePoints(
       homeLinks.map((l) => ({
         id: l.id,
@@ -266,15 +371,15 @@ export async function GET() {
       weekSeries = Array.from({ length: 7 }, () => weekViewTotal);
     }
   } catch {
-    /* posts 스냅샷 유지 */
+    weekSeries = Array.from({ length: 7 }, () => weekViewTotal);
   }
 
   const news = buildDerivedNews({
     asOf,
     visits: activeAllocs.map((a) => {
-      const inf = Array.isArray(a.influencers) ? a.influencers[0] : a.influencers;
-      const store = Array.isArray(a.stores) ? a.stores[0] : a.stores;
-      const product = Array.isArray(a.products) ? a.products[0] : a.products;
+      const inf = one(a.influencers);
+      const store = one(a.stores);
+      const product = one(a.products);
       const handleRaw =
         inf?.instagram_handle_normalized || inf?.instagram_handle || "";
       return {
@@ -303,8 +408,8 @@ export async function GET() {
 
   const visits = splitHomeVisits(
     activeAllocs.map((a) => {
-      const inf = Array.isArray(a.influencers) ? a.influencers[0] : a.influencers;
-      const product = Array.isArray(a.products) ? a.products[0] : a.products;
+      const inf = one(a.influencers);
+      const product = one(a.products);
       const handleRaw =
         inf?.instagram_handle_normalized || inf?.instagram_handle || "";
       return {

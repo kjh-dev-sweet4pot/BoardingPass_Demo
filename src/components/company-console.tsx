@@ -574,8 +574,15 @@ export function CompanyConsole({
       sidebarFooter={sidebarFooter}
       mobileActions={mobileActions}
     >
-      {view === "home" ? (
+      <div
+        className={
+          view === "home"
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+            : "hidden"
+        }
+      >
         <CompanyHomeLanding
+          active={view === "home"}
           companyName={company.name}
           onOpenPerformance={() => setView("content")}
           onOpenPublish={(influencerId) => {
@@ -584,13 +591,21 @@ export function CompanyConsole({
           }}
           onOpenPool={() => setView("pool")}
         />
-      ) : view === "pool" ? (
+      </div>
+      <div
+        className={
+          view === "pool"
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+            : "hidden"
+        }
+      >
         <CompanyCreatorPool
           companyId={company.id}
           companyName={company.name}
           loginId={company.login_id}
         />
-      ) : view === "publish" ? (
+      </div>
+      {view === "publish" ? (
         <CompanyProgressTab
           companyId={company.id}
           initialAllocations={progressItems}
@@ -630,7 +645,7 @@ export function CompanyConsole({
           onPeriodChange={setPeriod}
           onMetaChange={setPerformanceMeta}
         />
-      ) : allocsLoading && !isDemo ? (
+      ) : view === "home" || view === "pool" ? null : allocsLoading && !isDemo ? (
         <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--muted)]">
           배정 불러오는 중…
         </div>

@@ -965,11 +965,14 @@ function NewsSidebar({
 
 export function CompanyHomeLanding({
   companyName,
+  active = true,
   onOpenPerformance,
   onOpenPublish,
   onOpenPool,
 }: {
   companyName: string;
+  /** 탭이 보일 때만 60초 폴링. 마운트 시 1회 로드는 항상 함. */
+  active?: boolean;
   onOpenPerformance?: () => void;
   onOpenPublish?: (influencerId?: string) => void;
   onOpenPool?: () => void;
@@ -991,34 +994,46 @@ export function CompanyHomeLanding({
 
   useEffect(() => {
     let cancelled = false;
-    const load = () => {
+    fetch("/api/com/home", { cache: "no-store" })
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || "요약을 불러오지 못했습니다.");
+        if (!cancelled) {
+          setData(body as CompanyHomePayload);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(
+            e instanceof Error ? e.message : "요약을 불러오지 못했습니다.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => {
       fetch("/api/com/home", { cache: "no-store" })
         .then(async (res) => {
           const body = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(body.error || "요약을 불러오지 못했습니다.");
-          if (!cancelled) {
-            setData(body as CompanyHomePayload);
-            setError(null);
-          }
+          if (!res.ok) return;
+          setData(body as CompanyHomePayload);
+          setError(null);
         })
-        .catch((e) => {
-          if (!cancelled) {
-            setError(
-              e instanceof Error ? e.message : "요약을 불러오지 못했습니다.",
-            );
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
+        .catch(() => {
+          /* 폴링 실패는 기존 화면 유지 */
         });
-    };
-    load();
-    const id = window.setInterval(load, 60_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, []);
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, [active]);
 
   const week = data?.best.week || [];
   const insightLinks = data?.links || [];

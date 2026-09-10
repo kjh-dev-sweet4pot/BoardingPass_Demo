@@ -23,10 +23,87 @@ const ALLOC_PAGE = 1000;
 /** PostgREST `.in()` URL 한도. 1000개면 Bad Request */
 const IN_CHUNK = 80;
 
-function chunkIds(ids: string[], size = IN_CHUNK) {
+export function chunkIds(ids: string[], size = IN_CHUNK) {
   const out: string[][] = [];
   for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
   return out;
+}
+
+/** 이미 가진 발행 링크의 content_metrics만. allocations/links 재조회 없음. */
+export async function fetchMetricsForLinks(
+  supabase: SupabaseClient,
+  links: {
+    id: string;
+    published_at: string | null;
+    views: number | null;
+    likes?: number | null;
+    comments?: number | null;
+    saves?: number | null;
+    shares?: number | null;
+    reposts?: number | null;
+    link_url?: string | null;
+  }[],
+  { days = 90 }: { days?: number } = {},
+) {
+  if (links.length === 0) return [];
+
+  const xhsLinkIds = new Set(
+    links
+      .filter((l) => resolveCreatorPlatform(l.link_url) === "xiaohongshu")
+      .map((l) => l.id),
+  );
+  const posted = links
+    .map((l) => l.published_at)
+    .filter((s): s is string => Boolean(s))
+    .sort();
+  const since =
+    posted[0] ||
+    new Date(Date.now() - days * 86400 * 1000).toISOString();
+
+  const parts = chunkIds(links.map((l) => l.id));
+  const pages = await Promise.all(
+    parts.map((part) =>
+      supabase
+        .from("content_metrics")
+        .select(
+          "creator_link_id, collected_at, views, likes, comments, saves, shares, reposts",
+        )
+        .in("creator_link_id", part)
+        .gte("collected_at", since)
+        .order("collected_at", { ascending: true }),
+    ),
+  );
+
+  const metrics: {
+    creator_link_id: string;
+    collected_at: string;
+    views: number | null;
+    likes: number | null;
+    comments: number | null;
+    saves: number | null;
+    shares: number | null;
+    reposts: number | null;
+  }[] = [];
+  for (const { data, error } of pages) {
+    if (error) throw new Error(error.message);
+    metrics.push(...(data || []));
+  }
+
+  const metricRows = metrics.map((m) => {
+    if (!xhsLinkIds.has(m.creator_link_id)) return m;
+    return {
+      ...m,
+      views: estimateXiaohongshuViews({
+        views: m.views,
+        likes: m.likes,
+        comments: m.comments,
+        saves: m.saves,
+        shares: m.shares,
+      }),
+    };
+  });
+
+  return padMetricsBeforeFirstCollect(links, metricRows);
 }
 
 export async function fetchInsights(
