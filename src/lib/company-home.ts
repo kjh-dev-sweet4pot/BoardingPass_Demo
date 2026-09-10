@@ -1,4 +1,10 @@
 import { formatMetric } from "@/lib/content-insights";
+import {
+  predictRidgeLikesInterval,
+  predictRidgeSavesInterval,
+  predictRidgeViewsInterval,
+  RIDGE_ACCURACY_PCT,
+} from "@/lib/forecast-ridge";
 import { canonicalBranchName } from "@/lib/store-name";
 
 export type CompanyHomeNewsKind = "일정" | "성과";
@@ -231,9 +237,15 @@ export type HomeForecastRow = {
   name: string;
   handle: string;
   views: number | null;
+  viewsLo: number | null;
+  viewsHi: number | null;
   likes: number | null;
+  likesLo: number | null;
+  likesHi: number | null;
   comments: number | null;
   saves: number | null;
+  savesLo: number | null;
+  savesHi: number | null;
   avgCount: number;
   viewsEstimated?: boolean;
 };
@@ -241,9 +253,18 @@ export type HomeForecastRow = {
 export type HomeForecast = {
   pendingCount: number;
   views: number;
+  viewsLo: number;
+  viewsHi: number;
+  viewsAccuracyPct: number;
   likes: number;
+  likesLo: number;
+  likesHi: number;
+  likesAccuracyPct: number;
   comments: number;
   saves: number;
+  savesLo: number;
+  savesHi: number;
+  savesAccuracyPct: number;
   rows: HomeForecastRow[];
 };
 
@@ -286,7 +307,7 @@ export type CompanyHomePayload = {
   forecast: HomeForecast;
 };
 
-/** 미업로드 인원 × 최근 3건 평균. 평균 없는 인원은 합계에서 제외 */
+/** 미업로드 인원 × 관련 게시 3건 평균을 Ridge(α=10)로 조회수 보정. 평균 없는 인원은 합계에서 제외 */
 export function buildHomeForecast(
   pending: { id: string; name: string; handle: string }[],
   avgById: Record<string, HomeForecastAvg | undefined>,
@@ -294,14 +315,44 @@ export function buildHomeForecast(
   const rows: HomeForecastRow[] = pending.map((p) => {
     const a = avgById[p.id];
     const ok = Boolean(a && a.count > 0);
+    const band = ok
+      ? predictRidgeViewsInterval({
+          views: a!.views,
+          likes: a!.likes,
+          comments: a!.comments,
+          saves: a!.saves,
+        })
+      : null;
+    const likeBand = ok
+      ? predictRidgeLikesInterval({
+          views: a!.views,
+          likes: a!.likes,
+          comments: a!.comments,
+          saves: a!.saves,
+        })
+      : null;
+    const saveBand = ok
+      ? predictRidgeSavesInterval({
+          views: a!.views,
+          likes: a!.likes,
+          comments: a!.comments,
+          saves: a!.saves,
+        })
+      : null;
     return {
       id: p.id,
       name: p.name,
       handle: p.handle,
-      views: ok ? a!.views : null,
-      likes: ok ? a!.likes : null,
+      views: band?.point ?? null,
+      viewsLo: band?.lo ?? null,
+      viewsHi: band?.hi ?? null,
+      likes: likeBand?.point ?? null,
+      likesLo: likeBand?.lo ?? null,
+      likesHi: likeBand?.hi ?? null,
       comments: ok ? (a!.comments ?? 0) : null,
-      saves: ok ? (a!.saves ?? 0) : null,
+      saves: saveBand?.point ?? null,
+      savesLo: saveBand?.lo ?? null,
+      savesHi: saveBand?.hi ?? null,
       avgCount: ok ? a!.count : 0,
       viewsEstimated: a?.viewsEstimated,
     };
@@ -313,9 +364,18 @@ export function buildHomeForecast(
   return {
     pendingCount: pending.length,
     views: rows.reduce((s, r) => s + (r.views || 0), 0),
+    viewsLo: rows.reduce((s, r) => s + (r.viewsLo || 0), 0),
+    viewsHi: rows.reduce((s, r) => s + (r.viewsHi || 0), 0),
+    viewsAccuracyPct: RIDGE_ACCURACY_PCT.views,
     likes: rows.reduce((s, r) => s + (r.likes || 0), 0),
+    likesLo: rows.reduce((s, r) => s + (r.likesLo || 0), 0),
+    likesHi: rows.reduce((s, r) => s + (r.likesHi || 0), 0),
+    likesAccuracyPct: RIDGE_ACCURACY_PCT.likes,
     comments: rows.reduce((s, r) => s + (r.comments || 0), 0),
     saves: rows.reduce((s, r) => s + (r.saves || 0), 0),
+    savesLo: rows.reduce((s, r) => s + (r.savesLo || 0), 0),
+    savesHi: rows.reduce((s, r) => s + (r.savesHi || 0), 0),
+    savesAccuracyPct: RIDGE_ACCURACY_PCT.saves,
     rows,
   };
 }
@@ -1108,8 +1168,10 @@ function assertRankBestPosts() {
   );
   if (
     fc.pendingCount !== 2 ||
-    fc.views !== 100 ||
-    fc.likes !== 10 ||
+    fc.views !== 788 ||
+    fc.viewsLo >= fc.viewsHi ||
+    fc.likes !== 9 ||
+    fc.saves !== 1 ||
     fc.rows[0]!.id !== "a" ||
     fc.rows[1]!.views !== null
   ) {

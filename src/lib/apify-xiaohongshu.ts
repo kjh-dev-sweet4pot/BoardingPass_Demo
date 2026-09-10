@@ -314,7 +314,8 @@ export async function scrapeXiaohongshuRecentNotes(
   const posts = [...(items[0]?.posts || [])].sort(
     (a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0),
   );
-  return posts.slice(0, take).map((p) => {
+  // 피드 상단 고정글 회피: 최신 3건 건너뛰고 그다음 3건
+  return posts.slice(3, 3 + take).map((p) => {
     const likes = pickCount(p.liked_count) ?? 0;
     const comments = pickCount(p.comments_count) ?? 0;
     const saves = pickCount(p.collected_count);

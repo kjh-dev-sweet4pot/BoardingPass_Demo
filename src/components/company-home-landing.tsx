@@ -1,6 +1,17 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import {
+  cloneElement,
+  Fragment,
+  isValidElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+  type TransitionEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { CreatorPhoto } from "@/components/creator-photo";
 import {
@@ -355,6 +366,9 @@ function EfficiencyPlaceholder() {
 const RANK_VISIBLE = 4;
 const RANK_ROW_PX = 60;
 const RANK_TICK_MS = 3000;
+const RANK_SLIDE_MS = 420;
+const RANK_ROW_INTERACT =
+  "cursor-pointer hover:bg-[var(--accent-soft)] hover:shadow-[inset_3px_0_0_0_var(--accent)] focus-visible:bg-[var(--accent-soft)] focus-visible:shadow-[inset_3px_0_0_0_var(--accent)] focus-visible:outline-none";
 
 function RankPostRow({
   row,
@@ -405,7 +419,7 @@ function RankPostRow({
         href={row.url}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${cls} hover:bg-[var(--surface-hover)]`}
+        className={`${cls} ${RANK_ROW_INTERACT}`}
       >
         {inner}
       </a>
@@ -464,7 +478,7 @@ function RankInfRow({
       <button
         type="button"
         onClick={onOpen}
-        className={`${cls} hover:bg-[var(--surface-hover)]`}
+        className={`${cls} ${RANK_ROW_INTERACT}`}
       >
         {inner}
       </button>
@@ -473,7 +487,7 @@ function RankInfRow({
   return <div className={cls}>{inner}</div>;
 }
 
-/** 4줄 고정 뷰포트 · 3초마다 한 줄씩 위로 밀기 */
+/** 4줄 고정 뷰포트 · 3초마다 한 줄씩 위로 밀기. 호버/포커스 시 멈춤. */
 function AutoScrollRankRows({
   rows,
   reduceMotion,
@@ -485,44 +499,69 @@ function AutoScrollRankRows({
   const canScroll = !reduceMotion && n > RANK_VISIBLE;
   const [offset, setOffset] = useState(0);
   const [animate, setAnimate] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const wrapping = useRef(false);
 
   useEffect(() => {
     setOffset(0);
     setAnimate(true);
+    wrapping.current = false;
   }, [n]);
 
   useEffect(() => {
-    if (!canScroll) return;
+    if (!canScroll || paused) return;
     const id = window.setInterval(() => {
       setAnimate(true);
-      setOffset((o) => o + 1);
+      setOffset((o) => (o >= n ? o : o + 1));
     }, RANK_TICK_MS);
     return () => window.clearInterval(id);
-  }, [canScroll, n]);
+  }, [canScroll, n, paused]);
+
+  function snapLoop() {
+    if (wrapping.current) return;
+    wrapping.current = true;
+    setAnimate(false);
+    setOffset(0);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        wrapping.current = false;
+        setAnimate(true);
+      });
+    });
+  }
+
+  function onTrackTransitionEnd(e: TransitionEvent<HTMLDivElement>) {
+    if (e.target !== e.currentTarget) return;
+    if (e.propertyName !== "transform") return;
+    if (offset >= n) snapLoop();
+  }
 
   useEffect(() => {
     if (!canScroll || offset < n) return;
-    const t = window.setTimeout(() => {
-      setAnimate(false);
-      setOffset(0);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setAnimate(true));
-      });
-    }, 420);
+    const t = window.setTimeout(snapLoop, RANK_SLIDE_MS + 80);
     return () => window.clearTimeout(t);
   }, [offset, n, canScroll]);
 
   if (n === 0) return null;
 
-  const track = canScroll
-    ? [...rows, ...rows.slice(0, RANK_VISIBLE)]
-    : rows.slice(0, RANK_VISIBLE);
+  const clones = rows.slice(0, RANK_VISIBLE).map((row, i) =>
+    isValidElement(row) ? cloneElement(row, { key: `clone-${i}` }) : row,
+  );
+  const track = canScroll ? [...rows, ...clones] : rows.slice(0, RANK_VISIBLE);
 
   return (
     <div
       className="overflow-hidden"
       style={{ height: RANK_VISIBLE * RANK_ROW_PX }}
       aria-live="off"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setPaused(false);
+        }
+      }}
     >
       <div
         className={
@@ -535,9 +574,13 @@ function AutoScrollRankRows({
             ? `translateY(-${offset * RANK_ROW_PX}px)`
             : undefined,
         }}
+        onTransitionEnd={onTrackTransitionEnd}
       >
         {track.map((row, i) => (
-          <div key={i} style={{ height: RANK_ROW_PX }}>
+          <div
+            key={i < n ? `r-${i}` : `c-${i - n}`}
+            style={{ height: RANK_ROW_PX }}
+          >
             {row}
           </div>
         ))}

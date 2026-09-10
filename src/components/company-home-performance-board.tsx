@@ -403,6 +403,10 @@ export function CompanyHomeVisitBoard({
 const FORECAST_DISCLAIMER =
   "협력 인원의 과거 성과를 기준한 추정치이며, 이는 보장된 성과 수치가 아닙니다";
 
+function formatRange(lo: number, hi: number) {
+  return `${formatMetric(lo)}–${formatMetric(hi)}`;
+}
+
 function ForecastPanel({
   forecast,
   open,
@@ -417,9 +421,33 @@ function ForecastPanel({
     (forecast?.views || 0) + (forecast?.likes || 0) + (forecast?.saves || 0) > 0;
   const maxViews = Math.max(...rows.map((r) => r.views || 0), 1);
   const cells = [
-    { label: "조회수", value: forecast?.views ?? 0, color: "#3b82f6" },
-    { label: "좋아요", value: forecast?.likes ?? 0, color: "#c2410c" },
-    { label: "저장", value: forecast?.saves ?? 0, color: "#0f766e" },
+    {
+      label: "조회수",
+      range:
+        forecast && forecast.viewsHi > 0
+          ? formatRange(forecast.viewsLo, forecast.viewsHi)
+          : null,
+      accuracyPct: forecast?.viewsAccuracyPct,
+      color: "#3b82f6",
+    },
+    {
+      label: "좋아요",
+      range:
+        forecast && forecast.likesHi > 0
+          ? formatRange(forecast.likesLo, forecast.likesHi)
+          : null,
+      accuracyPct: forecast?.likesAccuracyPct,
+      color: "#c2410c",
+    },
+    {
+      label: "저장",
+      range:
+        forecast && forecast.savesHi > 0
+          ? formatRange(forecast.savesLo, forecast.savesHi)
+          : null,
+      accuracyPct: forecast?.savesAccuracyPct,
+      color: "#0f766e",
+    },
   ];
   return (
     <div
@@ -437,7 +465,7 @@ function ForecastPanel({
           <p className="mt-1.5 rounded-[6px] bg-white/80 px-3 py-2 text-[12px] leading-relaxed text-[#4a6580]">
             <span className="font-semibold text-[#1e3a5f]">근거 · </span>
             아직 발행하지 않은 배정 인원의 관련된 게시물 3건의 평균을 기반으로
-            추정합니다.
+            추정합니다. 조회·좋아요·저장은 Ridge 점추정 ±10% 구간입니다.
             {withAvg > 0 && withAvg < n
               ? ` 3건 평균이 있는 ${withAvg}명만 포함했습니다.`
               : null}
@@ -458,12 +486,20 @@ function ForecastPanel({
                 >
                   <p className="text-[10.5px] font-semibold tracking-wide text-[#6b849c]">
                     예측 {c.label}
+                    {c.range ? (
+                      <span className="ml-1 font-medium text-[#6b849c]">±10%</span>
+                    ) : null}
+                    {c.accuracyPct != null ? (
+                      <span className="ml-1 font-medium text-[#6b849c]">
+                        정확도 {c.accuracyPct}%
+                      </span>
+                    ) : null}
                   </p>
                   <p
                     className="mt-0.5 text-[18px] font-extrabold leading-tight tabular-nums sm:text-[22px]"
                     style={{ color: c.color }}
                   >
-                    +{formatMetric(c.value)}
+                    {c.range ? `+${c.range}` : "—"}
                   </p>
                 </div>
               ))}
@@ -472,17 +508,17 @@ function ForecastPanel({
           <p className="mt-3 text-[11px] font-semibold text-[#4a6580]">
             인플루언서별 예측 · 관련 게시 3건 평균
           </p>
-          <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_4.25rem_4.25rem_4.25rem] gap-x-2 px-0.5 text-[10.5px] text-[#6b849c]">
+          <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_5.75rem_5.75rem_5.75rem] gap-x-2 px-0.5 text-[10.5px] text-[#6b849c]">
             <span>이름</span>
-            <span className="text-right">조회</span>
-            <span className="text-right">좋아요</span>
-            <span className="text-right">저장</span>
+            <span className="text-right">조회 ±10%</span>
+            <span className="text-right">좋아요 ±10%</span>
+            <span className="text-right">저장 ±10%</span>
           </div>
           <ul className="mt-1 max-h-[240px] list-none overflow-auto p-0">
             {rows.map((r) => (
               <li
                 key={r.id}
-                className="grid grid-cols-[minmax(0,1fr)_4.25rem_4.25rem_4.25rem] items-center gap-x-2 border-t border-[#d5e0ec] py-1.5"
+                className="grid grid-cols-[minmax(0,1fr)_5.75rem_5.75rem_5.75rem] items-center gap-x-2 border-t border-[#d5e0ec] py-1.5"
               >
                 <span className="min-w-0">
                   <span className="block truncate text-[13px] font-semibold text-[#1e3a5f]">
@@ -502,19 +538,25 @@ function ForecastPanel({
                 </span>
                 {r.avgCount > 0 ? (
                   <>
-                    <span className="text-right text-[13px] font-bold tabular-nums text-[#3b82f6]">
-                      {formatMetric(r.views || 0)}
+                    <span className="text-right text-[12px] font-bold tabular-nums leading-tight text-[#3b82f6]">
+                      {r.viewsLo != null && r.viewsHi != null
+                        ? formatRange(r.viewsLo, r.viewsHi)
+                        : formatMetric(r.views || 0)}
                       {r.viewsEstimated ? (
                         <span className="ml-0.5 text-[9px] font-semibold text-[#6b849c]">
                           추정
                         </span>
                       ) : null}
                     </span>
-                    <span className="text-right text-[13px] font-bold tabular-nums text-[#c2410c]">
-                      {formatMetric(r.likes || 0)}
+                    <span className="text-right text-[12px] font-bold tabular-nums leading-tight text-[#c2410c]">
+                      {r.likesLo != null && r.likesHi != null
+                        ? formatRange(r.likesLo, r.likesHi)
+                        : formatMetric(r.likes || 0)}
                     </span>
-                    <span className="text-right text-[13px] font-bold tabular-nums text-[#0f766e]">
-                      {formatMetric(r.saves || 0)}
+                    <span className="text-right text-[12px] font-bold tabular-nums leading-tight text-[#0f766e]">
+                      {r.savesLo != null && r.savesHi != null
+                        ? formatRange(r.savesLo, r.savesHi)
+                        : formatMetric(r.saves || 0)}
                     </span>
                   </>
                 ) : (

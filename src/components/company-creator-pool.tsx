@@ -452,7 +452,7 @@ function CreatorCard({
         <p className="text-[10px] leading-4 text-[var(--muted)]">
           {row.avgPostCount
             ? row.avgFromProfile
-              ? `최근 게시 ${row.avgPostCount}건 평균`
+              ? `관련 게시 ${row.avgPostCount}건 평균`
               : `최근 발행 ${row.avgPostCount}건 평균`
             : row.metrics.views != null
               ? "성과 평균"
@@ -578,7 +578,7 @@ function CreatorDetail({
         {creator.avgPostCount ? (
           <p className="sm:col-span-2 text-[11px] text-[var(--muted)]">
             {creator.avgFromProfile
-              ? `최근 게시 ${creator.avgPostCount}건 기준`
+              ? `관련 게시 ${creator.avgPostCount}건 기준`
               : `최근 발행 ${creator.avgPostCount}건 기준`}
           </p>
         ) : null}
