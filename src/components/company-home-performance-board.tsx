@@ -349,7 +349,7 @@ export function CompanyHomeVisitBoard({
           {onOpenProgress ? (
             <button
               type="button"
-              onClick={onOpenProgress}
+              onClick={() => onOpenProgress()}
               className="text-[12.5px] font-semibold text-[var(--accent)] hover:underline"
             >
               진행현황 전체 보기 →

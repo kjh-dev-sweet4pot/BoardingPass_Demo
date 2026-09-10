@@ -8,6 +8,7 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
+import { type AllocationWithRelations } from "@/lib/types";
 
 export default async function InfSubmitPage() {
   const influencerId = await getInfluencerSessionId();

@@ -845,7 +845,7 @@ function NewsSidebar({
           {onOpenProgress ? (
             <button
               type="button"
-              onClick={onOpenProgress}
+              onClick={() => onOpenProgress()}
               className="text-[12.5px] font-semibold text-[var(--accent)] hover:underline"
             >
               전체 보기 →

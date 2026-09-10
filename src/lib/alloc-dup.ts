@@ -17,12 +17,12 @@ export type SharedVisitAlloc = {
   creator_links?: unknown[] | null;
 };
 
-function productName(raw: RelName) {
+function productName(raw: RelName | undefined) {
   const one = Array.isArray(raw) ? raw[0] : raw;
   return (one?.name || "").trim();
 }
 
-function storeName(raw: RelName) {
+function storeName(raw: RelName | undefined) {
   const one = Array.isArray(raw) ? raw[0] : raw;
   return (one?.name || "").trim();
 }

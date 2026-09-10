@@ -8,6 +8,7 @@ import {
 import { getInfluencerSessionId } from "@/lib/session";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
+import { detectPlatform, validateCreatorUrl } from "@/lib/creator-link";
 
 const LINKS_ON_ALLOCATION = `creator_links(${CREATOR_LINK_PUBLIC_COLUMNS})`;
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createApiClientIfConfigured } from "@/lib/supabase/api-client";
 import { getInfluencerSessionId } from "@/lib/session";
 import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
+import { applyInfluencerStoreVisit } from "@/lib/inf-visit";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 /**
