@@ -4,9 +4,8 @@ import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-cl
 import { hashPassword } from "@/lib/password";
 import {
   COMPANY_SELECT,
-  COMPANY_SELECT_BASE,
-  COMPANY_SELECT_MAIL,
   companyCrmFieldsFromBody,
+  companySelectAfterColumnError,
   isMissingColumnError,
   isMissingCompanyCrmColumn,
   normalizeLoginId,
@@ -73,42 +72,16 @@ export async function PATCH(
   }
   Object.assign(patch, crm.fields);
 
-  let { data, error } = await supabase
-    .from("companies")
-    .update(patch)
-    .eq("id", id)
-    .select(COMPANY_SELECT)
-    .maybeSingle();
-
+  let { error } = await supabase.from("companies").update(patch).eq("id", id);
   if (error && isMissingCompanyCrmColumn(error.message)) {
     for (const key of Object.keys(crm.fields)) delete patch[key];
-    const retry = await supabase
-      .from("companies")
-      .update(patch)
-      .eq("id", id)
-      .select(COMPANY_SELECT_MAIL)
-      .maybeSingle();
-    data = retry.data as typeof data;
+    const retry = await supabase.from("companies").update(patch).eq("id", id);
     error = retry.error;
-    if (!error && data) {
-      return NextResponse.json({
-        company: data,
-        warning:
-          "계약·예산 컬럼이 DB에 없습니다. scripts/sql/companies-contract-fields.sql 을 실행해 주세요.",
-      });
-    }
   }
-
   if (error && isMissingColumnError(error.message, "contact_email")) {
     delete patch.contact_email;
     for (const key of Object.keys(crm.fields)) delete patch[key];
-    const retry = await supabase
-      .from("companies")
-      .update(patch)
-      .eq("id", id)
-      .select(COMPANY_SELECT_BASE)
-      .maybeSingle();
-    data = retry.data as typeof data;
+    const retry = await supabase.from("companies").update(patch).eq("id", id);
     error = retry.error;
   }
 
@@ -124,11 +97,34 @@ export async function PATCH(
       { status },
     );
   }
-  if (!data) {
+  let select = COMPANY_SELECT;
+  let crmColsMissing = false;
+  let fetched = await supabase
+    .from("companies")
+    .select(select)
+    .eq("id", id)
+    .maybeSingle();
+  while (fetched.error) {
+    if (isMissingCompanyCrmColumn(fetched.error.message)) crmColsMissing = true;
+    const next = companySelectAfterColumnError(fetched.error.message);
+    if (!next || next === select) {
+      return NextResponse.json({ error: fetched.error.message }, { status: 500 });
+    }
+    select = next;
+    fetched = await supabase.from("companies").select(select).eq("id", id).maybeSingle();
+  }
+  if (!fetched.data) {
     return NextResponse.json(
       { error: "회원사를 찾을 수 없습니다." },
       { status: 404 },
     );
   }
-  return NextResponse.json({ company: data });
+  if (crmColsMissing) {
+    return NextResponse.json({
+      company: fetched.data,
+      warning:
+        "계약·예산 컬럼이 DB에 없습니다. scripts/sql/companies-contract-fields.sql 을 실행해 주세요.",
+    });
+  }
+  return NextResponse.json({ company: fetched.data });
 }

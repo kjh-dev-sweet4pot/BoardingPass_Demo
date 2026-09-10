@@ -12,7 +12,9 @@ import { buildCompanyExcelTemplate } from "@/lib/company-xlsx-template";
 import {
   COMPANY_MAIL_KINDS,
   buildCompanyMailTemplate,
+  parseMailAddressField,
   resolveCompanyMailTo,
+  unpackMailLogRecipients,
   type CompanyMailKind,
 } from "@/lib/company-mail";
 import { AdminCompanyDocsPanel } from "@/components/admin-company-docs-tab";
@@ -668,6 +670,25 @@ function CompanyList({
   );
 }
 
+function MailRecipientList({ raw }: { raw: string }) {
+  const { emails, invalid } = parseMailAddressField(raw);
+  if (!emails.length && !invalid.length) return null;
+  return (
+    <ul className="mt-1.5 space-y-0.5 text-[12px]">
+      {emails.map((e) => (
+        <li key={e} className="text-[var(--ink)]">
+          {e}
+        </li>
+      ))}
+      {invalid.map((e) => (
+        <li key={`bad-${e}`} className="text-[var(--danger)]">
+          형식이 아님 · {e}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function MailPanel({
   companies,
   isManager,
@@ -682,6 +703,7 @@ function MailPanel({
   const [campaignId, setCampaignId] = useState("");
   const [kind, setKind] = useState<CompanyMailKind>("견적서");
   const [toEmails, setToEmails] = useState("");
+  const [bccEmails, setBccEmails] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -861,6 +883,7 @@ function MailPanel({
       fd.set("campaign_id", campaignId);
       fd.set("kind", kind);
       fd.set("to_emails", toEmails);
+      fd.set("bcc_emails", bccEmails);
       fd.set("subject", subject);
       fd.set("body", body);
       for (const id of docIds) fd.append("doc_ids", id);
@@ -957,6 +980,16 @@ function MailPanel({
             placeholder="a@b.com, c@d.com"
             required
           />
+          <MailRecipientList raw={toEmails} />
+        </Field>
+        <Field label="숨은참조">
+          <input
+            className={fieldClass}
+            value={bccEmails}
+            onChange={(e) => setBccEmails(e.target.value)}
+            placeholder="내부@slam-global.com"
+          />
+          <MailRecipientList raw={bccEmails} />
         </Field>
         <Field label="제목">
           <input className={fieldClass} value={subject} onChange={(e) => setSubject(e.target.value)} required />
@@ -1087,6 +1120,7 @@ function MailPanel({
               const open = openLogId === log.id;
               const companyName =
                 companies.find((c) => c.id === log.company_id)?.name || "";
+              const recips = unpackMailLogRecipients(log.to_emails);
               const campName =
                 campaigns.find((c) => c.id === log.campaign_id)?.name || "";
               return (
@@ -1110,7 +1144,11 @@ function MailPanel({
                       {log.subject}
                     </p>
                     <p className="text-[11px] text-[var(--muted)]">
-                      {log.to_emails.join(", ")} · {fmtDt(log.created_at)}
+                      {recips.to.join(", ") || "—"}
+                      {recips.bcc.length
+                        ? ` · 숨은참조 ${recips.bcc.length}`
+                        : ""}{" "}
+                      · {fmtDt(log.created_at)}
                     </p>
                   </button>
                   {open ? (
@@ -1129,8 +1167,14 @@ function MailPanel({
                       ) : null}
                       <p>
                         <span className="text-[var(--muted)]">받는 사람 </span>
-                        {log.to_emails.join(", ") || "—"}
+                        {recips.to.join(", ") || "—"}
                       </p>
+                      {recips.bcc.length ? (
+                        <p>
+                          <span className="text-[var(--muted)]">숨은참조 </span>
+                          {recips.bcc.join(", ")}
+                        </p>
+                      ) : null}
                       {log.created_by ? (
                         <p>
                           <span className="text-[var(--muted)]">발송자 </span>

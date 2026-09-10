@@ -28,6 +28,50 @@ export function isMailAddress(v: string) {
   return EMAIL_RE.test(v);
 }
 
+const MAIL_BCC_MARK = "bcc:";
+const MAIL_RECIPIENT_MAX = 50;
+
+export function uniqueMailAddresses(list: string[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of list) {
+    const e = raw.trim().toLowerCase();
+    if (!e || seen.has(e)) continue;
+    seen.add(e);
+    out.push(e);
+  }
+  return out;
+}
+
+export function parseMailAddressField(raw: string) {
+  const parts = parseMailAddresses(raw);
+  return {
+    emails: uniqueMailAddresses(parts.filter(isMailAddress)),
+    invalid: parts.filter((p) => !isMailAddress(p)),
+  };
+}
+
+export function packMailLogRecipients(to: string[], bcc: string[]) {
+  return [...to, ...bcc.map((e) => `${MAIL_BCC_MARK}${e}`)];
+}
+
+export function unpackMailLogRecipients(raw: string[] | null | undefined) {
+  const to: string[] = [];
+  const bcc: string[] = [];
+  for (const item of raw || []) {
+    if (item.startsWith(MAIL_BCC_MARK)) bcc.push(item.slice(MAIL_BCC_MARK.length));
+    else to.push(item);
+  }
+  return { to, bcc };
+}
+
+export function mailRecipientLimitError(to: string[], bcc: string[]) {
+  if (to.length + bcc.length > MAIL_RECIPIENT_MAX) {
+    return `수신·숨은참조는 합쳐 ${MAIL_RECIPIENT_MAX}명까지입니다.`;
+  }
+  return null;
+}
+
 export function resolveCompanyMailTo(company: {
   contact_email?: string | null;
   contact?: string | null;
@@ -101,13 +145,16 @@ export function mailTextToHtml(text: string) {
   return `<p style="white-space:pre-wrap;font-family:sans-serif;font-size:14px;line-height:1.6;color:#222">${escapeMailHtml(text)}</p>`;
 }
 
+export const MAIL_SIGNATURE_CID = "brandslam-signature";
+
 export function mailSignatureHtml(input: {
   managerName?: string | null;
-  imageDataUrl?: string | null;
+  imageCid?: string | null;
 }) {
   const name = (input.managerName || "").trim();
-  const img = input.imageDataUrl
-    ? `<img src="${input.imageDataUrl}" alt="" style="max-height:72px;max-width:220px;display:block;margin:0 0 10px"/>`
+  const cid = (input.imageCid || "").trim();
+  const img = cid
+    ? `<img src="cid:${cid}" alt="" width="420" style="width:420px;max-width:100%;height:auto;display:block;margin:0 0 10px"/>`
     : "";
   const who = name
     ? `${escapeMailHtml(name)}<br/>${SENDER_COMPANY}`
@@ -119,7 +166,7 @@ ${img}<p style="margin:0">${who}</p>
 
 export function buildCompanyMailHtml(
   body: string,
-  signature?: { managerName?: string | null; imageDataUrl?: string | null },
+  signature?: { managerName?: string | null; imageCid?: string | null },
 ) {
   return `${mailTextToHtml(body)}${mailSignatureHtml(signature || {})}`;
 }
@@ -193,10 +240,12 @@ export type MailAttachment = {
   filename: string;
   content: string;
   contentType?: string;
+  contentId?: string;
 };
 
 export async function sendCompanyMailViaResend(input: {
   to: string[];
+  bcc?: string[];
   subject: string;
   body: string;
   html?: string;
@@ -217,12 +266,15 @@ export async function sendCompanyMailViaResend(input: {
     body: JSON.stringify({
       from: getCompanyMailFrom(),
       to: input.to,
+      ...(input.bcc?.length ? { bcc: input.bcc } : {}),
       subject: input.subject,
       text: input.body,
       html: input.html || mailTextToHtml(input.body),
       attachments: input.attachments?.map((a) => ({
         filename: a.filename,
         content: a.content,
+        ...(a.contentType ? { content_type: a.contentType } : {}),
+        ...(a.contentId ? { content_id: a.contentId } : {}),
       })),
     }),
   });
@@ -269,6 +321,21 @@ function assertCompanyMailTemplates() {
   }
   if (parseMailAddresses("a@b.co, c@d.co").length !== 2) {
     throw new Error("company-mail parse failed");
+  }
+  const packed = packMailLogRecipients(["a@b.co"], ["hidden@b.co"]);
+  const unpacked = unpackMailLogRecipients(packed);
+  if (unpacked.to.join() !== "a@b.co" || unpacked.bcc.join() !== "hidden@b.co") {
+    throw new Error("company-mail bcc pack failed");
+  }
+  if (parseMailAddressField("a@b.co; C@d.co a@b.co").emails.length !== 2) {
+    throw new Error("company-mail unique failed");
+  }
+  const html = buildCompanyMailHtml("본문", {
+    managerName: "김매니저",
+    imageCid: MAIL_SIGNATURE_CID,
+  });
+  if (!html.includes(`cid:${MAIL_SIGNATURE_CID}`) || html.includes("data:image")) {
+    throw new Error("company-mail signature cid failed");
   }
 }
 
