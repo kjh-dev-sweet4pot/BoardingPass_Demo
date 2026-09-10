@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { cloneElement, isValidElement, type ReactNode } from "react";
+
+function withKey(node: ReactNode, key: string) {
+  return isValidElement(node) ? cloneElement(node, { key }) : node;
+}
 import {
   NavHoverDropdown,
   NavSubSegment,
@@ -94,7 +98,7 @@ export function AdminConsoleShell({
           </Link>
           <p className="truncate text-base font-semibold text-[var(--ink)]">운영 콘솔</p>
         </div>
-        {sidebarActions}
+        {withKey(sidebarActions, "admin-logout-mobile")}
       </div>
       <div className="mb-2 flex shrink-0 flex-col gap-2 px-4 lg:hidden">
         <div
@@ -235,7 +239,9 @@ export function AdminConsoleShell({
           ))}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-3">{sidebarActions}</div>
+        <div className="flex shrink-0 items-center gap-3">
+          {withKey(sidebarActions, "admin-logout-desktop")}
+        </div>
       </header>
 
       {headerFooter ? (
@@ -244,7 +250,9 @@ export function AdminConsoleShell({
         </div>
       ) : null}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {children}
+      </div>
     </div>
   );
 }

@@ -676,12 +676,12 @@ function MailRecipientList({ raw }: { raw: string }) {
   return (
     <ul className="mt-1.5 space-y-0.5 text-[12px]">
       {emails.map((e) => (
-        <li key={e} className="text-[var(--ink)]">
+        <li key={`ok:${e}`} className="text-[var(--ink)]">
           {e}
         </li>
       ))}
-      {invalid.map((e) => (
-        <li key={`bad-${e}`} className="text-[var(--danger)]">
+      {invalid.map((e, i) => (
+        <li key={`bad:${i}:${e}`} className="text-[var(--danger)]">
           형식이 아님 · {e}
         </li>
       ))}
