@@ -15,6 +15,7 @@ import {
   resolveCompanyMailTo,
   sendCompanyMailViaResend,
   SENDER_COMPANY,
+  type MailAttachment,
 } from "@/lib/company-mail";
 import {
   loadAdminMailProfile,
@@ -194,7 +195,7 @@ export async function POST(request: NextRequest) {
   if (!subject) subject = template.subject;
   if (!body) body = template.body;
 
-  const attachments: { filename: string; content: string }[] = [];
+  const attachments: MailAttachment[] = [];
   const attachmentNames: string[] = [];
 
   const docIds = [...new Set(form.getAll("doc_ids").map((v) => String(v).trim()).filter(Boolean))];
