@@ -1,6 +1,18 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import {
+  cloneElement,
+  Fragment,
+  isValidElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+  type TransitionEvent,
+  type CSSProperties,
+} from "react";
 import { createPortal } from "react-dom";
 import { CreatorPhoto } from "@/components/creator-photo";
 import {
@@ -143,6 +155,7 @@ function DonutCell({
             strokeWidth={sw}
           />
           <circle
+            className="com-home-donut-arc"
             cx={size / 2}
             cy={size / 2}
             r={r}
@@ -152,6 +165,12 @@ function DonutCell({
             strokeLinecap="round"
             strokeDasharray={c.toFixed(2)}
             strokeDashoffset={off.toFixed(2)}
+            style={
+              {
+                "--donut-c": c.toFixed(2),
+                "--donut-off": off.toFixed(2),
+              } as CSSProperties
+            }
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
           />
         </svg>
@@ -168,7 +187,7 @@ function DonutCell({
     </>
   );
   const cls =
-    "flex h-[88px] w-full items-center gap-3 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2";
+    "flex h-[88px] w-full items-center gap-3 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 com-surface";
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={`${cls} cursor-pointer`}>
@@ -205,7 +224,7 @@ function StripPlain({
     </>
   );
   const cls =
-    "flex h-[88px] w-full items-center gap-3 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2";
+    "flex h-[88px] w-full items-center gap-3 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 com-surface";
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={`${cls} cursor-pointer`}>
@@ -299,7 +318,7 @@ function ViewsCell({
     </>
   );
   const cls =
-    "flex h-[88px] w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2";
+    "flex h-[88px] w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 com-surface";
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={`${cls} cursor-pointer`}>
@@ -355,6 +374,9 @@ function EfficiencyPlaceholder() {
 const RANK_VISIBLE = 4;
 const RANK_ROW_PX = 60;
 const RANK_TICK_MS = 3000;
+const RANK_SLIDE_MS = 420;
+const RANK_ROW_INTERACT =
+  "cursor-pointer hover:bg-[var(--accent-soft)] hover:shadow-[inset_3px_0_0_0_var(--accent)] focus-visible:bg-[var(--accent-soft)] focus-visible:shadow-[inset_3px_0_0_0_var(--accent)] focus-visible:outline-none";
 
 function RankPostRow({
   row,
@@ -405,7 +427,7 @@ function RankPostRow({
         href={row.url}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${cls} hover:bg-[var(--surface-hover)]`}
+        className={`${cls} ${RANK_ROW_INTERACT}`}
       >
         {inner}
       </a>
@@ -464,7 +486,7 @@ function RankInfRow({
       <button
         type="button"
         onClick={onOpen}
-        className={`${cls} hover:bg-[var(--surface-hover)]`}
+        className={`${cls} ${RANK_ROW_INTERACT}`}
       >
         {inner}
       </button>
@@ -473,7 +495,7 @@ function RankInfRow({
   return <div className={cls}>{inner}</div>;
 }
 
-/** 4줄 고정 뷰포트 · 3초마다 한 줄씩 위로 밀기 */
+/** 4줄 고정 뷰포트 · 3초마다 한 줄씩 위로 밀기. 호버/포커스 시 멈춤. */
 function AutoScrollRankRows({
   rows,
   reduceMotion,
@@ -485,44 +507,69 @@ function AutoScrollRankRows({
   const canScroll = !reduceMotion && n > RANK_VISIBLE;
   const [offset, setOffset] = useState(0);
   const [animate, setAnimate] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const wrapping = useRef(false);
 
   useEffect(() => {
     setOffset(0);
     setAnimate(true);
+    wrapping.current = false;
   }, [n]);
 
   useEffect(() => {
-    if (!canScroll) return;
+    if (!canScroll || paused) return;
     const id = window.setInterval(() => {
       setAnimate(true);
-      setOffset((o) => o + 1);
+      setOffset((o) => (o >= n ? o : o + 1));
     }, RANK_TICK_MS);
     return () => window.clearInterval(id);
-  }, [canScroll, n]);
+  }, [canScroll, n, paused]);
+
+  function snapLoop() {
+    if (wrapping.current) return;
+    wrapping.current = true;
+    setAnimate(false);
+    setOffset(0);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        wrapping.current = false;
+        setAnimate(true);
+      });
+    });
+  }
+
+  function onTrackTransitionEnd(e: TransitionEvent<HTMLDivElement>) {
+    if (e.target !== e.currentTarget) return;
+    if (e.propertyName !== "transform") return;
+    if (offset >= n) snapLoop();
+  }
 
   useEffect(() => {
     if (!canScroll || offset < n) return;
-    const t = window.setTimeout(() => {
-      setAnimate(false);
-      setOffset(0);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setAnimate(true));
-      });
-    }, 420);
+    const t = window.setTimeout(snapLoop, RANK_SLIDE_MS + 80);
     return () => window.clearTimeout(t);
   }, [offset, n, canScroll]);
 
   if (n === 0) return null;
 
-  const track = canScroll
-    ? [...rows, ...rows.slice(0, RANK_VISIBLE)]
-    : rows.slice(0, RANK_VISIBLE);
+  const clones = rows.slice(0, RANK_VISIBLE).map((row, i) =>
+    isValidElement(row) ? cloneElement(row, { key: `clone-${i}` }) : row,
+  );
+  const track = canScroll ? [...rows, ...clones] : rows.slice(0, RANK_VISIBLE);
 
   return (
     <div
       className="overflow-hidden"
       style={{ height: RANK_VISIBLE * RANK_ROW_PX }}
       aria-live="off"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setPaused(false);
+        }
+      }}
     >
       <div
         className={
@@ -535,9 +582,13 @@ function AutoScrollRankRows({
             ? `translateY(-${offset * RANK_ROW_PX}px)`
             : undefined,
         }}
+        onTransitionEnd={onTrackTransitionEnd}
       >
         {track.map((row, i) => (
-          <div key={i} style={{ height: RANK_ROW_PX }}>
+          <div
+            key={i < n ? `r-${i}` : `c-${i - n}`}
+            style={{ height: RANK_ROW_PX }}
+          >
             {row}
           </div>
         ))}
@@ -566,7 +617,7 @@ function RankCard({
   return (
     <section
       ref={cardRef}
-      className={`scroll-mt-4 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-4 transition-colors duration-150 ${
+      className={`com-surface scroll-mt-4 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-4 transition-colors duration-150 ${
         flash ? "!bg-[#FBF3E4]" : ""
       }`}
     >
@@ -622,7 +673,7 @@ function NewsDetailPanel({
   item: CompanyHomeNewsItem;
   asOf: string;
   onOpenPerformance?: () => void;
-  onOpenProgress?: () => void;
+  onOpenProgress?: (influencerId?: string) => void;
 }) {
   const d = item.detail;
   if (d?.type !== "visit" && d?.type !== "publish") {
@@ -704,7 +755,7 @@ function NewsDetailPanel({
           type="button"
           className="inline-flex h-8 items-center justify-center rounded-[6px] bg-[var(--accent)] text-[12px] font-semibold text-white"
           onClick={() =>
-            visit ? onOpenProgress?.() : onOpenPerformance?.()
+            visit ? onOpenProgress?.(d.influencerId) : onOpenPerformance?.()
           }
         >
           {visit ? "진행 현황에서 보기" : "성과 바로가기"}
@@ -732,7 +783,7 @@ function NewsSidebar({
   insightLinks: HomeInsightLink[];
   insightsLoading: boolean;
   onOpenPerformance?: () => void;
-  onOpenProgress?: () => void;
+  onOpenProgress?: (influencerId?: string) => void;
 }) {
   const shown = pickNewsFeed(items);
   const groups = useMemo(() => groupByDay(shown, (i) => i.at), [shown]);
@@ -794,7 +845,7 @@ function NewsSidebar({
           {onOpenProgress ? (
             <button
               type="button"
-              onClick={onOpenProgress}
+              onClick={() => onOpenProgress()}
               className="text-[12.5px] font-semibold text-[var(--accent)] hover:underline"
             >
               전체 보기 →
@@ -922,26 +973,26 @@ function NewsSidebar({
 
 export function CompanyHomeLanding({
   companyName,
-  companyId,
+  active = true,
   onOpenPerformance,
   onOpenPublish,
   onOpenPool,
 }: {
   companyName: string;
-  companyId: string;
+  /** 탭이 보일 때만 60초 폴링. 마운트 시 1회 로드는 항상 함. */
+  active?: boolean;
   onOpenPerformance?: () => void;
-  onOpenPublish?: () => void;
+  onOpenPublish?: (influencerId?: string) => void;
   onOpenPool?: () => void;
 }) {
   const [data, setData] = useState<CompanyHomePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [insightLinks, setInsightLinks] = useState<HomeInsightLink[]>([]);
-  const [insightsLoading, setInsightsLoading] = useState(true);
-  const [insightsError, setInsightsError] = useState<string | null>(null);
   const [flashMonthly, setFlashMonthly] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const monthlyRef = useRef<HTMLElement | null>(null);
+  const homeEnterRef = useRef<HTMLDivElement | null>(null);
+  const homeEnterReady = useRef(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -953,66 +1004,61 @@ export function CompanyHomeLanding({
 
   useEffect(() => {
     let cancelled = false;
-    const load = () => {
-      fetch("/api/com/home", { cache: "no-store" })
-        .then(async (res) => {
-          const body = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(body.error || "요약을 불러오지 못했습니다.");
-          if (!cancelled) {
-            setData(body as CompanyHomePayload);
-            setError(null);
-          }
-        })
-        .catch((e) => {
-          if (!cancelled) {
-            setError(
-              e instanceof Error ? e.message : "요약을 불러오지 못했습니다.",
-            );
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-    };
-    load();
-    const id = window.setInterval(load, 60_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, []);
-
-  // ponytail: board + 도넛이 같은 소스 — 한 번만 fetch
-  useEffect(() => {
-    let cancelled = false;
-    setInsightsLoading(true);
-    fetch("/api/com/insights?days=180", { cache: "no-store" })
+    fetch("/api/com/home", { cache: "no-store" })
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error || "성과를 불러오지 못했습니다.");
+        if (!res.ok) throw new Error(body.error || "요약을 불러오지 못했습니다.");
         if (!cancelled) {
-          setInsightLinks(
-            Array.isArray(body.links) ? (body.links as HomeInsightLink[]) : [],
-          );
-          setInsightsError(null);
+          setData(body as CompanyHomePayload);
+          setError(null);
         }
       })
       .catch((e) => {
         if (!cancelled) {
-          setInsightLinks([]);
-          setInsightsError(
-            e instanceof Error ? e.message : "성과를 불러오지 못했습니다.",
+          setError(
+            e instanceof Error ? e.message : "요약을 불러오지 못했습니다.",
           );
         }
       })
       .finally(() => {
-        if (!cancelled) setInsightsLoading(false);
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [companyId]);
+  }, []);
 
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => {
+      fetch("/api/com/home", { cache: "no-store" })
+        .then(async (res) => {
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) return;
+          setData(body as CompanyHomePayload);
+          setError(null);
+        })
+        .catch(() => {
+          /* 폴링 실패는 기존 화면 유지 */
+        });
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, [active]);
+
+  useEffect(() => {
+    if (!active || !data || reduceMotion) return;
+    const el = homeEnterRef.current;
+    if (!el) return;
+    if (!homeEnterReady.current) {
+      homeEnterReady.current = true;
+      return;
+    }
+    el.classList.remove("com-home-enter");
+    void el.offsetWidth;
+    el.classList.add("com-home-enter");
+  }, [active, Boolean(data), reduceMotion]);
+  const insightLinks = data?.links || [];
+  const boardLoading = loading && !data;
   const week = data?.best.week || [];
   const month = data?.best.month || [];
   const tickerItems = reduceMotion ? month.slice(0, 3) : month;
@@ -1036,7 +1082,7 @@ export function CompanyHomeLanding({
     <div className="min-h-0 flex-1 overflow-auto">
       <div className="px-0 pb-8 pt-0 sm:px-0">
         {loading && !data ? (
-          <p className="px-5 py-5 text-sm text-[var(--muted)] sm:px-8">
+          <p className="com-loading px-5 py-5 text-sm text-[var(--muted)] sm:px-8">
             불러오는 중…
           </p>
         ) : null}
@@ -1047,11 +1093,11 @@ export function CompanyHomeLanding({
         ) : null}
 
         {data ? (
-          <>
+          <div ref={homeEnterRef} className="com-home-enter">
             <p className="px-5 pt-3 text-[11.5px] text-[var(--muted)] sm:px-8">
               {companyName} · {data.asOf} 조회 시점 기준
             </p>
-            <div className="mt-3 grid grid-cols-1 gap-3 px-5 sm:grid-cols-2 sm:px-8 xl:grid-cols-3">
+            <div className="com-home-kpis mt-3 grid grid-cols-1 gap-3 px-5 sm:grid-cols-2 sm:px-8 xl:grid-cols-3">
               <KpiHoverTip
                 title="콘텐츠 발행"
                 rows={[
@@ -1117,7 +1163,7 @@ export function CompanyHomeLanding({
                   extra={
                     <div className="h-[5px] overflow-hidden rounded-full bg-[#EDE7DC]">
                       <span
-                        className="block h-full bg-[#2F7D5A]"
+                        className="com-home-bar block h-full bg-[#2F7D5A]"
                         style={{ width: `${infBar}%` }}
                       />
                     </div>
@@ -1197,12 +1243,13 @@ export function CompanyHomeLanding({
               </div>
             </div>
 
-            <div className="flex flex-col gap-5 border-b border-[var(--line)] px-5 py-5 sm:px-8 xl:flex-row xl:items-start">
+            <div className="com-home-boards flex flex-col gap-5 border-b border-[var(--line)] px-5 py-5 sm:px-8 xl:flex-row xl:items-start">
               <div className="min-w-0 flex-1">
                 <CompanyHomePerformanceBoard
                   links={insightLinks}
-                  loading={insightsLoading}
-                  error={insightsError}
+                  loading={boardLoading}
+                  error={null}
+                  forecast={data.forecast}
                   onOpenMore={onOpenPerformance}
                 />
               </div>
@@ -1214,13 +1261,13 @@ export function CompanyHomeLanding({
                 items={data.news}
                 asOf={data.asOf}
                 insightLinks={insightLinks}
-                insightsLoading={insightsLoading}
+                insightsLoading={boardLoading}
                 onOpenPerformance={onOpenPerformance}
                 onOpenProgress={onOpenPublish}
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 px-5 py-5 sm:px-8 md:grid-cols-2 xl:grid-cols-4">
+            <div className="com-home-ranks grid grid-cols-1 gap-4 px-5 py-5 sm:px-8 md:grid-cols-2 xl:grid-cols-4">
               <EfficiencyPlaceholder />
               <RankCard
                 title="주간 랭킹 TOP 10"
@@ -1257,7 +1304,7 @@ export function CompanyHomeLanding({
                 ))}
               />
             </div>
-          </>
+          </div>
         ) : null}
       </div>
     </div>

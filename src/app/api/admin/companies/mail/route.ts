@@ -3,16 +3,19 @@ import { requireAdminManager, requireAnyAdmin } from "@/lib/access";
 import {
   COMPANY_MAIL_LOG_SELECT,
   COMPANY_MAIL_KINDS,
+  MAIL_SIGNATURE_CID,
   buildCompanyMailHtml,
   buildCompanyMailTemplate,
   isCompanyMailConfigured,
   probeResendMailAccount,
   isCompanyMailKind,
-  isMailAddress,
-  parseMailAddresses,
+  mailRecipientLimitError,
+  packMailLogRecipients,
+  parseMailAddressField,
   resolveCompanyMailTo,
   sendCompanyMailViaResend,
   SENDER_COMPANY,
+  type MailAttachment,
 } from "@/lib/company-mail";
 import {
   loadAdminMailProfile,
@@ -21,6 +24,7 @@ import {
 import { CONTENT_FILES_BUCKET } from "@/lib/content-file-storage";
 import { docHtml, mailDocFilename, type CompanyDocKind } from "@/lib/company-docs";
 import { htmlToPdf } from "@/lib/html-to-pdf";
+import { isMissingColumnError } from "@/lib/company";
 import { ADMIN_USERNAME, getAdminLoginId } from "@/lib/session";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
@@ -93,6 +97,7 @@ export async function POST(request: NextRequest) {
   const campaignId = String(form.get("campaign_id") || "").trim();
   const kindRaw = String(form.get("kind") || "").trim();
   const toRaw = String(form.get("to_emails") || "").trim();
+  const bccRaw = String(form.get("bcc_emails") || "").trim();
   let subject = String(form.get("subject") || "").trim();
   let body = String(form.get("body") || "").trim();
   const attachGuideline = form.get("attach_guideline") !== "0";
@@ -115,9 +120,10 @@ export async function POST(request: NextRequest) {
     .select("id, name, contact, contact_email")
     .eq("id", companyId)
     .maybeSingle();
-  if (withEmail.data) {
-    companyRow = withEmail.data;
-  } else {
+  if (withEmail.error) {
+    if (!isMissingColumnError(withEmail.error.message, "contact_email")) {
+      return NextResponse.json({ error: withEmail.error.message }, { status: 500 });
+    }
     const fallback = await supabase
       .from("companies")
       .select("id, name, contact")
@@ -127,6 +133,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: fallback.error.message }, { status: 500 });
     }
     companyRow = fallback.data;
+  } else {
+    companyRow = withEmail.data;
   }
   if (!companyRow) {
     return NextResponse.json({ error: "회원사를 찾을 수 없습니다." }, { status: 404 });
@@ -148,16 +156,35 @@ export async function POST(request: NextRequest) {
     campaignName = campaign.name;
   }
 
-  const to = parseMailAddresses(toRaw).filter(isMailAddress);
+  const parsedTo = parseMailAddressField(toRaw);
+  const parsedBcc = parseMailAddressField(bccRaw);
+  if (parsedTo.invalid.length) {
+    return NextResponse.json(
+      { error: `수신 주소가 올바르지 않습니다: ${parsedTo.invalid.join(", ")}` },
+      { status: 400 },
+    );
+  }
+  if (parsedBcc.invalid.length) {
+    return NextResponse.json(
+      { error: `숨은참조 주소가 올바르지 않습니다: ${parsedBcc.invalid.join(", ")}` },
+      { status: 400 },
+    );
+  }
+  const to = [...parsedTo.emails];
+  const bcc = parsedBcc.emails.filter((e) => !to.includes(e));
   if (to.length === 0) {
     const fallbackTo = resolveCompanyMailTo(companyRow);
-    if (fallbackTo) to.push(fallbackTo);
+    if (fallbackTo) to.push(fallbackTo.toLowerCase());
   }
   if (to.length === 0) {
     return NextResponse.json(
       { error: "수신 메일 주소가 없습니다. 회원사 수신 메일을 등록하세요." },
       { status: 400 },
     );
+  }
+  const limitErr = mailRecipientLimitError(to, bcc);
+  if (limitErr) {
+    return NextResponse.json({ error: limitErr }, { status: 400 });
   }
 
   const template = buildCompanyMailTemplate({
@@ -168,7 +195,7 @@ export async function POST(request: NextRequest) {
   if (!subject) subject = template.subject;
   if (!body) body = template.body;
 
-  const attachments: { filename: string; content: string }[] = [];
+  const attachments: MailAttachment[] = [];
   const attachmentNames: string[] = [];
 
   const docIds = [...new Set(form.getAll("doc_ids").map((v) => String(v).trim()).filter(Boolean))];
@@ -265,18 +292,25 @@ export async function POST(request: NextRequest) {
     const loginId = (await getAdminLoginId()) || ADMIN_USERNAME;
     const profileDb = hasServiceRoleKey() ? createServiceClient() : supabase;
     const profile = await loadAdminMailProfile(profileDb, loginId);
-    let imageDataUrl: string | null = null;
+    let imageCid: string | null = null;
     if (profile.signaturePath) {
       const sig = await loadSignatureBytes(profileDb, profile.signaturePath);
       if (sig) {
-        imageDataUrl = `data:${sig.type};base64,${sig.bytes.toString("base64")}`;
+        attachments.push({
+          filename: sig.filename,
+          content: sig.bytes.toString("base64"),
+          contentType: sig.type || "image/png",
+          contentId: MAIL_SIGNATURE_CID,
+        });
+        imageCid = MAIL_SIGNATURE_CID;
       }
     }
     const managerName = profile.displayName;
-    const html = buildCompanyMailHtml(body, { managerName, imageDataUrl });
+    const html = buildCompanyMailHtml(body, { managerName, imageCid });
     const signedText = `${body.trim()}\n\n--\n${managerName ? `${managerName}\n` : ""}${SENDER_COMPANY}\n`;
     await sendCompanyMailViaResend({
       to,
+      bcc,
       subject,
       body: signedText,
       html,
@@ -294,7 +328,7 @@ export async function POST(request: NextRequest) {
       company_id: companyId,
       campaign_id: campaignId || null,
       kind: kindRaw,
-      to_emails: to,
+      to_emails: packMailLogRecipients(to, bcc),
       subject,
       body,
       attachment_names: attachmentNames,

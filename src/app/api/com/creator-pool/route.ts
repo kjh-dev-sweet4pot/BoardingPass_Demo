@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { chunkIds } from "@/app/api/com/insights/route";
 import { getCompanySessionId } from "@/lib/session";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
@@ -9,6 +10,9 @@ async function getClient() {
   if (hasServiceRoleKey()) return createServiceClient();
   return createApiClientIfConfigured();
 }
+
+const PUBLISHED_OR =
+  "content_status.eq.발행완료,publish_url.not.is.null,and(content_status.is.null,status.eq.approved)";
 
 /**
  * GET /api/com/creator-pool
@@ -27,7 +31,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("allocations")
     .select(
-      "id, product_id, created_at, visit_date, products(name), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url, followers, region), creator_links(url, publish_url, platform, status, content_status, submitted_at, views, likes, comments, saves)",
+      "id, product_id, created_at, visit_date, products(name), influencers(id, name, instagram_handle, instagram_handle_normalized, sns_url, followers, region)",
     )
     .eq("company_id", companyId)
     .order("created_at", { ascending: false });
@@ -36,13 +40,55 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  type LinkRow = {
+    allocation_id: string;
+    url: string | null;
+    publish_url: string | null;
+    platform: string | null;
+    status: string | null;
+    content_status: string | null;
+    submitted_at: string | null;
+    views: number | null;
+    likes: number | null;
+    comments: number | null;
+    saves: number | null;
+  };
+  const rawLinks: LinkRow[] = [];
+  const allocIds = (data ?? []).map((r) => r.id);
+  if (allocIds.length > 0) {
+    const pages = await Promise.all(
+      chunkIds(allocIds).map((part) =>
+        supabase
+          .from("creator_links")
+          .select(
+            "allocation_id, url, publish_url, platform, status, content_status, submitted_at, views, likes, comments, saves",
+          )
+          .in("allocation_id", part)
+          .or(PUBLISHED_OR),
+      ),
+    );
+    for (const page of pages) {
+      if (page.error) {
+        return NextResponse.json({ error: page.error.message }, { status: 500 });
+      }
+      rawLinks.push(...((page.data || []) as LinkRow[]));
+    }
+  }
+
+  const linksByAlloc = new Map<string, LinkRow[]>();
+  for (const l of rawLinks) {
+    const list = linksByAlloc.get(l.allocation_id) || [];
+    list.push(l);
+    linksByAlloc.set(l.allocation_id, list);
+  }
+
   const best = new Map<
     string,
     {
       inf: Parameters<typeof poolCreatorFromInfluencer>[0];
       product: string | null;
       visitYmd: string;
-      links: NonNullable<(typeof data)[number]["creator_links"]>;
+      links: LinkRow[];
     }
   >();
   for (const row of data ?? []) {
@@ -52,11 +98,7 @@ export async function GET() {
     const productRaw = row.products;
     const product = Array.isArray(productRaw) ? productRaw[0] : productRaw;
     const visitYmd = row.visit_date ? String(row.visit_date).slice(0, 10) : "";
-    const rowLinks = Array.isArray(row.creator_links)
-      ? row.creator_links
-      : row.creator_links
-        ? [row.creator_links]
-        : [];
+    const rowLinks = linksByAlloc.get(row.id) || [];
     const prev = best.get(inf.id);
     if (!prev) {
       best.set(inf.id, {

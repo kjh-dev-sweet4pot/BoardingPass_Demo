@@ -7,6 +7,7 @@ import { getInfluencerSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
+import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
 import { type AllocationWithRelations } from "@/lib/types";
 
 export default async function InfPublishPage() {
@@ -42,7 +43,9 @@ export default async function InfPublishPage() {
           <p className="text-sm text-red-400">{error.message}</p>
         ) : (
           <InfPublishClient
-            initialAllocations={(rows as unknown as AllocationWithRelations[]) || []}
+            initialAllocations={collapseSharedVisitAllocations(
+              (rows as unknown as AllocationWithRelations[]) || [],
+            )}
           />
         )}
       </main>

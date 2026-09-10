@@ -1,4 +1,10 @@
 import { formatMetric } from "@/lib/content-insights";
+import {
+  predictRidgeLikesInterval,
+  predictRidgeSavesInterval,
+  predictRidgeViewsInterval,
+  RIDGE_ACCURACY_PCT,
+} from "@/lib/forecast-ridge";
 import { canonicalBranchName } from "@/lib/store-name";
 
 export type CompanyHomeNewsKind = "일정" | "성과";
@@ -192,6 +198,76 @@ export function teloactHomeBudget() {
   };
 }
 
+/** 홈 성과 보드용 — insights links 최소 형태 */
+export type HomeInsightLink = {
+  id: string;
+  link_url: string | null;
+  published_at: string | null;
+  views: number | null;
+  likes: number | null;
+  saves?: number | null;
+  allocations: {
+    influencer_id?: string;
+    influencers: {
+      id: string;
+      name: string;
+      instagram_handle_normalized?: string;
+      instagram_handle?: string;
+      region?: string | null;
+    } | null;
+    products: { id: string; name: string } | null;
+    allocation_pricing?:
+      | { display_price: number | null }
+      | { display_price: number | null }[]
+      | null;
+  } | null;
+};
+
+export type HomeForecastAvg = {
+  views: number;
+  likes: number;
+  comments: number | null;
+  saves: number | null;
+  count: number;
+  viewsEstimated?: boolean;
+};
+
+export type HomeForecastRow = {
+  id: string;
+  name: string;
+  handle: string;
+  views: number | null;
+  viewsLo: number | null;
+  viewsHi: number | null;
+  likes: number | null;
+  likesLo: number | null;
+  likesHi: number | null;
+  comments: number | null;
+  saves: number | null;
+  savesLo: number | null;
+  savesHi: number | null;
+  avgCount: number;
+  viewsEstimated?: boolean;
+};
+
+export type HomeForecast = {
+  pendingCount: number;
+  views: number;
+  viewsLo: number;
+  viewsHi: number;
+  viewsAccuracyPct: number;
+  likes: number;
+  likesLo: number;
+  likesHi: number;
+  likesAccuracyPct: number;
+  comments: number;
+  saves: number;
+  savesLo: number;
+  savesHi: number;
+  savesAccuracyPct: number;
+  rows: HomeForecastRow[];
+};
+
 export type CompanyHomePayload = {
   asOf: string;
   budget: {
@@ -227,7 +303,82 @@ export type CompanyHomePayload = {
   };
   news: CompanyHomeNewsItem[];
   visits: CompanyHomeVisits;
+  links: HomeInsightLink[];
+  forecast: HomeForecast;
 };
+
+/** 미업로드 인원 × 관련 게시 3건 평균을 Ridge(α=10)로 조회수 보정. 평균 없는 인원은 합계에서 제외 */
+export function buildHomeForecast(
+  pending: { id: string; name: string; handle: string }[],
+  avgById: Record<string, HomeForecastAvg | undefined>,
+): HomeForecast {
+  const rows: HomeForecastRow[] = pending.map((p) => {
+    const a = avgById[p.id];
+    const ok = Boolean(a && a.count > 0);
+    const band = ok
+      ? predictRidgeViewsInterval({
+          views: a!.views,
+          likes: a!.likes,
+          comments: a!.comments,
+          saves: a!.saves,
+        })
+      : null;
+    const likeBand = ok
+      ? predictRidgeLikesInterval({
+          views: a!.views,
+          likes: a!.likes,
+          comments: a!.comments,
+          saves: a!.saves,
+        })
+      : null;
+    const saveBand = ok
+      ? predictRidgeSavesInterval({
+          views: a!.views,
+          likes: a!.likes,
+          comments: a!.comments,
+          saves: a!.saves,
+        })
+      : null;
+    return {
+      id: p.id,
+      name: p.name,
+      handle: p.handle,
+      views: band?.point ?? null,
+      viewsLo: band?.lo ?? null,
+      viewsHi: band?.hi ?? null,
+      likes: likeBand?.point ?? null,
+      likesLo: likeBand?.lo ?? null,
+      likesHi: likeBand?.hi ?? null,
+      comments: ok ? (a!.comments ?? 0) : null,
+      saves: saveBand?.point ?? null,
+      savesLo: saveBand?.lo ?? null,
+      savesHi: saveBand?.hi ?? null,
+      avgCount: ok ? a!.count : 0,
+      viewsEstimated: a?.viewsEstimated,
+    };
+  });
+  rows.sort(
+    (a, b) =>
+      (b.views ?? -1) - (a.views ?? -1) || a.name.localeCompare(b.name, "ko"),
+  );
+  return {
+    pendingCount: pending.length,
+    views: rows.reduce((s, r) => s + (r.views || 0), 0),
+    viewsLo: rows.reduce((s, r) => s + (r.viewsLo || 0), 0),
+    viewsHi: rows.reduce((s, r) => s + (r.viewsHi || 0), 0),
+    viewsAccuracyPct: RIDGE_ACCURACY_PCT.views,
+    likes: rows.reduce((s, r) => s + (r.likes || 0), 0),
+    likesLo: rows.reduce((s, r) => s + (r.likesLo || 0), 0),
+    likesHi: rows.reduce((s, r) => s + (r.likesHi || 0), 0),
+    likesAccuracyPct: RIDGE_ACCURACY_PCT.likes,
+    comments: rows.reduce((s, r) => s + (r.comments || 0), 0),
+    saves: rows.reduce((s, r) => s + (r.saves || 0), 0),
+    savesLo: rows.reduce((s, r) => s + (r.savesLo || 0), 0),
+    savesHi: rows.reduce((s, r) => s + (r.savesHi || 0), 0),
+    savesAccuracyPct: RIDGE_ACCURACY_PCT.saves,
+    rows,
+  };
+}
 
 export function ymdKstNow() {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
@@ -451,31 +602,6 @@ export function wowPct(current: number, previous: number) {
   if (previous <= 0) return null;
   return Math.round(((current - previous) / previous) * 100);
 }
-
-/** 홈 성과 보드용 — insights links 최소 형태 */
-export type HomeInsightLink = {
-  id: string;
-  link_url: string | null;
-  published_at: string | null;
-  views: number | null;
-  likes: number | null;
-  saves?: number | null;
-  allocations: {
-    influencer_id?: string;
-    influencers: {
-      id: string;
-      name: string;
-      instagram_handle_normalized?: string;
-      instagram_handle?: string;
-      region?: string | null;
-    } | null;
-    products: { id: string; name: string } | null;
-    allocation_pricing?:
-      | { display_price: number | null }
-      | { display_price: number | null }[]
-      | null;
-  } | null;
-};
 
 export type WeekPoint = {
   key: string;
@@ -1032,6 +1158,24 @@ function assertRankBestPosts() {
   }
   if (weekOfMonth(1) !== 1 || weekOfMonth(8) !== 2 || weekOfMonth(31) !== 5) {
     throw new Error("weekOfMonth failed");
+  }
+  const fc = buildHomeForecast(
+    [
+      { id: "a", name: "A", handle: "@a" },
+      { id: "b", name: "B", handle: "@b" },
+    ],
+    { a: { views: 100, likes: 10, comments: 1, saves: 2, count: 3 } },
+  );
+  if (
+    fc.pendingCount !== 2 ||
+    fc.views !== 788 ||
+    fc.viewsLo >= fc.viewsHi ||
+    fc.likes !== 9 ||
+    fc.saves !== 1 ||
+    fc.rows[0]!.id !== "a" ||
+    fc.rows[1]!.views !== null
+  ) {
+    throw new Error("buildHomeForecast failed");
   }
   const weeks = buildWeekSeries(
     [

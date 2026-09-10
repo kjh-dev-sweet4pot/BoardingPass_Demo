@@ -15,12 +15,14 @@ export function NavHoverDropdown<T extends string>({
   active,
   selectedId,
   onSelect,
+  gnbUnderline = false,
 }: {
   label: string;
   items: NavDropdownItem<T>[];
   active: boolean;
   selectedId?: T;
   onSelect: (id: T) => void;
+  gnbUnderline?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -76,7 +78,7 @@ export function NavHoverDropdown<T extends string>({
           onSelect(items[0].id);
           hideNow();
         }}
-        className={`inline-flex items-center gap-1 text-[15px] tracking-[-0.02em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
+        className={`${gnbUnderline ? "com-nav-tab " : ""}inline-flex items-center gap-1 text-[15px] tracking-[-0.02em] transition-colors duration-300 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
           active
             ? "font-bold text-[var(--ink)]"
             : "font-semibold text-[#cabda7] hover:text-[var(--ink)]"
@@ -101,10 +103,10 @@ export function NavHoverDropdown<T extends string>({
         </svg>
       </button>
       {open ? (
-        <div className="absolute left-1/2 top-full z-30 -translate-x-1/2 pt-2.5">
+        <div className="absolute left-1/2 top-full z-50 -translate-x-1/2 pt-2.5">
           <ul
             role="menu"
-            className="min-w-[196px] overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--surface)] p-1 shadow-[0_10px_32px_rgba(91,65,48,0.12)]"
+            className="com-flyout min-w-[196px] overflow-hidden rounded-[8px] border border-[var(--line)] bg-[var(--surface)] p-1 shadow-[0_10px_32px_rgba(91,65,48,0.12)]"
           >
             {items.map((item) => {
               const selected = selectedId === item.id;
@@ -167,7 +169,7 @@ export function NavSubSegment<T extends string>({
           role="tab"
           aria-selected={view === item.id}
           onClick={() => onViewChange(item.id)}
-          className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-semibold ${
+          className={`flex-1 rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors duration-300 ease-out ${
             view === item.id
               ? "bg-[var(--accent)] !text-white"
               : "text-[var(--muted)]"

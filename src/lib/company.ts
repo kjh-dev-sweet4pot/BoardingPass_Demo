@@ -38,6 +38,13 @@ export function isMissingCompanyCrmColumn(message: string) {
   return COMPANY_CRM_COLUMNS.some((c) => isMissingColumnError(message, c));
 }
 
+/** SELECT 재시도용. write(update/insert)와 묶지 말 것. */
+export function companySelectAfterColumnError(message: string) {
+  if (isMissingCompanyCrmColumn(message)) return COMPANY_SELECT_MAIL;
+  if (isMissingColumnError(message, "contact_email")) return COMPANY_SELECT_BASE;
+  return null;
+}
+
 export function parseCompanyDate(raw: unknown): string | null | typeof Number.NaN {
   if (raw == null) return null;
   const s = String(raw).trim();
@@ -176,6 +183,22 @@ export function matchCompany(
 }
 
 if (process.env.RUN_COMPANY_CRM_SELF_CHECK === "1") {
+  if (
+    companySelectAfterColumnError("column first_meet_on of relation companies does not exist") !==
+    COMPANY_SELECT_MAIL
+  ) {
+    throw new Error("companySelectAfterColumnError CRM");
+  }
+  if (
+    companySelectAfterColumnError(
+      "Could not find the 'contact_email' column of 'companies' in the schema cache",
+    ) !== COMPANY_SELECT_BASE
+  ) {
+    throw new Error("companySelectAfterColumnError email");
+  }
+  if (companySelectAfterColumnError("duplicate key value violates unique constraint") !== null) {
+    throw new Error("companySelectAfterColumnError should ignore non-column errors");
+  }
   if (parseCompanyDate("2026-09-03") !== "2026-09-03") {
     throw new Error("parseCompanyDate failed");
   }

@@ -320,7 +320,7 @@ export function CompanyCreatorPool({
 
         <div className="min-h-0 flex-1 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3">
           {poolLoading ? (
-            <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
+            <p className="com-loading px-4 py-10 text-center text-sm text-[var(--muted)]">
               크리에이터를 불러오는 중…
             </p>
           ) : shown.length === 0 ? (
@@ -330,7 +330,7 @@ export function CompanyCreatorPool({
                 : "조건에 맞는 크리에이터가 없습니다."}
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="com-stagger grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {shown.map((row) => (
                 <CreatorCard
                   key={row.id}
@@ -383,7 +383,7 @@ function CreatorCard({
   const countryBadge = regionBadgeText(row.region);
   return (
     <article
-      className={`flex cursor-pointer flex-col overflow-hidden rounded-[6px] border bg-[var(--surface)] transition ${
+      className={`com-surface flex cursor-pointer flex-col overflow-hidden rounded-[6px] border bg-[var(--surface)] ${
         active
           ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/30"
           : "border-[var(--line)] hover:border-[var(--accent)]/40"
@@ -452,7 +452,7 @@ function CreatorCard({
         <p className="text-[10px] leading-4 text-[var(--muted)]">
           {row.avgPostCount
             ? row.avgFromProfile
-              ? `최근 게시 ${row.avgPostCount}건 평균`
+              ? `관련 게시 ${row.avgPostCount}건 평균`
               : `최근 발행 ${row.avgPostCount}건 평균`
             : row.metrics.views != null
               ? "성과 평균"
@@ -578,7 +578,7 @@ function CreatorDetail({
         {creator.avgPostCount ? (
           <p className="sm:col-span-2 text-[11px] text-[var(--muted)]">
             {creator.avgFromProfile
-              ? `최근 게시 ${creator.avgPostCount}건 기준`
+              ? `관련 게시 ${creator.avgPostCount}건 기준`
               : `최근 발행 ${creator.avgPostCount}건 기준`}
           </p>
         ) : null}

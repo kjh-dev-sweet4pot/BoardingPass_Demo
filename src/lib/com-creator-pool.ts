@@ -71,37 +71,48 @@ function isPublishedLink(l: PoolLinkRow) {
   return l.status === "approved";
 }
 
-export function averageRecentPosts(links: PoolLinkRow[], take = 3) {
-  const ranked = links
-    .filter((l) => isPublishedLink(l) && (l.url || l.publish_url))
-    .map((l) => {
-      const href = (l.publish_url || l.url || "").trim();
-      const platform = resolveCreatorPlatform(href, l.platform);
-      const likes = num(l.likes) ?? 0;
-      const comments = num(l.comments) ?? 0;
-      const saves = num(l.saves) ?? 0;
-      const views =
-        platform === "xiaohongshu"
-          ? estimateXiaohongshuViews({
-              views: num(l.views),
-              likes,
-              comments,
-              saves,
-            })
-          : num(l.views) ?? 0;
-      return {
-        href,
-        platform,
-        at: (l.submitted_at || "").slice(0, 19),
-        views,
-        likes,
-        comments,
-        saves,
-        estimated: platform === "xiaohongshu",
-      };
-    })
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .slice(0, take);
+export function skipNewestThenTake<T>(
+  newestFirst: T[],
+  take = 3,
+  skip = 3,
+) {
+  return newestFirst.slice(skip, skip + take);
+}
+
+export function averageRecentPosts(links: PoolLinkRow[], take = 3, skip = 3) {
+  const ranked = skipNewestThenTake(
+    links
+      .filter((l) => isPublishedLink(l) && (l.url || l.publish_url))
+      .map((l) => {
+        const href = (l.publish_url || l.url || "").trim();
+        const platform = resolveCreatorPlatform(href, l.platform);
+        const likes = num(l.likes) ?? 0;
+        const comments = num(l.comments) ?? 0;
+        const saves = num(l.saves) ?? 0;
+        const views =
+          platform === "xiaohongshu"
+            ? estimateXiaohongshuViews({
+                views: num(l.views),
+                likes,
+                comments,
+                saves,
+              })
+            : num(l.views) ?? 0;
+        return {
+          href,
+          platform,
+          at: (l.submitted_at || "").slice(0, 19),
+          views,
+          likes,
+          comments,
+          saves,
+          estimated: platform === "xiaohongshu",
+        };
+      })
+      .sort((a, b) => b.at.localeCompare(a.at)),
+    take,
+    skip,
+  );
 
   const mean = (pick: (p: (typeof ranked)[number]) => number) => {
     if (!ranked.length) return null;
@@ -190,6 +201,9 @@ export function poolCreatorFromInfluencer(
 if (process.env.RUN_COM_CREATOR_POOL_SELF_CHECK === "1") {
   const avg = averageRecentPosts(
     [
+      { url: "https://x.com/f", submitted_at: "2026-09-06", views: 1, likes: 1, comments: 1, status: "approved", content_status: "발행완료" },
+      { url: "https://x.com/e", submitted_at: "2026-09-05", views: 1, likes: 1, comments: 1, status: "approved", content_status: "발행완료" },
+      { url: "https://x.com/g", submitted_at: "2026-09-04", views: 1, likes: 1, comments: 1, status: "approved", content_status: "발행완료" },
       { url: "https://x.com/a", submitted_at: "2026-09-01", views: 100, likes: 10, comments: 1, status: "approved", content_status: "발행완료" },
       { url: "https://x.com/b", submitted_at: "2026-09-03", views: 300, likes: 30, comments: 3, status: "approved", content_status: "발행완료" },
       { url: "https://x.com/c", submitted_at: "2026-09-02", views: 200, likes: 20, comments: 2, status: "approved", content_status: "발행완료" },

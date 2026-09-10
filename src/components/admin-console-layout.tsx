@@ -136,6 +136,7 @@ export function AdminConsoleLayout({
       sidebarActions={sidebarActions}
       headerFooter={headerFooter}
     >
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       {error || message ? (
         <div className="shrink-0 px-4 pt-4 sm:px-7">
           <Notice error={error} message={message} />
@@ -218,6 +219,7 @@ export function AdminConsoleLayout({
           </div>
         </div>
       ) : null}
+      </div>
     </AdminConsoleShell>
   );
 }

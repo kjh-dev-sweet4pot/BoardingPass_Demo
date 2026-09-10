@@ -6,7 +6,7 @@ import { getStoreSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
-import { isBranchStoreName } from "@/lib/store-name";
+import { isBranchStoreName, uniqueBranchStores } from "@/lib/store-name";
 import { type Store } from "@/lib/types";
 
 const inputClass = `${fieldClass} h-auto w-full rounded-[6px] border-[#E8D5BE] px-5 py-4 text-sm text-[#3D1F0A] placeholder:text-[#C9AA88] focus:border-[#6B3B1F] focus:ring-2 focus:ring-[#6B3B1F]/10`;
@@ -35,8 +35,10 @@ export default async function PharLoginPage({
     .select("id, name")
     .order("name", { ascending: true });
 
-  const storeList = ((stores as Pick<Store, "id" | "name">[]) || []).filter((s) =>
-    isBranchStoreName(s.name),
+  const storeList = uniqueBranchStores(
+    ((stores as Pick<Store, "id" | "name">[]) || []).filter((s) =>
+      isBranchStoreName(s.name),
+    ),
   );
   const noticeError = params.error || error?.message;
 

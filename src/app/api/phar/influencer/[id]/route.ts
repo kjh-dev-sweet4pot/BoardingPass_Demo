@@ -4,6 +4,8 @@ import {
   supabaseConfigError,
 } from "@/lib/supabase/api-client";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
+import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
+import { branchStoreIds } from "@/lib/phar-store-allocations";
 import { getStoreSessionId, isAdminSession } from "@/lib/session";
 
 export async function GET(
@@ -34,7 +36,8 @@ export async function GET(
 
   // 지점 로그인: 해당 매장 배정만 / Admin: 전체
   if (!isAdmin && storeId) {
-    allocQuery = allocQuery.eq("store_id", storeId);
+    const ids = await branchStoreIds(supabase, storeId);
+    allocQuery = allocQuery.in("store_id", ids);
   }
 
   const [
@@ -56,7 +59,7 @@ export async function GET(
     return NextResponse.json({ error: allocError.message }, { status: 500 });
   }
 
-  const rows = allocations || [];
+  const rows = collapseSharedVisitAllocations(allocations || []);
   if (rows.length === 0) {
     return NextResponse.json(
       {

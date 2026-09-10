@@ -364,7 +364,7 @@ if (process.env.RUN_IMPORT_DUP_SELF_CHECK === "1") {
     content_urls: ["https://x.com/a", "https://x.com/b"],
   });
   const fields = changes.map((c) => c.field).join(",");
-  if (fields !== "visit_date,store,content_url") {
+  if (fields !== "visit_date,content_url") {
     throw new Error(`importDupChanges fields failed: ${fields}`);
   }
   console.log("import-dup self-check ok");

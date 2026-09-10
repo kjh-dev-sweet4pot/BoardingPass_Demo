@@ -58,3 +58,6 @@ next-env.d.ts
 
 #sql files
 /scripts/sql/
+
+# CSV dumps (PII — do not commit)
+/exports/

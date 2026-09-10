@@ -3,6 +3,7 @@ import { InfAppHeader } from "@/components/inf-app-header";
 import { InfBottomNav } from "@/components/inf-bottom-nav";
 import { InfLoginClient } from "@/components/inf-login-client";
 import { InfServerMessage } from "@/components/inf-server-message";
+import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
 import { applyInfluencerStoreVisit } from "@/lib/inf-visit";
 import { type AllocationWithRelations, type Influencer } from "@/lib/types";
 import { getInfluencerSessionId } from "@/lib/session";
@@ -73,7 +74,9 @@ export default async function InfPage({
   }
 
   const influencer = inf as Influencer;
-  const allocations = (rows as unknown as AllocationWithRelations[]) || [];
+  const allocations = collapseSharedVisitAllocations(
+    (rows as unknown as AllocationWithRelations[]) || [],
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--surface)]">

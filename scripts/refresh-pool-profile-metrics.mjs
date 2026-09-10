@@ -1,5 +1,5 @@
 /**
- * 캠페인 발행이 없는 배정 인플 → SNS 최근 3건 평균을 JSON에 저장.
+ * 캠페인 발행이 없는 배정 인플 → SNS 최신 3건을 건너뛴 다음 3건 평균을 JSON에 저장.
  *   node scripts/refresh-pool-profile-metrics.mjs
  *   node scripts/refresh-pool-profile-metrics.mjs --dry-run
  */
@@ -100,7 +100,7 @@ async function scrapeXhs(profileUrl) {
   const posts = [...(items[0]?.posts || [])].sort(
     (a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0),
   );
-  return posts.slice(0, 3).map((p) => {
+  return posts.slice(3, 6).map((p) => {
     const likes = asCount(p.liked_count);
     const comments = asCount(p.comments_count);
     const saves = asCount(p.collected_count);

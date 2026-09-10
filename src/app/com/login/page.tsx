@@ -13,7 +13,7 @@ export default async function CompanyLoginPage({
   const params = await searchParams;
 
   return (
-    <div className="owm-theme flex min-h-screen flex-col">
+    <div className="owm-theme com-login flex min-h-screen flex-col">
       <div className="flex flex-1 flex-col items-center justify-center px-5 sm:px-8">
         <div className="owm-login-logo mb-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}

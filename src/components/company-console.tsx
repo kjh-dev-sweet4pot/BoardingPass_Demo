@@ -279,6 +279,7 @@ export function CompanyConsole({
   const isDemo = isDemoCompany(company);
   const gate = useBudgetGate(company.id);
   const [view, setView] = useState<CompanyConsoleView>("home");
+  const [focusInfluencerId, setFocusInfluencerId] = useState<string | null>(null);
   // live: 배정은 진행현황·배정 탭 진입 시 지연 로드
   const [liveAllocations, setLiveAllocations] =
     useState<AllocationWithRelations[]>(initialAllocations);
@@ -311,7 +312,7 @@ export function CompanyConsole({
 
   useEffect(() => {
     if (isDemo) return;
-    if (view !== "publish" && view !== "alloc" && view !== "home") return;
+    if (view !== "publish" && view !== "alloc") return;
     if (loadedCompanyIdRef.current === company.id) return;
 
     let cancelled = false;
@@ -565,33 +566,57 @@ export function CompanyConsole({
     <CompanyConsoleShell
       companyName={company.name}
       view={view}
-      onViewChange={setView}
+      onViewChange={(next) => {
+        setFocusInfluencerId(null);
+        setView(next);
+      }}
       sidebarActions={sidebarActions}
       sidebarFooter={sidebarFooter}
       mobileActions={mobileActions}
     >
-      {view === "home" ? (
+      <div
+        className={
+          view === "home"
+            ? "com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden"
+            : "hidden"
+        }
+      >
         <CompanyHomeLanding
+          active={view === "home"}
           companyName={company.name}
-          companyId={company.id}
           onOpenPerformance={() => setView("content")}
-          onOpenPublish={() => setView("publish")}
+          onOpenPublish={(influencerId) => {
+            setFocusInfluencerId(influencerId ?? null);
+            setView("publish");
+          }}
           onOpenPool={() => setView("pool")}
         />
-      ) : view === "pool" ? (
+      </div>
+      <div
+        className={
+          view === "pool"
+            ? "com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden"
+            : "hidden"
+        }
+      >
         <CompanyCreatorPool
           companyId={company.id}
           companyName={company.name}
           loginId={company.login_id}
         />
-      ) : view === "publish" ? (
+      </div>
+      {view === "publish" ? (
+        <div className="com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden">
         <CompanyProgressTab
           companyId={company.id}
           initialAllocations={progressItems}
           live={!isDemo}
           loading={allocsLoading}
+          focusInfluencerId={focusInfluencerId}
         />
+        </div>
       ) : view === "contentLookup" ? (
+        <div className="com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden">
         <CompanyPerformanceLookupTab
           initialData={
             isDemo
@@ -604,12 +629,16 @@ export function CompanyConsole({
           onPeriodChange={setPeriod}
           onMetaChange={setPerformanceMeta}
         />
+        </div>
       ) : view === "budgetPerformance" ? (
+        <div className="com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden">
         <CompanyBudgetPerformanceTab
           companyId={company.id}
           onMetaChange={setPerformanceMeta}
         />
+        </div>
       ) : view === "content" ? (
+        <div className="com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden">
         <CompanyPerformanceTab
           companyId={company.id}
           initialData={
@@ -623,12 +652,13 @@ export function CompanyConsole({
           onPeriodChange={setPeriod}
           onMetaChange={setPerformanceMeta}
         />
-      ) : allocsLoading && !isDemo ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--muted)]">
+        </div>
+      ) : view === "home" || view === "pool" ? null : allocsLoading && !isDemo ? (
+        <div className="com-view-enter com-loading flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--muted)]">
           배정 불러오는 중…
         </div>
       ) : (
-      <div className="grid min-h-0 flex-1 gap-4 overflow-auto px-4 py-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.85fr)] lg:px-8 lg:py-6">
+      <div className="com-view-enter grid min-h-0 flex-1 gap-4 overflow-auto px-4 py-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.85fr)] lg:px-8 lg:py-6">
         <div className="flex min-h-0 flex-col gap-3">
       <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">
         배정 현황
@@ -714,7 +744,7 @@ export function CompanyConsole({
             type="button"
             aria-pressed={active}
             onClick={() => applyCounter(key)}
-            className={`rounded-[6px] border px-4 py-4 text-left transition ${
+            className={`com-surface rounded-[6px] border px-4 py-4 text-left ${
               active
                 ? "border-[var(--accent)] bg-[var(--surface)]"
                 : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--accent)]/40"
