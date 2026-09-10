@@ -320,7 +320,7 @@ export function CompanyCreatorPool({
 
         <div className="min-h-0 flex-1 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3">
           {poolLoading ? (
-            <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
+            <p className="com-loading px-4 py-10 text-center text-sm text-[var(--muted)]">
               크리에이터를 불러오는 중…
             </p>
           ) : shown.length === 0 ? (
@@ -330,7 +330,7 @@ export function CompanyCreatorPool({
                 : "조건에 맞는 크리에이터가 없습니다."}
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="com-stagger grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {shown.map((row) => (
                 <CreatorCard
                   key={row.id}
@@ -383,7 +383,7 @@ function CreatorCard({
   const countryBadge = regionBadgeText(row.region);
   return (
     <article
-      className={`flex cursor-pointer flex-col overflow-hidden rounded-[6px] border bg-[var(--surface)] transition ${
+      className={`com-surface flex cursor-pointer flex-col overflow-hidden rounded-[6px] border bg-[var(--surface)] ${
         active
           ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/30"
           : "border-[var(--line)] hover:border-[var(--accent)]/40"

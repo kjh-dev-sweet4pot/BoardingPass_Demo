@@ -225,28 +225,89 @@ button {
   50% { transform: translate(4%, -5%) scale(1.1); }
 }
 
+@keyframes owm-landing-veil {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes owm-landing-bg-in {
+  from { opacity: 0; transform: scale(1.06); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes owm-landing-logo {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 @keyframes owm-landing-fade-up {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+.owm-landing-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  background: #0f0703;
+  animation: owm-landing-veil 1.15s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.owm-landing-bg {
+  animation: owm-landing-bg-in 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.owm-landing-logo {
+  animation: owm-landing-logo 1s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
+}
+
+.owm-landing-rule {
+  animation: owm-landing-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.42s both;
+}
+
+.owm-landing-kicker {
+  animation: owm-landing-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.52s both;
+}
+
+.owm-landing-title {
+  animation: owm-landing-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.62s both;
+}
+
+.owm-landing-sub {
+  animation: owm-landing-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.72s both;
+}
+
 .owm-landing-header {
-  animation: owm-landing-fade-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+  animation: none;
 }
 
 .owm-landing-card {
   opacity: 0;
-  animation: owm-landing-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: owm-landing-fade-up 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .owm-landing-footer {
-  animation: owm-landing-fade-up 0.6s ease-out 1s both;
+  animation: owm-landing-fade-up 0.6s ease-out 1.15s both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .owm-landing-blob {
     animation: none !important;
   }
+  .owm-landing-veil,
+  .owm-landing-bg,
+  .owm-landing-logo,
+  .owm-landing-rule,
+  .owm-landing-kicker,
+  .owm-landing-title,
+  .owm-landing-sub,
   .owm-landing-header,
   .owm-landing-card,
   .owm-landing-footer {
@@ -292,6 +353,326 @@ button {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+}
+
+/* ── 회원사 콘솔 모션 (절제된 라이즈 · 셰인) ── */
+@keyframes com-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes com-header-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes com-sheen {
+  0% {
+    transform: translateX(-30%);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateX(130%);
+    opacity: 0;
+  }
+}
+
+@keyframes com-ambience {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes com-underline {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes com-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes com-flyout {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.com-flyout {
+  animation: com-flyout 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.com-console {
+  position: relative;
+  isolation: isolate;
+}
+
+.com-console::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(90% 55% at 8% -10%, rgb(197 137 87 / 0.11), transparent 52%),
+    radial-gradient(70% 40% at 100% 0%, rgb(86 67 58 / 0.05), transparent 48%);
+  animation: com-ambience 22s ease-in-out infinite;
+}
+
+.com-console > * {
+  position: relative;
+  z-index: 1;
+}
+
+.com-console-header {
+  position: relative;
+  z-index: 40;
+  animation: com-header-in 0.7s ease-out both;
+}
+
+.com-console-header::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgb(255 252 247 / 0.42) 50%,
+    transparent 62%
+  );
+  animation: com-sheen 1.8s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+}
+
+.com-nav-tab {
+  position: relative;
+}
+
+.com-nav-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -7px;
+  height: 1px;
+  background: var(--ink);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.com-nav-tab[aria-selected="true"]::after {
+  transform: scaleX(1);
+}
+
+.com-view-enter {
+  animation: com-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.com-stagger > * {
+  animation: com-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.com-stagger > *:nth-child(1) {
+  animation-delay: 0.04s;
+}
+.com-stagger > *:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.com-stagger > *:nth-child(3) {
+  animation-delay: 0.16s;
+}
+.com-stagger > *:nth-child(4) {
+  animation-delay: 0.22s;
+}
+.com-stagger > *:nth-child(n + 5) {
+  animation-delay: 0.28s;
+}
+
+@keyframes com-home-donut {
+  from {
+    stroke-dashoffset: var(--donut-c);
+  }
+  to {
+    stroke-dashoffset: var(--donut-off);
+  }
+}
+
+@keyframes com-home-bar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.com-home-enter > * {
+  animation: com-rise 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.com-home-enter > *:nth-child(1) {
+  animation-delay: 0.04s;
+}
+.com-home-enter > *:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.com-home-enter > *:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.com-home-enter > *:nth-child(4) {
+  animation-delay: 0.3s;
+}
+.com-home-enter > *:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+.com-home-enter .com-home-kpis > * {
+  animation: com-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.com-home-enter .com-home-kpis > *:nth-child(1) {
+  animation-delay: 0.16s;
+}
+.com-home-enter .com-home-kpis > *:nth-child(2) {
+  animation-delay: 0.24s;
+}
+.com-home-enter .com-home-kpis > *:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+.com-home-enter .com-home-boards > * {
+  animation: com-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.com-home-enter .com-home-boards > *:nth-child(1) {
+  animation-delay: 0.34s;
+}
+.com-home-enter .com-home-boards > *:nth-child(2) {
+  animation-delay: 0.42s;
+}
+.com-home-enter .com-home-boards > *:nth-child(3) {
+  animation-delay: 0.5s;
+}
+
+.com-home-enter .com-home-ranks > * {
+  animation: com-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.com-home-enter .com-home-ranks > *:nth-child(1) {
+  animation-delay: 0.46s;
+}
+.com-home-enter .com-home-ranks > *:nth-child(2) {
+  animation-delay: 0.54s;
+}
+.com-home-enter .com-home-ranks > *:nth-child(3) {
+  animation-delay: 0.62s;
+}
+.com-home-enter .com-home-ranks > *:nth-child(4) {
+  animation-delay: 0.7s;
+}
+
+.com-home-enter .com-home-donut-arc {
+  animation: com-home-donut 1s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
+}
+
+.com-home-enter .com-home-bar {
+  transform-origin: left center;
+  animation: com-home-bar 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.32s both;
+}
+
+.com-surface {
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.35s ease;
+}
+
+.com-surface:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 36px rgb(47 35 29 / 0.08);
+}
+
+.com-loading {
+  animation: com-pulse 1.6s ease-in-out infinite;
+}
+
+.com-login {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.com-login::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(80% 50% at 50% 0%, rgb(197 137 87 / 0.14), transparent 55%),
+    radial-gradient(60% 40% at 80% 100%, rgb(86 67 58 / 0.06), transparent 50%);
+  animation: com-ambience 18s ease-in-out infinite;
+}
+
+.com-login > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .com-console::before,
+  .com-console-header,
+  .com-console-header::after,
+  .com-view-enter,
+  .com-stagger > *,
+  .com-home-enter > *,
+  .com-home-enter .com-home-kpis > *,
+  .com-home-enter .com-home-boards > *,
+  .com-home-enter .com-home-ranks > *,
+  .com-home-enter .com-home-donut-arc,
+  .com-home-enter .com-home-bar,
+  .com-flyout,
+  .com-loading,
+  .com-login::before {
+    animation: none !important;
+  }
+  .com-nav-tab::after {
+    transition: none;
+  }
+  .com-surface,
+  .com-surface:hover {
+    transform: none;
+    box-shadow: none;
+    transition: none;
   }
 }
 

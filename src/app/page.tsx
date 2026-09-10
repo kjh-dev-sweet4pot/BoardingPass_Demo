@@ -95,24 +95,25 @@ export default function HomePage() {
       <div className="owm-landing-blob owm-landing-blob-b" aria-hidden />
       <div className="owm-landing-blob owm-landing-blob-c" aria-hidden />
       <div className="owm-landing-grain" aria-hidden />
+      <div className="owm-landing-veil" aria-hidden />
 
       <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col px-6 py-14 sm:max-w-lg">
         {/* 상단 로고 */}
-        <div className="flex flex-col items-center text-center owm-landing-header">
+        <div className="flex flex-col items-center text-center">
           <img
             src="/owm-logo.webp"
             alt="O.W.M 옵티마 웰니스 뮤지엄 약국"
-            className="w-24 drop-shadow-[0_2px_18px_rgba(0,0,0,0.35)]"
+            className="owm-landing-logo w-24 drop-shadow-[0_2px_18px_rgba(0,0,0,0.35)]"
             draggable={false}
           />
-          <div className="mt-6 h-px w-10 bg-[#E8C79A]/60" />
-          <p className="mt-6 text-[0.62rem] font-medium tracking-[0.32em] text-[#E8C79A]/90 uppercase">
+          <div className="owm-landing-rule mt-6 h-px w-10 bg-[#E8C79A]/60" />
+          <p className="owm-landing-kicker mt-6 text-[0.62rem] font-medium tracking-[0.32em] text-[#E8C79A]/90 uppercase">
             Boarding Pass
           </p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-wide text-[#F7E9D5]">
+          <h1 className="owm-landing-title mt-3 text-2xl font-semibold tracking-wide text-[#F7E9D5]">
             역할을 선택해주세요
           </h1>
-          <p className="mt-2 text-sm tracking-wide text-[#D7B98F]/80">
+          <p className="owm-landing-sub mt-2 text-sm tracking-wide text-[#D7B98F]/80">
             Optima Wellness Museum Pharmacy
           </p>
         </div>
@@ -123,7 +124,7 @@ export default function HomePage() {
             <Link
               key={portal.href}
               href={portal.href}
-              style={{ animationDelay: `${0.55 + i * 0.12}s` }}
+              style={{ animationDelay: `${0.82 + i * 0.12}s` }}
               className="owm-landing-card group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-white/12 bg-white/8 px-5 py-5 backdrop-blur-xl transition hover:border-[#E8C79A]/50 hover:bg-white/12 active:scale-[0.98]"
             >
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#E8C79A]/15 text-[#F0D5AA] transition group-hover:bg-[#E8C79A]/25 group-hover:text-[#FAE9CE]">

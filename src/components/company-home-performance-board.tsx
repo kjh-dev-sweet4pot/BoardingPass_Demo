@@ -427,7 +427,6 @@ function ForecastPanel({
         forecast && forecast.viewsHi > 0
           ? formatRange(forecast.viewsLo, forecast.viewsHi)
           : null,
-      accuracyPct: forecast?.viewsAccuracyPct,
       color: "#3b82f6",
     },
     {
@@ -436,7 +435,6 @@ function ForecastPanel({
         forecast && forecast.likesHi > 0
           ? formatRange(forecast.likesLo, forecast.likesHi)
           : null,
-      accuracyPct: forecast?.likesAccuracyPct,
       color: "#c2410c",
     },
     {
@@ -445,7 +443,6 @@ function ForecastPanel({
         forecast && forecast.savesHi > 0
           ? formatRange(forecast.savesLo, forecast.savesHi)
           : null,
-      accuracyPct: forecast?.savesAccuracyPct,
       color: "#0f766e",
     },
   ];
@@ -465,7 +462,7 @@ function ForecastPanel({
           <p className="mt-1.5 rounded-[6px] bg-white/80 px-3 py-2 text-[12px] leading-relaxed text-[#4a6580]">
             <span className="font-semibold text-[#1e3a5f]">근거 · </span>
             아직 발행하지 않은 배정 인원의 관련된 게시물 3건의 평균을 기반으로
-            추정합니다. 조회·좋아요·저장은 Ridge 점추정 ±10% 구간입니다.
+            추정합니다.
             {withAvg > 0 && withAvg < n
               ? ` 3건 평균이 있는 ${withAvg}명만 포함했습니다.`
               : null}
@@ -484,16 +481,11 @@ function ForecastPanel({
                   className={`${open ? "bp-forecast-cell" : ""} rounded-[8px] border border-[#c5d4e4] bg-white px-2.5 py-2.5 sm:px-3`}
                   style={{ animationDelay: `${80 + i * 70}ms` }}
                 >
-                  <p className="text-[10.5px] font-semibold tracking-wide text-[#6b849c]">
-                    예측 {c.label}
-                    {c.range ? (
-                      <span className="ml-1 font-medium text-[#6b849c]">±10%</span>
-                    ) : null}
-                    {c.accuracyPct != null ? (
-                      <span className="ml-1 font-medium text-[#6b849c]">
-                        정확도 {c.accuracyPct}%
-                      </span>
-                    ) : null}
+                  <p className="flex flex-wrap items-center gap-1 text-[10.5px] font-extrabold tracking-wide text-[#1e3a5f]">
+                    {c.label}
+                    <span className="inline-flex items-center rounded-[4px] border-2 border-[#1e3a5f] px-1 py-px text-[10px] font-extrabold leading-none text-[#1e3a5f]">
+                      예측치
+                    </span>
                   </p>
                   <p
                     className="mt-0.5 text-[18px] font-extrabold leading-tight tabular-nums sm:text-[22px]"
@@ -510,9 +502,9 @@ function ForecastPanel({
           </p>
           <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_5.75rem_5.75rem_5.75rem] gap-x-2 px-0.5 text-[10.5px] text-[#6b849c]">
             <span>이름</span>
-            <span className="text-right">조회 ±10%</span>
-            <span className="text-right">좋아요 ±10%</span>
-            <span className="text-right">저장 ±10%</span>
+            <span className="text-right font-extrabold text-[#1e3a5f]">조회</span>
+            <span className="text-right font-extrabold text-[#1e3a5f]">좋아요</span>
+            <span className="text-right font-extrabold text-[#1e3a5f]">저장</span>
           </div>
           <ul className="mt-1 max-h-[240px] list-none overflow-auto p-0">
             {rows.map((r) => (
@@ -754,7 +746,7 @@ export function CompanyHomePerformanceBoard({
       </div>
 
       {loading ? (
-        <p className="text-sm text-[var(--muted)]">성과 불러오는 중…</p>
+        <p className="com-loading text-sm text-[var(--muted)]">성과 불러오는 중…</p>
       ) : null}
       {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
 

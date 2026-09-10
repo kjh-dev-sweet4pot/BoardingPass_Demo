@@ -11,6 +11,7 @@ import {
   type ReactNode,
   type Ref,
   type TransitionEvent,
+  type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
 import { CreatorPhoto } from "@/components/creator-photo";
@@ -154,6 +155,7 @@ function DonutCell({
             strokeWidth={sw}
           />
           <circle
+            className="com-home-donut-arc"
             cx={size / 2}
             cy={size / 2}
             r={r}
@@ -163,6 +165,12 @@ function DonutCell({
             strokeLinecap="round"
             strokeDasharray={c.toFixed(2)}
             strokeDashoffset={off.toFixed(2)}
+            style={
+              {
+                "--donut-c": c.toFixed(2),
+                "--donut-off": off.toFixed(2),
+              } as CSSProperties
+            }
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
           />
         </svg>
@@ -179,7 +187,7 @@ function DonutCell({
     </>
   );
   const cls =
-    "flex h-[88px] w-full items-center gap-3 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2";
+    "flex h-[88px] w-full items-center gap-3 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 com-surface";
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={`${cls} cursor-pointer`}>
@@ -216,7 +224,7 @@ function StripPlain({
     </>
   );
   const cls =
-    "flex h-[88px] w-full items-center gap-3 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2";
+    "flex h-[88px] w-full items-center gap-3 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 com-surface";
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={`${cls} cursor-pointer`}>
@@ -310,7 +318,7 @@ function ViewsCell({
     </>
   );
   const cls =
-    "flex h-[88px] w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2";
+    "flex h-[88px] w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 com-surface";
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={`${cls} cursor-pointer`}>
@@ -609,7 +617,7 @@ function RankCard({
   return (
     <section
       ref={cardRef}
-      className={`scroll-mt-4 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-4 transition-colors duration-150 ${
+      className={`com-surface scroll-mt-4 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-4 transition-colors duration-150 ${
         flash ? "!bg-[#FBF3E4]" : ""
       }`}
     >
@@ -983,6 +991,8 @@ export function CompanyHomeLanding({
   const [flashMonthly, setFlashMonthly] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const monthlyRef = useRef<HTMLElement | null>(null);
+  const homeEnterRef = useRef<HTMLDivElement | null>(null);
+  const homeEnterReady = useRef(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -1035,9 +1045,21 @@ export function CompanyHomeLanding({
     return () => window.clearInterval(id);
   }, [active]);
 
-  const week = data?.best.week || [];
+  useEffect(() => {
+    if (!active || !data || reduceMotion) return;
+    const el = homeEnterRef.current;
+    if (!el) return;
+    if (!homeEnterReady.current) {
+      homeEnterReady.current = true;
+      return;
+    }
+    el.classList.remove("com-home-enter");
+    void el.offsetWidth;
+    el.classList.add("com-home-enter");
+  }, [active, Boolean(data), reduceMotion]);
   const insightLinks = data?.links || [];
   const boardLoading = loading && !data;
+  const week = data?.best.week || [];
   const month = data?.best.month || [];
   const tickerItems = reduceMotion ? month.slice(0, 3) : month;
   const tickerLoop = !reduceMotion && month.length > 0;
@@ -1060,7 +1082,7 @@ export function CompanyHomeLanding({
     <div className="min-h-0 flex-1 overflow-auto">
       <div className="px-0 pb-8 pt-0 sm:px-0">
         {loading && !data ? (
-          <p className="px-5 py-5 text-sm text-[var(--muted)] sm:px-8">
+          <p className="com-loading px-5 py-5 text-sm text-[var(--muted)] sm:px-8">
             불러오는 중…
           </p>
         ) : null}
@@ -1071,11 +1093,11 @@ export function CompanyHomeLanding({
         ) : null}
 
         {data ? (
-          <>
+          <div ref={homeEnterRef} className="com-home-enter">
             <p className="px-5 pt-3 text-[11.5px] text-[var(--muted)] sm:px-8">
               {companyName} · {data.asOf} 조회 시점 기준
             </p>
-            <div className="mt-3 grid grid-cols-1 gap-3 px-5 sm:grid-cols-2 sm:px-8 xl:grid-cols-3">
+            <div className="com-home-kpis mt-3 grid grid-cols-1 gap-3 px-5 sm:grid-cols-2 sm:px-8 xl:grid-cols-3">
               <KpiHoverTip
                 title="콘텐츠 발행"
                 rows={[
@@ -1141,7 +1163,7 @@ export function CompanyHomeLanding({
                   extra={
                     <div className="h-[5px] overflow-hidden rounded-full bg-[#EDE7DC]">
                       <span
-                        className="block h-full bg-[#2F7D5A]"
+                        className="com-home-bar block h-full bg-[#2F7D5A]"
                         style={{ width: `${infBar}%` }}
                       />
                     </div>
@@ -1221,7 +1243,7 @@ export function CompanyHomeLanding({
               </div>
             </div>
 
-            <div className="flex flex-col gap-5 border-b border-[var(--line)] px-5 py-5 sm:px-8 xl:flex-row xl:items-start">
+            <div className="com-home-boards flex flex-col gap-5 border-b border-[var(--line)] px-5 py-5 sm:px-8 xl:flex-row xl:items-start">
               <div className="min-w-0 flex-1">
                 <CompanyHomePerformanceBoard
                   links={insightLinks}
@@ -1245,7 +1267,7 @@ export function CompanyHomeLanding({
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 px-5 py-5 sm:px-8 md:grid-cols-2 xl:grid-cols-4">
+            <div className="com-home-ranks grid grid-cols-1 gap-4 px-5 py-5 sm:px-8 md:grid-cols-2 xl:grid-cols-4">
               <EfficiencyPlaceholder />
               <RankCard
                 title="주간 랭킹 TOP 10"
@@ -1282,7 +1304,7 @@ export function CompanyHomeLanding({
                 ))}
               />
             </div>
-          </>
+          </div>
         ) : null}
       </div>
     </div>

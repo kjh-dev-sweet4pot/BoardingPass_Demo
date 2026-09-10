@@ -577,7 +577,7 @@ export function CompanyConsole({
       <div
         className={
           view === "home"
-            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+            ? "com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden"
             : "hidden"
         }
       >
@@ -595,7 +595,7 @@ export function CompanyConsole({
       <div
         className={
           view === "pool"
-            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+            ? "com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden"
             : "hidden"
         }
       >
@@ -606,6 +606,7 @@ export function CompanyConsole({
         />
       </div>
       {view === "publish" ? (
+        <div className="com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden">
         <CompanyProgressTab
           companyId={company.id}
           initialAllocations={progressItems}
@@ -613,7 +614,9 @@ export function CompanyConsole({
           loading={allocsLoading}
           focusInfluencerId={focusInfluencerId}
         />
+        </div>
       ) : view === "contentLookup" ? (
+        <div className="com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden">
         <CompanyPerformanceLookupTab
           initialData={
             isDemo
@@ -626,12 +629,16 @@ export function CompanyConsole({
           onPeriodChange={setPeriod}
           onMetaChange={setPerformanceMeta}
         />
+        </div>
       ) : view === "budgetPerformance" ? (
+        <div className="com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden">
         <CompanyBudgetPerformanceTab
           companyId={company.id}
           onMetaChange={setPerformanceMeta}
         />
+        </div>
       ) : view === "content" ? (
+        <div className="com-view-enter flex min-h-0 flex-1 flex-col overflow-hidden">
         <CompanyPerformanceTab
           companyId={company.id}
           initialData={
@@ -645,12 +652,13 @@ export function CompanyConsole({
           onPeriodChange={setPeriod}
           onMetaChange={setPerformanceMeta}
         />
+        </div>
       ) : view === "home" || view === "pool" ? null : allocsLoading && !isDemo ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--muted)]">
+        <div className="com-view-enter com-loading flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--muted)]">
           배정 불러오는 중…
         </div>
       ) : (
-      <div className="grid min-h-0 flex-1 gap-4 overflow-auto px-4 py-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.85fr)] lg:px-8 lg:py-6">
+      <div className="com-view-enter grid min-h-0 flex-1 gap-4 overflow-auto px-4 py-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.85fr)] lg:px-8 lg:py-6">
         <div className="flex min-h-0 flex-col gap-3">
       <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">
         배정 현황
@@ -736,7 +744,7 @@ export function CompanyConsole({
             type="button"
             aria-pressed={active}
             onClick={() => applyCounter(key)}
-            className={`rounded-[6px] border px-4 py-4 text-left transition ${
+            className={`com-surface rounded-[6px] border px-4 py-4 text-left ${
               active
                 ? "border-[var(--accent)] bg-[var(--surface)]"
                 : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--accent)]/40"

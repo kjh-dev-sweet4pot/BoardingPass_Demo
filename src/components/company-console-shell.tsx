@@ -68,7 +68,7 @@ export function CompanyConsoleShell({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="com-console flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-2.5 lg:hidden">
         <button
           type="button"
@@ -102,7 +102,7 @@ export function CompanyConsoleShell({
         </div>
       ) : null}
 
-      <header className="hidden shrink-0 items-center gap-6 border-b border-[var(--line)] bg-[var(--surface)] px-8 py-3.5 lg:flex">
+      <header className="com-console-header hidden shrink-0 items-center gap-6 border-b border-[var(--line)] bg-[var(--surface)] px-8 py-3.5 lg:flex">
         <button
           type="button"
           onClick={() => onViewChange("home")}
@@ -127,7 +127,7 @@ export function CompanyConsoleShell({
         </button>
 
         <nav
-          className="flex min-w-0 flex-1 items-center justify-start gap-8"
+          className="relative z-10 flex min-w-0 flex-1 items-center justify-start gap-8 overflow-visible"
           role="tablist"
         >
           {MAIN_TABS.map((tab) => {
@@ -139,7 +139,7 @@ export function CompanyConsoleShell({
                 role="tab"
                 aria-selected={active}
                 onClick={() => onViewChange(tab.id)}
-                className={`text-[15px] tracking-[-0.02em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
+                className={`com-nav-tab text-[15px] tracking-[-0.02em] transition-colors duration-300 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
                   active
                     ? "font-bold text-[var(--ink)]"
                     : "font-semibold text-[#cabda7] hover:text-[var(--ink)]"
@@ -156,6 +156,7 @@ export function CompanyConsoleShell({
             active={isPerformanceView(view)}
             selectedId={isPerformanceView(view) ? view : undefined}
             onSelect={onViewChange}
+            gnbUnderline
           />
         </nav>
 
@@ -193,7 +194,7 @@ export function CompanyConsoleShell({
                 aria-label={tab.full}
                 aria-selected={active}
                 onClick={() => onViewChange(tab.id)}
-                className={`flex min-h-12 flex-col items-center justify-center px-1 text-[11px] font-semibold ${
+                className={`flex min-h-12 flex-col items-center justify-center px-1 text-[11px] font-semibold transition-colors duration-300 ease-out ${
                   active ? "text-[var(--accent)]" : "text-[var(--muted)]"
                 }`}
               >
