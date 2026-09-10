@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createApiClientIfConfigured } from "@/lib/supabase/api-client";
 import { getInfluencerSessionId } from "@/lib/session";
-import { applyInfluencerStoreVisit } from "@/lib/inf-visit";
+import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 /**
@@ -61,7 +61,7 @@ export async function POST() {
 
     return NextResponse.json({
       influencer: infResult.data,
-      allocations: allocResult.data || [],
+      allocations: collapseSharedVisitAllocations(allocResult.data || []),
     });
   } catch (err) {
     const message =

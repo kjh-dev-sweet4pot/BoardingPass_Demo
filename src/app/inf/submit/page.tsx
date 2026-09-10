@@ -7,7 +7,7 @@ import { getInfluencerSessionId } from "@/lib/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
-import { type AllocationWithRelations } from "@/lib/types";
+import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
 
 export default async function InfSubmitPage() {
   const influencerId = await getInfluencerSessionId();
@@ -42,7 +42,9 @@ export default async function InfSubmitPage() {
           <p className="text-sm text-red-400">{error.message}</p>
         ) : (
           <InfSubmitClient
-            initialAllocations={(rows as unknown as AllocationWithRelations[]) || []}
+            initialAllocations={collapseSharedVisitAllocations(
+              (rows as unknown as AllocationWithRelations[]) || [],
+            )}
           />
         )}
       </main>

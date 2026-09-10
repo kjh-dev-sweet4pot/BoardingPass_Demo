@@ -7,7 +7,7 @@ import {
 } from "@/lib/collect-link-thumbnail";
 import { getInfluencerSessionId } from "@/lib/session";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
-import { detectPlatform, validateCreatorUrl } from "@/lib/creator-link";
+import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
 
 const LINKS_ON_ALLOCATION = `creator_links(${CREATOR_LINK_PUBLIC_COLUMNS})`;
 
@@ -30,7 +30,9 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ allocations: allocations || [] });
+  return NextResponse.json({
+    allocations: collapseSharedVisitAllocations(allocations || []),
+  });
 }
 
 export async function POST(request: Request) {
