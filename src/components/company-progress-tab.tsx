@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
 import { StateBadge, type StateBadgeValue } from "@/components/state-badge";
@@ -245,18 +245,31 @@ function PublishedLinkChip({ link }: { link: ProgressLink }) {
 function KanbanCard({
   card,
   onClick,
+  flash,
+  pin,
 }: {
   card: ProgressKanbanCard;
   onClick: () => void;
+  flash?: boolean;
+  pin?: boolean;
 }) {
+  const ref = useRef<HTMLButtonElement>(null);
   const ratio =
     card.targetCount > 0 ? Math.min(1, card.publishedCount / card.targetCount) : 0;
 
+  useEffect(() => {
+    if (!pin) return;
+    ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [pin]);
+
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onClick}
-      className="flex w-full flex-col gap-1.5 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-2.5 text-left transition hover:bg-[var(--surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
+      className={`flex w-full flex-col gap-1.5 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-2.5 text-left transition hover:bg-[var(--surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
+        flash ? "bp-kanban-flash" : ""
+      }`}
     >
       <div className="flex items-center gap-2">
         <KanbanCreatorPhoto card={card} />
@@ -525,17 +538,20 @@ export function CompanyProgressTab({
   initialAllocations = [],
   live = false,
   loading = false,
+  focusInfluencerId = null,
 }: {
   companyId: string;
   initialAllocations?: AllocationWithRelations[];
   live?: boolean;
   loading?: boolean;
+  focusInfluencerId?: string | null;
 }) {
   const [productFilter, setProductFilter] = useState("");
   const [searchQ, setSearchQ] = useState("");
   const [selected, setSelected] = useState<ProgressKanbanCard | null>(null);
   const [allocations, setAllocations] = useState(initialAllocations);
   const [refreshing, setRefreshing] = useState(false);
+  const [flashId, setFlashId] = useState<string | null>(null);
   const [colLimit, setColLimit] = useState<
     Partial<Record<(typeof BOARD_COLUMNS)[number], number>>
   >({});
@@ -547,6 +563,12 @@ export function CompanyProgressTab({
   useEffect(() => {
     setColLimit({});
   }, [productFilter, searchQ, allocations]);
+
+  useEffect(() => {
+    if (!focusInfluencerId) return;
+    setSearchQ("");
+    setProductFilter("");
+  }, [focusInfluencerId]);
 
   async function reload() {
     if (!live) return;
@@ -592,15 +614,38 @@ export function CompanyProgressTab({
       const list = map.get(boardColumn(card.status));
       if (list) list.push(card);
     }
-    for (const list of map.values()) {
+    for (const [col, list] of map) {
       list.sort((a, b) => {
-        const da = a.visitDates[0] || a.updatedAt;
-        const db = b.visitDates[0] || b.updatedAt;
-        return da.localeCompare(db) || a.name.localeCompare(b.name, "ko");
+        const latest = (c: ProgressKanbanCard) =>
+          c.visitDates[c.visitDates.length - 1] || c.updatedAt;
+        const earliest = (c: ProgressKanbanCard) => c.visitDates[0] || c.updatedAt;
+        const da = col === "발행완료" ? latest(a) : earliest(a);
+        const db = col === "발행완료" ? latest(b) : earliest(b);
+        const byDate =
+          col === "발행완료" ? db.localeCompare(da) : da.localeCompare(db);
+        return byDate || a.name.localeCompare(b.name, "ko");
       });
     }
     return map;
   }, [filteredCards]);
+
+  useEffect(() => {
+    if (!focusInfluencerId) return;
+    const hits = cards.filter((c) => c.influencerId === focusInfluencerId);
+    if (hits.length === 0) return;
+    setColLimit((s) => {
+      const next = { ...s };
+      for (const col of BOARD_COLUMNS) {
+        const list = grouped.get(col) ?? [];
+        const idx = list.findIndex((c) => c.influencerId === focusInfluencerId);
+        if (idx >= 0) next[col] = Math.max(s[col] ?? COL_PAGE, idx + 1);
+      }
+      return next;
+    });
+    setFlashId(focusInfluencerId);
+    const t = window.setTimeout(() => setFlashId(null), 3200);
+    return () => window.clearTimeout(t);
+  }, [focusInfluencerId, cards, grouped]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-4 lg:px-[26px] lg:py-5">
@@ -661,6 +706,9 @@ export function CompanyProgressTab({
               const limit = colLimit[col] ?? COL_PAGE;
               const shown = items.slice(0, limit);
               const rest = items.length - shown.length;
+              const pinId = flashId
+                ? shown.find((c) => c.influencerId === flashId)?.id
+                : null;
               return (
                 <section
                   key={col}
@@ -684,6 +732,8 @@ export function CompanyProgressTab({
                         <KanbanCard
                           key={`${card.status}-${card.influencerId}`}
                           card={card}
+                          flash={flashId === card.influencerId}
+                          pin={pinId === card.id}
                           onClick={() => setSelected(card)}
                         />
                       ))}

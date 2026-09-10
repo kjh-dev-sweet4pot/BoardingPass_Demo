@@ -279,6 +279,7 @@ export function CompanyConsole({
   const isDemo = isDemoCompany(company);
   const gate = useBudgetGate(company.id);
   const [view, setView] = useState<CompanyConsoleView>("home");
+  const [focusInfluencerId, setFocusInfluencerId] = useState<string | null>(null);
   // live: 배정은 진행현황·배정 탭 진입 시 지연 로드
   const [liveAllocations, setLiveAllocations] =
     useState<AllocationWithRelations[]>(initialAllocations);
@@ -565,7 +566,10 @@ export function CompanyConsole({
     <CompanyConsoleShell
       companyName={company.name}
       view={view}
-      onViewChange={setView}
+      onViewChange={(next) => {
+        setFocusInfluencerId(null);
+        setView(next);
+      }}
       sidebarActions={sidebarActions}
       sidebarFooter={sidebarFooter}
       mobileActions={mobileActions}
@@ -575,7 +579,10 @@ export function CompanyConsole({
           companyName={company.name}
           companyId={company.id}
           onOpenPerformance={() => setView("content")}
-          onOpenPublish={() => setView("publish")}
+          onOpenPublish={(influencerId) => {
+            setFocusInfluencerId(influencerId ?? null);
+            setView("publish");
+          }}
           onOpenPool={() => setView("pool")}
         />
       ) : view === "pool" ? (
@@ -590,6 +597,7 @@ export function CompanyConsole({
           initialAllocations={progressItems}
           live={!isDemo}
           loading={allocsLoading}
+          focusInfluencerId={focusInfluencerId}
         />
       ) : view === "contentLookup" ? (
         <CompanyPerformanceLookupTab

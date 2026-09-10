@@ -622,7 +622,7 @@ function NewsDetailPanel({
   item: CompanyHomeNewsItem;
   asOf: string;
   onOpenPerformance?: () => void;
-  onOpenProgress?: () => void;
+  onOpenProgress?: (influencerId?: string) => void;
 }) {
   const d = item.detail;
   if (d?.type !== "visit" && d?.type !== "publish") {
@@ -704,7 +704,7 @@ function NewsDetailPanel({
           type="button"
           className="inline-flex h-8 items-center justify-center rounded-[6px] bg-[var(--accent)] text-[12px] font-semibold text-white"
           onClick={() =>
-            visit ? onOpenProgress?.() : onOpenPerformance?.()
+            visit ? onOpenProgress?.(d.influencerId) : onOpenPerformance?.()
           }
         >
           {visit ? "진행 현황에서 보기" : "성과 바로가기"}
@@ -732,7 +732,7 @@ function NewsSidebar({
   insightLinks: HomeInsightLink[];
   insightsLoading: boolean;
   onOpenPerformance?: () => void;
-  onOpenProgress?: () => void;
+  onOpenProgress?: (influencerId?: string) => void;
 }) {
   const shown = pickNewsFeed(items);
   const groups = useMemo(() => groupByDay(shown, (i) => i.at), [shown]);
@@ -930,7 +930,7 @@ export function CompanyHomeLanding({
   companyName: string;
   companyId: string;
   onOpenPerformance?: () => void;
-  onOpenPublish?: () => void;
+  onOpenPublish?: (influencerId?: string) => void;
   onOpenPool?: () => void;
 }) {
   const [data, setData] = useState<CompanyHomePayload | null>(null);

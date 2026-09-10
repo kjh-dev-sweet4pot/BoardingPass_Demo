@@ -597,6 +597,30 @@ button {
   animation: bp-news-blip-text 1.4s steps(1, end) infinite;
 }
 
+@keyframes bp-kanban-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    background: var(--surface);
+  }
+  50% {
+    box-shadow: 0 0 0 2px var(--accent);
+    background: var(--accent-soft);
+  }
+}
+
+.bp-kanban-flash {
+  animation: bp-kanban-flash 0.7s ease-in-out 4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-kanban-flash {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--accent);
+    background: var(--accent-soft);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bp-ticker-track,
   .bp-news-dot,
