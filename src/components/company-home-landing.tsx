@@ -922,13 +922,11 @@ function NewsSidebar({
 
 export function CompanyHomeLanding({
   companyName,
-  companyId,
   onOpenPerformance,
   onOpenPublish,
   onOpenPool,
 }: {
   companyName: string;
-  companyId: string;
   onOpenPerformance?: () => void;
   onOpenPublish?: (influencerId?: string) => void;
   onOpenPool?: () => void;
@@ -936,9 +934,6 @@ export function CompanyHomeLanding({
   const [data, setData] = useState<CompanyHomePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [insightLinks, setInsightLinks] = useState<HomeInsightLink[]>([]);
-  const [insightsLoading, setInsightsLoading] = useState(true);
-  const [insightsError, setInsightsError] = useState<string | null>(null);
   const [flashMonthly, setFlashMonthly] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const monthlyRef = useRef<HTMLElement | null>(null);
@@ -982,38 +977,9 @@ export function CompanyHomeLanding({
     };
   }, []);
 
-  // ponytail: board + 도넛이 같은 소스 — 한 번만 fetch
-  useEffect(() => {
-    let cancelled = false;
-    setInsightsLoading(true);
-    fetch("/api/com/insights?days=180", { cache: "no-store" })
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error || "성과를 불러오지 못했습니다.");
-        if (!cancelled) {
-          setInsightLinks(
-            Array.isArray(body.links) ? (body.links as HomeInsightLink[]) : [],
-          );
-          setInsightsError(null);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setInsightLinks([]);
-          setInsightsError(
-            e instanceof Error ? e.message : "성과를 불러오지 못했습니다.",
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setInsightsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [companyId]);
-
   const week = data?.best.week || [];
+  const insightLinks = data?.links || [];
+  const boardLoading = loading && !data;
   const month = data?.best.month || [];
   const tickerItems = reduceMotion ? month.slice(0, 3) : month;
   const tickerLoop = !reduceMotion && month.length > 0;
@@ -1201,8 +1167,9 @@ export function CompanyHomeLanding({
               <div className="min-w-0 flex-1">
                 <CompanyHomePerformanceBoard
                   links={insightLinks}
-                  loading={insightsLoading}
-                  error={insightsError}
+                  loading={boardLoading}
+                  error={null}
+                  forecast={data.forecast}
                   onOpenMore={onOpenPerformance}
                 />
               </div>
@@ -1214,7 +1181,7 @@ export function CompanyHomeLanding({
                 items={data.news}
                 asOf={data.asOf}
                 insightLinks={insightLinks}
-                insightsLoading={insightsLoading}
+                insightsLoading={boardLoading}
                 onOpenPerformance={onOpenPerformance}
                 onOpenProgress={onOpenPublish}
               />

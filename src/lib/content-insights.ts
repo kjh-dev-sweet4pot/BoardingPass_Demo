@@ -231,11 +231,9 @@ export function marketLabel(market?: string | null) {
 }
 
 export function formatMetric(n: number) {
-  if (n >= 10000) {
-    const man = n / 10000;
-    return `${man >= 10 ? man.toFixed(0) : man.toFixed(1)}만`;
-  }
-  return n.toLocaleString("ko-KR");
+  const v = Math.round(Number(n) || 0);
+  if (v >= 10000) return `${Math.round(v / 10000)}만`;
+  return v.toLocaleString("ko-KR");
 }
 
 export function formatViews(n: number, estimated?: boolean) {

@@ -312,7 +312,7 @@ export function CompanyConsole({
 
   useEffect(() => {
     if (isDemo) return;
-    if (view !== "publish" && view !== "alloc" && view !== "home") return;
+    if (view !== "publish" && view !== "alloc") return;
     if (loadedCompanyIdRef.current === company.id) return;
 
     let cancelled = false;
@@ -577,7 +577,6 @@ export function CompanyConsole({
       {view === "home" ? (
         <CompanyHomeLanding
           companyName={company.name}
-          companyId={company.id}
           onOpenPerformance={() => setView("content")}
           onOpenPublish={(influencerId) => {
             setFocusInfluencerId(influencerId ?? null);

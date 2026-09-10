@@ -4,6 +4,7 @@ import { fetchInsights } from "@/app/api/com/insights/route";
 import { buildBudgetPerformanceForCompany } from "@/lib/company-budget-performance";
 import {
   buildDerivedNews,
+  buildHomeForecast,
   buildViewsCurvePoints,
   cumulativeViewsSeriesFromMetrics,
   rankBestPosts,
@@ -16,7 +17,10 @@ import {
   type CompanyHomeBestPost,
   type CompanyHomeInfluencerRow,
   type CompanyHomePayload,
+  type HomeForecastAvg,
+  type HomeInsightLink,
 } from "@/lib/company-home";
+import profileMetrics from "@/lib/data/pool-profile-metrics.json";
 import { getCompanySessionId } from "@/lib/session";
 import {
   createApiClientIfConfigured,
@@ -228,18 +232,15 @@ export async function GET() {
   weekSeries[6] = weekViewTotal;
   let weekWow: number | null = null;
   let weekCurve: { day: number; views: number }[] = [];
+  let homeLinks: HomeInsightLink[] = [];
   try {
     const insights = await fetchInsights(supabase, companyId, { days: 90 });
-    const insightLinks = (insights.links || []) as {
-      id: string;
-      views?: number | null;
-      published_at?: string | null;
-    }[];
-    const linkTotal = insightLinks.reduce(
+    homeLinks = (insights.links || []) as HomeInsightLink[];
+    const linkTotal = homeLinks.reduce(
       (s, l) => s + (Number(l.views) || 0),
       0,
     );
-    if (linkTotal > 0 || insightLinks.length > 0) {
+    if (linkTotal > 0 || homeLinks.length > 0) {
       weekViewTotal = linkTotal;
     }
     const metrics = (insights.metrics || []) as {
@@ -248,7 +249,7 @@ export async function GET() {
       views: number | null;
     }[];
     weekCurve = buildViewsCurvePoints(
-      insightLinks.map((l) => ({
+      homeLinks.map((l) => ({
         id: l.id,
         published_at: l.published_at ?? null,
       })),
@@ -318,6 +319,19 @@ export async function GET() {
     asOf,
   );
 
+  const publishedInf = new Set(posts.map((p) => p.influencerId));
+  for (const l of homeLinks) {
+    const id = l.allocations?.influencers?.id || l.allocations?.influencer_id;
+    if (id) publishedInf.add(id);
+  }
+  const avgById = profileMetrics as Record<string, HomeForecastAvg | undefined>;
+  const forecast = buildHomeForecast(
+    [...infRows.values()]
+      .filter((r) => !publishedInf.has(r.id))
+      .map((r) => ({ id: r.id, name: r.name, handle: r.handle })),
+    avgById,
+  );
+
   const payload: CompanyHomePayload = {
     asOf,
     budget,
@@ -343,6 +357,8 @@ export async function GET() {
     },
     news,
     visits,
+    links: homeLinks,
+    forecast,
   };
 
   return NextResponse.json(payload);
