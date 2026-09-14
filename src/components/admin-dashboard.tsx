@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { type Company } from "@/lib/types";
 
 type Queues = {
@@ -107,6 +108,7 @@ export function AdminDashboard({
   companies: Company[];
   onOpenQueue: (queue: AdminQueueKey) => void;
 }) {
+  const { showTest, hiddenCompanyIds } = useAdminTestVisibility();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState("");
@@ -118,6 +120,9 @@ export function AdminDashboard({
     setLoading(true);
     const qs = new URLSearchParams();
     if (companyId) qs.set("company_id", companyId);
+    else if (!showTest && hiddenCompanyIds.length) {
+      qs.set("exclude_company_ids", hiddenCompanyIds.join(","));
+    }
     if (from) qs.set("from", from);
     if (to) qs.set("to", to);
     fetch(`/api/admin/dashboard${qs.size ? `?${qs}` : ""}`)
@@ -127,7 +132,7 @@ export function AdminDashboard({
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [companyId, from, to]);
+  }, [companyId, from, to, showTest, hiddenCompanyIds]);
 
   const queues = data?.queues;
   const publishedCount = data?.publishedCount ?? 0;

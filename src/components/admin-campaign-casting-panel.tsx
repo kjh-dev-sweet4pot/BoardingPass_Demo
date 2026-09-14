@@ -9,6 +9,7 @@ import {
   secondaryBtnClass,
 } from "@/components/ui";
 import { InfluencerAvatar } from "@/components/influencer-avatar";
+import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import {
   type CastingStatus,
   type Company,
@@ -146,24 +147,34 @@ export function AdminCampaignCastingPanel({
     visit_date: "",
   });
 
+  const { includeCompany } = useAdminTestVisibility();
+  const listedCampaigns = useMemo(
+    () => campaigns.filter((c) => includeCompany({ id: c.company_id, name: c.companies?.name })),
+    [campaigns, includeCompany],
+  );
+  const listedCastings = useMemo(
+    () => castings.filter((c) => includeCompany({ id: c.company_id, name: c.companies?.name })),
+    [castings, includeCompany],
+  );
+
   const selectedCampaign = useMemo(
-    () => campaigns.find((c) => c.id === selectedCampaignId) ?? null,
-    [campaigns, selectedCampaignId],
+    () => listedCampaigns.find((c) => c.id === selectedCampaignId) ?? null,
+    [listedCampaigns, selectedCampaignId],
   );
 
   const selectedCasting = useMemo(
-    () => castings.find((c) => c.id === selectedCastingId) ?? null,
-    [castings, selectedCastingId],
+    () => listedCastings.find((c) => c.id === selectedCastingId) ?? null,
+    [listedCastings, selectedCastingId],
   );
 
   const campaignQ = campaignQuery.trim().toLowerCase();
   const visibleCampaigns = campaignQ
-    ? campaigns.filter((c) =>
+    ? listedCampaigns.filter((c) =>
         [c.name, c.companies?.name, c.products?.name, c.status]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(campaignQ)),
       )
-    : campaigns;
+    : listedCampaigns;
 
   useEffect(() => {
     setEditBudgetDraft(null);
@@ -370,7 +381,7 @@ export function AdminCampaignCastingPanel({
     });
   }
 
-  const activeCompanies = companies.filter((c) => c.is_active);
+  const activeCompanies = companies.filter((c) => c.is_active && includeCompany(c));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -709,7 +720,7 @@ export function AdminCampaignCastingPanel({
                   onChange={(e) => setSelectedCampaignId(e.target.value || null)}
                 >
                   <option value="">캠페인 전체</option>
-                  {campaigns.map((c) => (
+                  {listedCampaigns.map((c) => (
                     <option key={c.id} value={c.id}>
                       {(c.name || c.products?.name || "캠페인") +
                         ` · ${c.companies?.name ?? ""}`}
@@ -745,7 +756,7 @@ export function AdminCampaignCastingPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {castings.map((c) => (
+                  {listedCastings.map((c) => (
                     <tr
                       key={c.id}
                       onClick={() => setSelectedCastingId(c.id)}
@@ -806,7 +817,7 @@ export function AdminCampaignCastingPanel({
                       }}
                     >
                       <option value="">선택</option>
-                      {campaigns
+                      {listedCampaigns
                         .filter((c) => c.status !== "취소" && c.status !== "보류")
                         .map((c) => (
                           <option key={c.id} value={c.id}>

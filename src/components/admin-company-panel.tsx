@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
 import { COMPANY_CONTRACT_STAGES } from "@/lib/company";
 import { type Company } from "@/lib/types";
@@ -12,8 +13,10 @@ export function AdminCompanyPanel({
   companies: Company[];
   compact?: boolean;
 }) {
+  const { includeCompany } = useAdminTestVisibility();
   const [open, setOpen] = useState(false);
   const [list, setList] = useState(companies);
+  const shown = useMemo(() => list.filter(includeCompany), [list, includeCompany]);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [loginId, setLoginId] = useState("");
@@ -188,7 +191,7 @@ export function AdminCompanyPanel({
         >
           <h2 className="text-lg text-[var(--ink)]">회원사 관리</h2>
           <span className="text-xs font-medium text-[var(--muted)]">
-            {open ? "접기 ▲" : `${list.length}곳 ▼`}
+            {open ? "접기 ▲" : `${shown.length}곳 ▼`}
           </span>
         </button>
       ) : null}
@@ -198,10 +201,10 @@ export function AdminCompanyPanel({
           <ul className="max-h-48 space-y-2 overflow-auto">
             {loading ? (
               <li className="text-sm text-[var(--muted)]">불러오는 중…</li>
-            ) : list.length === 0 ? (
+            ) : shown.length === 0 ? (
               <li className="text-sm text-[var(--muted)]">등록된 회원사가 없습니다.</li>
             ) : (
-              list.map((company) => (
+              shown.map((company) => (
                 <li
                   key={company.id}
                   className="flex items-center justify-between gap-2 rounded-[6px] border border-[var(--line)] px-3 py-2 text-sm"

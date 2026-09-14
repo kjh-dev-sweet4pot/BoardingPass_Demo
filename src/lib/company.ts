@@ -191,6 +191,15 @@ export function isAdminTestCompany(company: {
   return ADMIN_TEST_COMPANY_KEYS.has(name) || ADMIN_TEST_COMPANY_KEYS.has(login);
 }
 
+const COMPANY_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** 쿼리의 exclude_company_ids. UUID만 남긴다. */
+export function parseExcludeCompanyIds(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return [...new Set(raw.split(",").map((s) => s.trim()).filter((s) => COMPANY_ID_RE.test(s)))];
+}
+
 export function matchCompany(
   raw: string,
   companies: CompanyMatchInput[],
@@ -234,6 +243,13 @@ if (process.env.RUN_COMPANY_CRM_SELF_CHECK === "1") {
   }
   if (isAdminTestCompany({ name: "옵티팜", login_id: "optipharm" })) {
     throw new Error("isAdminTestCompany should spare real companies");
+  }
+  if (
+    parseExcludeCompanyIds(
+      "11111111-1111-1111-1111-111111111111, not-a-uuid, 11111111-1111-1111-1111-111111111111",
+    ).join(",") !== "11111111-1111-1111-1111-111111111111"
+  ) {
+    throw new Error("parseExcludeCompanyIds");
   }
   if (parseCompanyDate("2026-09-03") !== "2026-09-03") {
     throw new Error("parseCompanyDate failed");

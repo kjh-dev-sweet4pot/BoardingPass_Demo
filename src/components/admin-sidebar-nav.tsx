@@ -17,6 +17,7 @@ export type AdminSection =
   | "performance"
   | "performanceLookup"
   | "companies"
+  | "companiesOverview"
   | "companiesRegister"
   | "companiesMail"
   | "companiesDocs"
@@ -32,12 +33,14 @@ const AFTER_PERF: { id: "campaigns"; label: string }[] = [
 
 export const COMPANIES_NAV: NavDropdownItem<
   | "companies"
+  | "companiesOverview"
   | "companiesRegister"
   | "companiesMail"
   | "companiesDocs"
   | "companiesBudget"
 >[] = [
   { id: "companies", label: "목록", hint: "회원사 조회" },
+  { id: "companiesOverview", label: "요약", hint: "전체 요약·정보 수정" },
   { id: "companiesRegister", label: "등록", hint: "회원사 개설" },
   { id: "companiesBudget", label: "예산", hint: "월·차수 입금·가용" },
   { id: "companiesDocs", label: "계약·인보이스", hint: "양식 작성·인쇄" },
@@ -72,6 +75,7 @@ function isPerf(s: AdminSection) {
 function isCompanies(s: AdminSection) {
   return (
     s === "companies" ||
+    s === "companiesOverview" ||
     s === "companiesRegister" ||
     s === "companiesMail" ||
     s === "companiesDocs" ||
@@ -152,6 +156,7 @@ export function AdminConsoleShell({
             view={
               section as
                 | "companies"
+                | "companiesOverview"
                 | "companiesRegister"
                 | "companiesMail"
                 | "companiesDocs"
@@ -223,6 +228,7 @@ export function AdminConsoleShell({
               isCompanies(section)
                 ? (section as
                     | "companies"
+                    | "companiesOverview"
                     | "companiesRegister"
                     | "companiesMail"
                     | "companiesDocs"

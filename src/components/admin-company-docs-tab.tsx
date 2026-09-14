@@ -172,11 +172,13 @@ function LineEditor({
 export function AdminCompanyDocsPanel({
   companies,
   isManager,
+  presetCompanyId = "",
 }: {
   companies: Company[];
   isManager: boolean;
+  presetCompanyId?: string;
 }) {
-  const [companyId, setCompanyId] = useState(companies[0]?.id || "");
+  const [companyId, setCompanyId] = useState(presetCompanyId || companies[0]?.id || "");
   const [docs, setDocs] = useState<CompanyDocRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

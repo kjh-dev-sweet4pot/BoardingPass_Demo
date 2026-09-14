@@ -18,13 +18,16 @@ import {
   type CompanyMailKind,
 } from "@/lib/company-mail";
 import { AdminCompanyDocsPanel } from "@/components/admin-company-docs-tab";
+import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { AdminCompanyBudgetPanel } from "@/components/admin-company-budget-tab";
+import { AdminCompanyOverview } from "@/components/admin-company-overview";
 import { formatKrw } from "@/lib/creator-pool-mock";
 import { docHtml, type CompanyDocRow } from "@/lib/company-docs";
 import { type Company } from "@/lib/types";
 
 export type CompaniesSub =
   | "companies"
+  | "companiesOverview"
   | "companiesRegister"
   | "companiesMail"
   | "companiesDocs"
@@ -583,8 +586,8 @@ function CompanyList({
   onChanged: (list: Company[]) => void;
   onMail: (companyId: string) => void;
 }) {
+  const { showTest, setShowTest } = useAdminTestVisibility();
   const [q, setQ] = useState("");
-  const [showTest, setShowTest] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const testCount = useMemo(
@@ -754,7 +757,12 @@ function MailPanel({
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [sigFile, setSigFile] = useState<File | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
+  const { includeCompany } = useAdminTestVisibility();
   const [logs, setLogs] = useState<MailLog[]>([]);
+  const visibleLogs = useMemo(
+    () => logs.filter((log) => includeCompany({ id: log.company_id })),
+    [logs, includeCompany],
+  );
   const [openLogId, setOpenLogId] = useState<string | null>(null);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [mailFrom, setMailFrom] = useState<string>("");
@@ -763,6 +771,10 @@ function MailPanel({
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (companyId && !companies.some((c) => c.id === companyId)) setCompanyId("");
+  }, [companyId, companies]);
 
   const company = companies.find((c) => c.id === companyId) || null;
   const campaignName = campaigns.find((c) => c.id === campaignId)?.name || "";
@@ -1152,10 +1164,10 @@ function MailPanel({
       <div className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-4">
         <p className="mb-3 text-sm font-semibold">발송 이력</p>
         <ul className="max-h-[420px] space-y-2 overflow-auto text-sm">
-          {logs.length === 0 ? (
+          {visibleLogs.length === 0 ? (
             <li className="text-[var(--muted)]">이력이 없습니다.</li>
           ) : (
-            logs.map((log) => {
+            visibleLogs.map((log) => {
               const open = openLogId === log.id;
               const companyName =
                 companies.find((c) => c.id === log.company_id)?.name || "";
@@ -1305,8 +1317,11 @@ export function AdminCompaniesTab({
   sub: CompaniesSub;
   onSubChange: (s: CompaniesSub) => void;
 }) {
+  const { includeCompany } = useAdminTestVisibility();
   const [list, setList] = useState(companies);
   const [mailCompanyId, setMailCompanyId] = useState("");
+  const [focusCompanyId, setFocusCompanyId] = useState("");
+  const visible = useMemo(() => list.filter(includeCompany), [list, includeCompany]);
 
   useEffect(() => setList(companies), [companies]);
 
@@ -1334,6 +1349,20 @@ export function AdminCompaniesTab({
             }}
           />
         ) : null}
+        {sub === "companiesOverview" ? (
+          <AdminCompanyOverview
+            companies={visible}
+            isManager={isManager}
+            onChanged={(c) =>
+              setList((prev) => prev.map((x) => (x.id === c.id ? c : x)))
+            }
+            onManage={(id, dest) => {
+              setFocusCompanyId(id);
+              if (dest === "companiesMail") setMailCompanyId(id);
+              onSubChange(dest);
+            }}
+          />
+        ) : null}
         {sub === "companiesRegister" ? (
           <div className="space-y-6">
             <CompanyCsvImport
@@ -1349,7 +1378,7 @@ export function AdminCompaniesTab({
               }
             />
             <CompanyForm
-              companies={list}
+              companies={visible}
               isManager={isManager}
               onSaved={(c) =>
                 setList((prev) => {
@@ -1363,14 +1392,19 @@ export function AdminCompaniesTab({
           </div>
         ) : null}
         {sub === "companiesMail" ? (
-          <MailPanel companies={list} isManager={isManager} presetCompanyId={mailCompanyId} />
+          <MailPanel companies={visible} isManager={isManager} presetCompanyId={mailCompanyId || focusCompanyId} />
         ) : null}
         {sub === "companiesDocs" ? (
-          <AdminCompanyDocsPanel companies={list} isManager={isManager} />
+          <AdminCompanyDocsPanel
+            companies={visible}
+            isManager={isManager}
+            presetCompanyId={focusCompanyId}
+          />
         ) : null}
         {sub === "companiesBudget" ? (
           <AdminCompanyBudgetPanel
-            companies={list}
+            companies={visible}
+            presetCompanyId={focusCompanyId}
             isManager={isManager}
             onBudgetsApplied={(patches) =>
               setList((prev) =>

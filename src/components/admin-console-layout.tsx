@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AdminCampaignCastingPanel } from "@/components/admin-campaign-casting-panel";
 import { AdminCompaniesTab } from "@/components/admin-companies-tab";
 import { AdminCompanyPanel } from "@/components/admin-company-panel";
@@ -10,6 +10,10 @@ import { AdminInfluencersTab } from "@/components/admin-influencers-tab";
 import { AdminPerformanceLookupTab, AdminPerformanceTab } from "@/components/admin-performance-tab";
 import { type AdminReviewTab } from "@/components/admin-review-queue";
 import { AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
+import {
+  AdminTestVisibilityProvider,
+  useAdminTestVisibility,
+} from "@/components/admin-test-visibility";
 import { Notice } from "@/components/ui";
 import {
   formatMd,
@@ -61,7 +65,24 @@ function PageHeader({
   );
 }
 
-export function AdminConsoleLayout({
+export function AdminConsoleLayout(props: {
+  storeList: Store[];
+  companyList: Company[];
+  productList: Product[];
+  list: AllocationWithRelations[];
+  isManager: boolean;
+  error?: string;
+  message?: string;
+  sidebarActions?: ReactNode;
+}) {
+  return (
+    <AdminTestVisibilityProvider companies={props.companyList}>
+      <AdminConsoleLayoutBody {...props} />
+    </AdminTestVisibilityProvider>
+  );
+}
+
+function AdminConsoleLayoutBody({
   storeList,
   companyList,
   productList,
@@ -80,6 +101,18 @@ export function AdminConsoleLayout({
   message?: string;
   sidebarActions?: ReactNode;
 }) {
+  const { includeCompany } = useAdminTestVisibility();
+  const visibleCompanies = useMemo(
+    () => companyList.filter(includeCompany),
+    [companyList, includeCompany],
+  );
+  const visibleAllocations = useMemo(
+    () =>
+      list.filter((item) =>
+        includeCompany({ id: item.company_id, name: item.companies?.name }),
+      ),
+    [list, includeCompany],
+  );
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [reviewQueue, setReviewQueue] = useState<AdminReviewTab>("reviewPending");
   const [castingStale, setCastingStale] = useState(false);
@@ -147,10 +180,10 @@ export function AdminConsoleLayout({
         <div className="min-h-0 flex-1 overflow-auto">
           <PageHeader section="dashboard" />
           <div className="space-y-6 px-4 pb-8 sm:px-7">
-            <AdminDashboard companies={companyList} onOpenQueue={openQueue} />
+            <AdminDashboard companies={visibleCompanies} onOpenQueue={openQueue} />
             <div className="grid gap-4 lg:grid-cols-2">
-              <AdminCompanyPanel companies={companyList} />
-              <AdminImportPanel compact companies={companyList} />
+              <AdminCompanyPanel companies={visibleCompanies} />
+              <AdminImportPanel compact companies={visibleCompanies} />
             </div>
           </div>
         </div>
@@ -159,7 +192,7 @@ export function AdminConsoleLayout({
       {section === "performance" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AdminPerformanceTab
-            companies={companyList}
+            companies={visibleCompanies}
             onMetaChange={setPerformanceMeta}
           />
         </div>
@@ -168,13 +201,14 @@ export function AdminConsoleLayout({
       {section === "performanceLookup" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AdminPerformanceLookupTab
-            companies={companyList}
+            companies={visibleCompanies}
             onMetaChange={setPerformanceMeta}
           />
         </div>
       ) : null}
 
       {      section === "companies" ||
+      section === "companiesOverview" ||
       section === "companiesRegister" ||
       section === "companiesMail" ||
       section === "companiesDocs" ||
@@ -197,9 +231,9 @@ export function AdminConsoleLayout({
             sub={section}
             isManager={isManager}
             storeList={storeList}
-            companyList={companyList}
+            companyList={visibleCompanies}
             productList={productList}
-            allocations={list}
+            allocations={visibleAllocations}
             reviewQueue={reviewQueue}
             onReviewQueueChange={setReviewQueue}
           />
@@ -211,7 +245,7 @@ export function AdminConsoleLayout({
           <PageHeader section="campaigns" />
           <div className="min-h-0 flex-1 overflow-auto px-4 pb-8 sm:px-7">
             <AdminCampaignCastingPanel
-              companies={companyList}
+              companies={visibleCompanies}
               products={productList}
               stores={storeList}
               isManager={isManager}

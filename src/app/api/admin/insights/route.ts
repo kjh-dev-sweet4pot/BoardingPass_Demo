@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAnyAdmin } from "@/lib/access";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { fetchInsights } from "@/app/api/com/insights/route";
+import { parseExcludeCompanyIds } from "@/lib/company";
 
 /**
  * GET /api/admin/insights?company_id=&days=90
@@ -16,10 +17,13 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const companyId = searchParams.get("company_id") || null;
+  const excludeCompanyIds = companyId
+    ? []
+    : parseExcludeCompanyIds(searchParams.get("exclude_company_ids"));
   const days = Math.min(parseInt(searchParams.get("days") || "90", 10) || 90, 365);
 
   try {
-    const payload = await fetchInsights(supabase, companyId, { days });
+    const payload = await fetchInsights(supabase, companyId, { days, excludeCompanyIds });
     return NextResponse.json(payload);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

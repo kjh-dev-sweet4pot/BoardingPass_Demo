@@ -96,16 +96,9 @@ export function roundKind(round: { kind?: string | null }): BudgetRoundKind {
   return round.kind === "사용" ? "사용" : "입금";
 }
 
-/** 사용 계획. 같은 월·구분의 입금 행은 이미 사용 행이 있으면 빼서 중복 표시하지 않는다. */
-export function usageHistoryRounds<
-  T extends { kind?: string | null; period_month: string; label: string | null },
->(rows: T[]): T[] {
-  const usage = rows.filter((r) => roundKind(r) === "사용");
-  const covered = new Set(usage.map((r) => `${r.period_month}|${r.label || ""}`));
-  const legacy = rows.filter(
-    (r) => roundKind(r) === "입금" && !covered.has(`${r.period_month}|${r.label || ""}`),
-  );
-  return [...usage, ...legacy];
+/** 사용 계획만. 입금 행은 사용에 넣지 않는다. */
+export function usageHistoryRounds<T extends { kind?: string | null }>(rows: T[]): T[] {
+  return rows.filter((r) => roundKind(r) === "사용");
 }
 
 export function summarizeCashflow<
@@ -263,9 +256,9 @@ if (
     { kind: "입금", period_month: "2026-09-01", label: "" },
     { kind: "사용", period_month: "2026-09-01", label: "" },
     { kind: "입금", period_month: "2026-10-01", label: "1차" },
-  ]).length !== 2
+  ]).length !== 1
 ) {
-  throw new Error("usageHistoryRounds should drop a deposit once a usage row covers it");
+  throw new Error("usageHistoryRounds should ignore 입금 rows");
 }
 if (rollupDepositedBudgetKrw([{ deposit_status: "협의중", amount_krw: null }]) !== null) {
   throw new Error("rollupDepositedBudgetKrw empty should be null");
@@ -291,5 +284,18 @@ if (rollupDepositedBudgetKrw([{ deposit_status: "협의중", amount_krw: null }]
   ]);
   if (flow.deposited !== 40_000_000 || flow.used !== 20_000_000 || flow.balance !== 20_000_000) {
     throw new Error("summarizeCashflow failed");
+  }
+  const depositOnly = summarizeCashflow([
+    {
+      kind: "입금",
+      deposit_status: "입금 완료",
+      usage_status: "사용 예정",
+      amount_krw: 40_000_000,
+      period_month: "2026-08-01",
+      label: "",
+    },
+  ]);
+  if (depositOnly.used !== 0 || depositOnly.usage.length !== 0) {
+    throw new Error("summarizeCashflow should not treat a deposit as usage");
   }
 }

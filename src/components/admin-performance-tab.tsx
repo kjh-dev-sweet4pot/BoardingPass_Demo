@@ -1,21 +1,29 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { CompanyPerformanceLookupTab } from "@/components/company-performance-lookup-tab";
 import { CompanyPerformanceTab } from "@/components/company-performance-tab";
 import type { ContentPeriod } from "@/lib/content-insights";
 import type { Company } from "@/lib/types";
 
 function useAdminInsights(companies: Company[]) {
+  const { showTest, hiddenCompanyIds } = useAdminTestVisibility();
   const [companyId, setCompanyId] = useState("");
   const [period, setPeriod] = useState<ContentPeriod>("all");
   const activeCompanies = useMemo(
     () => companies.filter((c) => c.is_active !== false),
     [companies],
   );
-  const insightsUrl = companyId
-    ? `/api/admin/insights?company_id=${encodeURIComponent(companyId)}`
-    : "/api/admin/insights";
+  const insightsUrl = useMemo(() => {
+    const qs = new URLSearchParams();
+    if (companyId) qs.set("company_id", companyId);
+    else if (!showTest && hiddenCompanyIds.length) {
+      qs.set("exclude_company_ids", hiddenCompanyIds.join(","));
+    }
+    const q = qs.toString();
+    return q ? `/api/admin/insights?${q}` : "/api/admin/insights";
+  }, [companyId, showTest, hiddenCompanyIds]);
   const companySelect = (
     <select
       aria-label="회원사"
@@ -80,6 +88,7 @@ export function AdminPerformanceLookupTab({
       onPeriodChange={setPeriod}
       onMetaChange={onMetaChange}
       toolbarExtra={companySelect}
+      refreshInfluencerOnSelect
     />
   );
 }
