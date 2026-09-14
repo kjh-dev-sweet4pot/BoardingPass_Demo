@@ -174,10 +174,11 @@ export function AdminConsoleLayout({
         </div>
       ) : null}
 
-      {section === "companies" ||
+      {      section === "companies" ||
       section === "companiesRegister" ||
       section === "companiesMail" ||
-      section === "companiesDocs" ? (
+      section === "companiesDocs" ||
+      section === "companiesBudget" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AdminCompaniesTab
             companies={companyList}

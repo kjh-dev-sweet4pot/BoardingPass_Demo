@@ -164,6 +164,33 @@ export function isDemoCompany(company: { login_id?: string | null }) {
   return normalizeLoginId(company.login_id || "") === DEMO_COMPANY_LOGIN_ID;
 }
 
+/** 운영 목록에서 기본 숨김. 이름 또는 로그인 아이디가 맞으면 테스트. */
+const ADMIN_TEST_COMPANY_KEYS = new Set([
+  "23yearsold",
+  "bbb",
+  "brandslam",
+  "ddd",
+  "eee",
+  "knownbeautyalpha",
+  "knownbeautybeta",
+  "technical",
+  "test",
+  "wjdghl",
+  "company",
+  "companya",
+  "companyb",
+  "aaa",
+]);
+
+export function isAdminTestCompany(company: {
+  name?: string | null;
+  login_id?: string | null;
+}) {
+  const name = normalizeCompanyKey(company.name || "");
+  const login = normalizeLoginId(company.login_id || "");
+  return ADMIN_TEST_COMPANY_KEYS.has(name) || ADMIN_TEST_COMPANY_KEYS.has(login);
+}
+
 export function matchCompany(
   raw: string,
   companies: CompanyMatchInput[],
@@ -198,6 +225,15 @@ if (process.env.RUN_COMPANY_CRM_SELF_CHECK === "1") {
   }
   if (companySelectAfterColumnError("duplicate key value violates unique constraint") !== null) {
     throw new Error("companySelectAfterColumnError should ignore non-column errors");
+  }
+  if (!isAdminTestCompany({ name: "KnownBeauty Alpha", login_id: "x" })) {
+    throw new Error("isAdminTestCompany name");
+  }
+  if (!isAdminTestCompany({ name: "renamed", login_id: "aaa" })) {
+    throw new Error("isAdminTestCompany login");
+  }
+  if (isAdminTestCompany({ name: "옵티팜", login_id: "optipharm" })) {
+    throw new Error("isAdminTestCompany should spare real companies");
   }
   if (parseCompanyDate("2026-09-03") !== "2026-09-03") {
     throw new Error("parseCompanyDate failed");

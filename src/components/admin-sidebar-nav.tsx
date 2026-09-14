@@ -20,6 +20,7 @@ export type AdminSection =
   | "companiesRegister"
   | "companiesMail"
   | "companiesDocs"
+  | "companiesBudget"
   | "influencersRegister"
   | "influencersReview"
   | "influencersAlloc"
@@ -30,10 +31,15 @@ const AFTER_PERF: { id: "campaigns"; label: string }[] = [
 ];
 
 export const COMPANIES_NAV: NavDropdownItem<
-  "companies" | "companiesRegister" | "companiesMail" | "companiesDocs"
+  | "companies"
+  | "companiesRegister"
+  | "companiesMail"
+  | "companiesDocs"
+  | "companiesBudget"
 >[] = [
   { id: "companies", label: "목록", hint: "회원사 조회" },
   { id: "companiesRegister", label: "등록", hint: "회원사 개설" },
+  { id: "companiesBudget", label: "예산", hint: "월·차수 입금·가용" },
   { id: "companiesDocs", label: "계약·인보이스", hint: "양식 작성·인쇄" },
   { id: "companiesMail", label: "메일 발송", hint: "계약서·견적서·가이드라인" },
 ];
@@ -64,7 +70,13 @@ function isPerf(s: AdminSection) {
 }
 
 function isCompanies(s: AdminSection) {
-  return s === "companies" || s === "companiesRegister" || s === "companiesMail" || s === "companiesDocs";
+  return (
+    s === "companies" ||
+    s === "companiesRegister" ||
+    s === "companiesMail" ||
+    s === "companiesDocs" ||
+    s === "companiesBudget"
+  );
 }
 
 function isInfluencers(s: AdminSection) {
@@ -137,7 +149,14 @@ export function AdminConsoleShell({
         {isCompanies(section) ? (
           <NavSubSegment
             items={COMPANIES_NAV}
-            view={section as "companies" | "companiesRegister" | "companiesMail" | "companiesDocs"}
+            view={
+              section as
+                | "companies"
+                | "companiesRegister"
+                | "companiesMail"
+                | "companiesDocs"
+                | "companiesBudget"
+            }
             onViewChange={onSectionChange}
           />
         ) : null}
@@ -202,7 +221,12 @@ export function AdminConsoleShell({
             active={isCompanies(section)}
             selectedId={
               isCompanies(section)
-                ? (section as "companies" | "companiesRegister" | "companiesMail" | "companiesDocs")
+                ? (section as
+                    | "companies"
+                    | "companiesRegister"
+                    | "companiesMail"
+                    | "companiesDocs"
+                    | "companiesBudget")
                 : undefined
             }
             onSelect={onSectionChange}

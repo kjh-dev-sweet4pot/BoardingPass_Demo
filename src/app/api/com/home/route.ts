@@ -374,6 +374,9 @@ export async function GET() {
     weekSeries = Array.from({ length: 7 }, () => weekViewTotal);
   }
 
+  const postedAtById = new Map(
+    rawLinks.map((l) => [l.id, l.published_at] as const),
+  );
   const news = buildDerivedNews({
     asOf,
     visits: activeAllocs.map((a) => {
@@ -395,15 +398,18 @@ export async function GET() {
         published: publishedAllocIds.has(a.id),
       };
     }),
-    uploads: posts.map((p) => ({
-      id: p.id,
-      influencerId: p.influencerId,
-      name: p.name,
-      handle: p.handle,
-      at: p.publishedAt || "",
-      url: p.url,
-      product: p.product,
-    })),
+    uploads: posts.map((p) => {
+      const fromDb = postedAtById.get(p.id);
+      return {
+        id: p.id,
+        influencerId: p.influencerId,
+        name: p.name,
+        handle: p.handle,
+        at: postedAtById.has(p.id) ? fromDb || "" : p.publishedAt || "",
+        url: p.url,
+        product: p.product,
+      };
+    }),
   });
 
   const visits = splitHomeVisits(

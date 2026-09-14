@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Field, fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
-import { COMPANY_CONTRACT_STAGES } from "@/lib/company";
+import { COMPANY_CONTRACT_STAGES, isAdminTestCompany } from "@/lib/company";
 import {
   companyCsvTemplate,
   parseCompanyImportRows,
@@ -18,11 +18,17 @@ import {
   type CompanyMailKind,
 } from "@/lib/company-mail";
 import { AdminCompanyDocsPanel } from "@/components/admin-company-docs-tab";
+import { AdminCompanyBudgetPanel } from "@/components/admin-company-budget-tab";
 import { formatKrw } from "@/lib/creator-pool-mock";
 import { docHtml, type CompanyDocRow } from "@/lib/company-docs";
 import { type Company } from "@/lib/types";
 
-export type CompaniesSub = "companies" | "companiesRegister" | "companiesMail" | "companiesDocs";
+export type CompaniesSub =
+  | "companies"
+  | "companiesRegister"
+  | "companiesMail"
+  | "companiesDocs"
+  | "companiesBudget";
 
 type MailLog = {
   id: string;
@@ -499,7 +505,7 @@ function CompanyForm({
           </Field>
         </div>
         <p className="text-[11px] text-[var(--muted)]">
-          배정 예산은 홈·예산 성과의 총 예산으로 쓰입니다. 소요 비용은 운영 메모용이며 배정 노출가 합계와 별개입니다.
+          배정 예산은 홈·예산 성과의 총 예산으로 쓰입니다. 예산 탭의 입금 완료 합이 있으면 그 값으로 덮어씁니다. 소요 비용은 운영 메모용이며 배정 노출가 합계와 별개입니다.
         </p>
         <Field label="콘텐츠 가이드라인 URL">
           <input
@@ -553,6 +559,19 @@ function CompanyForm({
   );
 }
 
+function matchesCompanyQuery(c: Company, key: string) {
+  return [
+    c.name,
+    c.login_id,
+    c.contact,
+    c.contact_email,
+    c.contract_stage,
+    ...(c.aliases || []),
+  ]
+    .filter(Boolean)
+    .some((v) => String(v).toLowerCase().includes(key));
+}
+
 function CompanyList({
   companies,
   isManager,
@@ -565,24 +584,26 @@ function CompanyList({
   onMail: (companyId: string) => void;
 }) {
   const [q, setQ] = useState("");
+  const [showTest, setShowTest] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const testCount = useMemo(
+    () => companies.filter((c) => isAdminTestCompany(c)).length,
+    [companies],
+  );
 
   const filtered = useMemo(() => {
     const key = q.trim().toLowerCase();
-    if (!key) return companies;
-    return companies.filter((c) =>
-      [
-        c.name,
-        c.login_id,
-        c.contact,
-        c.contact_email,
-        c.contract_stage,
-        ...(c.aliases || []),
-      ]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(key)),
-    );
-  }, [companies, q]);
+    const pool = showTest ? companies : companies.filter((c) => !isAdminTestCompany(c));
+    if (!key) return pool;
+    return pool.filter((c) => matchesCompanyQuery(c, key));
+  }, [companies, q, showTest]);
+
+  const hiddenTestHits = useMemo(() => {
+    const key = q.trim().toLowerCase();
+    if (showTest || !key) return 0;
+    return companies.filter((c) => isAdminTestCompany(c) && matchesCompanyQuery(c, key)).length;
+  }, [companies, q, showTest]);
 
   async function toggleActive(company: Company) {
     const res = await fetch(`/api/admin/companies/${company.id}`, {
@@ -600,12 +621,24 @@ function CompanyList({
 
   return (
     <div className="space-y-3">
-      <input
-        className={`${fieldClass} w-full max-w-sm`}
-        placeholder="이름 · 아이디 · 메일 검색"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          className={`${fieldClass} w-full max-w-sm`}
+          placeholder="이름 · 아이디 · 메일 검색"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        {testCount > 0 ? (
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--muted)]">
+            <input
+              type="checkbox"
+              checked={showTest}
+              onChange={(e) => setShowTest(e.target.checked)}
+            />
+            테스트 {testCount}곳 보기
+          </label>
+        ) : null}
+      </div>
       {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
       <div className="overflow-x-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
         <table className="w-full min-w-[960px] text-left text-sm">
@@ -624,7 +657,13 @@ function CompanyList({
             {filtered.length === 0 ? (
               <tr>
                 <td className="px-3 py-6 text-[var(--muted)]" colSpan={7}>
-                  등록된 회원사가 없습니다.
+                  {hiddenTestHits > 0
+                    ? "테스트 회원사에만 있습니다. 위 보기를 켜세요."
+                    : q.trim()
+                      ? "검색 결과가 없습니다."
+                      : testCount > 0 && !showTest
+                        ? "테스트 회원사를 숨겼습니다."
+                        : "등록된 회원사가 없습니다."}
                 </td>
               </tr>
             ) : (
@@ -1328,6 +1367,20 @@ export function AdminCompaniesTab({
         ) : null}
         {sub === "companiesDocs" ? (
           <AdminCompanyDocsPanel companies={list} isManager={isManager} />
+        ) : null}
+        {sub === "companiesBudget" ? (
+          <AdminCompanyBudgetPanel
+            companies={list}
+            isManager={isManager}
+            onBudgetsApplied={(patches) =>
+              setList((prev) =>
+                prev.map((c) => {
+                  const hit = patches.find((p) => p.company_id === c.id);
+                  return hit ? { ...c, budget_amount: hit.budget_amount } : c;
+                }),
+              )
+            }
+          />
         ) : null}
       </div>
     </div>

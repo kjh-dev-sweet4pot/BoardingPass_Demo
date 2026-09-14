@@ -867,14 +867,15 @@ export function buildDerivedNews(input: {
   }
   for (const u of input.uploads || []) {
     const raw = (u.at || "").trim();
+    if (!raw) continue;
     const day = /^\d{4}-\d{2}-\d{2}$/.test(raw.slice(0, 10))
       ? raw.slice(0, 10)
-      : asOf;
-    if (day > asOf || day < from) continue;
+      : "";
+    if (!day || day > asOf || day < from) continue;
     const who = u.name.trim() || "인플루언서";
     const handle = u.handle || "";
     const product = (u.product || "").trim();
-    const at = raw && raw.length >= 10 ? raw : `${day}T12:00:00+09:00`;
+    const at = raw.length >= 10 ? raw : `${day}T12:00:00+09:00`;
     items.push({
       id: `pub-${u.id}`,
       at,
@@ -1012,8 +1013,8 @@ function assertRankBestPosts() {
     asOf: "2026-09-09",
     uploads: [{ id: "u0", name: "발행자", at: "", url: "https://x.com/p" }],
   });
-  if (undated.length !== 1 || undated[0]!.title !== "발행자 발행 완료") {
-    throw new Error("buildDerivedNews undated publish failed");
+  if (undated.length !== 0) {
+    throw new Error("buildDerivedNews undated publish should skip");
   }
   const mixed = pickNewsFeed([
     ...Array.from({ length: 8 }, (_, i) => visitNews[0]!),
