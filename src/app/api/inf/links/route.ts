@@ -7,7 +7,7 @@ import {
 } from "@/lib/collect-link-thumbnail";
 import { getInfluencerSessionId } from "@/lib/session";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
-import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
+import { collapseSharedVisitAllocations, propagateSharedVisitCreatorLink } from "@/lib/alloc-dup";
 import { detectPlatform, validateCreatorUrl } from "@/lib/creator-link";
 
 const LINKS_ON_ALLOCATION = `creator_links(${CREATOR_LINK_PUBLIC_COLUMNS})`;
@@ -135,6 +135,19 @@ export async function POST(request: Request) {
       { error: error?.message || "등록에 실패했습니다." },
       { status: 500 },
     );
+  }
+
+  try {
+    await propagateSharedVisitCreatorLink(supabase, allocationId, {
+      id: created.id,
+      influencer_id: influencerId,
+      url: linkUrl,
+      platform: created.platform,
+      status: "submitted",
+      thumbnail_status: "pending",
+    });
+  } catch {
+    // 원본 등록은 유지
   }
 
   if (created.platform === "tiktok") {

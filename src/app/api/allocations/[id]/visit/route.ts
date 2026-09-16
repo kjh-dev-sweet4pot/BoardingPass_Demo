@@ -5,6 +5,7 @@ import {
   supabaseConfigError,
 } from "@/lib/supabase/api-client";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
+import { propagateSharedVisitState } from "@/lib/alloc-dup";
 import { getStoreSessionId, isAdminSession } from "@/lib/session";
 
 export async function POST(
@@ -35,7 +36,7 @@ export async function POST(
   if (!supabase) return supabaseConfigError();
   const { data: current, error: fetchError } = await supabase
     .from("allocations")
-    .select("*")
+    .select("*, products(name), stores(name)")
     .eq("id", id)
     .maybeSingle();
 
@@ -112,8 +113,16 @@ export async function POST(
       { status: 500 },
     );
   }
+  let syncWarning: string | undefined;
+  try {
+    await propagateSharedVisitState(supabase, current, updated);
+  } catch (err) {
+    syncWarning = err instanceof Error ? err.message : "같은 방문 반영 실패";
+  }
+
   revalidatePath("/admin");
   revalidatePath("/phar");
   revalidatePath("/com");
-  return NextResponse.json({ allocation: updated });
+  revalidatePath("/inf");
+  return NextResponse.json({ allocation: updated, syncWarning });
 }

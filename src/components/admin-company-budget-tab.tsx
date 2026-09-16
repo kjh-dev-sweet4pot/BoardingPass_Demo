@@ -7,12 +7,17 @@ import {
   BUDGET_DEPOSIT_STATUSES,
   BUDGET_TABLE_SETUP,
   BUDGET_USAGE_STATUSES,
+  displayDepositKrw,
   formatManwon,
   krwToManwon,
   monthLabel,
+  normalizeDepositStatus,
+  normalizeUsageStatus,
+  orphanUsageRounds,
   roundKind,
   shiftMonth,
   summarizeCashflow,
+  usagesForDeposit,
   type BudgetDepositStatus,
   type BudgetRound,
   type BudgetUsageStatus,
@@ -45,7 +50,11 @@ export function AdminCompanyBudgetPanel({
 }: {
   companies: Company[];
   isManager: boolean;
-  onBudgetsApplied: (patches: { company_id: string; budget_amount: number | null }[]) => void;
+  onBudgetsApplied: (patches: {
+    company_id: string;
+    budget_amount: number | null;
+    contract_stage?: string | null;
+  }[]) => void;
   presetCompanyId?: string;
 }) {
   const { includeCompany } = useAdminTestVisibility();
@@ -67,9 +76,7 @@ export function AdminCompanyBudgetPanel({
   const [companyId, setCompanyId] = useState(presetCompanyId);
   const [companyName, setCompanyName] = useState("");
   const [picked, setPicked] = useState(Boolean(presetCompanyId));
-  const [openRows, setOpenRows] = useState<
-    { key: string; kind: "입금" | "사용"; period: string }[]
-  >([]);
+  const [openRows, setOpenRows] = useState<{ key: string; period: string }[]>([]);
 
   const sortedCompanies = useMemo(
     () => [...liveCompanies].sort((a, b) => a.name.localeCompare(b.name, "ko")),
@@ -85,10 +92,7 @@ export function AdminCompanyBudgetPanel({
   const deposits = scoped
     .filter((r) => roundKind(r) === "입금")
     .sort((a, b) => a.period_month.localeCompare(b.period_month) || (a.label || "").localeCompare(b.label || ""));
-  const usageItems = scoped
-    .filter((r) => roundKind(r) === "사용")
-    .map((round) => ({ round, copy: false }))
-    .sort((a, b) => a.round.period_month.localeCompare(b.round.period_month));
+  const orphanUsage = orphanUsageRounds(scoped);
 
   const sheets = useMemo(() => {
     const source = picked ? scoped : liveRounds;
@@ -141,19 +145,16 @@ export function AdminCompanyBudgetPanel({
     };
   }
 
-  function addRow(kind: "입금" | "사용") {
+  function addRow() {
     if (!picked || (!activeCompanyId && !companyName.trim())) {
       setError("회원사를 선택하거나 이름을 입력하세요.");
       return;
     }
-    const source = kind === "입금" ? deposits : usageItems.map((item) => item.round);
     const period = nextPeriod([
-      ...source,
-      ...openRows
-        .filter((row) => row.kind === kind)
-        .map((row) => ({ period_month: `${row.period}-01` })),
+      ...deposits,
+      ...openRows.map((row) => ({ period_month: `${row.period}-01` })),
     ]);
-    setOpenRows((prev) => [...prev, { key: `${kind}-${period}-${Date.now()}`, kind, period }]);
+    setOpenRows((prev) => [...prev, { key: `입금-${period}-${Date.now()}`, period }]);
     setError(null);
   }
 
@@ -176,8 +177,10 @@ export function AdminCompanyBudgetPanel({
     <div className="space-y-3">
       <style>{`@keyframes budget-open{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`}</style>
       <p className="text-xs text-[var(--muted)]">
-        입금과 사용은 저장된 값이 채워집니다. 추가는 목록 바로 아래에 칸이 붙습니다. 오른쪽은 입금
-        예산과 사용 예산을 맞춘 현금흐름입니다. 전체 예산은 입금 완료만 합산합니다. 단위는 만원.
+        입금 행 아래에 사용 분할을 여러 개 붙일 수 있습니다. 값을 바꾼 뒤 적용을 눌러야
+        저장됩니다. 입금 상태 흐름은 입점 논의중·협의중 → 입금 지연 → 입금 완료이며, 하나라도
+        입금 지연이면 전체가 입금 지연입니다. 오른쪽 전체 예산은 입금 완료만 합산합니다. 단위는
+        만원.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-[minmax(220px,280px)_1fr] sm:items-end">
@@ -264,14 +267,13 @@ export function AdminCompanyBudgetPanel({
 
         {picked ? (
           <div className="flex flex-wrap items-start gap-3">
-            <LineList
-              title="입금 예산"
-              kind="입금"
-              items={deposits.map((round) => ({ round, copy: false }))}
+            <DepositList
+              items={deposits}
+              allRounds={scoped}
               isManager={isManager}
-              openRows={openRows.filter((row) => row.kind === "입금")}
+              openRows={openRows}
               onRemoveOpen={(key) => setOpenRows((prev) => prev.filter((row) => row.key !== key))}
-              onAdd={() => addRow("입금")}
+              onAdd={addRow}
               onDelete={onDelete}
               onSaved={async (data) => {
                 applyBudgets(data);
@@ -280,22 +282,13 @@ export function AdminCompanyBudgetPanel({
               onError={setError}
               companyPayload={companyPayload}
             />
-            <LineList
-              title="사용 예산"
-              kind="사용"
-              items={usageItems}
-              isManager={isManager}
-              openRows={openRows.filter((row) => row.kind === "사용")}
-              onRemoveOpen={(key) => setOpenRows((prev) => prev.filter((row) => row.key !== key))}
-              onAdd={() => addRow("사용")}
-              onDelete={onDelete}
-              onSaved={async (data) => {
-                applyBudgets(data);
-                await load();
-              }}
-              onError={setError}
-              companyPayload={companyPayload}
-            />
+            {orphanUsage.length ? (
+              <p className="max-w-sm text-[11px] text-[var(--muted)]">
+                연결되지 않은 사용 행 {orphanUsage.length}건이 있습니다.{" "}
+                <code className="text-[10px]">scripts/sql/company-budget-usage-splits.sql</code> 을
+                실행하면 입금에 붙습니다.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -303,10 +296,9 @@ export function AdminCompanyBudgetPanel({
   );
 }
 
-function LineList({
-  title,
-  kind,
+function DepositList({
   items,
+  allRounds,
   isManager,
   openRows = [],
   onRemoveOpen,
@@ -316,9 +308,8 @@ function LineList({
   onError,
   companyPayload,
 }: {
-  title: string;
-  kind: "입금" | "사용";
-  items: { round: BudgetRound; copy: boolean }[];
+  items: BudgetRound[];
+  allRounds: BudgetRound[];
   isManager: boolean;
   openRows?: { key: string; period: string }[];
   onRemoveOpen?: (key: string) => void;
@@ -333,20 +324,24 @@ function LineList({
 }) {
   return (
     <section className="w-fit max-w-full rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3">
-      <p className="text-base font-semibold">{title}</p>
-      <div className="mt-2 space-y-2">
+      <p className="text-base font-semibold">입금 예산</p>
+      <p className="mt-0.5 text-[11px] text-[var(--muted)]">
+        입금마다 사용 분할을 여러 개 둘 수 있습니다. 금액·월을 나눈 뒤 적용하세요.
+      </p>
+      <div className="mt-2 space-y-3">
         {items.length === 0 ? (
           <p className="text-[11px] text-[var(--muted)]">아직 없습니다. 추가로 칸을 붙입니다.</p>
         ) : (
-          items.map((item) => (
-            <BudgetLine
-              key={`${kind}-${item.round.id}-${item.copy ? "copy" : "own"}`}
-              round={item.round}
-              kind={kind}
-              copy={item.copy}
+          items.map((round) => (
+            <DepositCard
+              key={round.id}
+              round={round}
+              usages={usagesForDeposit(allRounds, round.id)}
+              copy={false}
               fresh={false}
               isManager={isManager}
-              onDelete={() => void onDelete(item.round)}
+              onDelete={() => void onDelete(round)}
+              onDeleteUsage={(u) => void onDelete(u)}
               onSaved={onSaved}
               onError={onError}
               companyPayload={companyPayload}
@@ -355,12 +350,12 @@ function LineList({
         )}
         {isManager ? (
           <button type="button" className={secondaryBtnClass} onClick={onAdd}>
-            추가
+            입금 추가
           </button>
         ) : null}
         {openRows.map((row) => (
           <div key={row.key} style={{ animation: "budget-open 180ms ease-out" }}>
-            <BudgetLine
+            <DepositCard
               round={{
                 id: row.key,
                 company_id: null,
@@ -368,14 +363,16 @@ function LineList({
                 label: "",
                 period_month: `${row.period}-01`,
                 amount_krw: null,
-                deposit_status: kind === "입금" ? "입금 완료" : "협의중",
-                usage_status: kind === "사용" ? "가용" : "사용 예정",
+                deposit_status: "입점 논의중",
+                usage_status: "협의중",
+                kind: "입금",
               }}
-              kind={kind}
+              usages={[]}
               copy
               fresh
               isManager={isManager}
               onDelete={() => onRemoveOpen?.(row.key)}
+              onDeleteUsage={() => undefined}
               onSaved={async (data) => {
                 onRemoveOpen?.(row.key);
                 await onSaved(data);
@@ -390,23 +387,25 @@ function LineList({
   );
 }
 
-function BudgetLine({
+function DepositCard({
   round,
-  kind,
+  usages,
   copy,
   fresh,
   isManager,
   onDelete,
+  onDeleteUsage,
   onSaved,
   onError,
   companyPayload,
 }: {
   round: BudgetRound;
-  kind: "입금" | "사용";
+  usages: BudgetRound[];
   copy: boolean;
   fresh: boolean;
   isManager: boolean;
   onDelete: () => void;
+  onDeleteUsage: (round: BudgetRound) => void;
   onSaved: (data: {
     budgets?: { company_id: string; budget_amount: number | null }[];
     warning?: string;
@@ -417,29 +416,26 @@ function BudgetLine({
   const [period, setPeriod] = useState(round.period_month.slice(0, 7));
   const [amount, setAmount] = useState(krwToManwon(round.amount_krw)?.toString() ?? "");
   const [label, setLabel] = useState(round.label || "");
-  const [status, setStatus] = useState(kind === "입금" ? round.deposit_status : round.usage_status);
+  const [status, setStatus] = useState(normalizeDepositStatus(round.deposit_status));
   const [busy, setBusy] = useState(false);
+  const [openUsages, setOpenUsages] = useState<{ key: string; period: string }[]>([]);
 
   useEffect(() => {
     setPeriod(round.period_month.slice(0, 7));
     setAmount(krwToManwon(round.amount_krw)?.toString() ?? "");
     setLabel(round.label || "");
-    setStatus(kind === "입금" ? round.deposit_status : round.usage_status);
-  }, [
-    round.id,
-    round.period_month,
-    round.amount_krw,
-    round.label,
-    round.deposit_status,
-    round.usage_status,
-    kind,
-  ]);
+    setStatus(normalizeDepositStatus(round.deposit_status));
+  }, [round.id, round.period_month, round.amount_krw, round.label, round.deposit_status]);
 
   const dirty =
     period !== round.period_month.slice(0, 7) ||
     amount !== (krwToManwon(round.amount_krw)?.toString() ?? "") ||
     label !== (round.label || "") ||
-    status !== (kind === "입금" ? round.deposit_status : round.usage_status);
+    status !== normalizeDepositStatus(round.deposit_status);
+
+  const usedSum = usages.reduce((s, u) => s + (u.amount_krw || 0), 0);
+  const depositKrw = round.amount_krw || 0;
+  const overSplit = depositKrw > 0 && usedSum > depositKrw;
 
   async function commit() {
     if (!isManager || busy || !dirty) return;
@@ -448,12 +444,13 @@ function BudgetLine({
     try {
       const body = {
         ...companyPayload(),
-        kind,
+        kind: "입금" as const,
         label,
         period_month: period,
+        usage_period_month: null,
         amount_manwon: amount,
-        deposit_status: kind === "입금" ? status : "협의중",
-        usage_status: kind === "사용" ? status : "사용 예정",
+        deposit_status: status,
+        usage_status: "협의중",
       };
       const url = copy ? "/api/admin/company-budgets" : `/api/admin/company-budgets/${round.id}`;
       const res = await fetch(url, {
@@ -471,23 +468,242 @@ function BudgetLine({
     }
   }
 
+  function addUsage() {
+    if (copy || fresh) {
+      onError("입금을 먼저 적용한 뒤 사용 분할을 추가하세요.");
+      return;
+    }
+    const periodNext = nextPeriod([
+      ...usages,
+      ...openUsages.map((row) => ({ period_month: `${row.period}-01` })),
+      { period_month: round.period_month },
+    ]);
+    setOpenUsages((prev) => [...prev, { key: `use-${periodNext}-${Date.now()}`, period: periodNext }]);
+  }
+
+  const depositOptions = [...BUDGET_DEPOSIT_STATUSES] as string[];
+  if (status && !depositOptions.includes(status)) depositOptions.unshift(status);
   const lineField = `${fieldClass} h-9 w-auto shrink-0 px-2`;
 
   return (
     <div
-      className={`flex w-fit max-w-full flex-wrap items-center gap-1.5 rounded-[6px] border px-2 py-1.5 ${
+      className={`w-fit max-w-full rounded-[6px] border px-2 py-2 ${
         fresh ? "border-[var(--accent)]" : "border-[var(--line)]"
       }`}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) void commit();
-      }}
     >
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="shrink-0 text-[10px] font-semibold text-[var(--muted)]">입금</span>
+        <input
+          className={`${lineField} w-[11.5rem]`}
+          type="month"
+          value={period}
+          disabled={!isManager || busy}
+          onChange={(e) => setPeriod(e.target.value)}
+          aria-label="입금 월"
+        />
+        <input
+          className={`${lineField} w-24`}
+          inputMode="decimal"
+          value={amount}
+          placeholder="만원"
+          disabled={!isManager || busy}
+          onChange={(e) => setAmount(e.target.value)}
+          aria-label="입금 금액"
+        />
+        <input
+          className={`${lineField} w-16`}
+          value={label}
+          placeholder="차수"
+          disabled={!isManager || busy}
+          onChange={(e) => setLabel(e.target.value)}
+          aria-label="차수"
+        />
+        <select
+          className={`${lineField} w-[9.5rem]`}
+          value={status}
+          disabled={!isManager || busy}
+          onChange={(e) => setStatus(e.target.value as BudgetDepositStatus)}
+          aria-label="입금 상태"
+        >
+          {depositOptions.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        {isManager && dirty ? (
+          <button
+            type="button"
+            className="shrink-0 px-2 text-xs font-semibold text-[var(--accent)] disabled:opacity-50"
+            disabled={busy}
+            onClick={() => void commit()}
+          >
+            {busy ? "…" : "적용"}
+          </button>
+        ) : null}
+        {isManager && (!copy || fresh) ? (
+          <button type="button" className="shrink-0 px-1 text-xs text-[var(--muted)]" onClick={onDelete}>
+            삭제
+          </button>
+        ) : null}
+      </div>
+
+      {!copy && !fresh ? (
+        <div className="mt-2 space-y-1.5 border-t border-[var(--line)] pt-2">
+          <div className="flex flex-wrap items-baseline gap-2 px-0.5">
+            <p className="text-[10px] font-semibold text-[var(--muted)]">사용 분할</p>
+            <p className={`text-[10px] ${overSplit ? "text-[var(--danger)]" : "text-[var(--muted)]"}`}>
+              {formatManwon(usedSum)} / {formatManwon(round.amount_krw)}
+              {overSplit ? " · 입금보다 큼" : ""}
+            </p>
+          </div>
+          {usages.map((u) => (
+            <UsageSplitLine
+              key={u.id}
+              round={u}
+              deposit={round}
+              copy={false}
+              fresh={false}
+              isManager={isManager}
+              onDelete={() => onDeleteUsage(u)}
+              onSaved={onSaved}
+              onError={onError}
+              companyPayload={companyPayload}
+            />
+          ))}
+          {openUsages.map((row) => (
+            <div key={row.key} style={{ animation: "budget-open 180ms ease-out" }}>
+              <UsageSplitLine
+                round={{
+                  id: row.key,
+                  company_id: round.company_id,
+                  company_name: round.company_name,
+                  label: round.label,
+                  period_month: `${row.period}-01`,
+                  amount_krw: null,
+                  deposit_status: "협의중",
+                  usage_status: "가용",
+                  kind: "사용",
+                  source_deposit_id: round.id,
+                }}
+                deposit={round}
+                copy
+                fresh
+                isManager={isManager}
+                onDelete={() => setOpenUsages((prev) => prev.filter((x) => x.key !== row.key))}
+                onSaved={async (data) => {
+                  setOpenUsages((prev) => prev.filter((x) => x.key !== row.key));
+                  await onSaved(data);
+                }}
+                onError={onError}
+                companyPayload={companyPayload}
+              />
+            </div>
+          ))}
+          {isManager ? (
+            <button type="button" className="px-1 text-[11px] text-[var(--accent)]" onClick={addUsage}>
+              사용 추가
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 text-[10px] text-[var(--muted)]">입금 적용 후 사용 분할을 추가할 수 있습니다.</p>
+      )}
+    </div>
+  );
+}
+
+function UsageSplitLine({
+  round,
+  deposit,
+  copy,
+  fresh,
+  isManager,
+  onDelete,
+  onSaved,
+  onError,
+  companyPayload,
+}: {
+  round: BudgetRound;
+  deposit: BudgetRound;
+  copy: boolean;
+  fresh: boolean;
+  isManager: boolean;
+  onDelete: () => void;
+  onSaved: (data: {
+    budgets?: { company_id: string; budget_amount: number | null }[];
+    warning?: string;
+  }) => Promise<void>;
+  onError: (message: string) => void;
+  companyPayload: () => { company_id: string | null; company_name: string; label: string };
+}) {
+  const [period, setPeriod] = useState(round.period_month.slice(0, 7));
+  const [amount, setAmount] = useState(krwToManwon(round.amount_krw)?.toString() ?? "");
+  const [status, setStatus] = useState(normalizeUsageStatus(round.usage_status));
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setPeriod(round.period_month.slice(0, 7));
+    setAmount(krwToManwon(round.amount_krw)?.toString() ?? "");
+    setStatus(normalizeUsageStatus(round.usage_status));
+  }, [round.id, round.period_month, round.amount_krw, round.usage_status]);
+
+  const dirty =
+    period !== round.period_month.slice(0, 7) ||
+    amount !== (krwToManwon(round.amount_krw)?.toString() ?? "") ||
+    status !== normalizeUsageStatus(round.usage_status);
+
+  async function commit() {
+    if (!isManager || busy || !dirty) return;
+    setBusy(true);
+    onError("");
+    try {
+      const base = companyPayload();
+      const body = {
+        company_id: deposit.company_id || base.company_id,
+        company_name: deposit.company_name || base.company_name,
+        kind: "사용" as const,
+        label: deposit.label || "",
+        period_month: period,
+        amount_manwon: amount,
+        deposit_status: "협의중",
+        usage_status: status,
+        source_deposit_id: deposit.id,
+      };
+      const url = copy ? "/api/admin/company-budgets" : `/api/admin/company-budgets/${round.id}`;
+      const res = await fetch(url, {
+        method: copy ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "저장에 실패했습니다.");
+      await onSaved(data);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "저장에 실패했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const usageOptions = [...BUDGET_USAGE_STATUSES] as string[];
+  if (status && !usageOptions.includes(status)) usageOptions.unshift(status);
+  const lineField = `${fieldClass} h-9 w-auto shrink-0 px-2`;
+
+  return (
+    <div
+      className={`ml-3 flex w-fit max-w-full flex-wrap items-center gap-1.5 rounded-[6px] border px-2 py-1.5 ${
+        fresh ? "border-[var(--accent)]" : "border-[var(--line)]"
+      }`}
+    >
+      <span className="shrink-0 text-[10px] text-[var(--muted)]">사용</span>
       <input
         className={`${lineField} w-[11.5rem]`}
         type="month"
         value={period}
         disabled={!isManager || busy}
         onChange={(e) => setPeriod(e.target.value)}
+        aria-label="사용 월"
       />
       <input
         className={`${lineField} w-24`}
@@ -496,27 +712,32 @@ function BudgetLine({
         placeholder="만원"
         disabled={!isManager || busy}
         onChange={(e) => setAmount(e.target.value)}
-      />
-      <input
-        className={`${lineField} w-16`}
-        value={label}
-        placeholder="차수"
-        disabled={!isManager || busy}
-        onChange={(e) => setLabel(e.target.value)}
+        aria-label="사용 금액"
       />
       <select
-        className={`${lineField} w-[9.5rem]`}
+        className={`${lineField} w-[6.5rem]`}
         value={status}
         disabled={!isManager || busy}
-        onChange={(e) => setStatus(e.target.value as BudgetDepositStatus & BudgetUsageStatus)}
+        onChange={(e) => setStatus(e.target.value as BudgetUsageStatus)}
+        aria-label="사용 상태"
       >
-        {(kind === "입금" ? BUDGET_DEPOSIT_STATUSES : BUDGET_USAGE_STATUSES).map((s) => (
+        {usageOptions.map((s) => (
           <option key={s} value={s}>
             {s}
           </option>
         ))}
       </select>
-      {isManager && (!copy || fresh) ? (
+      {isManager && dirty ? (
+        <button
+          type="button"
+          className="shrink-0 px-2 text-xs font-semibold text-[var(--accent)] disabled:opacity-50"
+          disabled={busy}
+          onClick={() => void commit()}
+        >
+          {busy ? "…" : "적용"}
+        </button>
+      ) : null}
+      {isManager ? (
         <button type="button" className="shrink-0 px-1 text-xs text-[var(--muted)]" onClick={onDelete}>
           삭제
         </button>
@@ -548,18 +769,24 @@ function AllCashflowSheet({
     const rows = [...groups.entries()]
       .map(([key, list]) => {
         const summary = summarizeCashflow(list);
+        const depositDelayed = list.some(
+          (r) => roundKind(r) === "입금" && r.deposit_status === "입금 지연",
+        );
         return {
           key,
           companyId: list[0].company_id,
           companyName: list[0].company_name,
           name: displayName(list[0], companies),
           deposited: summary.deposited,
+          shownDeposit: displayDepositKrw(summary),
           used: summary.used,
+          depositDelayed,
         };
       })
       .sort((a, b) => {
         const paid = Number(b.deposited > 0) - Number(a.deposited > 0);
-        return paid || a.name.localeCompare(b.name, "ko");
+        const delayed = Number(b.depositDelayed) - Number(a.depositDelayed);
+        return paid || delayed || a.name.localeCompare(b.name, "ko");
       });
     const summary = summarizeCashflow(inMonth);
     return { month, rows, deposited: summary.deposited, used: summary.used };
@@ -588,9 +815,10 @@ function AllCashflowSheet({
                 <LedgerRow
                   key={row.key}
                   month={row.name}
-                  note=""
-                  amount={formatManwon(row.deposited)}
-                  dim={row.deposited === 0}
+                  note={row.depositDelayed ? "입금 지연" : ""}
+                  amount={formatManwon(row.shownDeposit)}
+                  dim={row.shownDeposit === 0 && !row.depositDelayed}
+                  alert={row.depositDelayed}
                   onPick={() => onPickCompany(row.companyId, row.companyName)}
                 />
               ))}
@@ -600,8 +828,9 @@ function AllCashflowSheet({
                 <LedgerRow
                   key={row.key}
                   month={row.name}
-                  note=""
+                  note={row.depositDelayed ? "입금 지연" : ""}
                   amount={formatManwon(row.used)}
+                  alert={row.depositDelayed}
                   onPick={() => onPickCompany(row.companyId, row.companyName)}
                 />
               ))}
@@ -642,14 +871,15 @@ function CashflowSheet({ title, rounds }: { title: string; rounds: BudgetRound[]
               note={[row.label, row.deposit_status].filter(Boolean).join(" · ")}
               amount={formatManwon(row.amount_krw)}
               dim={row.deposit_status !== "입금 완료"}
+              alert={row.deposit_status === "입금 지연"}
             />
           ))}
           <LedgerRow month="합계" note="입금 완료" amount={formatManwon(flow.deposited)} strong />
         </Ledger>
-        <Ledger title="사용 예산" empty="사용 없음" divider count={usage.length}>
+        <Ledger title="사용 예산" empty="사용 계획 없음" divider count={usage.length}>
           {usage.map((row) => (
             <LedgerRow
-              key={row.id}
+              key={`use-${row.id}-${row.period_month}`}
               month={monthLabel(row.period_month)}
               note={[row.label, row.usage_status].filter(Boolean).join(" · ")}
               amount={formatManwon(row.amount_krw)}
@@ -701,6 +931,7 @@ function LedgerRow({
   amount,
   strong,
   dim,
+  alert,
   onPick,
 }: {
   month: string;
@@ -708,19 +939,24 @@ function LedgerRow({
   amount: string;
   strong?: boolean;
   dim?: boolean;
+  alert?: boolean;
   onPick?: () => void;
 }) {
   const label = (
     <>
       {month}
-      {note ? <span className="ml-1 text-[11px] text-[var(--muted)]">{note}</span> : null}
+      {note ? (
+        <span className={`ml-1 text-[11px] ${alert ? "text-[var(--danger)]" : "text-[var(--muted)]"}`}>
+          {note}
+        </span>
+      ) : null}
     </>
   );
   return (
     <div
       className={`flex items-baseline justify-between gap-2 px-3 py-1.5 text-xs ${
         strong ? "border-t border-[var(--line)] font-semibold" : ""
-      } ${dim ? "text-[var(--muted)]" : ""}`}
+      } ${alert ? "text-[var(--danger)]" : dim ? "text-[var(--muted)]" : ""}`}
     >
       {onPick ? (
         <button type="button" className="text-left hover:underline" onClick={onPick}>

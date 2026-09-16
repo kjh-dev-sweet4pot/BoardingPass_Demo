@@ -10,7 +10,7 @@ import {
   type ImportRowInput,
   type ParsedImportRow,
 } from "@/lib/csv-import";
-import { findDuplicateAllocation } from "@/lib/alloc-dup";
+import { findDuplicateAllocation, inheritedVisitState } from "@/lib/alloc-dup";
 import {
   allocationReplacePatch,
   dupIndexKey,
@@ -512,6 +512,14 @@ export async function POST(request: Request) {
         continue;
       }
 
+      const inherited = await inheritedVisitState(supabase, {
+        id: "",
+        influencer_id: influencer.id,
+        store_id: storeId,
+        visit_date: row.visit_date,
+        stores: { name: row.store },
+        products: { name: row.product },
+      });
       const { data: allocation, error } = await supabase
         .from("allocations")
         .insert({
@@ -521,7 +529,12 @@ export async function POST(request: Request) {
           company_id: row.company_id,
           quantity: row.quantity,
           visit_date: row.visit_date,
-          status: "pending",
+          status: inherited?.status || "pending",
+          picked_up_at: inherited?.picked_up_at || null,
+          verified_at: inherited?.verified_at || null,
+          last_visited_at: inherited?.last_visited_at || null,
+          visit_source: inherited?.visit_source || null,
+          visit_confirmed_by: inherited?.visit_confirmed_by || null,
         })
         .select("id")
         .single();

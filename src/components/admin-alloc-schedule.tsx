@@ -19,6 +19,7 @@ import {
   type BucketCounts,
   type VisitBucket,
 } from "@/lib/admin-alloc-schedule";
+import { groupSharedVisitAllocations } from "@/lib/alloc-dup";
 import { addDaysYmd, type AllocationWithRelations, type Company, type Store } from "@/lib/types";
 
 type StatusTab = "all" | VisitBucket;
@@ -56,6 +57,41 @@ function StatusBar({
       ) : null}
     </div>
   );
+}
+
+function activeMembers(members: AllocationWithRelations[]) {
+  const live = members.filter((item) => bucketOf(item.status) !== null);
+  return live.length > 0 ? live : members;
+}
+
+function memberChipLabel(
+  member: AllocationWithRelations,
+  members: AllocationWithRelations[],
+) {
+  const name = member.companies?.name?.trim() || "—";
+  const same = members.filter(
+    (item) => (item.companies?.name?.trim() || "—") === name,
+  );
+  if (same.length < 2) return name;
+  const tag = (member.visit_code || member.id).slice(0, 6);
+  return `${name} · ${tag}`;
+}
+
+function companyLabels(members: AllocationWithRelations[]) {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const item of activeMembers(members)) {
+    const key = item.company_id || item.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(item.companies?.name?.trim() || "—");
+  }
+  return names.sort((a, b) => a.localeCompare(b, "ko"));
+}
+
+function matchesStore(members: AllocationWithRelations[], storeId: string | null) {
+  if (!storeId) return true;
+  return members.some((item) => item.store_id === storeId);
 }
 
 function KpiCell({
@@ -110,14 +146,19 @@ export function AdminAllocSchedule({
     ? storeList.find((s) => s.id === storeId)?.name || null
     : null;
 
+  const groups = useMemo(
+    () => groupSharedVisitAllocations(liveList),
+    [liveList],
+  );
+
   const scoped = useMemo(
     () =>
-      liveList.filter(
-        (item) =>
-          (!storeId || item.store_id === storeId) &&
-          bucketOf(item.status) !== null,
+      groups.filter(
+        (group) =>
+          bucketOf(group.primary.status) !== null &&
+          matchesStore(group.members, storeId),
       ),
-    [liveList, storeId],
+    [groups, storeId],
   );
 
   const monthStats = useMemo(() => {
@@ -127,7 +168,8 @@ export function AdminAllocSchedule({
     let imminentToday = 0;
     let imminentTomorrow = 0;
 
-    for (const item of scoped) {
+    for (const group of scoped) {
+      const item = group.primary;
       const b = bucketOf(item.status);
       if (!b) continue;
       const k = visitKey(item);
@@ -155,7 +197,8 @@ export function AdminAllocSchedule({
     for (const store of storeList) {
       byStore.set(store.id, { ...emptyCounts(), todayPlan: 0 });
     }
-    for (const item of liveList) {
+    for (const group of groups) {
+      const item = group.primary;
       const b = bucketOf(item.status);
       if (!b) continue;
       const row = byStore.get(item.store_id);
@@ -177,22 +220,22 @@ export function AdminAllocSchedule({
       })
       .filter((s) => s.total > 0 || storeId === s.id)
       .sort((a, b) => b.total - a.total);
-  }, [storeList, liveList, monthYm, today, storeId]);
+  }, [storeList, groups, monthYm, today, storeId]);
 
   const listRows = useMemo(() => {
-    let rows = scoped.filter((item) => {
-      const k = visitKey(item);
+    let rows = scoped.filter((group) => {
+      const k = visitKey(group.primary);
       return day ? k === day : k.startsWith(monthYm);
     });
 
     const q = query.trim().toLowerCase();
     if (q) {
-      rows = rows.filter((item) => {
+      rows = rows.filter((group) => {
         const blob = [
-          item.influencers?.name,
-          item.influencers?.instagram_handle,
-          item.products?.name,
-          item.companies?.name,
+          group.primary.influencers?.name,
+          group.primary.influencers?.instagram_handle,
+          group.primary.products?.name,
+          ...companyLabels(group.members),
         ]
           .filter(Boolean)
           .join(" ")
@@ -207,22 +250,29 @@ export function AdminAllocSchedule({
       visited: 0,
       received: 0,
     };
-    for (const r of rows) {
-      const b = bucketOf(r.status);
+    for (const group of rows) {
+      const b = bucketOf(group.primary.status);
       if (b) tabCounts[b] += 1;
     }
 
     if (status !== "all") {
-      rows = rows.filter((r) => bucketOf(r.status) === status);
+      rows = rows.filter((group) => bucketOf(group.primary.status) === status);
     }
 
-    rows = rows.slice().sort((a, b) => visitKey(a).localeCompare(visitKey(b)));
+    rows = rows
+      .slice()
+      .sort((a, b) => visitKey(a.primary).localeCompare(visitKey(b.primary)));
     return { rows, tabCounts };
   }, [scoped, day, monthYm, query, status]);
 
-  const openItem = openId
-    ? liveList.find((item) => item.id === openId) || null
+  const openGroup = openId
+    ? groups.find((group) => group.members.some((item) => item.id === openId)) ||
+      null
     : null;
+  const openItem = openGroup
+    ? openGroup.members.find((item) => item.id === openId) || openGroup.primary
+    : liveList.find((item) => item.id === openId) || null;
+  const openCompanies = openGroup ? companyLabels(openGroup.members) : [];
 
   const listTitle = day
     ? `${padDateDot(day)} 방문 목록`
@@ -568,7 +618,9 @@ export function AdminAllocSchedule({
               조건에 맞는 배정이 없습니다.
             </p>
           ) : (
-            listRows.rows.map((item) => {
+            listRows.rows.map((group) => {
+              const item = group.primary;
+              const companies = companyLabels(group.members);
               const b = bucketOf(item.status)!;
               const badge = BADGE[b];
               const ymd = visitKey(item);
@@ -579,7 +631,7 @@ export function AdminAllocSchedule({
                 dayDiffYmd(ymd, today) <= 1;
               return (
                 <button
-                  key={item.id}
+                  key={group.key}
                   type="button"
                   onClick={() => setOpenId(item.id)}
                   className={`grid w-full grid-cols-1 items-center border-b border-[var(--line)] px-4 text-left transition hover:bg-[var(--accent-soft)] ${gridCols} ${
@@ -612,8 +664,16 @@ export function AdminAllocSchedule({
                   <div className="py-2.5 text-sm text-[var(--ink)]">
                     {item.stores?.name || "—"}
                   </div>
-                  <div className="py-2.5 text-sm text-[var(--muted)]">
-                    {item.companies?.name || "—"}
+                  <div
+                    className="py-2.5 text-sm text-[var(--muted)]"
+                    title={companies.join(", ")}
+                  >
+                    <span className="text-[var(--ink)]">{companies[0] || "—"}</span>
+                    {companies.length > 1 ? (
+                      <span className="ml-1 text-[11px] font-bold text-[var(--accent)]">
+                        외 {companies.length - 1}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="py-2.5 pl-0 md:pl-3.5">
                     <span
@@ -664,13 +724,55 @@ export function AdminAllocSchedule({
                 닫기
               </button>
             </div>
+            {openGroup && openGroup.members.length > 1 ? (
+              <div className="mb-4">
+                <p className="text-xs text-[var(--muted)]">
+                  같은 방문 · 회원사 {openCompanies.length}곳
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {openGroup.members.map((member) => {
+                    const on = member.id === openItem?.id;
+                    const name = memberChipLabel(member, openGroup.members);
+                    return (
+                      <button
+                        key={member.id}
+                        type="button"
+                        onClick={() => setOpenId(member.id)}
+                        className={`rounded-[6px] border px-2.5 py-1 text-xs font-bold ${
+                          on
+                            ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                            : "border-[var(--line)] text-[var(--muted)]"
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
             <AdminAllocationEditForm
               item={openItem}
               storeList={storeList}
               companyList={companyList}
-              onUpdated={(next) =>
+              onUpdated={(next, syncedIds) =>
                 setLiveList((prev) =>
-                  prev.map((item) => (item.id === next.id ? next : item)),
+                  prev.map((item) => {
+                    if (item.id === next.id) return next;
+                    if (!syncedIds?.includes(item.id)) return item;
+                    return {
+                      ...item,
+                      status: next.status,
+                      picked_up_at: next.picked_up_at,
+                      verified_at: next.verified_at,
+                      last_visited_at: next.last_visited_at,
+                      visit_source: next.visit_source,
+                      visit_confirmed_by: next.visit_confirmed_by,
+                      visit_date: next.visit_date,
+                      store_id: next.store_id,
+                      stores: next.stores,
+                    };
+                  }),
                 )
               }
             />

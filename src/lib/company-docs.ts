@@ -169,6 +169,40 @@ export function contractAnnexInvoice(payload: ContractPayload): InvoicePayload {
   };
 }
 
+/** 계약서 견적 줄에 내용이 있는지. 빈 초안은 인보이스로 따로 안 만든다. */
+export function hasDocLineContent(lines: DocLine[]) {
+  return lines.some(
+    (l) => l.description.trim() || l.remark.trim() || Number(l.unitPrice) || Number(l.qty) !== 1,
+  );
+}
+
+/**
+ * 계약서에서 직접 쓴 견적 → 저장용 인보이스.
+ * 이미 불러온 인보이스(번호가 "견적"이 아님)면 그 내용을 유지한다.
+ */
+export function invoiceFromContract(
+  contract: ContractPayload,
+  company?: {
+    contact?: string | null;
+    contact_email?: string | null;
+    login_id?: string | null;
+  } | null,
+): InvoicePayload {
+  const attached = contract.attachedInvoice;
+  if (attached?.invoiceNo && attached.invoiceNo !== "견적") {
+    return { ...attached, lines: contract.lines.map((l) => ({ ...l })) };
+  }
+  return {
+    invoiceNo: defaultInvoiceNo(company?.login_id),
+    issuedOn: contract.issuedOn || ymdKst(),
+    toName: contract.partyAName,
+    toAddress: contract.partyAAddress,
+    toTel: company?.contact || "",
+    toEmail: company?.contact_email || "",
+    lines: contract.lines.map((l) => ({ ...l })),
+  };
+}
+
 function esc(s: string) {
   return s
     .replace(/&/g, "&amp;")
@@ -424,6 +458,23 @@ if (process.env.RUN_COMPANY_DOCS_SELF_CHECK === "1") {
   const attached = applyInvoiceToContract(defaultContractPayload({ name: "클리어디어" }), inv);
   if (attached.amountExVat !== 2_000_000 || attached.attachedInvoice?.invoiceNo !== "slam260908cd") {
     throw new Error("applyInvoiceToContract");
+  }
+  const fromContract = invoiceFromContract(
+    {
+      ...defaultContractPayload({ name: "클리어디어" }),
+      lines: [{ description: "약사 콘텐츠", qty: 2, unitPrice: 1_000_000, remark: "" }],
+    },
+    { login_id: "cleardear", contact: "010", contact_email: "a@b.c" },
+  );
+  if (
+    fromContract.invoiceNo === "견적" ||
+    fromContract.toName !== "클리어디어" ||
+    fromContract.lines[0]?.unitPrice !== 1_000_000
+  ) {
+    throw new Error("invoiceFromContract");
+  }
+  if (!hasDocLineContent(fromContract.lines) || hasDocLineContent([emptyLine()])) {
+    throw new Error("hasDocLineContent");
   }
   const loaded = contractHtml({ ...attached, partyABizNo: "123-45-67890" });
   if (!loaded.includes("slam260908cd") || !loaded.includes(BRANDSLAM.account)) {

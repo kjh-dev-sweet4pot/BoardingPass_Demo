@@ -12,6 +12,8 @@ import {
   emptyLine,
   formatBizNo,
   formatDocKrw,
+  hasDocLineContent,
+  invoiceFromContract,
   invoiceHtml,
   invoiceTotals,
   lineAmount,
@@ -275,32 +277,66 @@ export function AdminCompanyDocsPanel({
     setError(null);
     if (kind === "계약서" && status === "발행" && !contract.partyABizNo.trim()) {
       setError("발행하려면 상대방(갑) 사업자등록번호를 입력하세요.");
+      setSaving(false);
       return;
     }
-    const payload =
-      kind === "인보이스"
-        ? invoice
-        : {
-            ...contract,
-            amountExVat: contract.amountExVat || invoiceTotals(contract.lines).subtotal,
-          };
-    const issuedOn =
-      kind === "인보이스" ? invoice.issuedOn : contract.issuedOn;
-    const body = {
-      company_id: companyId,
-      kind,
-      title: title.trim() || kind,
-      status,
-      issued_on: issuedOn || null,
-      payload,
-    };
     try {
+      let payload: InvoicePayload | ContractPayload =
+        kind === "인보이스"
+          ? invoice
+          : {
+              ...contract,
+              amountExVat: contract.amountExVat || invoiceTotals(contract.lines).subtotal,
+            };
+
+      // 계약서에서 견적을 직접 쓰면 인보이스 문서로도 저장한다.
+      if (kind === "계약서") {
+        const draft = payload as ContractPayload;
+        const attachedNo = draft.attachedInvoice?.invoiceNo?.trim() || "";
+        const alreadySaved =
+          attachedNo &&
+          attachedNo !== "견적" &&
+          savedInvoices.some(
+            (d) => (d.payload as InvoicePayload).invoiceNo === attachedNo,
+          );
+        if (!alreadySaved && hasDocLineContent(draft.lines)) {
+          const invPayload = invoiceFromContract(draft, company);
+          const invRes = await fetch("/api/admin/company-docs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              company_id: companyId,
+              kind: "인보이스",
+              title: `INVOICE ${invPayload.invoiceNo}`,
+              status,
+              issued_on: invPayload.issuedOn || null,
+              payload: invPayload,
+            }),
+          });
+          const invJson = await invRes.json().catch(() => ({}));
+          if (!invRes.ok) throw new Error(invJson.error || "인보이스 저장 실패");
+          payload = applyInvoiceToContract(draft, invPayload);
+          setContract(payload);
+        }
+      }
+
+      const issuedOn =
+        kind === "인보이스"
+          ? invoice.issuedOn
+          : (payload as ContractPayload).issuedOn;
       const res = await fetch(
         editingId ? `/api/admin/company-docs/${editingId}` : "/api/admin/company-docs",
         {
           method: editingId ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({
+            company_id: companyId,
+            kind,
+            title: title.trim() || kind,
+            status,
+            issued_on: issuedOn || null,
+            payload,
+          }),
         },
       );
       const json = await res.json().catch(() => ({}));
@@ -654,7 +690,8 @@ export function AdminCompanyDocsPanel({
               </div>
               {savedInvoices.length === 0 ? (
                 <p className="text-[11px] text-[var(--muted)]">
-                  이 회원사에 저장된 인보이스가 없습니다. 먼저 인보이스를 저장하세요.
+                  저장된 인보이스가 없습니다. 아래 견적을 채운 뒤 계약서를 저장하면 인보이스도 같이
+                  저장됩니다.
                 </p>
               ) : null}
               {contract.attachedInvoice?.invoiceNo ? (

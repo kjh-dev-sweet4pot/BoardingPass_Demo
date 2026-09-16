@@ -4,6 +4,7 @@ import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-cl
 import { hashPassword } from "@/lib/password";
 import {
   COMPANY_SELECT,
+  canEditContractStageIndependently,
   companyCrmFieldsFromBody,
   companySelectAfterColumnError,
   isMissingColumnError,
@@ -72,6 +73,34 @@ export async function PATCH(
   }
   Object.assign(patch, crm.fields);
 
+  if ("contract_stage" in patch) {
+    const { data: current } = await supabase
+      .from("companies")
+      .select("contract_stage")
+      .eq("id", id)
+      .maybeSingle();
+    const unlocked = canEditContractStageIndependently(current?.contract_stage);
+    const next = String(patch.contract_stage || "");
+    if (!unlocked) {
+      return NextResponse.json(
+        {
+          error:
+            "입금 완료 전에는 계약 단계가 입금 상태와 같습니다. 예산 탭에서 입금 상태를 바꿔 주세요.",
+        },
+        { status: 400 },
+      );
+    }
+    if (next && !canEditContractStageIndependently(next)) {
+      return NextResponse.json(
+        {
+          error:
+            "입금 완료 이후에는 캠페인 진행중·완료·종료·계약 파기만 선택할 수 있습니다.",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   let { error } = await supabase.from("companies").update(patch).eq("id", id);
   if (error && isMissingCompanyCrmColumn(error.message)) {
     for (const key of Object.keys(crm.fields)) delete patch[key];
@@ -86,6 +115,15 @@ export async function PATCH(
   }
 
   if (error) {
+    if (/companies_contract_stage_check/i.test(error.message)) {
+      return NextResponse.json(
+        {
+          error:
+            "계약 단계 DB 제약이 예전입니다. scripts/sql/companies-contract-fields.sql 을 Supabase SQL editor에서 실행해 주세요.",
+        },
+        { status: 500 },
+      );
+    }
     const status = error.message.toLowerCase().includes("unique") ? 409 : 500;
     return NextResponse.json(
       {

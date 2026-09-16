@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAnyAdmin } from "@/lib/access";
+import { propagateSharedVisitCreatorLink } from "@/lib/alloc-dup";
 import { adminReviewerFields, contentReviewLogsClient } from "@/lib/content-review-log";
 import { ADMIN_LINK_REVIEW_SELECT } from "@/lib/creator-link";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
@@ -99,6 +100,23 @@ export async function PATCH(
       { error: `검수는 반영됐으나 기록 저장 실패: ${logErr.message}` },
       { status: 500 },
     );
+  }
+
+  if (status === "approved" && data.allocation_id && data.influencer_id) {
+    try {
+      await propagateSharedVisitCreatorLink(supabase, data.allocation_id, {
+        id: data.id,
+        influencer_id: data.influencer_id,
+        url: data.publish_url || data.url,
+        platform: data.platform,
+        status: "approved",
+        content_status: "승인",
+        publish_url: data.publish_url ?? null,
+        submitted_at: data.submitted_at ?? null,
+      });
+    } catch {
+      // 검수 원본은 유지
+    }
   }
 
   return NextResponse.json({ link: data });

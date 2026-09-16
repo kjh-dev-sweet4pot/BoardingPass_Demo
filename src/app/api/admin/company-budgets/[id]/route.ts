@@ -3,13 +3,37 @@ import { requireAdminManager } from "@/lib/access";
 import { isMissingColumnError } from "@/lib/company";
 import {
   BUDGET_ROUND_SELECT,
+  BUDGET_ROUND_SELECT_NO_SOURCE,
+  BUDGET_ROUND_SELECT_NO_USAGE_PERIOD,
   BUDGET_TABLE_SETUP,
   budgetTableMissing,
   fillCompanyName,
+  isBudgetStatusCheckError,
+  normalizeBudgetRound,
   readRoundBody,
+  stripBudgetOptionalColumns,
   syncDepositedBudgets,
+  withLegacyBudgetStatuses,
+  type BudgetRound,
 } from "@/lib/company-budget-rounds";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
+
+function selectFallback(message: string) {
+  if (isMissingColumnError(message, "source_deposit_id")) return BUDGET_ROUND_SELECT_NO_SOURCE;
+  if (isMissingColumnError(message, "usage_period_month")) return BUDGET_ROUND_SELECT_NO_USAGE_PERIOD;
+  if (isMissingColumnError(message, "kind")) {
+    return "id, company_id, company_name, label, period_month, amount_krw, deposit_status, usage_status, created_at, updated_at";
+  }
+  return null;
+}
+
+function stripMissingColumns(row: Record<string, unknown>, message: string) {
+  const cols: string[] = [];
+  if (isMissingColumnError(message, "source_deposit_id")) cols.push("source_deposit_id");
+  if (isMissingColumnError(message, "usage_period_month")) cols.push("usage_period_month");
+  if (isMissingColumnError(message, "kind")) cols.push("kind");
+  return stripBudgetOptionalColumns(row, cols);
+}
 
 export async function PATCH(
   request: Request,
@@ -46,28 +70,57 @@ export async function PATCH(
     return NextResponse.json({ error: named.error }, { status: 400 });
   }
 
+  let payload: Record<string, unknown> & { deposit_status: string; usage_status: string } = {
+    ...named,
+    updated_at: new Date().toISOString(),
+  };
+  let select = BUDGET_ROUND_SELECT;
   let { data, error } = await supabase
     .from("company_budget_rounds")
-    .update({ ...named, updated_at: new Date().toISOString() })
+    .update(payload)
     .eq("id", id)
-    .select(BUDGET_ROUND_SELECT)
+    .select(select)
     .maybeSingle();
-  if (error && isMissingColumnError(error.message, "kind")) {
-    if (named.kind === "사용") {
-      return NextResponse.json(
-        { error: "입금과 사용 계획을 나누려면 SQL을 다시 실행하세요. " + BUDGET_TABLE_SETUP },
-        { status: 500 },
-      );
+
+  if (error && isMissingColumnError(error.message, "source_deposit_id") && named.kind === "사용") {
+    return NextResponse.json(
+      { error: "사용 분할을 쓰려면 SQL을 실행하세요. " + BUDGET_TABLE_SETUP },
+      { status: 500 },
+    );
+  }
+
+  for (
+    let i = 0;
+    i < 3 &&
+    error &&
+    (isMissingColumnError(error.message, "source_deposit_id") ||
+      isMissingColumnError(error.message, "usage_period_month") ||
+      isMissingColumnError(error.message, "kind"));
+    i++
+  ) {
+    if (isMissingColumnError(error.message, "kind") && named.kind === "사용") {
+      return NextResponse.json({ error: BUDGET_TABLE_SETUP }, { status: 500 });
     }
-    const { kind: _kind, ...legacy } = named;
+    payload = stripMissingColumns(payload, error.message);
+    select = selectFallback(error.message) || select;
     const fallback = await supabase
       .from("company_budget_rounds")
-      .update({ ...legacy, updated_at: new Date().toISOString() })
+      .update(payload)
       .eq("id", id)
-      .select(BUDGET_ROUND_SELECT.replace(", kind", ""))
+      .select(select)
       .maybeSingle();
     data = fallback.data;
     error = fallback.error;
+  }
+  if (error && isBudgetStatusCheckError(error.message)) {
+    const retry = await supabase
+      .from("company_budget_rounds")
+      .update({ ...withLegacyBudgetStatuses(payload), updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select(select)
+      .maybeSingle();
+    data = retry.data;
+    error = retry.error;
   }
   if (error) {
     const status = error.message.toLowerCase().includes("unique") ? 409 : 500;
@@ -88,11 +141,14 @@ export async function PATCH(
     ]);
   } catch (err) {
     return NextResponse.json({
-      round: data,
+      round: data ? normalizeBudgetRound(data as BudgetRound) : data,
       warning: err instanceof Error ? err.message : "배정 예산 반영 실패",
     });
   }
-  return NextResponse.json({ round: data, budgets });
+  return NextResponse.json({
+    round: data ? normalizeBudgetRound(data as BudgetRound) : data,
+    budgets,
+  });
 }
 
 export async function DELETE(
@@ -116,6 +172,9 @@ export async function DELETE(
   if (!existing.data) {
     return NextResponse.json({ error: "예산 라운드를 찾을 수 없습니다." }, { status: 404 });
   }
+
+  // cascade 없을 때 사용 분할 먼저 삭제
+  await supabase.from("company_budget_rounds").delete().eq("source_deposit_id", id);
 
   const { error } = await supabase.from("company_budget_rounds").delete().eq("id", id);
   if (error) {

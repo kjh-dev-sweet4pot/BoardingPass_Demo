@@ -3,7 +3,11 @@
 import { useMemo, useState } from "react";
 import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
-import { COMPANY_CONTRACT_STAGES } from "@/lib/company";
+import {
+  COMPANY_CONTRACT_STAGES,
+  CONTRACT_STAGES_AFTER_DEPOSIT,
+  canEditContractStageIndependently,
+} from "@/lib/company";
 import { type Company } from "@/lib/types";
 
 export function AdminCompanyPanel({
@@ -122,7 +126,9 @@ export function AdminCompanyPanel({
         first_meet_on: firstMeetOn || null,
         planned_start_on: plannedStartOn || null,
         planned_end_on: plannedEndOn || null,
-        contract_stage: contractStage || null,
+        ...(canEditContractStageIndependently(contractStage)
+          ? { contract_stage: contractStage || null }
+          : {}),
         budget_amount: budgetAmount || null,
         spent_amount: spentAmount || null,
         guideline_url: guidelineUrl || null,
@@ -321,14 +327,23 @@ export function AdminCompanyPanel({
               className={fieldClass}
               value={contractStage}
               onChange={(e) => setContractStage(e.target.value)}
+              disabled={!canEditContractStageIndependently(contractStage)}
             >
               <option value="">계약 진행 단계</option>
-              {COMPANY_CONTRACT_STAGES.map((s) => (
+              {(canEditContractStageIndependently(contractStage)
+                ? CONTRACT_STAGES_AFTER_DEPOSIT
+                : COMPANY_CONTRACT_STAGES.filter((s) => s === contractStage)
+              ).map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
               ))}
             </select>
+            {!canEditContractStageIndependently(contractStage) ? (
+              <p className="text-[11px] text-[var(--muted)]">
+                입금 완료 전에는 예산 입금 상태와 같습니다.
+              </p>
+            ) : null}
             <div className="grid grid-cols-2 gap-2">
               <input
                 className={fieldClass}

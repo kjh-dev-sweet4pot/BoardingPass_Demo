@@ -1,6 +1,9 @@
 import { isMoneyOk, parseMoney } from "@/lib/money";
 
 export const COMPANY_CONTRACT_STAGES = [
+  "입점 논의중",
+  "협의중",
+  "입금 지연",
   "최초미팅",
   "계약 조건 논의중",
   "계약 완료",
@@ -11,6 +14,36 @@ export const COMPANY_CONTRACT_STAGES = [
 ] as const;
 
 export type CompanyContractStage = (typeof COMPANY_CONTRACT_STAGES)[number];
+
+/** 입금 완료 전 — 입금 상태와 동일한 계약 단계 */
+export const CONTRACT_STAGES_SYNCED_TO_DEPOSIT = [
+  "입점 논의중",
+  "협의중",
+  "입금 지연",
+] as const;
+
+/** 입금 완료 후 — 따로 조정 */
+export const CONTRACT_STAGES_AFTER_DEPOSIT = [
+  "캠페인 진행중",
+  "캠페인 진행 완료",
+  "종료",
+  "계약 파기",
+] as const;
+
+export function isContractStageSyncedToDeposit(
+  stage: string | null | undefined,
+): boolean {
+  const s = String(stage || "").trim();
+  return (CONTRACT_STAGES_SYNCED_TO_DEPOSIT as readonly string[]).includes(s);
+}
+
+/** 입금 완료 이후라 계약 단계를 따로 고를 수 있는지 */
+export function canEditContractStageIndependently(
+  stage: string | null | undefined,
+): boolean {
+  const s = String(stage || "").trim();
+  return (CONTRACT_STAGES_AFTER_DEPOSIT as readonly string[]).includes(s);
+}
 
 export const COMPANY_SELECT_BASE =
   "id, name, login_id, aliases, contact, is_active, created_at, updated_at";

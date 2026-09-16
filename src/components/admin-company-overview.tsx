@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Field, fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
-import { COMPANY_CONTRACT_STAGES } from "@/lib/company";
+import {
+  COMPANY_CONTRACT_STAGES,
+  CONTRACT_STAGES_AFTER_DEPOSIT,
+  canEditContractStageIndependently,
+} from "@/lib/company";
 import { formatKrw } from "@/lib/creator-pool-mock";
 import type { Company } from "@/lib/types";
 
@@ -197,6 +201,7 @@ function CompanyEditForm({
   const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const stageUnlocked = canEditContractStageIndependently(company.contract_stage);
 
   useEffect(() => {
     setName(company.name);
@@ -236,7 +241,7 @@ function CompanyEditForm({
           first_meet_on: firstMeetOn || null,
           planned_start_on: plannedStartOn || null,
           planned_end_on: plannedEndOn || null,
-          contract_stage: contractStage || null,
+          ...(stageUnlocked ? { contract_stage: contractStage || null } : {}),
           budget_amount: budgetAmount || null,
           spent_amount: spentAmount || null,
           guideline_url: guidelineUrl || null,
@@ -293,12 +298,33 @@ function CompanyEditForm({
           <input className={fieldClass} value={aliases} onChange={(e) => setAliases(e.target.value)} disabled={!isManager} />
         </Field>
         <Field label="계약 진행 단계">
-          <select className={fieldClass} value={contractStage} onChange={(e) => setContractStage(e.target.value)} disabled={!isManager}>
-            <option value="">선택</option>
-            {COMPANY_CONTRACT_STAGES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
+          <select
+            className={fieldClass}
+            value={contractStage}
+            onChange={(e) => setContractStage(e.target.value)}
+            disabled={!isManager || !stageUnlocked}
+          >
+            {stageUnlocked ? <option value="">선택</option> : null}
+            {(stageUnlocked ? CONTRACT_STAGES_AFTER_DEPOSIT : COMPANY_CONTRACT_STAGES)
+              .filter((s) => stageUnlocked || s === contractStage)
+              .map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            {!stageUnlocked && contractStage && !(COMPANY_CONTRACT_STAGES as readonly string[]).includes(contractStage) ? (
+              <option value={contractStage}>{contractStage}</option>
+            ) : null}
           </select>
+          {!stageUnlocked ? (
+            <p className="mt-1 text-[11px] text-[var(--muted)]">
+              입금 완료 전에는 예산 입금 상태와 같습니다. 예산 탭에서 바꿔 주세요.
+            </p>
+          ) : (
+            <p className="mt-1 text-[11px] text-[var(--muted)]">
+              입금 완료 후입니다. 캠페인 진행 이후 단계만 직접 조정할 수 있습니다.
+            </p>
+          )}
         </Field>
         <Field label="최초 미팅 일자">
           <input className={fieldClass} type="date" value={firstMeetOn} onChange={(e) => setFirstMeetOn(e.target.value)} disabled={!isManager} />

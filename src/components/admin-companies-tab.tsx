@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Field, fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
-import { COMPANY_CONTRACT_STAGES, isAdminTestCompany } from "@/lib/company";
+import { COMPANY_CONTRACT_STAGES, CONTRACT_STAGES_AFTER_DEPOSIT, CONTRACT_STAGES_SYNCED_TO_DEPOSIT, canEditContractStageIndependently, isAdminTestCompany } from "@/lib/company";
 import {
   companyCsvTemplate,
   parseCompanyImportRows,
@@ -360,7 +360,9 @@ function CompanyForm({
         first_meet_on: firstMeetOn || null,
         planned_start_on: plannedStartOn || null,
         planned_end_on: plannedEndOn || null,
-        contract_stage: contractStage || null,
+        ...(editingId && !canEditContractStageIndependently(contractStage)
+          ? {}
+          : { contract_stage: contractStage || null }),
         budget_amount: budgetAmount || null,
         spent_amount: spentAmount || null,
         guideline_url: guidelineUrl || null,
@@ -475,15 +477,25 @@ function CompanyForm({
             className={fieldClass}
             value={contractStage}
             onChange={(e) => setContractStage(e.target.value)}
-            disabled={!isManager}
+            disabled={!isManager || (Boolean(editingId) && !canEditContractStageIndependently(contractStage))}
           >
             <option value="">선택</option>
-            {COMPANY_CONTRACT_STAGES.map((s) => (
+            {(editingId
+              ? canEditContractStageIndependently(contractStage)
+                ? CONTRACT_STAGES_AFTER_DEPOSIT
+                : COMPANY_CONTRACT_STAGES.filter((s) => s === contractStage)
+              : CONTRACT_STAGES_SYNCED_TO_DEPOSIT
+            ).map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
             ))}
           </select>
+          {editingId && !canEditContractStageIndependently(contractStage) ? (
+            <p className="mt-1 text-[11px] text-[var(--muted)]">
+              입금 완료 전에는 예산 입금 상태와 같습니다.
+            </p>
+          ) : null}
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="배정 예산 (원)">
@@ -1410,7 +1422,14 @@ export function AdminCompaniesTab({
               setList((prev) =>
                 prev.map((c) => {
                   const hit = patches.find((p) => p.company_id === c.id);
-                  return hit ? { ...c, budget_amount: hit.budget_amount } : c;
+                  if (!hit) return c;
+                  return {
+                    ...c,
+                    budget_amount: hit.budget_amount,
+                    ...(hit.contract_stage !== undefined
+                      ? { contract_stage: hit.contract_stage }
+                      : {}),
+                  };
                 }),
               )
             }
