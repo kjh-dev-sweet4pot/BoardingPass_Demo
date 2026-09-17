@@ -31,7 +31,6 @@ const MAIN_TABS: {
 const PERFORMANCE_ITEMS: NavDropdownItem<PerformanceView>[] = [
   { id: "content", label: "성과 대시보드", hint: "캠페인 전체 요약" },
   { id: "contentLookup", label: "성과 조회", hint: "인플루언서별 상세" },
-  { id: "budgetPerformance", label: "예산 성과", hint: "노출가 사용·차감 예정" },
 ];
 
 const MOBILE_TABS: { id: CompanyConsoleView; label: string; full: string }[] = [
