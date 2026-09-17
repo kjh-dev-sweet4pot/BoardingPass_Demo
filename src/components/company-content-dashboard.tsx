@@ -85,7 +85,7 @@ export function CompanyContentDashboard({
         </div>
 
         {snapshot.posts.length > 0 ? (
-          <div className="grid shrink-0 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 shrink-0 gap-3 sm:grid-cols-2">
             <BreakdownPanel
               title="국가별 성과"
               rows={snapshot.byMarket}

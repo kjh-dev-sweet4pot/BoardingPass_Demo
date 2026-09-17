@@ -1205,7 +1205,7 @@ export function CompanyHomeLanding({
               >
                 월간 랭킹 바로가기
               </button>
-              <div className="h-5 min-w-0 flex-1 overflow-hidden">
+              <div className="h-5 min-w-0 flex-1 overflow-hidden [-webkit-mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-16px),transparent)] [mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-16px),transparent)]">
                 {month.length === 0 ? (
                   <span className="text-[12.5px] text-[var(--muted)]">
                     최근 30일 발행된 게시물이 없습니다

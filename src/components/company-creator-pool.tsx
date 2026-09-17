@@ -550,7 +550,7 @@ function CreatorDetail({
         </a>
       ) : null}
 
-      <dl className="mb-0 grid gap-3 rounded-[6px] bg-[var(--accent-soft)]/50 px-4 py-4 sm:grid-cols-2">
+      <dl className="mb-0 grid grid-cols-1 gap-3 rounded-[6px] bg-[var(--accent-soft)]/50 px-4 py-4 sm:grid-cols-2">
         <div>
           <dt className="text-xs text-[var(--muted)]">팔로워</dt>
           <dd className="mt-1 font-semibold tabular-nums">

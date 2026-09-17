@@ -873,7 +873,7 @@ export function CompanyHomePerformanceBoard({
               발행된 콘텐츠가 없습니다.
             </p>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {shown.map((c) => (
                 <article
                   key={c.id}

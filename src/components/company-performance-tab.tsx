@@ -336,6 +336,18 @@ type TopMetric =
   | { kind: "shares" }
   | { kind: "reposts" };
 
+/** TOP 랭킹은 인플루언서당 최고 성과 1건만 — 같은 사람이 여러 자리를 차지하지 않도록 */
+function dedupeByInfluencer<T extends LinkRow>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const id = row.allocations?.influencer_id;
+    if (!id) return true;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
 function topMetricValue(row: LinkRow, metric: TopMetric): number {
   const views = row.views ?? 0;
   const likes = row.likes ?? 0;
@@ -819,82 +831,88 @@ export function CompanyPerformanceTab({
 
   const topByViews = useMemo(
     () =>
-      [...links]
-        .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
-        .slice(0, 5),
+      dedupeByInfluencer(
+        [...links].sort((a, b) => (b.views ?? 0) - (a.views ?? 0)),
+      ).slice(0, 5),
     [links],
   );
 
   const topByLikes = useMemo(
     () =>
-      [...links]
-        .sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0))
-        .slice(0, 5),
+      dedupeByInfluencer(
+        [...links].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0)),
+      ).slice(0, 5),
     [links],
   );
 
   const topByLikeRate = useMemo(
     () =>
-      [...links]
-        .filter((l) => (l.views ?? 0) >= RATIO_MIN_VIEWS)
-        .sort(
-          (a, b) =>
-            topMetricValue(b, { kind: "likeRate" }) -
-            topMetricValue(a, { kind: "likeRate" }),
-        )
-        .slice(0, 5),
+      dedupeByInfluencer(
+        [...links]
+          .filter((l) => (l.views ?? 0) >= RATIO_MIN_VIEWS)
+          .sort(
+            (a, b) =>
+              topMetricValue(b, { kind: "likeRate" }) -
+              topMetricValue(a, { kind: "likeRate" }),
+          ),
+      ).slice(0, 5),
     [links],
   );
 
   const topByCommentRate = useMemo(
     () =>
-      [...links]
-        .filter((l) => (l.views ?? 0) >= RATIO_MIN_VIEWS)
-        .sort(
-          (a, b) =>
-            topMetricValue(b, { kind: "commentRate" }) -
-            topMetricValue(a, { kind: "commentRate" }),
-        )
-        .slice(0, 5),
+      dedupeByInfluencer(
+        [...links]
+          .filter((l) => (l.views ?? 0) >= RATIO_MIN_VIEWS)
+          .sort(
+            (a, b) =>
+              topMetricValue(b, { kind: "commentRate" }) -
+              topMetricValue(a, { kind: "commentRate" }),
+          ),
+      ).slice(0, 5),
     [links],
   );
 
   const topByEr = useMemo(
     () =>
-      [...links]
-        .filter((l) => (l.views ?? 0) >= RATIO_MIN_VIEWS)
-        .sort(
-          (a, b) =>
-            topMetricValue(b, { kind: "er" }) - topMetricValue(a, { kind: "er" }),
-        )
-        .slice(0, 5),
+      dedupeByInfluencer(
+        [...links]
+          .filter((l) => (l.views ?? 0) >= RATIO_MIN_VIEWS)
+          .sort(
+            (a, b) =>
+              topMetricValue(b, { kind: "er" }) - topMetricValue(a, { kind: "er" }),
+          ),
+      ).slice(0, 5),
     [links],
   );
 
   const topBySaves = useMemo(
     () =>
-      [...links]
-        .filter((l) => l.saves != null && (l.saves ?? 0) > 0)
-        .sort((a, b) => (b.saves ?? 0) - (a.saves ?? 0))
-        .slice(0, 5),
+      dedupeByInfluencer(
+        [...links]
+          .filter((l) => l.saves != null && (l.saves ?? 0) > 0)
+          .sort((a, b) => (b.saves ?? 0) - (a.saves ?? 0)),
+      ).slice(0, 5),
     [links],
   );
 
   const topByShares = useMemo(
     () =>
-      [...links]
-        .filter((l) => l.shares != null && (l.shares ?? 0) > 0)
-        .sort((a, b) => (b.shares ?? 0) - (a.shares ?? 0))
-        .slice(0, 5),
+      dedupeByInfluencer(
+        [...links]
+          .filter((l) => l.shares != null && (l.shares ?? 0) > 0)
+          .sort((a, b) => (b.shares ?? 0) - (a.shares ?? 0)),
+      ).slice(0, 5),
     [links],
   );
 
   const topByReposts = useMemo(
     () =>
-      [...links]
-        .filter((l) => l.reposts != null && (l.reposts ?? 0) > 0)
-        .sort((a, b) => (b.reposts ?? 0) - (a.reposts ?? 0))
-        .slice(0, 5),
+      dedupeByInfluencer(
+        [...links]
+          .filter((l) => l.reposts != null && (l.reposts ?? 0) > 0)
+          .sort((a, b) => (b.reposts ?? 0) - (a.reposts ?? 0)),
+      ).slice(0, 5),
     [links],
   );
 
@@ -925,11 +943,12 @@ export function CompanyPerformanceTab({
     }
     if (earlyViews.size > 0) {
       return {
-        topByEarly: links
-          .filter((l) => (earlyViews.get(l.id) ?? 0) > 0)
-          .map((l) => ({ ...l, earlyViews: earlyViews.get(l.id) ?? 0 }))
-          .sort((a, b) => b.earlyViews - a.earlyViews)
-          .slice(0, 5),
+        topByEarly: dedupeByInfluencer(
+          links
+            .filter((l) => (earlyViews.get(l.id) ?? 0) > 0)
+            .map((l) => ({ ...l, earlyViews: earlyViews.get(l.id) ?? 0 }))
+            .sort((a, b) => b.earlyViews - a.earlyViews),
+        ).slice(0, 5),
         earlyAside: "D+1~2 스냅샷",
       };
     }
@@ -952,11 +971,12 @@ export function CompanyPerformanceTab({
       if (delta > 0) growth.set(id, delta);
     }
     return {
-      topByEarly: links
-        .filter((l) => (growth.get(l.id) ?? 0) > 0)
-        .map((l) => ({ ...l, earlyViews: growth.get(l.id) ?? 0 }))
-        .sort((a, b) => b.earlyViews - a.earlyViews)
-        .slice(0, 5),
+      topByEarly: dedupeByInfluencer(
+        links
+          .filter((l) => (growth.get(l.id) ?? 0) > 0)
+          .map((l) => ({ ...l, earlyViews: growth.get(l.id) ?? 0 }))
+          .sort((a, b) => b.earlyViews - a.earlyViews),
+      ).slice(0, 5),
       earlyAside: "첫·둘째 수집 증가",
     };
   }, [links, metrics]);
@@ -1290,7 +1310,7 @@ export function CompanyPerformanceTab({
             <h3 className="text-[13.5px] font-semibold text-[var(--ink)]">
               콘텐츠 성과 TOP
             </h3>
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               <TopContentPanel
                 title="조회수 TOP"
                 why={METRIC_WHY.views}
@@ -1312,7 +1332,7 @@ export function CompanyPerformanceTab({
               />
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               <TopContentPanel
                 title="저장 TOP"
                 why={METRIC_WHY.saves}
@@ -1333,7 +1353,7 @@ export function CompanyPerformanceTab({
               />
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               <TopContentPanel
                 title="댓글 반응 TOP"
                 why={METRIC_WHY.commentRate}
@@ -1358,7 +1378,7 @@ export function CompanyPerformanceTab({
             </div>
           </div>
 
-          <div className="grid items-start gap-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
             <PlatformErPanel rows={platformErRows} />
             <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
               <PanelTitle title="상품별 성과" why={METRIC_WHY.product} />
