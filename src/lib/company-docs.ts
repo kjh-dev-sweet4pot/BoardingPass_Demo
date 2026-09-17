@@ -72,6 +72,14 @@ export function emptyLine(): DocLine {
   return { description: "", qty: 1, unitPrice: 0, remark: "" };
 }
 
+/** 인보이스 단가 추천용 median. 빈 배열이면 null. */
+export function medianUnitPrice(nums: number[]): number | null {
+  if (!nums.length) return null;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
 export function lineAmount(line: DocLine) {
   const qty = Number(line.qty) || 0;
   const unit = Number(line.unitPrice) || 0;
@@ -166,6 +174,40 @@ export function contractAnnexInvoice(payload: ContractPayload): InvoicePayload {
     toTel: "",
     toEmail: "",
     lines: payload.lines,
+  };
+}
+
+/** 계약서 견적 줄에 내용이 있는지. 빈 초안은 인보이스로 따로 안 만든다. */
+export function hasDocLineContent(lines: DocLine[]) {
+  return lines.some(
+    (l) => l.description.trim() || l.remark.trim() || Number(l.unitPrice) || Number(l.qty) !== 1,
+  );
+}
+
+/**
+ * 계약서에서 직접 쓴 견적 → 저장용 인보이스.
+ * 이미 불러온 인보이스(번호가 "견적"이 아님)면 그 내용을 유지한다.
+ */
+export function invoiceFromContract(
+  contract: ContractPayload,
+  company?: {
+    contact?: string | null;
+    contact_email?: string | null;
+    login_id?: string | null;
+  } | null,
+): InvoicePayload {
+  const attached = contract.attachedInvoice;
+  if (attached?.invoiceNo && attached.invoiceNo !== "견적") {
+    return { ...attached, lines: contract.lines.map((l) => ({ ...l })) };
+  }
+  return {
+    invoiceNo: defaultInvoiceNo(company?.login_id),
+    issuedOn: contract.issuedOn || ymdKst(),
+    toName: contract.partyAName,
+    toAddress: contract.partyAAddress,
+    toTel: company?.contact || "",
+    toEmail: company?.contact_email || "",
+    lines: contract.lines.map((l) => ({ ...l })),
   };
 }
 
@@ -393,6 +435,14 @@ export function mailDocFilename(
 }
 
 if (process.env.RUN_COMPANY_DOCS_SELF_CHECK === "1") {
+  if (
+    medianUnitPrice([]) !== null ||
+    medianUnitPrice([100]) !== 100 ||
+    medianUnitPrice([100, 200, 300]) !== 200 ||
+    medianUnitPrice([100, 200, 300, 400]) !== 250
+  ) {
+    throw new Error("medianUnitPrice failed");
+  }
   const t = invoiceTotals([
     { description: "약사 콘텐츠", qty: 4, unitPrice: 1_500_000, remark: "" },
     { description: "메가", qty: 1, unitPrice: 3_000_000, remark: "" },
@@ -424,6 +474,23 @@ if (process.env.RUN_COMPANY_DOCS_SELF_CHECK === "1") {
   const attached = applyInvoiceToContract(defaultContractPayload({ name: "클리어디어" }), inv);
   if (attached.amountExVat !== 2_000_000 || attached.attachedInvoice?.invoiceNo !== "slam260908cd") {
     throw new Error("applyInvoiceToContract");
+  }
+  const fromContract = invoiceFromContract(
+    {
+      ...defaultContractPayload({ name: "클리어디어" }),
+      lines: [{ description: "약사 콘텐츠", qty: 2, unitPrice: 1_000_000, remark: "" }],
+    },
+    { login_id: "cleardear", contact: "010", contact_email: "a@b.c" },
+  );
+  if (
+    fromContract.invoiceNo === "견적" ||
+    fromContract.toName !== "클리어디어" ||
+    fromContract.lines[0]?.unitPrice !== 1_000_000
+  ) {
+    throw new Error("invoiceFromContract");
+  }
+  if (!hasDocLineContent(fromContract.lines) || hasDocLineContent([emptyLine()])) {
+    throw new Error("hasDocLineContent");
   }
   const loaded = contractHtml({ ...attached, partyABizNo: "123-45-67890" });
   if (!loaded.includes("slam260908cd") || !loaded.includes(BRANDSLAM.account)) {

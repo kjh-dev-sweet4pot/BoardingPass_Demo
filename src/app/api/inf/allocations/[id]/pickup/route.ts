@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { propagateSharedVisitState } from "@/lib/alloc-dup";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
+import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { getInfluencerSessionId } from "@/lib/session";
 
 export async function POST(
@@ -25,7 +27,7 @@ export async function POST(
 
   const { data: existing, error: fetchError } = await supabase
     .from("allocations")
-    .select("id, influencer_id, status, picked_up_at")
+    .select("id, influencer_id, status, picked_up_at, visit_date, store_id, products(name), stores(name)")
     .eq("id", id)
     .maybeSingle();
 
@@ -84,5 +86,13 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ allocation, alreadyPickedUp: false });
+  const writer = hasServiceRoleKey() ? createServiceClient() : supabase;
+  let syncWarning: string | undefined;
+  try {
+    await propagateSharedVisitState(writer, existing, allocation);
+  } catch (err) {
+    syncWarning = err instanceof Error ? err.message : "같은 방문 반영 실패";
+  }
+
+  return NextResponse.json({ allocation, alreadyPickedUp: false, syncWarning });
 }

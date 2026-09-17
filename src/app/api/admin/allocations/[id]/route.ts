@@ -4,7 +4,7 @@ import { requireAnyAdmin } from "@/lib/access";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { normalizeVisitDate } from "@/lib/csv-import";
 import { type AllocationStatus } from "@/lib/types";
-import { findDuplicateAllocation } from "@/lib/alloc-dup";
+import { findDuplicateAllocation, propagateSharedVisitState } from "@/lib/alloc-dup";
 
 const STATUSES: AllocationStatus[] = [
   "pending",
@@ -52,7 +52,7 @@ export async function PATCH(
   if (!supabase) return supabaseConfigError();
   const { data: current, error: fetchError } = await supabase
     .from("allocations")
-    .select("*")
+    .select("*, products(name), stores(name)")
     .eq("id", id)
     .maybeSingle();
 
@@ -227,8 +227,17 @@ export async function PATCH(
     );
   }
 
+  let syncedIds: string[] = [];
+  let syncWarning: string | undefined;
+  try {
+    syncedIds = await propagateSharedVisitState(supabase, current, updated);
+  } catch (err) {
+    syncWarning = err instanceof Error ? err.message : "같은 방문 반영 실패";
+  }
+
   revalidatePath("/admin");
   revalidatePath("/phar");
   revalidatePath("/com");
-  return NextResponse.json({ allocation: updated });
+  revalidatePath("/inf");
+  return NextResponse.json({ allocation: updated, syncedIds, syncWarning });
 }

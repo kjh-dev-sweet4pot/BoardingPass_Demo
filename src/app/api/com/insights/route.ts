@@ -109,7 +109,11 @@ export async function fetchMetricsForLinks(
 export async function fetchInsights(
   supabase: SupabaseClient,
   companyId: string | null,
-  { productId = null, days = 90 }: { productId?: string | null; days?: number } = {},
+  {
+    productId = null,
+    days = 90,
+    excludeCompanyIds = [],
+  }: { productId?: string | null; days?: number; excludeCompanyIds?: string[] } = {},
 ): Promise<InsightsPayload> {
   // 1단계: allocation ids (companyId null = 전체 회원사)
   const allocSelect =
@@ -122,6 +126,9 @@ export async function fetchInsights(
       .select(allocSelect)
       .range(from, from + ALLOC_PAGE - 1);
     if (companyId) allocQuery = allocQuery.eq("company_id", companyId);
+    else if (excludeCompanyIds.length) {
+      allocQuery = allocQuery.not("company_id", "in", `(${excludeCompanyIds.join(",")})`);
+    }
     if (productId) allocQuery = allocQuery.eq("product_id", productId);
     const { data, error: allocErr } = await allocQuery;
     if (allocErr) throw new Error(allocErr.message);

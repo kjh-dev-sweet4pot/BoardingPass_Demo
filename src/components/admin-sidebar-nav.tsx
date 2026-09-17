@@ -17,23 +17,37 @@ export type AdminSection =
   | "performance"
   | "performanceLookup"
   | "companies"
+  | "companiesOverview"
   | "companiesRegister"
   | "companiesMail"
   | "companiesDocs"
+  | "companiesBudget"
   | "influencersRegister"
   | "influencersReview"
   | "influencersAlloc"
-  | "campaigns";
+  | "campaigns"
+  | "marginOverview"
+  | "marginCampaign"
+  | "marginQuote"
+  | "marginRateCard"
+  | "marginRollup";
 
 const AFTER_PERF: { id: "campaigns"; label: string }[] = [
   { id: "campaigns", label: "캠페인·섭외" },
 ];
 
 export const COMPANIES_NAV: NavDropdownItem<
-  "companies" | "companiesRegister" | "companiesMail" | "companiesDocs"
+  | "companies"
+  | "companiesOverview"
+  | "companiesRegister"
+  | "companiesMail"
+  | "companiesDocs"
+  | "companiesBudget"
 >[] = [
   { id: "companies", label: "목록", hint: "회원사 조회" },
+  { id: "companiesOverview", label: "요약", hint: "전체 요약·정보 수정" },
   { id: "companiesRegister", label: "등록", hint: "회원사 개설" },
+  { id: "companiesBudget", label: "예산", hint: "월·차수 입금·가용" },
   { id: "companiesDocs", label: "계약·인보이스", hint: "양식 작성·인쇄" },
   { id: "companiesMail", label: "메일 발송", hint: "계약서·견적서·가이드라인" },
 ];
@@ -44,6 +58,16 @@ export const INFLUENCERS_NAV: NavDropdownItem<
   { id: "influencersRegister", label: "등록", hint: "인플루언서 개설·수정" },
   { id: "influencersReview", label: "검수", hint: "콘텐츠 승인·반려" },
   { id: "influencersAlloc", label: "배정·매장", hint: "방문 배정·지점" },
+];
+
+export const MARGIN_NAV: NavDropdownItem<
+  "marginOverview" | "marginCampaign" | "marginQuote" | "marginRateCard" | "marginRollup"
+>[] = [
+  { id: "marginOverview", label: "현황", hint: "캠페인별 마진율" },
+  { id: "marginCampaign", label: "캠페인 마진", hint: "예산·계획·배치" },
+  { id: "marginQuote", label: "견적 제안", hint: "슬롯 구성·마진 시뮬레이션" },
+  { id: "marginRateCard", label: "레이트카드", hint: "인플루언서 표준 단가" },
+  { id: "marginRollup", label: "정산", hint: "캠페인 집행 마진 집계" },
 ];
 
 const PERF: NavDropdownItem<"performance" | "performanceLookup">[] = [
@@ -64,7 +88,14 @@ function isPerf(s: AdminSection) {
 }
 
 function isCompanies(s: AdminSection) {
-  return s === "companies" || s === "companiesRegister" || s === "companiesMail" || s === "companiesDocs";
+  return (
+    s === "companies" ||
+    s === "companiesOverview" ||
+    s === "companiesRegister" ||
+    s === "companiesMail" ||
+    s === "companiesDocs" ||
+    s === "companiesBudget"
+  );
 }
 
 function isInfluencers(s: AdminSection) {
@@ -75,17 +106,30 @@ function isInfluencers(s: AdminSection) {
   );
 }
 
+function isMargin(s: AdminSection) {
+  return (
+    s === "marginOverview" ||
+    s === "marginCampaign" ||
+    s === "marginQuote" ||
+    s === "marginRateCard" ||
+    s === "marginRollup"
+  );
+}
+
 export function AdminConsoleShell({
   section,
   onSectionChange,
   sidebarActions,
   headerFooter,
+  isManager,
   children,
 }: {
   section: AdminSection;
   onSectionChange: (s: AdminSection) => void;
   sidebarActions?: ReactNode;
   headerFooter?: ReactNode;
+  /** 운영관리자만 마진 메뉴 노출 */
+  isManager?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -137,7 +181,15 @@ export function AdminConsoleShell({
         {isCompanies(section) ? (
           <NavSubSegment
             items={COMPANIES_NAV}
-            view={section as "companies" | "companiesRegister" | "companiesMail" | "companiesDocs"}
+            view={
+              section as
+                | "companies"
+                | "companiesOverview"
+                | "companiesRegister"
+                | "companiesMail"
+                | "companiesDocs"
+                | "companiesBudget"
+            }
             onViewChange={onSectionChange}
           />
         ) : null}
@@ -149,6 +201,20 @@ export function AdminConsoleShell({
                 | "influencersRegister"
                 | "influencersReview"
                 | "influencersAlloc"
+            }
+            onViewChange={onSectionChange}
+          />
+        ) : null}
+        {isManager && isMargin(section) ? (
+          <NavSubSegment
+            items={MARGIN_NAV}
+            view={
+              section as
+                | "marginOverview"
+                | "marginCampaign"
+                | "marginQuote"
+                | "marginRateCard"
+                | "marginRollup"
             }
             onViewChange={onSectionChange}
           />
@@ -202,7 +268,13 @@ export function AdminConsoleShell({
             active={isCompanies(section)}
             selectedId={
               isCompanies(section)
-                ? (section as "companies" | "companiesRegister" | "companiesMail" | "companiesDocs")
+                ? (section as
+                    | "companies"
+                    | "companiesOverview"
+                    | "companiesRegister"
+                    | "companiesMail"
+                    | "companiesDocs"
+                    | "companiesBudget")
                 : undefined
             }
             onSelect={onSectionChange}
@@ -221,6 +293,24 @@ export function AdminConsoleShell({
             }
             onSelect={onSectionChange}
           />
+          {isManager ? (
+            <NavHoverDropdown
+              label="마진"
+              items={MARGIN_NAV}
+              active={isMargin(section)}
+              selectedId={
+                isMargin(section)
+                  ? (section as
+                      | "marginOverview"
+                      | "marginCampaign"
+                      | "marginQuote"
+                      | "marginRateCard"
+                      | "marginRollup")
+                  : undefined
+              }
+              onSelect={onSectionChange}
+            />
+          ) : null}
           {AFTER_PERF.map((item) => (
             <button
               key={item.id}

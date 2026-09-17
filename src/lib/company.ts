@@ -1,6 +1,9 @@
 import { isMoneyOk, parseMoney } from "@/lib/money";
 
 export const COMPANY_CONTRACT_STAGES = [
+  "입점 논의중",
+  "협의중",
+  "입금 지연",
   "최초미팅",
   "계약 조건 논의중",
   "계약 완료",
@@ -11,6 +14,36 @@ export const COMPANY_CONTRACT_STAGES = [
 ] as const;
 
 export type CompanyContractStage = (typeof COMPANY_CONTRACT_STAGES)[number];
+
+/** 입금 완료 전 — 입금 상태와 동일한 계약 단계 */
+export const CONTRACT_STAGES_SYNCED_TO_DEPOSIT = [
+  "입점 논의중",
+  "협의중",
+  "입금 지연",
+] as const;
+
+/** 입금 완료 후 — 따로 조정 */
+export const CONTRACT_STAGES_AFTER_DEPOSIT = [
+  "캠페인 진행중",
+  "캠페인 진행 완료",
+  "종료",
+  "계약 파기",
+] as const;
+
+export function isContractStageSyncedToDeposit(
+  stage: string | null | undefined,
+): boolean {
+  const s = String(stage || "").trim();
+  return (CONTRACT_STAGES_SYNCED_TO_DEPOSIT as readonly string[]).includes(s);
+}
+
+/** 입금 완료 이후라 계약 단계를 따로 고를 수 있는지 */
+export function canEditContractStageIndependently(
+  stage: string | null | undefined,
+): boolean {
+  const s = String(stage || "").trim();
+  return (CONTRACT_STAGES_AFTER_DEPOSIT as readonly string[]).includes(s);
+}
 
 export const COMPANY_SELECT_BASE =
   "id, name, login_id, aliases, contact, is_active, created_at, updated_at";
@@ -164,6 +197,42 @@ export function isDemoCompany(company: { login_id?: string | null }) {
   return normalizeLoginId(company.login_id || "") === DEMO_COMPANY_LOGIN_ID;
 }
 
+/** 운영 목록에서 기본 숨김. 이름 또는 로그인 아이디가 맞으면 테스트. */
+const ADMIN_TEST_COMPANY_KEYS = new Set([
+  "23yearsold",
+  "bbb",
+  "brandslam",
+  "ddd",
+  "eee",
+  "knownbeautyalpha",
+  "knownbeautybeta",
+  "technical",
+  "test",
+  "wjdghl",
+  "company",
+  "companya",
+  "companyb",
+  "aaa",
+]);
+
+export function isAdminTestCompany(company: {
+  name?: string | null;
+  login_id?: string | null;
+}) {
+  const name = normalizeCompanyKey(company.name || "");
+  const login = normalizeLoginId(company.login_id || "");
+  return ADMIN_TEST_COMPANY_KEYS.has(name) || ADMIN_TEST_COMPANY_KEYS.has(login);
+}
+
+const COMPANY_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** 쿼리의 exclude_company_ids. UUID만 남긴다. */
+export function parseExcludeCompanyIds(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return [...new Set(raw.split(",").map((s) => s.trim()).filter((s) => COMPANY_ID_RE.test(s)))];
+}
+
 export function matchCompany(
   raw: string,
   companies: CompanyMatchInput[],
@@ -198,6 +267,22 @@ if (process.env.RUN_COMPANY_CRM_SELF_CHECK === "1") {
   }
   if (companySelectAfterColumnError("duplicate key value violates unique constraint") !== null) {
     throw new Error("companySelectAfterColumnError should ignore non-column errors");
+  }
+  if (!isAdminTestCompany({ name: "KnownBeauty Alpha", login_id: "x" })) {
+    throw new Error("isAdminTestCompany name");
+  }
+  if (!isAdminTestCompany({ name: "renamed", login_id: "aaa" })) {
+    throw new Error("isAdminTestCompany login");
+  }
+  if (isAdminTestCompany({ name: "옵티팜", login_id: "optipharm" })) {
+    throw new Error("isAdminTestCompany should spare real companies");
+  }
+  if (
+    parseExcludeCompanyIds(
+      "11111111-1111-1111-1111-111111111111, not-a-uuid, 11111111-1111-1111-1111-111111111111",
+    ).join(",") !== "11111111-1111-1111-1111-111111111111"
+  ) {
+    throw new Error("parseExcludeCompanyIds");
   }
   if (parseCompanyDate("2026-09-03") !== "2026-09-03") {
     throw new Error("parseCompanyDate failed");

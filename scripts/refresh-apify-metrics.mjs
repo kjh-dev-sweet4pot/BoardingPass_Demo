@@ -2,6 +2,9 @@
  * 발행 콘텐츠 지표를 Apify로 최신화. 같은 URL은 1회만 수집.
  *
  *   node scripts/refresh-apify-metrics.mjs
+ *   node scripts/refresh-apify-metrics.mjs --login=rxme
+ *   node scripts/refresh-apify-metrics.mjs --contains=6aa27ff1000000002b026e69
+ *   회원사로 좁혀도 같은 게시물 URL은 다른 회원사 링크까지 같이 갱신한다.
  *   node scripts/refresh-apify-metrics.mjs --dry-run
  */
 import { createClient } from "@supabase/supabase-js";
@@ -64,6 +67,16 @@ function detectPlatform(url) {
     /* ignore */
   }
   return "etc";
+}
+
+function postToken(url) {
+  const note = (url.match(/[0-9a-f]{24}/i) || [])[0];
+  if (note && /xiaohongshu|xhslink|rednote/i.test(url)) return note.toLowerCase();
+  const tt = url.match(/\/(?:video|photo)\/(\d+)/);
+  if (tt && /tiktok\.com/i.test(url)) return tt[1];
+  const ig = url.match(/\/(?:p|reel|reels|tv)\/([^/?#]+)/i);
+  if (ig && ig[1].length >= 8 && /instagram\.com|instagr\.am/i.test(url)) return ig[1].toLowerCase();
+  return null;
 }
 
 function urlKey(url) {
@@ -181,11 +194,20 @@ async function scrapeXhs(urls) {
     const shares = asCount(hit.shared_count) ?? asCount(hit.sharedCount) ?? asCount(hit.share_count);
     const measured =
       asCount(hit.view_count) ?? asCount(hit.viewCount) ?? asCount(hit.read_count);
+    // src/lib/xiaohongshu-views.ts 와 동일. 5% 역산은 조회수를 낮춰 덮어쓰지 않는다.
     const interact = likes + comments;
+    const legacy =
+      interact > 0 ? Math.round(interact / 0.05) : (saves || 0) > 0 ? Math.round(saves / 0.05) : 0;
+    const legacyEstimate =
+      measured > 0 && legacy > 0 && Math.abs(measured - legacy) / legacy <= 0.02;
     const estimated =
-      interact > 0 ? Math.round(interact / 0.05) : saves > 0 ? Math.round(saves / 0.05) : 0;
+      interact > 0 ? Math.round(interact / 0.012) : (saves || 0) > 0 ? Math.round(saves / 0.012) : 0;
+    const views =
+      measured > 0 && !legacyEstimate
+        ? measured
+        : Math.max(estimated, interact + (saves || 0) + (shares || 0));
     out.set(urlKey(url), {
-      views: measured > 0 ? measured : Math.max(estimated, interact + (saves || 0) + (shares || 0)),
+      views,
       likes,
       comments,
       saves,
@@ -235,10 +257,29 @@ async function applyMetrics(linkIds, metrics) {
   }
 }
 
+async function expandSiblings(groups) {
+  for (const g of groups.values()) {
+    const token = postToken(g.url);
+    if (!token) continue;
+    const { data, error } = await supabase
+      .from("creator_links")
+      .select("id, url, publish_url")
+      .or(`url.ilike.%${token}%,publish_url.ilike.%${token}%`);
+    if (error) throw new Error(error.message);
+    for (const row of data || []) {
+      const u = (row.publish_url || row.url || "").toLowerCase();
+      if (!u.includes(token) || g.ids.includes(row.id)) continue;
+      g.ids.push(row.id);
+    }
+  }
+}
+
 async function main() {
   if (!token) throw new Error("APIFY_TOKEN 없음");
   const loginArg = process.argv.find((a) => a.startsWith("--login="));
   const loginId = loginArg ? loginArg.slice("--login=".length).trim() : "";
+  const containsArg = process.argv.find((a) => a.startsWith("--contains="));
+  const contains = containsArg ? containsArg.slice("--contains=".length).trim().toLowerCase() : "";
   let query = supabase.from("creator_links").select("id, url, publish_url, platform");
   if (loginId) {
     const { data: co, error: coErr } = await supabase
@@ -270,6 +311,7 @@ async function main() {
   for (const link of links || []) {
     const url = (link.publish_url || link.url || "").trim();
     if (!url || !/^https?:\/\//i.test(url)) continue;
+    if (contains && !url.toLowerCase().includes(contains)) continue;
     const platform = detectPlatform(url);
     if (platform === "etc") continue;
     const key = `${platform}\t${urlKey(url)}`;
@@ -277,6 +319,8 @@ async function main() {
     g.ids.push(link.id);
     groups.set(key, g);
   }
+
+  await expandSiblings(groups);
 
   const byPlat = { tiktok: [], instagram: [], xiaohongshu: [] };
   for (const g of groups.values()) byPlat[g.platform].push(g);

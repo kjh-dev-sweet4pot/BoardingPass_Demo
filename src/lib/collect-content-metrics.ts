@@ -11,6 +11,7 @@ import {
 } from "@/lib/apify-xiaohongshu";
 import { detectPlatform } from "@/lib/creator-link";
 import { estimateXiaohongshuViews } from "@/lib/xiaohongshu-views";
+import { publishedPostKey, publishedPostToken } from "@/lib/published-post";
 import { nextRetryAt, parsePostedAtIso } from "@/lib/metrics-schedule";
 
 export type ScrapedMetrics = {
@@ -151,8 +152,73 @@ export async function countConsecutiveCollectFailures(
   return 0;
 }
 
+/** 같은 게시물을 가리키는 다른 회원사 링크. 없으면 빈 배열. */
+export async function siblingCreatorLinkIds(
+  supabase: SupabaseClient,
+  url: string,
+  exceptId: string,
+) {
+  const token = publishedPostToken(url);
+  const key = publishedPostKey(url);
+  if (!token || !key) return [];
+  const { data, error } = await supabase
+    .from("creator_links")
+    .select("id, url, publish_url")
+    .or(`url.ilike.%${token}%,publish_url.ilike.%${token}%`);
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .filter((row) => {
+      if (row.id === exceptId) return false;
+      return publishedPostKey(row.publish_url || row.url) === key;
+    })
+    .map((row) => row.id as string);
+}
+
+async function writeMetricsSnapshot(
+  supabase: SupabaseClient,
+  linkIds: string[],
+  metrics: ScrapedMetrics,
+  collectedAt: string,
+) {
+  if (!linkIds.length) return;
+  const linkPatch: Record<string, unknown> = {
+    views: metrics.views,
+    likes: metrics.likes,
+    comments: metrics.comments,
+    saves: metrics.saves,
+    shares: metrics.shares,
+    reposts: metrics.reposts,
+    metrics_collected_at: collectedAt,
+    verification_failed: false,
+    updated_at: collectedAt,
+  };
+  if (metrics.postedAt) linkPatch.published_at = metrics.postedAt;
+  const { error: linkErr } = await supabase
+    .from("creator_links")
+    .update(linkPatch)
+    .in("id", linkIds);
+  if (linkErr) throw new Error(linkErr.message);
+  for (const id of linkIds) {
+    const { error } = await supabase.from("content_metrics").upsert(
+      {
+        creator_link_id: id,
+        collected_at: collectedAt,
+        views: metrics.views,
+        likes: metrics.likes,
+        comments: metrics.comments,
+        saves: metrics.saves,
+        shares: metrics.shares,
+        reposts: metrics.reposts,
+      },
+      { onConflict: "creator_link_id,collected_at" },
+    );
+    if (error) throw new Error(error.message);
+  }
+}
+
 /**
  * Apify 수집 1회 실행 → content_metrics 누적, creator_links 스냅샷 갱신.
+ * 같은 게시물 URL이 다른 회원사에도 있으면 그 링크도 같이 갱신한다.
  * 실패 시 job만 실패 처리하고 링크 지표는 유지한다.
  */
 export async function collectLinkMetrics(
@@ -207,6 +273,9 @@ export async function collectLinkMetrics(
       .update(linkPatch)
       .eq("id", link.id);
     if (linkErr) throw new Error(linkErr.message);
+
+    const siblings = await siblingCreatorLinkIds(supabase, url, link.id);
+    await writeMetricsSnapshot(supabase, siblings, metrics, collectedAt);
 
     if (options.jobId) {
       await markJob(supabase, options.jobId, {

@@ -11,6 +11,7 @@ import {
   collectXiaohongshuLinkThumbnail,
 } from "@/lib/collect-link-thumbnail";
 import { detectPlatform, validateCreatorUrl } from "@/lib/creator-link";
+import { propagateSharedVisitCreatorLink } from "@/lib/alloc-dup";
 import { getInfluencerSessionId } from "@/lib/session";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
@@ -190,6 +191,21 @@ export async function POST(request: Request) {
       { error: insErr?.message || "제출 생성 실패" },
       { status: 500 },
     );
+  }
+
+  try {
+    await propagateSharedVisitCreatorLink(supabase, allocationId, {
+      id: created.id,
+      influencer_id: influencerId,
+      url,
+      platform: created.platform,
+      status: "submitted",
+      content_status: "제출",
+      thumbnail_status: snsUrl ? "pending" : null,
+      submitted_at: now,
+    });
+  } catch {
+    // 원본 제출은 유지. 형제 회원사 복제는 다음 발행·검수에서 다시 맞출 수 있다.
   }
 
   if (snsUrl && created.platform === "tiktok") {

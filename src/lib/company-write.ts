@@ -79,6 +79,13 @@ export async function createCompanyFromBody(
 
   if (error || !data) {
     const msg = error?.message || "회원사 생성에 실패했습니다.";
+    if (/companies_contract_stage_check/i.test(msg)) {
+      return {
+        error:
+          "계약 단계 DB 제약이 예전입니다. scripts/sql/companies-contract-fields.sql 을 Supabase SQL editor에서 실행해 주세요.",
+        status: 500,
+      };
+    }
     const status = msg.toLowerCase().includes("unique") ? 409 : 500;
     return {
       error:

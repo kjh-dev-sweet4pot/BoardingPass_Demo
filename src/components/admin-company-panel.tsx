@@ -1,8 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
-import { COMPANY_CONTRACT_STAGES } from "@/lib/company";
+import {
+  COMPANY_CONTRACT_STAGES,
+  CONTRACT_STAGES_AFTER_DEPOSIT,
+  canEditContractStageIndependently,
+} from "@/lib/company";
 import { type Company } from "@/lib/types";
 
 export function AdminCompanyPanel({
@@ -12,8 +17,10 @@ export function AdminCompanyPanel({
   companies: Company[];
   compact?: boolean;
 }) {
+  const { includeCompany } = useAdminTestVisibility();
   const [open, setOpen] = useState(false);
   const [list, setList] = useState(companies);
+  const shown = useMemo(() => list.filter(includeCompany), [list, includeCompany]);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [loginId, setLoginId] = useState("");
@@ -119,7 +126,9 @@ export function AdminCompanyPanel({
         first_meet_on: firstMeetOn || null,
         planned_start_on: plannedStartOn || null,
         planned_end_on: plannedEndOn || null,
-        contract_stage: contractStage || null,
+        ...(canEditContractStageIndependently(contractStage)
+          ? { contract_stage: contractStage || null }
+          : {}),
         budget_amount: budgetAmount || null,
         spent_amount: spentAmount || null,
         guideline_url: guidelineUrl || null,
@@ -188,7 +197,7 @@ export function AdminCompanyPanel({
         >
           <h2 className="text-lg text-[var(--ink)]">회원사 관리</h2>
           <span className="text-xs font-medium text-[var(--muted)]">
-            {open ? "접기 ▲" : `${list.length}곳 ▼`}
+            {open ? "접기 ▲" : `${shown.length}곳 ▼`}
           </span>
         </button>
       ) : null}
@@ -198,10 +207,10 @@ export function AdminCompanyPanel({
           <ul className="max-h-48 space-y-2 overflow-auto">
             {loading ? (
               <li className="text-sm text-[var(--muted)]">불러오는 중…</li>
-            ) : list.length === 0 ? (
+            ) : shown.length === 0 ? (
               <li className="text-sm text-[var(--muted)]">등록된 회원사가 없습니다.</li>
             ) : (
-              list.map((company) => (
+              shown.map((company) => (
                 <li
                   key={company.id}
                   className="flex items-center justify-between gap-2 rounded-[6px] border border-[var(--line)] px-3 py-2 text-sm"
@@ -318,14 +327,23 @@ export function AdminCompanyPanel({
               className={fieldClass}
               value={contractStage}
               onChange={(e) => setContractStage(e.target.value)}
+              disabled={!canEditContractStageIndependently(contractStage)}
             >
               <option value="">계약 진행 단계</option>
-              {COMPANY_CONTRACT_STAGES.map((s) => (
+              {(canEditContractStageIndependently(contractStage)
+                ? CONTRACT_STAGES_AFTER_DEPOSIT
+                : COMPANY_CONTRACT_STAGES.filter((s) => s === contractStage)
+              ).map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
               ))}
             </select>
+            {!canEditContractStageIndependently(contractStage) ? (
+              <p className="text-[11px] text-[var(--muted)]">
+                입금 완료 전에는 예산 입금 상태와 같습니다.
+              </p>
+            ) : null}
             <div className="grid grid-cols-2 gap-2">
               <input
                 className={fieldClass}

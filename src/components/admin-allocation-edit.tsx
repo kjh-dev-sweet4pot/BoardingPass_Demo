@@ -35,7 +35,7 @@ export function AdminAllocationEditForm({
   storeList: Store[];
   companyList?: Company[];
   compact?: boolean;
-  onUpdated: (next: AllocationWithRelations) => void;
+  onUpdated: (next: AllocationWithRelations, syncedIds?: string[]) => void;
 }) {
   const [visitDate, setVisitDate] = useState(visitDateInputValue(item));
   const [storeId, setStoreId] = useState(item.store_id);
@@ -96,8 +96,12 @@ export function AdminAllocationEditForm({
       if (!res.ok) {
         throw new Error(body.error || "수정에 실패했습니다.");
       }
-      onUpdated(body.allocation as AllocationWithRelations);
-      setSaved(true);
+      onUpdated(body.allocation as AllocationWithRelations, body.syncedIds);
+      if (body.syncWarning) {
+        setError(`저장되었지만 같은 방문 반영에 실패했습니다: ${body.syncWarning}`);
+      } else {
+        setSaved(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "수정에 실패했습니다.");
     } finally {

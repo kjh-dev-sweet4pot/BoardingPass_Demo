@@ -16,15 +16,15 @@ import { creatorSnsChannelOf } from "@/lib/creator-link";
 import { findPoolCreator, type CreatorPost, type PoolCreator } from "@/lib/creator-pool-mock";
 import type { AllocationWithRelations } from "@/lib/types";
 
-/** 회원사 칸반: 수령완료·제작중은 한 열로 본다. */
-const BOARD_COLUMNS = ["대기", "수령완료", "검수중", "발행완료"] as const;
+/** 회원사 칸반: 수령완료·제작중·검수중은 한 열로 본다. */
+const BOARD_COLUMNS = ["대기", "수령 완료/컨텐츠 검수", "발행완료"] as const;
 const COL_PAGE = 9;
 
 function boardColumn(status: KanbanColumn): (typeof BOARD_COLUMNS)[number] {
-  if (status === "제작중") return "수령완료";
-  if (status === "수령완료" || status === "대기" || status === "검수중" || status === "발행완료") {
-    return status;
+  if (status === "수령완료" || status === "제작중" || status === "검수중") {
+    return "수령 완료/컨텐츠 검수";
   }
+  if (status === "발행완료") return "발행완료";
   return "대기";
 }
 
@@ -700,7 +700,7 @@ export function CompanyProgressTab({
         />
       ) : (
         <>
-          <div className="flex flex-col gap-5 lg:grid lg:grid-cols-4 lg:gap-3">
+          <div className="flex flex-col gap-5 lg:grid lg:grid-cols-3 lg:gap-3">
             {BOARD_COLUMNS.map((col) => {
               const items = grouped.get(col) ?? [];
               const limit = colLimit[col] ?? COL_PAGE;
@@ -718,8 +718,8 @@ export function CompanyProgressTab({
                     <span className="text-[14px] font-bold text-[var(--ink)]">
                       {col}
                     </span>
-                    <span className="text-[13px] font-semibold tabular-nums text-[var(--muted)]">
-                      {items.length}
+                    <span className="text-[14px] font-bold tabular-nums text-[var(--ink)]">
+                      {items.length}건
                     </span>
                   </div>
                   {items.length === 0 ? (
@@ -761,9 +761,8 @@ export function CompanyProgressTab({
           <div className="flex flex-wrap gap-6 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-[18px] py-3 text-[11.5px] leading-relaxed text-[var(--muted)]">
             <span>
               배정 상태는 롤업 결과입니다 — 등록만{" "}
-              <b className="text-[var(--accent)]">대기</b> · 수령 후 제출 전{" "}
-              <b className="text-[var(--accent)]">수령완료</b> · 제출 후{" "}
-              <b className="text-[var(--accent)]">검수중</b> · 목표 도달{" "}
+              <b className="text-[var(--accent)]">대기</b> · 수령 후 목표 도달 전{" "}
+              <b className="text-[var(--accent)]">수령 완료/컨텐츠 검수</b> · 목표 도달{" "}
               <b className="text-[var(--accent)]">발행완료</b>.
             </span>
             <span className="ml-auto">

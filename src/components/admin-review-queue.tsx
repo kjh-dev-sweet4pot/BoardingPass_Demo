@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { primaryBtnClass, secondaryBtnClass } from "@/components/ui";
 import { creatorPlatformLabelOf } from "@/lib/creator-link";
 import { parseTikTokVideoId } from "@/lib/tiktok-oembed";
@@ -61,7 +62,7 @@ type QueueItem = {
     products?: { name?: string | null } | null;
     stores?: { name?: string | null } | null;
     influencers?: { name?: string | null; instagram_handle?: string | null } | null;
-    companies?: { name?: string | null } | null;
+    companies?: { id?: string | null; name?: string | null } | null;
     campaigns?: {
       id: string;
       name: string | null;
@@ -665,6 +666,7 @@ export function AdminReviewQueue({
   queue?: AdminReviewTab;
   onQueueChange?: (queue: AdminReviewTab) => void;
 }) {
+  const { includeCompany } = useAdminTestVisibility();
   const [items, setItems] = useState<QueueItem[]>([]);
   const [index, setIndex] = useState(0);
   const [memo, setMemo] = useState("");
@@ -800,7 +802,28 @@ export function AdminReviewQueue({
     }
   }, [queue, load, loadLogs, loadCollectionLogs]);
 
-  const current = items[index] ?? null;
+  const visibleItems = useMemo(
+    () =>
+      items.filter((item) =>
+        includeCompany({
+          id: item.allocations?.companies?.id,
+          name: item.allocations?.companies?.name,
+        }),
+      ),
+    [items, includeCompany],
+  );
+  const visibleCollectionLogs = useMemo(
+    () =>
+      collectionLogs.filter((log) =>
+        includeCompany({
+          id: log.creator_links?.allocations?.companies?.id,
+          name: log.creator_links?.allocations?.companies?.name,
+        }),
+      ),
+    [collectionLogs, includeCompany],
+  );
+
+  const current = visibleItems[index] ?? null;
   const alloc = current?.allocations;
   const campaignRaw = alloc?.campaigns;
   const campaign = Array.isArray(campaignRaw) ? campaignRaw[0] : campaignRaw;
@@ -824,8 +847,9 @@ export function AdminReviewQueue({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "처리 실패");
       const next = items.filter((item) => item.id !== current.id);
+      const nextVisible = visibleItems.filter((item) => item.id !== current.id);
       setItems(next);
-      setIndex((i) => Math.min(i, Math.max(0, next.length - 1)));
+      setIndex((i) => Math.min(i, Math.max(0, nextVisible.length - 1)));
       setMemo("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "처리 실패");
@@ -865,8 +889,8 @@ export function AdminReviewQueue({
                 {key === "reviewLogs"
                   ? logs.length
                   : key === "collectResults"
-                    ? collectionLogs.length
-                    : items.length}
+                    ? visibleCollectionLogs.length
+                    : visibleItems.length}
               </span>
             ) : null}
           </button>
@@ -899,7 +923,15 @@ export function AdminReviewQueue({
             emptyLabel="검수 기록이 없습니다."
             selectedLogId={selectedLogId}
             onSelect={(log) => void openLogDetail(log)}
-            logDetail={logDetail}
+            logDetail={
+              logDetail &&
+              includeCompany({
+                id: logDetail.allocations?.companies?.id,
+                name: logDetail.allocations?.companies?.name,
+              })
+                ? logDetail
+                : null
+            }
             logDetailLoading={logDetailLoading}
             detailError={logDetailError}
           />
@@ -918,7 +950,7 @@ export function AdminReviewQueue({
         <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[var(--ink)]">
-              Apify 수집 로그 {collectionLogsLoading ? "" : `${collectionLogs.length}건`}
+              Apify 수집 로그 {collectionLogsLoading ? "" : `${visibleCollectionLogs.length}건`}
             </h2>
             <button
               type="button"
@@ -932,7 +964,7 @@ export function AdminReviewQueue({
             </button>
           </div>
           <CollectionLogList
-            logs={collectionLogs}
+            logs={visibleCollectionLogs}
             loading={collectionLogsLoading}
             emptyLabel="수집 로그가 없습니다. 스케줄·수동 수집이 실행되면 여기에 기록됩니다."
             busyId={recollectBusyId}
@@ -940,16 +972,16 @@ export function AdminReviewQueue({
           />
         </section>
 
-        {!loading && items.length > 0 ? (
+        {!loading && visibleItems.length > 0 ? (
           <section className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-[var(--ink)]">
-                처리 필요 {items.length}건
+                처리 필요 {visibleItems.length}건
               </h2>
               <p className="text-xs text-[var(--muted)]">검증실패 · 수집 연속 실패</p>
             </div>
             <ul className="space-y-2">
-              {items.map((item) => (
+              {visibleItems.map((item) => (
                 <li
                   key={item.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-[6px] border border-[var(--line)] px-3 py-2 text-sm"
@@ -990,7 +1022,7 @@ export function AdminReviewQueue({
     );
   }
 
-  if (items.length === 0) {
+  if (visibleItems.length === 0) {
     return (
       <div className="flex flex-col gap-4">
         {tabs}
@@ -1013,14 +1045,14 @@ export function AdminReviewQueue({
       <aside className="owm-panel border border-[var(--line)] bg-[var(--surface)] shadow-sm">
         <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
           <h2 className="text-sm font-semibold">
-            {QUEUE_COPY[queue].list} {items.length}건
+            {QUEUE_COPY[queue].list} {visibleItems.length}건
           </h2>
           <button type="button" className="text-xs text-[var(--accent)]" onClick={() => void load()}>
             새로고침
           </button>
         </div>
         <ul className="max-h-[70vh] overflow-auto">
-          {items.map((item, i) => (
+          {visibleItems.map((item, i) => (
             <li key={item.id}>
               <button
                 type="button"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
 import { EmptyState } from "@/components/empty-state";
 import { formatMetric, formatViews, type ContentPeriod } from "@/lib/content-insights";
@@ -130,6 +130,7 @@ export function CompanyPerformanceLookupTab({
   onMetaChange,
   insightsUrl = "/api/com/insights",
   toolbarExtra,
+  refreshInfluencerOnSelect = false,
 }: {
   initialData?: {
     links: LinkRow[];
@@ -146,6 +147,8 @@ export function CompanyPerformanceLookupTab({
   }) => void;
   insightsUrl?: string;
   toolbarExtra?: ReactNode;
+  /** 인플루언서를 열면 그 사람 발행 콘텐츠를 다시 수집한다. 같은 글은 다른 회원사에도 반영. */
+  refreshInfluencerOnSelect?: boolean;
 }) {
   const [allLinks, setAllLinks] = useState<LinkRow[]>(initialData?.links ?? []);
   const [collectedAt, setCollectedAt] = useState(initialData?.collectedAt ?? null);
@@ -155,6 +158,10 @@ export function CompanyPerformanceLookupTab({
   const [productId, setProductId] = useState("");
   const [searchQ, setSearchQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [collectingId, setCollectingId] = useState<string | null>(null);
+  const [collectMsg, setCollectMsg] = useState<string | null>(null);
+  const refreshedIds = useRef(new Set<string>());
+  const collectGen = useRef(0);
   const deferredQ = useDeferredValue(searchQ);
   const asOfYmd = ymdKst(new Date());
 
@@ -235,6 +242,35 @@ export function CompanyPerformanceLookupTab({
   useEffect(() => {
     if (selectedId && !filtered.some((r) => r.id === selectedId)) setSelectedId(null);
   }, [filtered, selectedId]);
+
+  useEffect(() => {
+    const influencerId = selected?.id;
+    if (!refreshInfluencerOnSelect || !influencerId) return;
+    if (refreshedIds.current.has(influencerId)) return;
+    refreshedIds.current.add(influencerId);
+    const gen = ++collectGen.current;
+    setCollectingId(influencerId);
+    setCollectMsg(null);
+    void (async () => {
+      try {
+        const res = await fetch(`/api/admin/influencers/${influencerId}/refresh-metrics`, {
+          method: "POST",
+        });
+        const body = await res.json().catch(() => ({}));
+        if (gen !== collectGen.current) return;
+        if (!res.ok) throw new Error(body.error || "수집 실패");
+        const parts = [`완료 ${body.ok ?? 0}`, `실패 ${body.failed ?? 0}`].filter(Boolean);
+        setCollectMsg(parts.join(" · "));
+        await reload();
+      } catch (err) {
+        if (gen !== collectGen.current) return;
+        refreshedIds.current.delete(influencerId);
+        setCollectMsg(err instanceof Error ? err.message : "수집 실패");
+      } finally {
+        if (gen === collectGen.current) setCollectingId(null);
+      }
+    })();
+  }, [refreshInfluencerOnSelect, selected?.id]);
 
   if (loading) {
     return (
@@ -365,6 +401,11 @@ export function CompanyPerformanceLookupTab({
                       <p className="mt-1 truncate text-xs text-[var(--muted)]">
                         {selected.products.join(" · ")}
                       </p>
+                    ) : null}
+                    {collectingId === selected.id ? (
+                      <p className="mt-1 text-xs text-[var(--accent)]">성과 수집 중…</p>
+                    ) : collectMsg ? (
+                      <p className="mt-1 text-xs text-[var(--muted)]">{collectMsg}</p>
                     ) : null}
                   </div>
                 </div>

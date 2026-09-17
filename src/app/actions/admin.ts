@@ -6,7 +6,7 @@ import { createAuthedDbClient } from "@/lib/supabase/api-client";
 import { isAdminManagerSession } from "@/lib/session";
 import { normalizeHandle } from "@/lib/auth";
 import { normalizeVisitDate, parseProductAndQty } from "@/lib/csv-import";
-import { findDuplicateAllocation } from "@/lib/alloc-dup";
+import { findDuplicateAllocation, inheritedVisitState } from "@/lib/alloc-dup";
 import { canonicalBranchName, isBranchStoreName } from "@/lib/store-name";
 import { scheduleInfluencerProfileFetch } from "@/lib/influencer-profile-image";
 
@@ -159,6 +159,23 @@ export async function createManualAllocation(formData: FormData) {
     fail("동일한 배정(핸들·상품·매장·방문일·회원사)이 이미 있습니다.");
   }
 
+  let branchName = storeName;
+  if (!branchName) {
+    const { data: store } = await supabase
+      .from("stores")
+      .select("name")
+      .eq("id", storeId)
+      .maybeSingle();
+    branchName = store?.name || "";
+  }
+  const inherited = await inheritedVisitState(supabase, {
+    id: "",
+    influencer_id: influencerId,
+    store_id: storeId,
+    visit_date,
+    stores: { name: branchName },
+    products: { name: productName },
+  });
   const { error } = await supabase.from("allocations").insert({
     influencer_id: influencerId,
     product_id: productId,
@@ -167,7 +184,12 @@ export async function createManualAllocation(formData: FormData) {
     quantity,
     visit_date,
     visit_code,
-    status: "pending",
+    status: inherited?.status || "pending",
+    picked_up_at: inherited?.picked_up_at || null,
+    verified_at: inherited?.verified_at || null,
+    last_visited_at: inherited?.last_visited_at || null,
+    visit_source: inherited?.visit_source || null,
+    visit_confirmed_by: inherited?.visit_confirmed_by || null,
   });
 
   if (error) fail(error.message);

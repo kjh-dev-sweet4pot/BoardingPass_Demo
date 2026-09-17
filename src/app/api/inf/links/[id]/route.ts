@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { collectOnPublishUrl } from "@/lib/collect-content-metrics";
 import { validateCreatorUrl, detectPlatform } from "@/lib/creator-link";
+import { propagateSharedVisitCreatorLink } from "@/lib/alloc-dup";
 import { getInfluencerSessionId } from "@/lib/session";
 import { hasServiceRoleKey, createServiceClient } from "@/lib/supabase/service";
 
@@ -80,7 +81,7 @@ export async function PATCH(
 
   const { data: link, error: fetchError } = await supabase
     .from("creator_links")
-    .select("id, influencer_id, status")
+    .select("id, influencer_id, allocation_id, status")
     .eq("id", id)
     .maybeSingle();
 
@@ -98,17 +99,18 @@ export async function PATCH(
   }
 
   const now = new Date().toISOString();
+  const platform = detectPlatform(publishUrl);
   const { data: updated, error } = await supabase
     .from("creator_links")
     .update({
       publish_url: publishUrl,
       url: publishUrl,
-      platform: detectPlatform(publishUrl),
+      platform,
       content_status: "발행완료",
       updated_at: now,
     })
     .eq("id", id)
-    .select("id, publish_url, content_status, verification_failed")
+    .select("id, allocation_id, publish_url, content_status, verification_failed, url, platform, status")
     .single();
 
   if (error || !updated) {
@@ -116,6 +118,20 @@ export async function PATCH(
       { error: error?.message || "발행 URL 저장 실패" },
       { status: 500 },
     );
+  }
+
+  try {
+    await propagateSharedVisitCreatorLink(supabase, updated.allocation_id || link.allocation_id, {
+      id: updated.id,
+      influencer_id: influencerId,
+      url: publishUrl,
+      platform,
+      status: "approved",
+      content_status: "발행완료",
+      publish_url: publishUrl,
+    });
+  } catch {
+    // 원본 발행은 유지
   }
 
   if (process.env.APIFY_TOKEN?.trim()) {
