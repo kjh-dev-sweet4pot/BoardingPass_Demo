@@ -270,7 +270,7 @@ export function AdminDashboard({
               <>
                 <Kpi label="원가 합계" value={`${fmtKrw(budget.costFee ?? 0)}원`} />
                 <Kpi
-                  label="마진"
+                  label="집행 기준 마진"
                   value={`${fmtKrw(budget.margin ?? 0)}원`}
                   sub={
                     budget.exposureFee > 0

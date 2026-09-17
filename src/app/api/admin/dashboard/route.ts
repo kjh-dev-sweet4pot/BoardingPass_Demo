@@ -170,28 +170,39 @@ export async function GET(request: NextRequest) {
   // (운영관리자만 원가·마진 접근 가능, 운영담당자는 노출가만)
   const isManager = await canViewCostAmount();
 
+  // 노출가·원가는 allocation_pricing에만 있다 (castings에는 없음). allocations를 거쳐 조인.
   let budgetQuery = supabase
     .from("castings")
     .select(`
-      id, accepted_at, exposure_fee, cost_fee,
-      campaign_id,
-      campaigns!inner ( company_id )
+      id, company_id,
+      allocations!inner (
+        allocation_pricing ( display_price, cost_amount, accepted_at )
+      )
     `)
     .eq("status", "Accept");
 
-  if (companyId) budgetQuery = budgetQuery.eq("campaigns.company_id", companyId);
+  if (companyId) budgetQuery = budgetQuery.eq("company_id", companyId);
   else if (excludeIds.length) {
-    budgetQuery = budgetQuery.not("campaigns.company_id", "in", notInList(excludeIds));
+    budgetQuery = budgetQuery.not("company_id", "in", notInList(excludeIds));
   }
-  if (from) budgetQuery = budgetQuery.gte("accepted_at", from);
-  if (to) budgetQuery = budgetQuery.lte("accepted_at", `${to}T23:59:59`);
 
   const { data: castings } = await budgetQuery;
 
   let exposureFeeTotal = 0, costFeeTotal = 0;
   for (const c of castings ?? []) {
-    exposureFeeTotal += c.exposure_fee ?? 0;
-    costFeeTotal += c.cost_fee ?? 0;
+    const allocRaw = c.allocations as { allocation_pricing?: unknown } | { allocation_pricing?: unknown }[] | null;
+    const alloc = Array.isArray(allocRaw) ? allocRaw[0] : allocRaw;
+    const pricingRaw = alloc?.allocation_pricing as
+      | { display_price?: number | null; cost_amount?: number | null; accepted_at?: string | null }
+      | { display_price?: number | null; cost_amount?: number | null; accepted_at?: string | null }[]
+      | null
+      | undefined;
+    const pricing = Array.isArray(pricingRaw) ? pricingRaw[0] : pricingRaw;
+    if (!pricing) continue;
+    if (from && (!pricing.accepted_at || pricing.accepted_at < from)) continue;
+    if (to && (!pricing.accepted_at || pricing.accepted_at > `${to}T23:59:59`)) continue;
+    exposureFeeTotal += pricing.display_price ?? 0;
+    costFeeTotal += pricing.cost_amount ?? 0;
   }
 
   const budget = isManager

@@ -7,6 +7,10 @@ import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
 import { AdminDashboard, type AdminQueueKey } from "@/components/admin-dashboard";
 import { AdminInfluencersTab } from "@/components/admin-influencers-tab";
+import { AdminMarginCampaignPanel } from "@/components/admin-margin-campaign";
+import { AdminMarginOverviewPanel } from "@/components/admin-margin-overview";
+import { AdminMarginQuotePanel } from "@/components/admin-margin-quote";
+import { AdminMarginRateCardPanel } from "@/components/admin-margin-rate-card";
 import { AdminPerformanceLookupTab, AdminPerformanceTab } from "@/components/admin-performance-tab";
 import { type AdminReviewTab } from "@/components/admin-review-queue";
 import { AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
@@ -14,7 +18,7 @@ import {
   AdminTestVisibilityProvider,
   useAdminTestVisibility,
 } from "@/components/admin-test-visibility";
-import { Notice } from "@/components/ui";
+import { EmptyState, Notice } from "@/components/ui";
 import {
   formatMd,
   type AllocationWithRelations,
@@ -116,6 +120,7 @@ function AdminConsoleLayoutBody({
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [reviewQueue, setReviewQueue] = useState<AdminReviewTab>("reviewPending");
   const [castingStale, setCastingStale] = useState(false);
+  const [marginCampaignId, setMarginCampaignId] = useState<string | null>(null);
   const [performanceMeta, setPerformanceMeta] = useState<{
     asOf: string;
     lastCollected: string | null;
@@ -168,6 +173,7 @@ function AdminConsoleLayoutBody({
       }}
       sidebarActions={sidebarActions}
       headerFooter={headerFooter}
+      isManager={isManager}
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       {error || message ? (
@@ -253,6 +259,31 @@ function AdminConsoleLayoutBody({
             />
           </div>
         </div>
+      ) : null}
+
+      {section === "marginOverview" && isManager ? (
+        <AdminMarginOverviewPanel
+          companies={visibleCompanies}
+          onSelectCampaign={(campaignId) => {
+            setMarginCampaignId(campaignId);
+            setSection("marginCampaign");
+          }}
+        />
+      ) : null}
+
+      {section === "marginRateCard" && isManager ? <AdminMarginRateCardPanel /> : null}
+
+      {section === "marginQuote" && isManager ? <AdminMarginQuotePanel /> : null}
+
+      {section === "marginCampaign" && isManager ? (
+        marginCampaignId ? (
+          <AdminMarginCampaignPanel
+            campaignId={marginCampaignId}
+            onBack={() => setSection("marginOverview")}
+          />
+        ) : (
+          <EmptyState title="캠페인을 먼저 선택하세요." message="마진 현황에서 캠페인을 클릭하면 상세로 이동합니다." positive />
+        )
       ) : null}
       </div>
     </AdminConsoleShell>

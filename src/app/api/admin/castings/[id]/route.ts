@@ -7,6 +7,7 @@ import {
 } from "@/lib/access";
 import { acceptCasting } from "@/lib/admin-casting-accept";
 import { isMoneyOk, parseMoney } from "@/lib/money";
+import { getAdminLoginId } from "@/lib/session";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { type CastingStatus } from "@/lib/types";
 
@@ -73,6 +74,7 @@ export async function PATCH(
     email?: string;
     store_id?: string;
     visit_date?: string;
+    margin_reason?: string;
   };
   try {
     body = await request.json();
@@ -145,6 +147,7 @@ export async function PATCH(
     const email = String(body.email || "").trim();
     const storeId = String(body.store_id || "").trim();
     const visitDate = String(body.visit_date || "").trim();
+    const marginReason = String(body.margin_reason || "").trim() || undefined;
 
     if (
       !isMoneyOk(displayPrice) ||
@@ -180,6 +183,8 @@ export async function PATCH(
         email,
         storeId,
         visitDate,
+        marginReason,
+        actor: (await getAdminLoginId()) || "unknown",
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "섭외 확정 실패";

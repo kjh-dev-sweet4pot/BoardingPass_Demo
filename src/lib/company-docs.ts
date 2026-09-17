@@ -72,6 +72,14 @@ export function emptyLine(): DocLine {
   return { description: "", qty: 1, unitPrice: 0, remark: "" };
 }
 
+/** 인보이스 단가 추천용 median. 빈 배열이면 null. */
+export function medianUnitPrice(nums: number[]): number | null {
+  if (!nums.length) return null;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
 export function lineAmount(line: DocLine) {
   const qty = Number(line.qty) || 0;
   const unit = Number(line.unitPrice) || 0;
@@ -427,6 +435,14 @@ export function mailDocFilename(
 }
 
 if (process.env.RUN_COMPANY_DOCS_SELF_CHECK === "1") {
+  if (
+    medianUnitPrice([]) !== null ||
+    medianUnitPrice([100]) !== 100 ||
+    medianUnitPrice([100, 200, 300]) !== 200 ||
+    medianUnitPrice([100, 200, 300, 400]) !== 250
+  ) {
+    throw new Error("medianUnitPrice failed");
+  }
   const t = invoiceTotals([
     { description: "약사 콘텐츠", qty: 4, unitPrice: 1_500_000, remark: "" },
     { description: "메가", qty: 1, unitPrice: 3_000_000, remark: "" },

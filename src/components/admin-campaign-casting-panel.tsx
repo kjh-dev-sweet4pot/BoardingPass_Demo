@@ -11,6 +11,9 @@ import {
 import { InfluencerAvatar } from "@/components/influencer-avatar";
 import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import {
+  calcMarginRate,
+  MARGIN_STATE_COLOR,
+  marginState,
   type CastingStatus,
   type Company,
   type Product,
@@ -146,6 +149,10 @@ export function AdminCampaignCastingPanel({
     store_id: stores[0]?.id ?? "",
     visit_date: "",
   });
+  const [marginBase, setMarginBase] = useState<{ revenue: number | null; committedCost: number } | null>(
+    null,
+  );
+  const [marginReason, setMarginReason] = useState("");
 
   const { includeCompany } = useAdminTestVisibility();
   const listedCampaigns = useMemo(
@@ -166,6 +173,27 @@ export function AdminCampaignCastingPanel({
     () => listedCastings.find((c) => c.id === selectedCastingId) ?? null,
     [listedCastings, selectedCastingId],
   );
+
+  useEffect(() => {
+    if (!isManager || selectedCasting?.status !== "Nego") {
+      setMarginBase(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/admin/margin/campaign/${selectedCasting.campaign_id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || data.error) return;
+        setMarginBase({
+          revenue: data.campaign?.budget_amount ?? null,
+          committedCost: data.margin?.committed_cost ?? 0,
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isManager, selectedCasting?.id, selectedCasting?.status, selectedCasting?.campaign_id]);
 
   const campaignQ = campaignQuery.trim().toLowerCase();
   const visibleCampaigns = campaignQ
@@ -378,8 +406,15 @@ export function AdminCampaignCastingPanel({
       email: acceptForm.email,
       store_id: acceptForm.store_id,
       visit_date: acceptForm.visit_date,
+      margin_reason: marginReason,
     });
   }
+
+  const projectedMarginRate = marginBase
+    ? calcMarginRate(marginBase.revenue ?? 0, marginBase.committedCost + (Number(acceptForm.cost_amount) || 0))
+    : null;
+  const marginWarning = marginBase ? marginState(projectedMarginRate) : "unknown";
+  const marginReasonRequired = marginWarning === "over" || marginWarning === "caution" || marginWarning === "risk";
 
   const activeCompanies = companies.filter((c) => c.is_active && includeCompany(c));
 
@@ -968,6 +1003,29 @@ export function AdminCampaignCastingPanel({
                           }
                         />
                       </Field>
+                      {marginBase ? (
+                        <div className="flex flex-col gap-2 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-[var(--muted)]">확정 시 캠페인 마진율(예상)</span>
+                            <span
+                              className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                              style={{ backgroundColor: MARGIN_STATE_COLOR[marginWarning] }}
+                            >
+                              {projectedMarginRate === null ? "산정 불가" : `${projectedMarginRate}%`}
+                            </span>
+                          </div>
+                          {marginReasonRequired ? (
+                            <Field label="마진율 경고 사유 (확정하려면 필수)">
+                              <input
+                                className={fieldClass}
+                                required
+                                value={marginReason}
+                                onChange={(e) => setMarginReason(e.target.value)}
+                              />
+                            </Field>
+                          ) : null}
+                        </div>
+                      ) : null}
                       <Field label="목표 콘텐츠 수">
                         <input
                           className={fieldClass}

@@ -53,6 +53,18 @@ const PRICING_KEYS = [
   "margin_amount",
   "원가",
   "마진",
+  "margin_rate",
+  "committed_margin_rate",
+  "realized_margin_rate",
+  "burn_rate",
+  "spend_pct",
+  "planned_amount",
+  "unit_cost",
+  "standard_cost",
+  "committed_cost",
+  "realized_cost",
+  "other_cost",
+  "spent_display",
 ] as const;
 
 /** 운영담당자·회원사 API 응답에서 원가·마진 필드 제거 (R3) */
