@@ -287,7 +287,7 @@ export async function syncDepositedBudgets(
       .from("company_budget_rounds")
       .select("company_id, deposit_status, amount_krw")
       .in("company_id", ids);
-    data = fallback.data;
+    data = fallback.data as unknown as typeof data;
     error = fallback.error;
   }
   if (error) throw new Error(error.message);
@@ -386,7 +386,9 @@ export function readRoundBody(body: Record<string, unknown>) {
   const amount = parseManwon(body.amount_manwon ?? body.amount_krw);
 
   if (!period) {
-    return { error: (kind === "사용" ? "사용 월을 선택하세요." : "입금 월을 선택하세요.") as const };
+    const message: "사용 월을 선택하세요." | "입금 월을 선택하세요." =
+      kind === "사용" ? "사용 월을 선택하세요." : "입금 월을 선택하세요.";
+    return { error: message };
   }
   if (usagePeriodRaw && !usagePeriod) return { error: "사용 월 형식이 올바르지 않습니다." as const };
   if (kind === "사용" && !sourceDepositId) {

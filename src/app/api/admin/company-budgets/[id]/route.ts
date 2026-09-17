@@ -27,7 +27,7 @@ function selectFallback(message: string) {
   return null;
 }
 
-function stripMissingColumns(row: Record<string, unknown>, message: string) {
+function stripMissingColumns<T extends Record<string, unknown>>(row: T, message: string): T {
   const cols: string[] = [];
   if (isMissingColumnError(message, "source_deposit_id")) cols.push("source_deposit_id");
   if (isMissingColumnError(message, "usage_period_month")) cols.push("usage_period_month");
@@ -141,12 +141,12 @@ export async function PATCH(
     ]);
   } catch (err) {
     return NextResponse.json({
-      round: data ? normalizeBudgetRound(data as BudgetRound) : data,
+      round: data ? normalizeBudgetRound(data as unknown as BudgetRound) : data,
       warning: err instanceof Error ? err.message : "배정 예산 반영 실패",
     });
   }
   return NextResponse.json({
-    round: data ? normalizeBudgetRound(data as BudgetRound) : data,
+    round: data ? normalizeBudgetRound(data as unknown as BudgetRound) : data,
     budgets,
   });
 }

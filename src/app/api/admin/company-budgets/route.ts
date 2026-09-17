@@ -27,7 +27,7 @@ function selectFallback(message: string) {
   return null;
 }
 
-function stripMissingColumns(row: Record<string, unknown>, message: string) {
+function stripMissingColumns<T extends Record<string, unknown>>(row: T, message: string): T {
   const cols: string[] = [];
   if (isMissingColumnError(message, "source_deposit_id")) cols.push("source_deposit_id");
   if (isMissingColumnError(message, "usage_period_month")) cols.push("usage_period_month");
@@ -55,7 +55,7 @@ export async function GET() {
       .select(select)
       .order("period_month", { ascending: true })
       .order("company_name", { ascending: true });
-    data = fallback.data;
+    data = fallback.data as unknown as typeof data;
     error = fallback.error;
   }
 
@@ -155,14 +155,14 @@ export async function POST(request: Request) {
   } catch (err) {
     return NextResponse.json(
       {
-        round: data ? normalizeBudgetRound(data as BudgetRound) : data,
+        round: data ? normalizeBudgetRound(data as unknown as BudgetRound) : data,
         warning: err instanceof Error ? err.message : "배정 예산 반영 실패",
       },
       { status: 200 },
     );
   }
   return NextResponse.json({
-    round: data ? normalizeBudgetRound(data as BudgetRound) : data,
+    round: data ? normalizeBudgetRound(data as unknown as BudgetRound) : data,
     budgets,
   });
 }

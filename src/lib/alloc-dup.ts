@@ -57,7 +57,7 @@ function mergeLinks(a: unknown[] | null | undefined, b: unknown[] | null | undef
   return out;
 }
 
-function better(a: SharedVisitAlloc, b: SharedVisitAlloc) {
+function better<T extends SharedVisitAlloc>(a: T, b: T): T {
   const d = statusRank(a) - statusRank(b);
   if (d !== 0) return d < 0 ? a : b;
   return String(a.created_at || "") <= String(b.created_at || "") ? a : b;
