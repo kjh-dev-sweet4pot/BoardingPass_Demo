@@ -96,7 +96,10 @@ export type Product = {
   name: string;
   sku: string | null;
   description: string | null;
+  company_id?: string | null;
   created_at: string;
+  /** false면 보관됨 — 배정 이력이 있어 하드 삭제가 막혀 목록에서만 숨긴 상태 */
+  is_active?: boolean;
 };
 
 export type CampaignStatus = "견적수립" | "시행" | "결과" | "보류" | "취소";
@@ -142,36 +145,6 @@ export type PlacementGuide = {
   ends_on: string;
   created_at: string;
   updated_at: string;
-};
-
-export type CastingStatus = "Pending" | "Nego" | "Accept" | "결렬";
-
-export type Casting = {
-  id: string;
-  campaign_id: string;
-  company_id: string;
-  influencer_id: string;
-  status: CastingStatus;
-  allocation_id: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type NegotiationLog = {
-  id: string;
-  casting_id: string;
-  proposed_amount: number | null;
-  memo: string | null;
-  proposer: "company" | "operator";
-  operator_label: string | null;
-  created_at: string;
-};
-
-export const CASTING_STATUS_LABEL: Record<CastingStatus, string> = {
-  Pending: "Pending",
-  Nego: "Nego",
-  Accept: "Accept",
-  결렬: "결렬",
 };
 
 export type Allocation = {
@@ -301,13 +274,16 @@ export interface CampaignTarget {
 export interface BudgetPlanItem {
   id: string;
   campaign_id: string;
-  tier: Tier;
+  /** "unclassified" = 인보이스 설명에서 등급을 못 알아낸 경우 */
+  tier: Tier | "unclassified";
   content_type: ContentType | null;
   platform: Platform | null;
   unit_cost: number;
   slot_count: number;
   expected_publish_per_slot: number;
   sort_order: number;
+  /** 원문 메모 (예: 인보이스 항목 설명을 그대로 옮겨둔 것) */
+  memo?: string | null;
   created_at: string;
   updated_at: string;
   // derived, not stored — compute in API layer
@@ -342,23 +318,12 @@ export interface CreatorRateCard {
 export interface MarginOverrideLog {
   id: string;
   campaign_id: string;
-  casting_id: string | null;
   margin_before: number | null;
   margin_after: number | null;
   warn_type: WarnType;
   reason: string;
   actor: string;
   created_at: string;
-}
-
-export interface CastingCostSplit {
-  id: string;
-  casting_id: string;
-  campaign_id: string;
-  amount: number;
-  is_manual: boolean;
-  created_at: string;
-  updated_at: string;
 }
 
 /** v_campaign_margin 뷰 반환 행 */

@@ -52,28 +52,44 @@ export async function GET(
   if (itemsErr) return NextResponse.json({ error: itemsErr.message }, { status: 500 });
   if (costsErr) return NextResponse.json({ error: costsErr.message }, { status: 500 });
 
-  // 배정된 슬롯 수 (castings.budget_plan_item_id 기준)
-  const itemIds = (budgetItems ?? []).map((i) => i.id as string);
-  const { data: filledRows } = itemIds.length
-    ? await supabase.from("castings").select("budget_plan_item_id").in("budget_plan_item_id", itemIds)
-    : { data: [] as { budget_plan_item_id: string | null }[] };
-  const filledCountByItem = new Map<string, number>();
-  for (const row of filledRows ?? []) {
-    if (!row.budget_plan_item_id) continue;
-    filledCountByItem.set(
-      row.budget_plan_item_id,
-      (filledCountByItem.get(row.budget_plan_item_id) ?? 0) + 1,
-    );
+  // ponytail: 슬롯 채움 카운트는 castings.budget_plan_item_id 기반이었는데
+  // castings를 더 이상 안 써서(테이블 자체를 없앨 예정) 0으로 고정한다.
+  const items = (budgetItems ?? []).map((i) => ({
+    ...i,
+    planned_amount: (i.unit_cost as number) * (i.slot_count as number),
+    filled_count: 0,
+    remaining_count: i.slot_count as number,
+  }));
+
+  // 확정된 배정(인플루언서·원가) — 섭외/casting 플로우를 안 쓰므로 allocations를
+  // 직접 조회한다. budget_plan_item 슬롯 연결도 castings 기반이라 지금은 항상
+  // "슬롯 미지정"으로 잡히지만, 그 부분은 후순위(슬롯 매칭은 보류)라 그대로 둔다.
+  const { data: allocRows } = await supabase
+    .from("allocations")
+    .select(
+      "id, influencer_id, store_id, visit_date, influencers ( name ), allocation_pricing ( cost_amount, display_price, quote_total_amount )",
+    )
+    .eq("campaign_id", id)
+    .neq("status", "cancelled");
+
+  // 같은 방문(인플루언서+지점+날짜)을 공유하는 다른 회사 배정 수 — 원가가 몇 개 사에
+  // 나눠져 있는지 보여주기 위함 (visitKey 개념은 src/lib/alloc-dup.ts와 동일).
+  const infIds = [...new Set((allocRows ?? []).map((a) => a.influencer_id as string))];
+  const { data: siblingRows } = infIds.length
+    ? await supabase
+        .from("allocations")
+        .select("influencer_id, store_id, visit_date, company_id")
+        .in("influencer_id", infIds)
+        .neq("status", "cancelled")
+    : { data: [] as { influencer_id: string; store_id: string; visit_date: string | null; company_id: string | null }[] };
+
+  const companyCountByVisit = new Map<string, Set<string>>();
+  for (const row of siblingRows ?? []) {
+    const key = `${row.influencer_id}|${row.store_id}|${row.visit_date ?? ""}`;
+    const set = companyCountByVisit.get(key) ?? new Set<string>();
+    if (row.company_id) set.add(row.company_id);
+    companyCountByVisit.set(key, set);
   }
-  const items = (budgetItems ?? []).map((i) => {
-    const filled = filledCountByItem.get(i.id as string) ?? 0;
-    return {
-      ...i,
-      planned_amount: (i.unit_cost as number) * (i.slot_count as number),
-      filled_count: filled,
-      remaining_count: Math.max(0, (i.slot_count as number) - filled),
-    };
-  });
 
   return NextResponse.json({
     campaign,
@@ -81,6 +97,23 @@ export async function GET(
     target: target || null,
     budgetItems: items,
     otherCosts: otherCosts || [],
+    unassignedAllocations: (allocRows ?? []).map((a) => {
+      const inf = a.influencers as unknown as { name: string } | { name: string }[] | null;
+      const pricing = a.allocation_pricing as unknown as
+        | { cost_amount: number | null; display_price: number | null; quote_total_amount: number | null }
+        | { cost_amount: number | null; display_price: number | null; quote_total_amount: number | null }[]
+        | null;
+      const p = Array.isArray(pricing) ? pricing[0] : pricing;
+      const key = `${a.influencer_id}|${a.store_id}|${a.visit_date ?? ""}`;
+      return {
+        id: a.id as string,
+        influencer_name: (Array.isArray(inf) ? inf[0]?.name : inf?.name) ?? "—",
+        cost_amount: p?.cost_amount ?? null,
+        display_price: p?.display_price ?? null,
+        quote_total_amount: p?.quote_total_amount ?? null,
+        split_company_count: companyCountByVisit.get(key)?.size ?? 1,
+      };
+    }),
   });
 }
 

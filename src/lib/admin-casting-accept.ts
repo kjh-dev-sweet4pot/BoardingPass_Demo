@@ -4,7 +4,9 @@ import { recomputeCampaignStatus } from "@/lib/campaign-rollup";
 import { calcMarginRate, marginState, type WarnType } from "@/lib/types";
 
 export type AcceptCastingInput = {
-  castingId: string;
+  campaignId: string;
+  companyId: string;
+  influencerId: string;
   displayPrice: number;
   costAmount: number;
   targetContentCount: number;
@@ -17,9 +19,9 @@ export type AcceptCastingInput = {
   actor?: string;
 };
 
+// 마진율이 60% 이상이면(과다 마진 포함) 경고하지 않는다 — 낮은 마진만 확인이 필요하다.
 function marginWarnType(rate: number | null): WarnType | null {
   const state = marginState(rate);
-  if (state === "over") return "margin_high";
   if (state === "caution" || state === "risk") return "margin_low";
   return null;
 }
@@ -27,58 +29,39 @@ function marginWarnType(rate: number | null): WarnType | null {
 if (
   marginWarnType(null) !== null ||
   marginWarnType(70) !== null ||
-  marginWarnType(90) !== "margin_high" ||
+  marginWarnType(90) !== null ||
   marginWarnType(58) !== "margin_low" ||
   marginWarnType(40) !== "margin_low"
 ) {
   throw new Error("marginWarnType failed");
 }
 
+/** 섭외(casting) 없이, 결정된 인플루언서를 캠페인에 바로 배정 확정한다. */
 export async function acceptCasting(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
   input: AcceptCastingInput,
 ) {
-  const { data: casting, error: castErr } = await supabase
-    .from("castings")
-    .select(
-      "id, status, campaign_id, company_id, influencer_id, allocation_id, campaigns(id, product_id, status, budget_amount)",
-    )
-    .eq("id", input.castingId)
+  const { data: campaign, error: campErr } = await supabase
+    .from("campaigns")
+    .select("id, product_id, status, budget_amount")
+    .eq("id", input.campaignId)
     .maybeSingle();
-
-  if (castErr) throw new Error(castErr.message);
-  if (!casting) throw new Error("섭외를 찾을 수 없습니다.");
-  if (casting.status === "Accept") throw new Error("이미 확정된 섭외입니다.");
-  if (casting.status === "결렬") throw new Error("결렬된 섭외는 확정할 수 없습니다.");
-  if (casting.status !== "Nego") {
-    throw new Error("협의 개시(Nego) 상태에서만 섭외 확정이 가능합니다.");
-  }
-  if (casting.allocation_id) throw new Error("이미 배정이 연결된 섭외입니다.");
-
-  const campaignRaw = casting.campaigns;
-  const campaign = (Array.isArray(campaignRaw) ? campaignRaw[0] : campaignRaw) as {
-    id: string;
-    product_id: string;
-    status: string;
-    budget_amount: number | null;
-  } | null;
-  if (!campaign?.product_id) throw new Error("캠페인 상품 정보가 없습니다.");
-  if (campaign.status === "취소") throw new Error("취소된 캠페인에는 섭외 확정할 수 없습니다.");
+  if (campErr) throw new Error(campErr.message);
+  if (!campaign) throw new Error("캠페인을 찾을 수 없습니다.");
+  if (!campaign.product_id) throw new Error("캠페인 상품 정보가 없습니다.");
+  if (campaign.status === "취소") throw new Error("취소된 캠페인에는 배정 확정할 수 없습니다.");
 
   // 마진율 경고 확인 (§9.6) — hard block 아님. 경고 구간이면 사유 입력 시에만 진행.
-  const { data: acceptedCastings } = await supabase
-    .from("castings")
-    .select("allocations(allocation_pricing(cost_amount))")
-    .eq("campaign_id", casting.campaign_id)
-    .eq("status", "Accept");
-  const priorCost = (acceptedCastings ?? []).reduce((sum, row) => {
-    const alloc = Array.isArray(row.allocations) ? row.allocations[0] : row.allocations;
-    const pricing = Array.isArray(alloc?.allocation_pricing)
-      ? alloc?.allocation_pricing[0]
-      : alloc?.allocation_pricing;
-    return sum + (pricing?.cost_amount ?? 0);
-  }, 0);
+  const { data: priorPricing } = await supabase
+    .from("allocation_pricing")
+    .select("cost_amount, allocations!inner(campaign_id, status)")
+    .eq("allocations.campaign_id", input.campaignId)
+    .neq("allocations.status", "cancelled");
+  const priorCost = (priorPricing ?? []).reduce(
+    (sum: number, row: { cost_amount: number | null }) => sum + (row.cost_amount ?? 0),
+    0,
+  );
   const marginBefore = calcMarginRate(campaign.budget_amount ?? 0, priorCost);
   const marginAfter = calcMarginRate(campaign.budget_amount ?? 0, priorCost + input.costAmount);
   const warnType = marginWarnType(marginAfter);
@@ -95,15 +78,15 @@ export async function acceptCasting(
       email: input.email,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", casting.influencer_id);
+    .eq("id", input.influencerId);
   if (infErr) throw new Error(infErr.message);
 
   const dupId = await findDuplicateAllocation(supabase, {
-    influencerId: casting.influencer_id,
+    influencerId: input.influencerId,
     productId: campaign.product_id,
     storeId: input.storeId,
     visitDate: input.visitDate,
-    companyId: casting.company_id,
+    companyId: input.companyId,
   });
   if (dupId) throw new Error("동일 조건의 배정이 이미 있습니다.");
 
@@ -111,11 +94,11 @@ export async function acceptCasting(
   const { data: allocation, error: allocErr } = await supabase
     .from("allocations")
     .insert({
-      influencer_id: casting.influencer_id,
+      influencer_id: input.influencerId,
       product_id: campaign.product_id,
       store_id: input.storeId,
-      company_id: casting.company_id,
-      campaign_id: casting.campaign_id,
+      company_id: input.companyId,
+      campaign_id: input.campaignId,
       target_content_count: input.targetContentCount,
       visit_date: input.visitDate,
       quantity: 1,
@@ -129,7 +112,7 @@ export async function acceptCasting(
 
   const { error: priceErr } = await supabase.from("allocation_pricing").insert({
     allocation_id: allocation.id,
-    company_id: casting.company_id,
+    company_id: input.companyId,
     display_price: input.displayPrice,
     cost_amount: input.costAmount,
     accepted_at: now,
@@ -139,20 +122,9 @@ export async function acceptCasting(
     throw new Error(priceErr.message);
   }
 
-  const { error: updErr } = await supabase
-    .from("castings")
-    .update({
-      status: "Accept",
-      allocation_id: allocation.id,
-      updated_at: now,
-    })
-    .eq("id", casting.id);
-  if (updErr) throw new Error(updErr.message);
-
   if (warnType) {
     await supabase.from("margin_override_logs").insert({
-      campaign_id: casting.campaign_id,
-      casting_id: casting.id,
+      campaign_id: input.campaignId,
       margin_before: marginBefore,
       margin_after: marginAfter,
       warn_type: warnType,
@@ -163,12 +135,12 @@ export async function acceptCasting(
 
   // 보류·취소가 아니면 배정 추가로 캠페인 상태 롤업
   if (campaign.status !== "보류" && campaign.status !== "취소") {
-    const next = await recomputeCampaignStatus(supabase, casting.campaign_id);
+    const next = await recomputeCampaignStatus(supabase, input.campaignId);
     if (next !== campaign.status) {
       await supabase
         .from("campaigns")
         .update({ status: next, updated_at: now })
-        .eq("id", casting.campaign_id);
+        .eq("id", input.campaignId);
     }
   }
 

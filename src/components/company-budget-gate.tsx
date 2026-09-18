@@ -51,7 +51,7 @@ export function CompanyBudgetGate({
           뒤 활성화됩니다.
         </p>
 
-        <dl className="mt-6 grid gap-3 rounded-[6px] bg-[var(--accent-soft)]/60 px-4 py-4 sm:grid-cols-2">
+        <dl className="mt-6 grid grid-cols-1 gap-3 rounded-[6px] bg-[var(--accent-soft)]/60 px-4 py-4 sm:grid-cols-2">
           <div>
             <dt className="text-xs text-[var(--muted)]">확정 예산</dt>
             <dd className="mt-1 text-xl font-semibold text-[var(--accent)]">

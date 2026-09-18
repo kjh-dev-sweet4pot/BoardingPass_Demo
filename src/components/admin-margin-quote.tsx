@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { secondaryBtnClass } from "@/components/ui";
 import { formatManwon, parseManwon } from "@/lib/company-budget-rounds";
-import { quoteSummary, type QuoteLine } from "@/lib/quote-engine";
+import { quoteSummary, suggestQuoteLines, type QuoteLine } from "@/lib/quote-engine";
 import { MARGIN_STATE_COLOR, TARGET_MARGIN_RATE, type ContentType, type Platform, type Tier } from "@/lib/types";
 
 const TIERS: Tier[] = ["nano", "micro", "mid", "macro", "mega"];
@@ -23,6 +23,7 @@ function emptyLine(): QuoteLine {
 export function AdminMarginQuotePanel() {
   const [lines, setLines] = useState<QuoteLine[]>([emptyLine()]);
   const [targetRate, setTargetRate] = useState(TARGET_MARGIN_RATE);
+  const [clientBudget, setClientBudget] = useState("");
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [campaignId, setCampaignId] = useState("");
   const [applyMsg, setApplyMsg] = useState<string | null>(null);
@@ -67,6 +68,27 @@ export function AdminMarginQuotePanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 sm:p-7">
       <div className="rounded-[8px] border border-[var(--line)] p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <p className="text-sm text-[var(--muted)]">고객사 제시 예산(만원)</p>
+          <input
+            type="number"
+            className="h-9 w-28 rounded-[6px] border border-[var(--line)] px-2 text-sm"
+            value={clientBudget}
+            onChange={(e) => setClientBudget(e.target.value)}
+          />
+          <button
+            type="button"
+            className={secondaryBtnClass}
+            onClick={() => {
+              const budget = parseManwon(clientBudget) ?? 0;
+              if (!budget) return;
+              const targetCost = Math.round(budget * (1 - targetRate / 100));
+              setLines(suggestQuoteLines(targetCost));
+            }}
+          >
+            예산으로 조합 추천
+          </button>
+        </div>
         <div className="mb-3 flex items-center gap-2">
           <p className="text-sm text-[var(--muted)]">목표 마진율</p>
           <input

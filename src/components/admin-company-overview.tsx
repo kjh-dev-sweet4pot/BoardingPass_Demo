@@ -10,7 +10,7 @@ import {
 import { formatKrw } from "@/lib/creator-pool-mock";
 import type { Company } from "@/lib/types";
 
-export type CompanyManageDest = "companiesBudget" | "companiesDocs" | "companiesMail";
+export type CompanyManageDest = "companiesBudget" | "companiesDocs" | "companiesMail" | "companiesCampaigns";
 
 function money(n: number | null | undefined) {
   return n != null ? `${formatKrw(n)}원` : "—";
@@ -119,6 +119,9 @@ export function AdminCompanyOverview({
             <div className="flex flex-wrap gap-2">
               <button type="button" className={secondaryBtnClass} onClick={() => onManage(selected.id, "companiesBudget")}>
                 예산
+              </button>
+              <button type="button" className={secondaryBtnClass} onClick={() => onManage(selected.id, "companiesCampaigns")}>
+                캠페인
               </button>
               <button type="button" className={secondaryBtnClass} onClick={() => onManage(selected.id, "companiesDocs")}>
                 계약·인보이스

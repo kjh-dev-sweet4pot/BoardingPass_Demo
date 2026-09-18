@@ -235,7 +235,7 @@ function StripPlain({
   return <div className={cls}>{inner}</div>;
 }
 
-function formatCurveAxis(day: number, useHours: boolean) {
+export function formatCurveAxis(day: number, useHours: boolean) {
   if (useHours) {
     const h = Math.max(0, Math.round(day * 24));
     return `${h}시간`;
@@ -243,7 +243,7 @@ function formatCurveAxis(day: number, useHours: boolean) {
   return `D+${Math.max(0, Math.floor(day))}`;
 }
 
-function HomeViewsCurve({ points }: { points: { day: number; views: number }[] }) {
+export function HomeViewsCurve({ points }: { points: { day: number; views: number }[] }) {
   if (points.length < 2) {
     return (
       <p className="text-[10px] leading-snug text-[var(--muted)]">
@@ -1205,7 +1205,7 @@ export function CompanyHomeLanding({
               >
                 월간 랭킹 바로가기
               </button>
-              <div className="h-5 min-w-0 flex-1 overflow-hidden">
+              <div className="h-5 min-w-0 flex-1 overflow-hidden [-webkit-mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-16px),transparent)] [mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-16px),transparent)]">
                 {month.length === 0 ? (
                   <span className="text-[12.5px] text-[var(--muted)]">
                     최근 30일 발행된 게시물이 없습니다

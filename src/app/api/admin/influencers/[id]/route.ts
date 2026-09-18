@@ -3,6 +3,41 @@ import { normalizeHandle } from "@/lib/auth";
 import { requireAnyAdmin } from "@/lib/access";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 
+/**
+ * GET /api/admin/influencers/[id]
+ * 이 인플루언서의 가장 최근 배정(allocation) 지점·방문일 힌트 — 다른 회사에
+ * 이미 배정돼 있다면 같은 지점·날짜를 그대로 재사용할 수 있게 제공한다.
+ */
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const auth = await requireAnyAdmin();
+  if ("error" in auth) return auth.error;
+
+  const { id } = await context.params;
+  const supabase = await createAuthedDbClient();
+  if (!supabase) return supabaseConfigError();
+
+  const { data, error } = await supabase
+    .from("allocations")
+    .select("store_id, visit_date, stores ( id, name )")
+    .eq("influencer_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const storeRaw = data?.stores as { id: string; name: string } | { id: string; name: string }[] | null;
+  const store = Array.isArray(storeRaw) ? storeRaw[0] : storeRaw;
+
+  return NextResponse.json({
+    latestAllocation: data
+      ? { store_id: data.store_id, store_name: store?.name ?? null, visit_date: data.visit_date }
+      : null,
+  });
+}
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },

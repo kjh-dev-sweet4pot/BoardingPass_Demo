@@ -762,13 +762,15 @@ async function main() {
 
   for (const v of merged) {
     const storeId = await findOrCreateByName("stores", v.store, storeCache);
-    const productId = await findOrCreateByName("products", v.product, productCache);
     const influencerId = await findOrCreateInfluencer(v, infCache);
     const visit = v.visitDate || "2026-01-01";
     const companies = targetCompanies(v);
 
     for (const companyName of companies) {
     const companyId = await findOrCreateCompany(companyName, companyCache);
+    // ponytail: multi-brand visits share one 상품 cell but each company gets its own product row (brand name == product name)
+    const productName = companies.length > 1 ? companyName : v.product;
+    const productId = await findOrCreateByName("products", productName, productCache);
     const { data: dup } = await supabase
       .from("allocations")
       .select("id")

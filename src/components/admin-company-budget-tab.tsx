@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { Field, fieldClass, secondaryBtnClass } from "@/components/ui";
+import { formatDocKrw, invoiceTotals, lineAmount, type CompanyDocRow, type InvoicePayload } from "@/lib/company-docs";
+import { classifyTierFromText } from "@/lib/quote-engine";
 import {
   BUDGET_DEPOSIT_STATUSES,
   BUDGET_TABLE_SETUP,
@@ -10,6 +12,7 @@ import {
   displayDepositKrw,
   formatManwon,
   krwToManwon,
+  MANWON,
   monthLabel,
   normalizeDepositStatus,
   normalizeUsageStatus,
@@ -22,9 +25,26 @@ import {
   type BudgetRound,
   type BudgetUsageStatus,
 } from "@/lib/company-budget-rounds";
-import type { Company } from "@/lib/types";
+import type { Company, Product } from "@/lib/types";
 
 const SLAM_YEAR = "2026";
+
+type CampaignSummary = {
+  id: string;
+  company_id: string;
+  name: string | null;
+  status: string;
+  budget_amount: number | null;
+  products?: { name: string } | null;
+};
+
+/** 예산 라운드는 campaign_id가 없어 회원사 단위로만 매칭할 수 있다 (근사치). */
+function campaignNamesForCompany(campaigns: CampaignSummary[], companyId: string) {
+  return campaigns
+    .filter((c) => c.company_id === companyId && c.status !== "취소")
+    .map((c) => c.name || c.products?.name || "(이름 없음)")
+    .join(", ");
+}
 
 function displayName(round: BudgetRound, companies: Company[]) {
   return companies.find((c) => c.id === round.company_id)?.name || round.company_name;
@@ -42,13 +62,25 @@ function nextPeriod(rows: { period_month: string }[]) {
   return last ? shiftMonth(last.period_month, 1) : `${SLAM_YEAR}-09`;
 }
 
+const TIER_LABEL: Record<string, string> = {
+  mega: "메가",
+  macro: "매크로",
+  mid: "미들",
+  micro: "마이크로",
+  nano: "나노",
+  unclassified: "미분류",
+};
+
 export function AdminCompanyBudgetPanel({
   companies,
+  products,
   isManager,
   onBudgetsApplied,
   presetCompanyId = "",
+  presetInvoiceDocId = "",
 }: {
   companies: Company[];
+  products: Product[];
   isManager: boolean;
   onBudgetsApplied: (patches: {
     company_id: string;
@@ -56,9 +88,12 @@ export function AdminCompanyBudgetPanel({
     contract_stage?: string | null;
   }[]) => void;
   presetCompanyId?: string;
+  presetInvoiceDocId?: string;
 }) {
   const { includeCompany } = useAdminTestVisibility();
   const [rounds, setRounds] = useState<BudgetRound[]>([]);
+  const [productList, setProductList] = useState(products);
+  useEffect(() => setProductList(products), [products]);
   const liveCompanies = useMemo(
     () => companies.filter(includeCompany),
     [companies, includeCompany],
@@ -76,7 +111,9 @@ export function AdminCompanyBudgetPanel({
   const [companyId, setCompanyId] = useState(presetCompanyId);
   const [companyName, setCompanyName] = useState("");
   const [picked, setPicked] = useState(Boolean(presetCompanyId));
-  const [openRows, setOpenRows] = useState<{ key: string; period: string }[]>([]);
+  const [openRows, setOpenRows] = useState<
+    { key: string; period: string; amountManwon?: number; label?: string }[]
+  >([]);
 
   const sortedCompanies = useMemo(
     () => [...liveCompanies].sort((a, b) => a.name.localeCompare(b.name, "ko")),
@@ -108,6 +145,35 @@ export function AdminCompanyBudgetPanel({
     );
   }, [picked, scoped, liveRounds, companies]);
 
+  const [campaigns, setCampaigns] = useState<CampaignSummary[]>([]);
+  const [companyInvoices, setCompanyInvoices] = useState<CompanyDocRow[]>([]);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState(presetInvoiceDocId);
+
+  useEffect(() => setSelectedInvoiceId(presetInvoiceDocId), [presetInvoiceDocId]);
+
+  useEffect(() => {
+    if (!picked || !activeCompanyId) {
+      setCompanyInvoices([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/admin/company-docs?company_id=${encodeURIComponent(activeCompanyId)}`, {
+      cache: "no-store",
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        const docs = ((data.docs || []) as CompanyDocRow[]).filter((d) => d.kind === "인보이스");
+        setCompanyInvoices(docs);
+      })
+      .catch(() => setCompanyInvoices([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [picked, activeCompanyId]);
+
+  const refInvoice = companyInvoices.find((d) => d.id === selectedInvoiceId) || null;
+
   async function load() {
     setLoading(true);
     setError(null);
@@ -123,8 +189,15 @@ export function AdminCompanyBudgetPanel({
     return next;
   }
 
+  async function loadCampaigns() {
+    const res = await fetch("/api/admin/campaigns");
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) setCampaigns((data.campaigns || []) as CampaignSummary[]);
+  }
+
   useEffect(() => {
     void load();
+    void loadCampaigns();
   }, []);
 
   function applyBudgets(data: {
@@ -145,7 +218,7 @@ export function AdminCompanyBudgetPanel({
     };
   }
 
-  function addRow() {
+  function addRow(prefill?: { amountManwon: number; label: string }) {
     if (!picked || (!activeCompanyId && !companyName.trim())) {
       setError("회원사를 선택하거나 이름을 입력하세요.");
       return;
@@ -154,8 +227,24 @@ export function AdminCompanyBudgetPanel({
       ...deposits,
       ...openRows.map((row) => ({ period_month: `${row.period}-01` })),
     ]);
-    setOpenRows((prev) => [...prev, { key: `입금-${period}-${Date.now()}`, period }]);
+    setOpenRows((prev) => [
+      ...prev,
+      { key: `입금-${period}-${Date.now()}`, period, ...prefill },
+    ]);
     setError(null);
+  }
+
+  function addRowFromInvoice(doc: CompanyDocRow) {
+    const invoice = doc.payload as InvoicePayload;
+    const { subtotal, vat } = invoiceTotals(invoice.lines || []);
+    const amountManwon = krwToManwon(subtotal) ?? 0;
+    const label = invoice.invoiceNo || doc.title;
+    const alreadyAdded = deposits.some((d) => d.label === label);
+    const message = alreadyAdded
+      ? `이미 등록된 예산입니다. 그래도 등록하시겠습니까?\n공급가액 ${formatManwon(subtotal)} (VAT ${formatManwon(vat)} 별도)`
+      : `인보이스 공급가액 ${formatManwon(subtotal)} (VAT ${formatManwon(vat)} 별도)으로 예산 입금을 추가할까요?\n다음 화면에서 금액을 수정할 수 있습니다.`;
+    if (!window.confirm(message)) return;
+    addRow({ amountManwon, label });
   }
 
   async function onDelete(round: BudgetRound) {
@@ -244,6 +333,7 @@ export function AdminCompanyBudgetPanel({
                 key={group[0].company_id || group[0].company_name}
                 title={displayName(group[0], companies)}
                 rounds={group}
+                campaigns={campaigns.filter((c) => c.company_id === group[0].company_id)}
               />
             ))
           ) : (
@@ -267,9 +357,22 @@ export function AdminCompanyBudgetPanel({
 
         {picked ? (
           <div className="flex flex-wrap items-start gap-3">
+            {companyInvoices.length ? (
+              <InvoiceReferencePanel
+                invoices={companyInvoices}
+                selectedId={selectedInvoiceId}
+                onSelect={setSelectedInvoiceId}
+                doc={refInvoice}
+                isManager={isManager}
+                onAddBudget={() => refInvoice && addRowFromInvoice(refInvoice)}
+              />
+            ) : null}
             <DepositList
               items={deposits}
               allRounds={scoped}
+              campaignName={campaignNamesForCompany(campaigns, activeCompanyId)}
+              products={productList.filter((p) => p.company_id === activeCompanyId)}
+              onProductCreated={(p) => setProductList((prev) => [...prev, p])}
               isManager={isManager}
               openRows={openRows}
               onRemoveOpen={(key) => setOpenRows((prev) => prev.filter((row) => row.key !== key))}
@@ -278,6 +381,7 @@ export function AdminCompanyBudgetPanel({
               onSaved={async (data) => {
                 applyBudgets(data);
                 await load();
+                await loadCampaigns();
               }}
               onError={setError}
               companyPayload={companyPayload}
@@ -296,9 +400,91 @@ export function AdminCompanyBudgetPanel({
   );
 }
 
+function InvoiceReferencePanel({
+  invoices,
+  selectedId,
+  onSelect,
+  doc,
+  isManager,
+  onAddBudget,
+}: {
+  invoices: CompanyDocRow[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  doc: CompanyDocRow | null;
+  isManager: boolean;
+  onAddBudget: () => void;
+}) {
+  return (
+    <section className="w-fit max-w-full rounded-[6px] border border-[var(--accent)] bg-[var(--surface)] p-3">
+      <Field label="참고할 인보이스">
+        <select
+          className={fieldClass}
+          value={selectedId}
+          onChange={(e) => onSelect(e.target.value)}
+        >
+          <option value="">선택</option>
+          {invoices.map((d) => (
+            <option key={d.id} value={d.id}>
+              {(d.issued_on || "") + " " + d.title}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {doc ? <InvoiceLineTable doc={doc} /> : null}
+      {isManager && doc ? (
+        <div className="mt-2 flex justify-end">
+          <button type="button" className={secondaryBtnClass} onClick={onAddBudget}>
+            예산 추가
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function InvoiceLineTable({ doc }: { doc: CompanyDocRow }) {
+  const invoice = doc.payload as InvoicePayload;
+  const lines = invoice.lines || [];
+  const total = invoiceTotals(lines);
+  return (
+    <div className="mt-2">
+      <table className="text-left text-[12px]">
+        <thead className="text-[10px] text-[var(--muted)]">
+          <tr>
+            <th className="pr-3 font-medium">항목</th>
+            <th className="pr-3 font-medium">등급</th>
+            <th className="pr-3 font-medium">수량</th>
+            <th className="pr-3 font-medium">단가</th>
+            <th className="font-medium">금액</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((line, i) => (
+            <tr key={i} className="border-t border-[var(--line)]">
+              <td className="py-1 pr-3">{line.description || "—"}</td>
+              <td className="py-1 pr-3">{TIER_LABEL[classifyTierFromText(line.description)]}</td>
+              <td className="py-1 pr-3 tabular-nums">{line.qty}</td>
+              <td className="py-1 pr-3 tabular-nums">{formatDocKrw(line.unitPrice)}</td>
+              <td className="py-1 tabular-nums">{formatDocKrw(lineAmount(line))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-[12px] font-semibold">
+        {formatDocKrw(total.subtotal)}{" "}
+        <span className="font-normal text-[var(--muted)]">(VAT {formatDocKrw(total.vat)})</span>
+      </p>
+    </div>
+  );
+}
+
 function DepositList({
   items,
   allRounds,
+  campaignName,
+  products,
+  onProductCreated,
   isManager,
   openRows = [],
   onRemoveOpen,
@@ -310,8 +496,11 @@ function DepositList({
 }: {
   items: BudgetRound[];
   allRounds: BudgetRound[];
+  campaignName?: string;
+  products: Product[];
+  onProductCreated: (product: Product) => void;
   isManager: boolean;
-  openRows?: { key: string; period: string }[];
+  openRows?: { key: string; period: string; amountManwon?: number; label?: string }[];
   onRemoveOpen?: (key: string) => void;
   onAdd: () => void;
   onDelete: (round: BudgetRound) => Promise<void>;
@@ -337,6 +526,7 @@ function DepositList({
               key={round.id}
               round={round}
               usages={usagesForDeposit(allRounds, round.id)}
+              campaignName={campaignName}
               copy={false}
               fresh={false}
               isManager={isManager}
@@ -360,9 +550,9 @@ function DepositList({
                 id: row.key,
                 company_id: null,
                 company_name: "",
-                label: "",
+                label: row.label || "",
                 period_month: `${row.period}-01`,
-                amount_krw: null,
+                amount_krw: row.amountManwon ? row.amountManwon * MANWON : null,
                 deposit_status: "입점 논의중",
                 usage_status: "협의중",
                 kind: "입금",
@@ -370,6 +560,8 @@ function DepositList({
               usages={[]}
               copy
               fresh
+              products={products}
+              onProductCreated={onProductCreated}
               isManager={isManager}
               onDelete={() => onRemoveOpen?.(row.key)}
               onDeleteUsage={() => undefined}
@@ -390,8 +582,11 @@ function DepositList({
 function DepositCard({
   round,
   usages,
+  campaignName,
   copy,
   fresh,
+  products = [],
+  onProductCreated,
   isManager,
   onDelete,
   onDeleteUsage,
@@ -401,8 +596,11 @@ function DepositCard({
 }: {
   round: BudgetRound;
   usages: BudgetRound[];
+  campaignName?: string;
   copy: boolean;
   fresh: boolean;
+  products?: Product[];
+  onProductCreated?: (product: Product) => void;
   isManager: boolean;
   onDelete: () => void;
   onDeleteUsage: (round: BudgetRound) => void;
@@ -417,8 +615,38 @@ function DepositCard({
   const [amount, setAmount] = useState(krwToManwon(round.amount_krw)?.toString() ?? "");
   const [label, setLabel] = useState(round.label || "");
   const [status, setStatus] = useState(normalizeDepositStatus(round.deposit_status));
+  const [productId, setProductId] = useState("");
+  const [newProductName, setNewProductName] = useState("");
+  const [creatingProduct, setCreatingProduct] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [openUsages, setOpenUsages] = useState<{ key: string; period: string }[]>([]);
+  const [justSaved, setJustSaved] = useState(false);
+  const [openUsages, setOpenUsages] = useState<
+    { key: string; period: string; amountManwon?: number }[]
+  >([]);
+
+  async function createProduct() {
+    const name = newProductName.trim();
+    if (!name || busy) return;
+    setBusy(true);
+    onError("");
+    try {
+      const { company_id } = companyPayload();
+      const res = await fetch("/api/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, company_id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "상품 추가에 실패했습니다.");
+      onProductCreated?.(data.product as Product);
+      setProductId((data.product as Product).id);
+      setCreatingProduct(false);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "상품 추가에 실패했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     setPeriod(round.period_month.slice(0, 7));
@@ -433,12 +661,20 @@ function DepositCard({
     label !== (round.label || "") ||
     status !== normalizeDepositStatus(round.deposit_status);
 
+  useEffect(() => {
+    if (dirty) setJustSaved(false);
+  }, [dirty]);
+
   const usedSum = usages.reduce((s, u) => s + (u.amount_krw || 0), 0);
   const depositKrw = round.amount_krw || 0;
   const overSplit = depositKrw > 0 && usedSum > depositKrw;
 
   async function commit() {
     if (!isManager || busy || !dirty) return;
+    if (fresh && !productId) {
+      onError("새 입금은 캠페인 개설을 위해 상품을 선택해야 합니다.");
+      return;
+    }
     setBusy(true);
     onError("");
     try {
@@ -451,6 +687,7 @@ function DepositCard({
         amount_manwon: amount,
         deposit_status: status,
         usage_status: "협의중",
+        ...(fresh ? { product_id: productId } : {}),
       };
       const url = copy ? "/api/admin/company-budgets" : `/api/admin/company-budgets/${round.id}`;
       const res = await fetch(url, {
@@ -461,6 +698,7 @@ function DepositCard({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "저장에 실패했습니다.");
       await onSaved(data);
+      setJustSaved(true);
     } catch (err) {
       onError(err instanceof Error ? err.message : "저장에 실패했습니다.");
     } finally {
@@ -478,7 +716,16 @@ function DepositCard({
       ...openUsages.map((row) => ({ period_month: `${row.period}-01` })),
       { period_month: round.period_month },
     ]);
-    setOpenUsages((prev) => [...prev, { key: `use-${periodNext}-${Date.now()}`, period: periodNext }]);
+    const openSum = openUsages.reduce((s, row) => s + (row.amountManwon || 0) * MANWON, 0);
+    const remainingKrw = Math.max(depositKrw - usedSum - openSum, 0);
+    setOpenUsages((prev) => [
+      ...prev,
+      {
+        key: `use-${periodNext}-${Date.now()}`,
+        period: periodNext,
+        amountManwon: krwToManwon(remainingKrw) ?? undefined,
+      },
+    ]);
   }
 
   const depositOptions = [...BUDGET_DEPOSIT_STATUSES] as string[];
@@ -491,6 +738,9 @@ function DepositCard({
         fresh ? "border-[var(--accent)]" : "border-[var(--line)]"
       }`}
     >
+      {!fresh && !copy && campaignName ? (
+        <p className="mb-1 text-[10px] text-[var(--muted)]">캠페인: {campaignName}</p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="shrink-0 text-[10px] font-semibold text-[var(--muted)]">입금</span>
         <input
@@ -531,15 +781,70 @@ function DepositCard({
             </option>
           ))}
         </select>
-        {isManager && dirty ? (
+        {fresh ? (
+          <select
+            className={`${lineField} w-[9.5rem]`}
+            value={productId}
+            disabled={!isManager || busy}
+            onChange={(e) => {
+              if (e.target.value === "__new") {
+                setCreatingProduct(true);
+                setNewProductName(companyPayload().company_name);
+                setProductId("");
+                return;
+              }
+              setProductId(e.target.value);
+            }}
+            aria-label="캠페인 상품"
+          >
+            <option value="">상품 선택 (캠페인 개설)</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+            <option value="__new">+ 새 상품 추가</option>
+          </select>
+        ) : null}
+        {fresh && creatingProduct ? (
+          <>
+            <input
+              className={`${lineField} w-40`}
+              value={newProductName}
+              disabled={!isManager || busy}
+              onChange={(e) => setNewProductName(e.target.value)}
+              placeholder="상품명"
+              aria-label="새 상품명"
+            />
+            <button
+              type="button"
+              className="shrink-0 px-2 text-xs font-semibold text-[var(--accent)] disabled:opacity-50"
+              disabled={busy || !newProductName.trim()}
+              onClick={() => void createProduct()}
+            >
+              추가
+            </button>
+            <button
+              type="button"
+              className="shrink-0 px-1 text-xs text-[var(--muted)]"
+              onClick={() => setCreatingProduct(false)}
+            >
+              취소
+            </button>
+          </>
+        ) : null}
+        {isManager ? (
           <button
             type="button"
             className="shrink-0 px-2 text-xs font-semibold text-[var(--accent)] disabled:opacity-50"
-            disabled={busy}
+            disabled={busy || !dirty}
             onClick={() => void commit()}
           >
             {busy ? "…" : "적용"}
           </button>
+        ) : null}
+        {isManager && justSaved ? (
+          <span className="shrink-0 text-[11px] text-[var(--accent)]">적용되었습니다</span>
         ) : null}
         {isManager && (!copy || fresh) ? (
           <button type="button" className="shrink-0 px-1 text-xs text-[var(--muted)]" onClick={onDelete}>
@@ -580,7 +885,7 @@ function DepositCard({
                   company_name: round.company_name,
                   label: round.label,
                   period_month: `${row.period}-01`,
-                  amount_krw: null,
+                  amount_krw: row.amountManwon ? row.amountManwon * MANWON : null,
                   deposit_status: "협의중",
                   usage_status: "가용",
                   kind: "사용",
@@ -641,6 +946,7 @@ function UsageSplitLine({
   const [amount, setAmount] = useState(krwToManwon(round.amount_krw)?.toString() ?? "");
   const [status, setStatus] = useState(normalizeUsageStatus(round.usage_status));
   const [busy, setBusy] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
   useEffect(() => {
     setPeriod(round.period_month.slice(0, 7));
@@ -652,6 +958,10 @@ function UsageSplitLine({
     period !== round.period_month.slice(0, 7) ||
     amount !== (krwToManwon(round.amount_krw)?.toString() ?? "") ||
     status !== normalizeUsageStatus(round.usage_status);
+
+  useEffect(() => {
+    if (dirty) setJustSaved(false);
+  }, [dirty]);
 
   async function commit() {
     if (!isManager || busy || !dirty) return;
@@ -679,6 +989,7 @@ function UsageSplitLine({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "저장에 실패했습니다.");
       await onSaved(data);
+      setJustSaved(true);
     } catch (err) {
       onError(err instanceof Error ? err.message : "저장에 실패했습니다.");
     } finally {
@@ -727,15 +1038,18 @@ function UsageSplitLine({
           </option>
         ))}
       </select>
-      {isManager && dirty ? (
+      {isManager ? (
         <button
           type="button"
           className="shrink-0 px-2 text-xs font-semibold text-[var(--accent)] disabled:opacity-50"
-          disabled={busy}
+          disabled={busy || !dirty}
           onClick={() => void commit()}
         >
           {busy ? "…" : "적용"}
         </button>
+      ) : null}
+      {isManager && justSaved ? (
+        <span className="shrink-0 text-[11px] text-[var(--accent)]">적용되었습니다</span>
       ) : null}
       {isManager ? (
         <button type="button" className="shrink-0 px-1 text-xs text-[var(--muted)]" onClick={onDelete}>
@@ -848,7 +1162,15 @@ function AllCashflowSheet({
   );
 }
 
-function CashflowSheet({ title, rounds }: { title: string; rounds: BudgetRound[] }) {
+function CashflowSheet({
+  title,
+  rounds,
+  campaigns = [],
+}: {
+  title: string;
+  rounds: BudgetRound[];
+  campaigns?: CampaignSummary[];
+}) {
   const flow = summarizeCashflow(rounds);
   const deposits = [...flow.deposits].sort((a, b) => a.period_month.localeCompare(b.period_month));
   const usage = [...flow.usage].sort((a, b) => a.period_month.localeCompare(b.period_month));
@@ -861,6 +1183,14 @@ function CashflowSheet({ title, rounds }: { title: string; rounds: BudgetRound[]
           <FlowTotal label="사용 예산" value={formatManwon(flow.used)} />
           <FlowTotal label="잔액" value={formatManwon(flow.balance)} />
         </div>
+        {campaigns.length ? (
+          <p className="mt-1.5 text-[11px] text-[var(--muted)]">
+            캠페인:{" "}
+            {campaigns
+              .map((c) => `${c.products?.name || "(상품 없음)"} · ${formatManwon(c.budget_amount)} · ${c.status}`)
+              .join(" / ")}
+          </p>
+        ) : null}
       </header>
       <div className="grid grid-cols-2">
         <Ledger title="입금 예산" empty="입금 없음" count={deposits.length}>

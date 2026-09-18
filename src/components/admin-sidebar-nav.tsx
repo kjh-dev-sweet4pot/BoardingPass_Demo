@@ -22,18 +22,37 @@ export type AdminSection =
   | "companiesMail"
   | "companiesDocs"
   | "companiesBudget"
+  | "companiesProducts"
+  | "companiesCampaigns"
   | "influencersRegister"
   | "influencersReview"
   | "influencersAlloc"
-  | "campaigns"
   | "marginOverview"
   | "marginCampaign"
   | "marginQuote"
   | "marginRateCard"
   | "marginRollup";
 
-const AFTER_PERF: { id: "campaigns"; label: string }[] = [
-  { id: "campaigns", label: "캠페인·섭외" },
+export const ADMIN_SECTIONS: AdminSection[] = [
+  "dashboard",
+  "performance",
+  "performanceLookup",
+  "companies",
+  "companiesOverview",
+  "companiesRegister",
+  "companiesMail",
+  "companiesDocs",
+  "companiesBudget",
+  "companiesProducts",
+  "companiesCampaigns",
+  "influencersRegister",
+  "influencersReview",
+  "influencersAlloc",
+  "marginOverview",
+  "marginCampaign",
+  "marginQuote",
+  "marginRateCard",
+  "marginRollup",
 ];
 
 export const COMPANIES_NAV: NavDropdownItem<
@@ -43,11 +62,15 @@ export const COMPANIES_NAV: NavDropdownItem<
   | "companiesMail"
   | "companiesDocs"
   | "companiesBudget"
+  | "companiesProducts"
+  | "companiesCampaigns"
 >[] = [
   { id: "companies", label: "목록", hint: "회원사 조회" },
   { id: "companiesOverview", label: "요약", hint: "전체 요약·정보 수정" },
   { id: "companiesRegister", label: "등록", hint: "회원사 개설" },
   { id: "companiesBudget", label: "예산", hint: "월·차수 입금·가용" },
+  { id: "companiesCampaigns", label: "캠페인", hint: "캠페인·예산·인플루언서 배정" },
+  { id: "companiesProducts", label: "제품", hint: "회사별 제품 조회·수정" },
   { id: "companiesDocs", label: "계약·인보이스", hint: "양식 작성·인쇄" },
   { id: "companiesMail", label: "메일 발송", hint: "계약서·견적서·가이드라인" },
 ];
@@ -80,7 +103,6 @@ const MOBILE: { id: AdminSection; label: string }[] = [
   { id: "performance", label: "성과" },
   { id: "companies", label: "회원사" },
   { id: "influencersRegister", label: "인플루언서" },
-  { id: "campaigns", label: "캠페인·섭외" },
 ];
 
 function isPerf(s: AdminSection) {
@@ -94,7 +116,9 @@ function isCompanies(s: AdminSection) {
     s === "companiesRegister" ||
     s === "companiesMail" ||
     s === "companiesDocs" ||
-    s === "companiesBudget"
+    s === "companiesBudget" ||
+    s === "companiesProducts" ||
+    s === "companiesCampaigns"
   );
 }
 
@@ -189,6 +213,8 @@ export function AdminConsoleShell({
                 | "companiesMail"
                 | "companiesDocs"
                 | "companiesBudget"
+                | "companiesProducts"
+                | "companiesCampaigns"
             }
             onViewChange={onSectionChange}
           />
@@ -274,7 +300,9 @@ export function AdminConsoleShell({
                     | "companiesRegister"
                     | "companiesMail"
                     | "companiesDocs"
-                    | "companiesBudget")
+                    | "companiesBudget"
+                    | "companiesProducts"
+                    | "companiesCampaigns")
                 : undefined
             }
             onSelect={onSectionChange}
@@ -311,22 +339,6 @@ export function AdminConsoleShell({
               onSelect={onSectionChange}
             />
           ) : null}
-          {AFTER_PERF.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={section === item.id}
-              onClick={() => onSectionChange(item.id)}
-              className={`text-[15px] tracking-[-0.02em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
-                section === item.id
-                  ? "font-bold text-[var(--ink)]"
-                  : "font-semibold text-[#cabda7] hover:text-[var(--ink)]"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
         </nav>
 
         <div className="flex shrink-0 items-center gap-3">

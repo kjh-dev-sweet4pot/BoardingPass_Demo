@@ -12,6 +12,7 @@ import {
   normalizeBudgetRound,
   readRoundBody,
   stripBudgetOptionalColumns,
+  syncCampaignBudgetFromRounds,
   syncDepositedBudgets,
   withLegacyBudgetStatuses,
   type BudgetRound,
@@ -149,6 +150,42 @@ export async function POST(request: Request) {
     );
   }
 
+  let campaignWarning: string | null = null;
+  const productId = String(body.product_id || "").trim();
+  if (named.kind === "입금" && named.company_id && productId && data) {
+    try {
+      const { data: existingCampaign, error: findErr } = await supabase
+        .from("campaigns")
+        .select("id")
+        .eq("company_id", named.company_id)
+        .eq("product_id", productId)
+        .neq("status", "취소")
+        .maybeSingle();
+      if (findErr) throw new Error(findErr.message);
+
+      let campaignId = existingCampaign?.id as string | undefined;
+      if (!campaignId) {
+        const { data: newCampaign, error: createErr } = await supabase
+          .from("campaigns")
+          .insert({ company_id: named.company_id, product_id: productId, name: null, status: "견적수립" })
+          .select("id")
+          .single();
+        if (createErr) throw new Error(createErr.message);
+        campaignId = newCampaign.id as string;
+      }
+
+      const { error: linkErr } = await supabase
+        .from("company_budget_rounds")
+        .update({ campaign_id: campaignId })
+        .eq("id", (data as unknown as { id: string }).id);
+      if (linkErr) throw new Error(linkErr.message);
+
+      await syncCampaignBudgetFromRounds(supabase, campaignId);
+    } catch (err) {
+      campaignWarning = "캠페인 예산 반영 실패: " + (err instanceof Error ? err.message : String(err));
+    }
+  }
+
   let budgets: { company_id: string; budget_amount: number | null }[] = [];
   try {
     budgets = await syncDepositedBudgets(supabase, [named.company_id]);
@@ -156,7 +193,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         round: data ? normalizeBudgetRound(data as unknown as BudgetRound) : data,
-        warning: err instanceof Error ? err.message : "배정 예산 반영 실패",
+        warning: campaignWarning || (err instanceof Error ? err.message : "배정 예산 반영 실패"),
       },
       { status: 200 },
     );
@@ -164,5 +201,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     round: data ? normalizeBudgetRound(data as unknown as BudgetRound) : data,
     budgets,
+    warning: campaignWarning || undefined,
   });
 }

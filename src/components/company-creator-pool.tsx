@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
+import { HomeViewsCurve } from "@/components/company-home-landing";
 import {
   buildCreatorPool,
   CHANNEL_LABEL,
+  formatElapsedSincePublish,
   formatFollowers,
   formatMetric,
   getCreatorBrief,
@@ -457,6 +459,9 @@ function CreatorCard({
             : row.metrics.views != null
               ? "성과 평균"
               : "발행 콘텐츠 없음"}
+          {formatElapsedSincePublish(row.lastPublishedAt)
+            ? ` · ${formatElapsedSincePublish(row.lastPublishedAt)}`
+            : ""}
         </p>
 
         {row.profileUrl ? (
@@ -472,6 +477,41 @@ function CreatorCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function ViewsGrowthChart({ influencerId }: { influencerId: string }) {
+  const [points, setPoints] = useState<{ day: number; views: number }[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPoints(null);
+    fetch(`/api/com/creator-pool/${influencerId}/views-curve`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setPoints(data.points ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setPoints([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [influencerId]);
+
+  if (points !== null && points.length === 0) return null;
+
+  return (
+    <div className="mt-5">
+      <h4 className="text-sm font-semibold">조회수 증가 추이</h4>
+      <div className="mt-2 rounded-[6px] border border-[var(--line)] px-3 py-2.5">
+        {points === null ? (
+          <p className="text-sm text-[var(--muted)]">불러오는 중…</p>
+        ) : (
+          <HomeViewsCurve points={points} />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -550,7 +590,7 @@ function CreatorDetail({
         </a>
       ) : null}
 
-      <dl className="mb-0 grid gap-3 rounded-[6px] bg-[var(--accent-soft)]/50 px-4 py-4 sm:grid-cols-2">
+      <dl className="mb-0 grid grid-cols-1 gap-3 rounded-[6px] bg-[var(--accent-soft)]/50 px-4 py-4 sm:grid-cols-2">
         <div>
           <dt className="text-xs text-[var(--muted)]">팔로워</dt>
           <dd className="mt-1 font-semibold tabular-nums">
@@ -580,9 +620,14 @@ function CreatorDetail({
             {creator.avgFromProfile
               ? `관련 게시 ${creator.avgPostCount}건 기준`
               : `최근 발행 ${creator.avgPostCount}건 기준`}
+            {formatElapsedSincePublish(creator.lastPublishedAt)
+              ? ` · ${formatElapsedSincePublish(creator.lastPublishedAt)}`
+              : ""}
           </p>
         ) : null}
       </dl>
+
+      {isLiveInfluencerId(creator.id) ? <ViewsGrowthChart influencerId={creator.id} /> : null}
 
       <div className="mt-5">
         <h4 className="text-sm font-semibold">업로드 콘텐츠</h4>

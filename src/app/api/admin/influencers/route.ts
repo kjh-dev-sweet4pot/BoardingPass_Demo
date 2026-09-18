@@ -1,28 +1,89 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { normalizeHandle } from "@/lib/auth";
 import { requireAnyAdmin, requireAdminManager } from "@/lib/access";
+import { isAdminTestCompany } from "@/lib/company";
 import { scheduleInfluencerProfileFetch } from "@/lib/influencer-profile-image";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 
 const INFLUENCER_SELECT =
-  "id, name, instagram_handle, instagram_handle_normalized, sns_url, profile_image_path, followers, region, notes, created_at, updated_at";
+  "id, name, instagram_handle, instagram_handle_normalized, sns_url, profile_image_path, followers, region, notes, phone, email, created_at, updated_at";
 
-export async function GET() {
+/**
+ * GET /api/admin/influencers?unassigned=1&q=검색어
+ * unassigned=1: 어떤 회사에도 배정된 적 없는 인플루언서만 (사이트 배정용 로스터).
+ */
+export async function GET(request: NextRequest) {
   const auth = await requireAnyAdmin();
   if ("error" in auth) return auth.error;
 
   const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
-  const { data, error } = await supabase
+  const { searchParams } = new URL(request.url);
+  const unassigned = searchParams.get("unassigned") === "1";
+  const q = searchParams.get("q")?.trim().toLowerCase() || "";
+
+  // q 없이 최대 500명을 한꺼번에 조인하면 allocations 쪽 매칭 행이
+  // PostgREST 기본 상한(1000행)에 걸려 일부만 세어지는 문제가 있었다.
+  // 검색어가 없을 땐(드롭다운을 그냥 열었을 때) 소수만 보여줘 후보군을 작게 유지한다.
+  let query = supabase
     .from("influencers")
     .select(INFLUENCER_SELECT)
     .order("updated_at", { ascending: false })
-    .limit(500);
+    .limit(q ? 500 : 20);
+  if (q) query = query.or(`name.ilike.%${q}%,instagram_handle_normalized.ilike.%${q}%`);
+
+  const { data, error } = await query;
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ influencers: data || [] });
+  let influencers = data || [];
+
+  let companyCountById = new Map<string, number>();
+
+  if (influencers.length) {
+    const ids = influencers.map((i) => i.id);
+    const { data: allocRows, error: allocErr } = await supabase
+      .from("allocations")
+      .select("influencer_id, company_id, companies ( name, login_id )")
+      .in("influencer_id", ids)
+      .range(0, 9999);
+    if (allocErr) return NextResponse.json({ error: allocErr.message }, { status: 500 });
+
+    type CompanyRow = { name: string; login_id: string };
+    const testCastSet = new Set<string>();
+    const realCastSet = new Set<string>();
+    const realCompaniesByInf = new Map<string, Set<string>>();
+    for (const row of allocRows ?? []) {
+      const companiesRaw = row.companies as unknown as CompanyRow | CompanyRow[] | null;
+      const company = Array.isArray(companiesRaw) ? companiesRaw[0] : companiesRaw;
+      const infId = row.influencer_id as string;
+      const companyId = row.company_id as string | null;
+      if (!company || !companyId) continue;
+      if (isAdminTestCompany(company)) {
+        testCastSet.add(infId);
+        continue;
+      }
+      realCastSet.add(infId);
+      const set = realCompaniesByInf.get(infId) ?? new Set<string>();
+      set.add(companyId);
+      realCompaniesByInf.set(infId, set);
+    }
+    companyCountById = new Map([...realCompaniesByInf].map(([infId, set]) => [infId, set.size]));
+
+    // 테스트 회원사에 배정된 이력이 있는 인플루언서는 전부 제외한다.
+    influencers = influencers.filter((i) => !testCastSet.has(i.id as string));
+    if (unassigned) {
+      influencers = influencers.filter((i) => !realCastSet.has(i.id as string));
+    }
+  }
+
+  return NextResponse.json({
+    influencers: influencers.map((i) => ({
+      ...i,
+      company_count: companyCountById.get(i.id as string) ?? 0,
+    })),
+  });
 }
 
 export async function POST(request: Request) {

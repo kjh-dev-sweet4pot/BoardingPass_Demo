@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { AdminCampaignCastingPanel } from "@/components/admin-campaign-casting-panel";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { AdminCompaniesTab } from "@/components/admin-companies-tab";
 import { AdminCompanyPanel } from "@/components/admin-company-panel";
 import { AdminImportPanel } from "@/components/admin-import-panel";
@@ -13,7 +13,7 @@ import { AdminMarginQuotePanel } from "@/components/admin-margin-quote";
 import { AdminMarginRateCardPanel } from "@/components/admin-margin-rate-card";
 import { AdminPerformanceLookupTab, AdminPerformanceTab } from "@/components/admin-performance-tab";
 import { type AdminReviewTab } from "@/components/admin-review-queue";
-import { AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
+import { ADMIN_SECTIONS, AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
 import {
   AdminTestVisibilityProvider,
   useAdminTestVisibility,
@@ -27,12 +27,8 @@ import {
   type Store,
 } from "@/lib/types";
 
-const PAGE: Record<
-  "dashboard" | "campaigns",
-  { eyebrow: string; title: string }
-> = {
+const PAGE: Record<"dashboard", { eyebrow: string; title: string }> = {
   dashboard: { eyebrow: "Overview", title: "대시보드" },
-  campaigns: { eyebrow: "Campaigns", title: "캠페인·섭외" },
 };
 
 function fmtCollectedKst(iso: string) {
@@ -50,7 +46,7 @@ function PageHeader({
   section,
   extra,
 }: {
-  section: "dashboard" | "campaigns";
+  section: "dashboard";
   extra?: ReactNode;
 }) {
   const meta = PAGE[section];
@@ -69,6 +65,8 @@ function PageHeader({
   );
 }
 
+const REVIEW_TABS: AdminReviewTab[] = ["reviewPending", "reviewLogs", "publishStale", "collectResults"];
+
 export function AdminConsoleLayout(props: {
   storeList: Store[];
   companyList: Company[];
@@ -78,6 +76,9 @@ export function AdminConsoleLayout(props: {
   error?: string;
   message?: string;
   sidebarActions?: ReactNode;
+  initialSection?: string;
+  initialCampaignId?: string;
+  initialReviewQueue?: string;
 }) {
   return (
     <AdminTestVisibilityProvider companies={props.companyList}>
@@ -95,6 +96,9 @@ function AdminConsoleLayoutBody({
   error,
   message,
   sidebarActions,
+  initialSection,
+  initialCampaignId,
+  initialReviewQueue,
 }: {
   storeList: Store[];
   companyList: Company[];
@@ -104,7 +108,12 @@ function AdminConsoleLayoutBody({
   error?: string;
   message?: string;
   sidebarActions?: ReactNode;
+  initialSection?: string;
+  initialCampaignId?: string;
+  initialReviewQueue?: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const { includeCompany } = useAdminTestVisibility();
   const visibleCompanies = useMemo(
     () => companyList.filter(includeCompany),
@@ -117,32 +126,74 @@ function AdminConsoleLayoutBody({
       ),
     [list, includeCompany],
   );
-  const [section, setSection] = useState<AdminSection>("dashboard");
-  const [reviewQueue, setReviewQueue] = useState<AdminReviewTab>("reviewPending");
-  const [castingStale, setCastingStale] = useState(false);
-  const [marginCampaignId, setMarginCampaignId] = useState<string | null>(null);
+  const [section, setSection] = useState<AdminSection>(
+    initialSection && (ADMIN_SECTIONS as string[]).includes(initialSection)
+      ? (initialSection as AdminSection)
+      : "dashboard",
+  );
+  const [reviewQueue, setReviewQueue] = useState<AdminReviewTab>(
+    initialReviewQueue && (REVIEW_TABS as string[]).includes(initialReviewQueue)
+      ? (initialReviewQueue as AdminReviewTab)
+      : "reviewPending",
+  );
+  const [marginCampaignId, setMarginCampaignId] = useState<string | null>(initialCampaignId || null);
+  const [companiesFocusId, setCompaniesFocusId] = useState<string | null>(null);
   const [performanceMeta, setPerformanceMeta] = useState<{
     asOf: string;
     lastCollected: string | null;
     nextCollectAt: string | null;
   } | null>(null);
 
-  function openQueue(queue: AdminQueueKey) {
-    if (queue === "castingStale") {
-      setCastingStale(true);
-      setSection("campaigns");
-      return;
+  // 뒤로가기/앞으로가기는 URL만 바꾸고 이 컴포넌트를 다시 마운트하지 않으므로,
+  // 최초 마운트 때만 쓰이는 useState 초기값과 별개로 props가 바뀔 때마다 상태를 맞춰준다.
+  useEffect(() => {
+    setSection(
+      initialSection && (ADMIN_SECTIONS as string[]).includes(initialSection)
+        ? (initialSection as AdminSection)
+        : "dashboard",
+    );
+    setMarginCampaignId(initialCampaignId || null);
+    setReviewQueue(
+      initialReviewQueue && (REVIEW_TABS as string[]).includes(initialReviewQueue)
+        ? (initialReviewQueue as AdminReviewTab)
+        : "reviewPending",
+    );
+  }, [initialSection, initialCampaignId, initialReviewQueue]);
+
+  /** section/campaignId/reviewQueue를 상태에 반영하고 URL에 새 기록을 남긴다 —
+   * 뒤로가기로 직전 화면에 돌아가고, 새로고침해도 같은 화면이 남도록 한다. */
+  function navigate(next: {
+    section: AdminSection;
+    campaignId?: string | null;
+    companyId?: string | null;
+    reviewQueue?: AdminReviewTab;
+  }) {
+    setSection(next.section);
+    if ("campaignId" in next) setMarginCampaignId(next.campaignId ?? null);
+    if ("companyId" in next) setCompaniesFocusId(next.companyId ?? null);
+    if (next.reviewQueue) setReviewQueue(next.reviewQueue);
+
+    const params = new URLSearchParams();
+    params.set("section", next.section);
+    const campaignId = "campaignId" in next ? next.campaignId : marginCampaignId;
+    if (next.section === "marginCampaign" && campaignId) params.set("campaignId", campaignId);
+    const queue = next.reviewQueue ?? reviewQueue;
+    if (next.section === "influencersReview" && queue !== "reviewPending") {
+      params.set("reviewQueue", queue);
     }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  function openQueue(queue: AdminQueueKey) {
     if (queue === "published") {
-      setSection("performance");
+      navigate({ section: "performance" });
       return;
     }
     const tab: AdminReviewTab =
       queue === "verifyFailed" || queue === "collectFailed"
         ? "collectResults"
         : queue;
-    setReviewQueue(tab);
-    setSection("influencersReview");
+    navigate({ section: "influencersReview", reviewQueue: tab });
   }
 
   const headerFooter =
@@ -166,10 +217,8 @@ function AdminConsoleLayoutBody({
     <AdminConsoleShell
       section={section}
       onSectionChange={(next) => {
-        if (next !== "campaigns") setCastingStale(false);
-        if (next !== "influencersReview") setReviewQueue("reviewPending");
         if (next !== "performance" && next !== "performanceLookup") setPerformanceMeta(null);
-        setSection(next);
+        navigate({ section: next, campaignId: null, reviewQueue: "reviewPending" });
       }}
       sidebarActions={sidebarActions}
       headerFooter={headerFooter}
@@ -218,13 +267,18 @@ function AdminConsoleLayoutBody({
       section === "companiesRegister" ||
       section === "companiesMail" ||
       section === "companiesDocs" ||
-      section === "companiesBudget" ? (
+      section === "companiesBudget" ||
+      section === "companiesProducts" ||
+      section === "companiesCampaigns" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AdminCompaniesTab
             companies={companyList}
+            products={productList}
+            stores={storeList}
             isManager={isManager}
             sub={section}
-            onSubChange={setSection}
+            onSubChange={(next) => navigate({ section: next })}
+            initialFocusCompanyId={companiesFocusId}
           />
         </div>
       ) : null}
@@ -241,33 +295,17 @@ function AdminConsoleLayoutBody({
             productList={productList}
             allocations={visibleAllocations}
             reviewQueue={reviewQueue}
-            onReviewQueueChange={setReviewQueue}
+            onReviewQueueChange={(next) => navigate({ section: "influencersReview", reviewQueue: next })}
           />
-        </div>
-      ) : null}
-
-      {section === "campaigns" ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <PageHeader section="campaigns" />
-          <div className="min-h-0 flex-1 overflow-auto px-4 pb-8 sm:px-7">
-            <AdminCampaignCastingPanel
-              companies={visibleCompanies}
-              products={productList}
-              stores={storeList}
-              isManager={isManager}
-              staleCastings={castingStale}
-            />
-          </div>
         </div>
       ) : null}
 
       {section === "marginOverview" && isManager ? (
         <AdminMarginOverviewPanel
           companies={visibleCompanies}
-          onSelectCampaign={(campaignId) => {
-            setMarginCampaignId(campaignId);
-            setSection("marginCampaign");
-          }}
+          products={productList}
+          onSelectCampaign={(campaignId) => navigate({ section: "marginCampaign", campaignId })}
+          onManageBudget={(companyId) => navigate({ section: "companiesBudget", companyId })}
         />
       ) : null}
 
@@ -279,7 +317,8 @@ function AdminConsoleLayoutBody({
         marginCampaignId ? (
           <AdminMarginCampaignPanel
             campaignId={marginCampaignId}
-            onBack={() => setSection("marginOverview")}
+            stores={storeList}
+            onBack={() => navigate({ section: "marginOverview", campaignId: null })}
           />
         ) : (
           <EmptyState title="캠페인을 먼저 선택하세요." message="마진 현황에서 캠페인을 클릭하면 상세로 이동합니다." positive />

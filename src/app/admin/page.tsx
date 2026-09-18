@@ -20,6 +20,9 @@ export default async function AdminPage({
   searchParams: Promise<{
     error?: string;
     message?: string;
+    section?: string;
+    campaignId?: string;
+    reviewQueue?: string;
   }>;
 }) {
   if (!(await isAdminSession())) redirect("/admin/login");
@@ -76,6 +79,9 @@ export default async function AdminPage({
         isManager={adminRole === "admin_manager"}
         error={params.error || error?.message}
         message={params.message}
+        initialSection={params.section}
+        initialCampaignId={params.campaignId}
+        initialReviewQueue={params.reviewQueue}
         sidebarActions={
           <form action={signOut}>
             <input type="hidden" name="next" value="/" />
