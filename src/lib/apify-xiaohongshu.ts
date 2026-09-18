@@ -1,6 +1,8 @@
 /**
  * Xiaohongshu (RedNote) via Apify
- * - note metrics: atomus/xiaohongshu-scraper (note-detail)
+ * - note metrics: scrapesage/rednote-xiaohongshu-scraper (note-detail, atomus 대비 1/10 가격)
+ * - profile(팔로워): funny_ground/xiaohongshu-profile-scraper (atomus 대비 훨씬 저렴, 토큰 불필요)
+ * - 프로필의 "최근 게시물 목록"만 atomus 유지 (더 저렴한 액터 3종 실측 테스트 결과 모두 실패)
  * 조회·좋아요·댓글·저장·공유. 리포스트는 소스 미제공 → null
  */
 import { apifyErrorMessage } from "@/lib/apify-errors";
@@ -9,6 +11,8 @@ import { parsePostedAtIso } from "@/lib/metrics-schedule";
 import { estimateXiaohongshuViews } from "@/lib/xiaohongshu-views";
 
 const ACTOR_ID = "atomus~xiaohongshu-scraper";
+const NOTE_ACTOR_ID = "scrapesage~rednote-xiaohongshu-scraper";
+const PROFILE_ACTOR_ID = "funny_ground~xiaohongshu-profile-scraper";
 const APIFY_BASE = "https://api.apify.com/v2";
 const NOTE_ID_RE = /[0-9a-f]{24}/i;
 
@@ -82,66 +86,40 @@ function pickCount(...vals: unknown[]) {
   return null;
 }
 
-type AtomusNote = {
-  id?: string;
+type ScrapeSageNote = {
   noteId?: string;
   url?: string;
-  inputUrl?: string;
-  liked_count?: unknown;
-  likedCount?: unknown;
-  collected_count?: unknown;
-  collectedCount?: unknown;
-  comments_count?: unknown;
-  commentsCount?: unknown;
-  shared_count?: unknown;
-  sharedCount?: unknown;
-  share_count?: unknown;
-  view_count?: unknown;
-  viewCount?: unknown;
-  read_count?: unknown;
-  cover?: string;
+  likes?: unknown;
+  comments?: unknown;
+  collects?: unknown;
+  shares?: unknown;
   coverUrl?: string;
-  images?: string[];
-  user?: { nickname?: string; red_id?: string; user_id?: string };
-  author?: { nickname?: string; userId?: string };
-  timestamp?: unknown;
-  time?: unknown;
-  publishTime?: unknown;
+  authorName?: string;
+  authorRedId?: string | null;
+  publishedAt?: string;
+  publishedTimestamp?: unknown;
 };
 
-function mapNote(item: AtomusNote, inputUrl?: string): XiaohongshuScraperResult {
-  const id = (item.id || item.noteId || "").toLowerCase() || null;
+function mapScrapeSageNote(item: ScrapeSageNote, inputUrl?: string): XiaohongshuScraperResult {
+  const id = (item.noteId || "").toLowerCase() || null;
   const url = item.url || inputUrl || "";
-  const likes = pickCount(item.liked_count, item.likedCount) ?? 0;
-  const comments = pickCount(item.comments_count, item.commentsCount) ?? 0;
-  const saves = pickCount(item.collected_count, item.collectedCount);
-  const shares = pickCount(item.shared_count, item.sharedCount, item.share_count);
+  const likes = pickCount(item.likes) ?? 0;
+  const comments = pickCount(item.comments) ?? 0;
+  const saves = pickCount(item.collects);
+  const shares = pickCount(item.shares);
   return {
     id,
     url,
-    inputUrl: item.inputUrl || inputUrl,
-    views: estimateXiaohongshuViews({
-      views: pickCount(item.view_count, item.viewCount, item.read_count),
-      likes,
-      comments,
-      saves,
-      shares,
-    }),
+    inputUrl,
+    // 이 액터도 실측 조회수는 안 줌(샤오홍슈가 공개 페이지에 노출 안 함) → 항상 추정치
+    views: estimateXiaohongshuViews({ views: null, likes, comments, saves, shares }),
     likes,
     comments,
     saves,
     shares,
-    coverUrl: item.coverUrl || item.cover || item.images?.[0] || null,
-    authorHandle:
-      item.user?.red_id ||
-      item.user?.nickname ||
-      item.author?.nickname ||
-      item.user?.user_id ||
-      item.author?.userId ||
-      null,
-    postedAt: parsePostedAtIso(
-      item.timestamp ?? item.time ?? item.publishTime,
-    ),
+    coverUrl: item.coverUrl || null,
+    authorHandle: item.authorRedId || item.authorName || null,
+    postedAt: parsePostedAtIso(item.publishedTimestamp ?? item.publishedAt),
   };
 }
 
@@ -154,14 +132,17 @@ export async function scrapeXiaohongshuPosts(
   if (urls.length === 0) return [];
 
   const res = await fetch(
-    `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
+    `${APIFY_BASE}/acts/${NOTE_ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        searchType: "note-detail",
+        mode: "notes",
         noteUrls: urls,
-        includeComments: false,
+        enrichNoteDetails: true,
+        includeAuthorProfile: true,
+        // 샤오홍슈가 동일 IP 반복 요청을 레이트리밋함 — RESIDENTIAL 프록시 필수(비용은 액터 단가에 포함, 별도 청구 없음)
+        proxyConfiguration: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
       }),
     },
   );
@@ -171,11 +152,11 @@ export async function scrapeXiaohongshuPosts(
     throw new Error(await apifyErrorMessage(res.status, text));
   }
 
-  const raw = (await res.json()) as AtomusNote[];
+  const raw = (await res.json()) as ScrapeSageNote[];
   if (!Array.isArray(raw)) return [];
   return raw
-    .filter((item) => item.id || item.noteId || item.url)
-    .map((item, i) => mapNote(item, urls[i]));
+    .filter((item) => item.noteId || item.url)
+    .map((item, i) => mapScrapeSageNote(item, urls[i]));
 }
 
 export function findXiaohongshuResultForUrl(
@@ -230,15 +211,11 @@ export async function scrapeXiaohongshuProfile(
   if (!target) throw new Error("샤오홍슈 프로필 URL이 없습니다.");
 
   const res = await fetch(
-    `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
+    `${APIFY_BASE}/acts/${PROFILE_ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        searchType: "profile",
-        userUrls: [target],
-        includePosts: false,
-      }),
+      body: JSON.stringify({ profileUrls: [target] }),
     },
   );
   if (!res.ok) {
@@ -246,25 +223,21 @@ export async function scrapeXiaohongshuProfile(
     throw new Error(await apifyErrorMessage(res.status, text));
   }
   const items = (await res.json()) as Array<{
-    avatar?: string;
-    user?: { avatar?: string };
-    fans?: number;
-    fans_count?: number;
-    ip_location?: string;
-    location?: string;
+    success?: boolean;
+    avatarUrl?: string;
+    // 공개 표시가 "1.7만"처럼 축약이면 이 숫자는 하한값(예: 17000)이다. followersIsExact로 정확도 구분.
+    followersLowerBound?: number;
+    ipLocation?: string;
   }>;
   const item = items[0];
-  if (!item) return { imageUrl: null, followers: null, region: null };
-  const imageUrl =
-    (typeof item.avatar === "string" && item.avatar) ||
-    (typeof item.user?.avatar === "string" && item.user.avatar) ||
-    null;
-  const fans = item.fans ?? item.fans_count;
+  if (!item?.success) return { imageUrl: null, followers: null, region: null };
   return {
-    imageUrl: imageUrl && /^https?:\/\//i.test(imageUrl) ? imageUrl : null,
+    imageUrl: item.avatarUrl && /^https?:\/\//i.test(item.avatarUrl) ? item.avatarUrl : null,
     followers:
-      typeof fans === "number" && Number.isFinite(fans) ? Math.round(fans) : null,
-    region: item.ip_location || item.location || null,
+      typeof item.followersLowerBound === "number" && Number.isFinite(item.followersLowerBound)
+        ? Math.round(item.followersLowerBound)
+        : null,
+    region: item.ipLocation || null,
   };
 }
 

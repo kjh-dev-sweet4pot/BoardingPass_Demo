@@ -65,8 +65,7 @@ export const COMPANIES_NAV: NavDropdownItem<
   | "companiesProducts"
   | "companiesCampaigns"
 >[] = [
-  { id: "companies", label: "목록", hint: "회원사 조회" },
-  { id: "companiesOverview", label: "요약", hint: "전체 요약·정보 수정" },
+  { id: "companies", label: "목록", hint: "조회·요약·정보 수정" },
   { id: "companiesRegister", label: "등록", hint: "회원사 개설" },
   { id: "companiesBudget", label: "예산", hint: "월·차수 입금·가용" },
   { id: "companiesCampaigns", label: "캠페인", hint: "캠페인·예산·인플루언서 배정" },

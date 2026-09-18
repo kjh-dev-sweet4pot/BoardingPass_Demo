@@ -36,19 +36,31 @@ export default async function AdminPage({
     .from("companies")
     .select(COMPANY_SELECT)
     .order("name", { ascending: true });
-  const [{ data: stores }, companiesRes, { data: products }, { data: allocations, error }] =
+  // 이 페이지는 admin 콘솔 내 탭 전환(navigate())마다 서버에서 다시 실행된다.
+  // 아래 allocations 쿼리는 무거운 풀 조인이라, 실제로 그 목록을 쓰는
+  // 인플루언서 탭(등록/검수/배정)일 때만 돈다 — 그 외 탭(성과·마진 등)에서
+  // 매번 전체 배정을 긁어오면서 느려지는 걸 막는다.
+  const section = params.section;
+  const needsAllocations =
+    section === "influencersRegister" ||
+    section === "influencersReview" ||
+    section === "influencersAlloc";
+  const [{ data: stores }, companiesRes, { data: products }, allocResult] =
     await Promise.all([
       supabase.from("stores").select("*").order("name", { ascending: true }),
       companiesQuery,
       supabase.from("products").select("*").order("name", { ascending: true }),
-      supabase
-        .from("allocations")
-        .select(
-          "*, products(*), stores(*), influencers(*), companies(id, name), creator_links(id, status)",
-        )
-        .order("visit_date", { ascending: false })
-        .order("created_at", { ascending: false }),
+      needsAllocations
+        ? supabase
+            .from("allocations")
+            .select(
+              "*, products(*), stores(*), influencers(*), companies(id, name), creator_links(id, status)",
+            )
+            .order("visit_date", { ascending: false })
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
     ]);
+  const { data: allocations, error } = allocResult;
   let companies = companiesRes.data;
   if (companiesRes.error) {
     const msg = companiesRes.error.message;

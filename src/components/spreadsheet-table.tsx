@@ -358,27 +358,47 @@ function SpreadsheetTableInner<T>(
                     return (
                       <td
                         key={c.key}
-                        onClick={(e) => {
-                          if (!c.edit) return;
-                          e.stopPropagation();
-                          setEditingCell({ rowKey: rk, columnKey: c.key });
-                        }}
                         className={`overflow-hidden text-ellipsis whitespace-nowrap border border-[var(--line)] px-3 py-1.5 tabular-nums ${
                           ALIGN_CLASS[c.align ?? "left"]
-                        } ${c.edit ? "cursor-text" : ""} ${isDirtyCell ? "bg-[var(--accent-soft)]" : ""}`}
-                        title={c.edit ? "클릭해서 수정" : undefined}
+                        } ${isDirtyCell ? "bg-[var(--accent-soft)]" : ""}`}
                       >
-                        {isDirtyCell && draft !== undefined ? (
-                          <span className="whitespace-nowrap">
-                            <span className="text-[var(--muted)] line-through">{c.render(row)}</span>
-                            <span className="mx-1">→</span>
-                            <span className="font-semibold text-[var(--accent)]">
-                              {c.edit?.formatValue ? c.edit.formatValue(draft) : draft}
-                            </span>
+                        <span className="inline-flex w-full items-center gap-1">
+                          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis">
+                            {isDirtyCell && draft !== undefined ? (
+                              <span className="whitespace-nowrap">
+                                <span className="text-[var(--muted)] line-through">{c.render(row)}</span>
+                                <span className="mx-1">→</span>
+                                <span className="font-semibold text-red-600">
+                                  {c.edit?.formatValue ? c.edit.formatValue(draft) : draft}
+                                </span>
+                              </span>
+                            ) : (
+                              c.render(row)
+                            )}
                           </span>
-                        ) : (
-                          c.render(row)
-                        )}
+                          {c.edit ? (
+                            <button
+                              type="button"
+                              aria-label={`${c.label} 수정`}
+                              title="수정"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCell({ rowKey: rk, columnKey: c.key });
+                              }}
+                              className="shrink-0 rounded p-0.5 text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--accent)]"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                className="h-3.5 w-3.5"
+                              >
+                                <path d="M14.69 2.98a1.75 1.75 0 0 1 2.475 2.475l-.97.97-2.475-2.475.97-.97Z" />
+                                <path d="M12.664 4.007 3.75 12.92a1.75 1.75 0 0 0-.46.813l-.68 2.858a.5.5 0 0 0 .6.6l2.858-.68a1.75 1.75 0 0 0 .813-.46l8.913-8.913-2.475-2.475Z" />
+                              </svg>
+                            </button>
+                          ) : null}
+                        </span>
                       </td>
                     );
                   })}

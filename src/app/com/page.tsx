@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
 import { CompanyConsole } from "@/components/company-console";
+import { CompanyNotificationSettingsButton } from "@/components/company-notification-settings";
 import { AppShell, Notice } from "@/components/ui";
 import { buildMockContentInsights } from "@/lib/content-insights-mock";
 import { getCompanySessionId } from "@/lib/session";
@@ -54,15 +55,18 @@ export default async function CompanyPage() {
         initialMonthInsights={emptyInsights}
         initialAllInsights={emptyInsights}
         sidebarActions={
-          <form action={signOut}>
-            <input type="hidden" name="next" value="/com/login" />
-            <button
-              className="text-[15px] font-semibold text-[var(--muted)] transition hover:text-[var(--ink)]"
-              type="submit"
-            >
-              로그아웃
-            </button>
-          </form>
+          <div className="flex items-center gap-4">
+            <CompanyNotificationSettingsButton />
+            <form action={signOut}>
+              <input type="hidden" name="next" value="/com/login" />
+              <button
+                className="text-[15px] font-semibold text-[var(--muted)] transition hover:text-[var(--ink)]"
+                type="submit"
+              >
+                로그아웃
+              </button>
+            </form>
+          </div>
         }
       />
     </AppShell>

@@ -36,14 +36,75 @@ function readBody(body: RateCardBody) {
   };
 }
 
-/** GET /api/admin/margin/rate-cards?influencer_id= */
+/**
+ * 실제 배정·집행 데이터(allocations → allocation_pricing/creator_links)에서 인플루언서×플랫폼별
+ * 최근 단가를 뽑아 "실측" 레이트카드 행으로 만든다. creator_rate_cards는 수기 입력만 쌓이는 별도
+ * 표라 늘 비어 있었음 — 그 표만 보여주면 실제로 있는 배정 단가가 하나도 안 보였다.
+ * influencerId를 주면 그 인플루언서만, 생략하면 전체를 계산한다.
+ */
+async function computedRateCards(
+  supabase: Awaited<ReturnType<typeof createAuthedDbClient>>,
+  influencerId?: string,
+) {
+  if (!supabase) return [];
+  // allocations가 수천 건이라 allocation_id를 먼저 다 모아 .in()으로 되짚으면 URL이 너무 길어져
+  // "Bad Request"가 난다 — allocation_pricing에서 곧장 allocations를 조인해 걸러야 안전하다.
+  let pricingQuery = supabase
+    .from("allocation_pricing")
+    .select("allocation_id, cost_amount, accepted_at, allocations!inner(influencer_id)")
+    .not("cost_amount", "is", null)
+    .not("accepted_at", "is", null);
+  if (influencerId) pricingQuery = pricingQuery.eq("allocations.influencer_id", influencerId);
+  const { data: pricing } = await pricingQuery;
+  if (!pricing || pricing.length === 0) return [];
+
+  const allocIds = pricing.map((p) => p.allocation_id as string);
+  const { data: links } = await supabase
+    .from("creator_links")
+    .select("allocation_id, platform")
+    .in("allocation_id", allocIds);
+  const platformByAlloc = new Map<string, string>();
+  for (const l of links ?? []) {
+    if (l.platform) platformByAlloc.set(l.allocation_id as string, l.platform as string);
+  }
+
+  const grouped = new Map<string, { cost_amount: number; accepted_at: string }[]>();
+  for (const p of pricing) {
+    const allocRel = p.allocations as unknown as { influencer_id: string } | { influencer_id: string }[];
+    const infId = Array.isArray(allocRel) ? allocRel[0]?.influencer_id : allocRel?.influencer_id;
+    if (!infId) continue;
+    const platform = platformByAlloc.get(p.allocation_id as string) || "etc";
+    const key = `${infId}::${platform}`;
+    const list = grouped.get(key) ?? [];
+    list.push({ cost_amount: p.cost_amount as number, accepted_at: p.accepted_at as string });
+    grouped.set(key, list);
+  }
+
+  return [...grouped.entries()].map(([key, rows]) => {
+    const [infId, platform] = key.split("::");
+    const sorted = [...rows].sort((a, b) => b.accepted_at.localeCompare(a.accepted_at));
+    const latest = sorted[0];
+    return {
+      id: `computed:${key}`,
+      influencer_id: infId,
+      content_type: null,
+      platform,
+      standard_cost: latest.cost_amount,
+      source: "invoice" as const,
+      effective_from: latest.accepted_at.slice(0, 10),
+      memo: `실측 배정 단가 ${rows.length}건 중 최근값`,
+    };
+  });
+}
+
+/** GET /api/admin/margin/rate-cards?influencer_id= (생략하면 전체 인플루언서) */
 export async function GET(request: NextRequest) {
   const auth = await requireAdminManager();
   if ("error" in auth) return auth.error;
   const supabase = await createAuthedDbClient();
   if (!supabase) return supabaseConfigError();
 
-  const influencerId = new URL(request.url).searchParams.get("influencer_id");
+  const influencerId = new URL(request.url).searchParams.get("influencer_id") || undefined;
   let query = supabase
     .from("creator_rate_cards")
     .select("*")
@@ -53,7 +114,9 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ rateCards: data });
+
+  const computed = await computedRateCards(supabase, influencerId);
+  return NextResponse.json({ rateCards: [...computed, ...(data ?? [])] });
 }
 
 export async function POST(request: NextRequest) {
