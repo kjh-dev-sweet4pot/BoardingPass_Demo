@@ -31,7 +31,8 @@ export type AdminSection =
   | "marginCampaign"
   | "marginQuote"
   | "marginRateCard"
-  | "marginRollup";
+  | "marginRollup"
+  | "bankda";
 
 export const ADMIN_SECTIONS: AdminSection[] = [
   "dashboard",
@@ -53,6 +54,7 @@ export const ADMIN_SECTIONS: AdminSection[] = [
   "marginQuote",
   "marginRateCard",
   "marginRollup",
+  "bankda",
 ];
 
 export const COMPANIES_NAV: NavDropdownItem<
@@ -338,6 +340,20 @@ export function AdminConsoleShell({
               onSelect={onSectionChange}
             />
           ) : null}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={section === "bankda"}
+            onClick={() => onSectionChange("bankda")}
+            className={`text-[15px] tracking-[-0.02em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
+              section === "bankda"
+                ? "font-bold text-[var(--ink)]"
+                : "font-semibold text-[#cabda7] hover:text-[var(--ink)]"
+            }`}
+          >
+            Bankda{" "}
+            <span className="text-[10px] font-normal text-[var(--muted)]">beta</span>
+          </button>
         </nav>
 
         <div className="flex shrink-0 items-center gap-3">

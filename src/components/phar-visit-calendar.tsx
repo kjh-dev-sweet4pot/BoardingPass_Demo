@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { StateBadge } from "@/components/state-badge";
+import { PharTopProducts } from "@/components/phar-top-products";
 import { todayYmdKst } from "@/lib/inf-visit";
 import {
   LOAD_HEAT,
@@ -350,7 +351,11 @@ export function PharVisitCalendar({
         ) : null}
       </section>
 
-      <aside className="flex min-h-0 flex-col overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
+      <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
+        <div className="max-h-[40%] shrink-0 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-2.5">
+          <PharTopProducts items={items} compact />
+        </div>
+        <aside className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
         <div className="shrink-0 border-b border-[var(--line)] px-4 py-3">
           <h3 className="text-[15px] font-bold text-[var(--ink)]">{header}</h3>
           {summary && (summary.pendingCount || summary.visitedCount || summary.pickedUpCount) ? (
@@ -403,7 +408,8 @@ export function PharVisitCalendar({
             </button>
           </div>
         ) : null}
-      </aside>
+        </aside>
+      </div>
     </div>
   );
 }

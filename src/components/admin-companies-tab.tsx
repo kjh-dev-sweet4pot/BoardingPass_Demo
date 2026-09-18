@@ -31,7 +31,18 @@ import {
 } from "@/components/spreadsheet-table";
 import { formatKrw } from "@/lib/creator-pool-mock";
 import { docHtml, type CompanyDocRow } from "@/lib/company-docs";
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NOTIFICATION_SETTING_LABELS,
+  nextWeeklyReportAt,
+  type NotificationSettings,
+} from "@/lib/company-notifications";
 import { type Company, type Product, type Store } from "@/lib/types";
+
+const AUTO_MAIL_SENDER_PREFIX = "system";
+function isAutoMailLog(log: { created_by: string | null }) {
+  return (log.created_by || "").startsWith(AUTO_MAIL_SENDER_PREFIX);
+}
 
 function AdminCompanyCampaignsPanel({
   companies,
@@ -893,6 +904,110 @@ function MailRecipientList({ raw }: { raw: string }) {
   );
 }
 
+function MailLogList({
+  logs,
+  companies,
+  campaigns,
+  openLogId,
+  setOpenLogId,
+  emptyText,
+}: {
+  logs: MailLog[];
+  companies: Company[];
+  campaigns: CampaignOpt[];
+  openLogId: string | null;
+  setOpenLogId: (id: string | null) => void;
+  emptyText: string;
+}) {
+  return (
+    <ul className="max-h-[420px] space-y-2 overflow-auto text-sm">
+      {logs.length === 0 ? (
+        <li className="text-[var(--muted)]">{emptyText}</li>
+      ) : (
+        logs.map((log) => {
+          const open = openLogId === log.id;
+          const companyName = companies.find((c) => c.id === log.company_id)?.name || "";
+          const recips = unpackMailLogRecipients(log.to_emails);
+          const campName = campaigns.find((c) => c.id === log.campaign_id)?.name || "";
+          return (
+            <li key={log.id} className="rounded-[6px] border border-[var(--line)]">
+              <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpenLogId(open ? null : log.id)}
+                className="w-full px-3 py-2 text-left"
+              >
+                <p className="font-medium">
+                  {log.kind}
+                  <span className="ml-2 text-[11px] font-normal text-[var(--muted)]">
+                    {log.sent_at ? "발송" : "실패"}
+                  </span>
+                </p>
+                <p className="truncate text-[12px] text-[var(--muted)]">{log.subject}</p>
+                <p className="text-[11px] text-[var(--muted)]">
+                  {recips.to.join(", ") || "—"}
+                  {recips.bcc.length ? ` · 숨은참조 ${recips.bcc.length}` : ""} · {fmtDt(log.created_at)}
+                </p>
+              </button>
+              {open ? (
+                <div className="space-y-2 border-t border-[var(--line)] px-3 py-3 text-[12px]">
+                  {companyName ? (
+                    <p>
+                      <span className="text-[var(--muted)]">회원사 </span>
+                      {companyName}
+                    </p>
+                  ) : null}
+                  {campName ? (
+                    <p>
+                      <span className="text-[var(--muted)]">캠페인 </span>
+                      {campName}
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="text-[var(--muted)]">받는 사람 </span>
+                    {recips.to.join(", ") || "—"}
+                  </p>
+                  {recips.bcc.length ? (
+                    <p>
+                      <span className="text-[var(--muted)]">숨은참조 </span>
+                      {recips.bcc.join(", ")}
+                    </p>
+                  ) : null}
+                  {log.created_by ? (
+                    <p>
+                      <span className="text-[var(--muted)]">발송자 </span>
+                      {log.created_by}
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="text-[var(--muted)]">제목 </span>
+                    {log.subject || "—"}
+                  </p>
+                  <div>
+                    <p className="mb-1 text-[var(--muted)]">본문</p>
+                    <pre className="whitespace-pre-wrap rounded-[6px] bg-[var(--accent-soft)]/50 px-2.5 py-2 font-sans text-[12px] leading-relaxed text-[var(--ink)]">
+                      {log.body?.trim() || "본문이 없습니다."}
+                    </pre>
+                  </div>
+                  {log.attachment_names?.length ? (
+                    <p>
+                      <span className="text-[var(--muted)]">첨부 </span>
+                      {log.attachment_names.join(", ")}
+                    </p>
+                  ) : null}
+                  {log.error ? <p className="text-[var(--danger)]">{log.error}</p> : null}
+                </div>
+              ) : log.error ? (
+                <p className="px-3 pb-2 text-[11px] text-[var(--danger)]">{log.error}</p>
+              ) : null}
+            </li>
+          );
+        })
+      )}
+    </ul>
+  );
+}
+
 function MailPanel({
   companies,
   isManager,
@@ -925,7 +1040,11 @@ function MailPanel({
     () => logs.filter((log) => includeCompany({ id: log.company_id })),
     [logs, includeCompany],
   );
+  const manualLogs = useMemo(() => visibleLogs.filter((log) => !isAutoMailLog(log)), [visibleLogs]);
+  const autoLogs = useMemo(() => visibleLogs.filter(isAutoMailLog), [visibleLogs]);
   const [openLogId, setOpenLogId] = useState<string | null>(null);
+  const [autoSettings, setAutoSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
+  const [autoSettingsLoading, setAutoSettingsLoading] = useState(false);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [mailFrom, setMailFrom] = useState<string>("");
   const [resendHint, setResendHint] = useState<string>("");
@@ -1057,6 +1176,19 @@ function MailPanel({
   useEffect(() => {
     void loadLogs();
   }, [loadLogs]);
+
+  useEffect(() => {
+    if (!companyId) {
+      setAutoSettings(DEFAULT_NOTIFICATION_SETTINGS);
+      return;
+    }
+    setAutoSettingsLoading(true);
+    fetch(`/api/admin/companies/${companyId}/notification-settings`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setAutoSettings(j.settings || DEFAULT_NOTIFICATION_SETTINGS))
+      .catch(() => setAutoSettings(DEFAULT_NOTIFICATION_SETTINGS))
+      .finally(() => setAutoSettingsLoading(false));
+  }, [companyId]);
 
   async function saveMailProfile() {
     if (!isManager) return;
@@ -1325,105 +1457,58 @@ function MailPanel({
 
       <div className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-4">
         <p className="mb-3 text-sm font-semibold">발송 이력</p>
-        <ul className="max-h-[420px] space-y-2 overflow-auto text-sm">
-          {visibleLogs.length === 0 ? (
-            <li className="text-[var(--muted)]">이력이 없습니다.</li>
-          ) : (
-            visibleLogs.map((log) => {
-              const open = openLogId === log.id;
-              const companyName =
-                companies.find((c) => c.id === log.company_id)?.name || "";
-              const recips = unpackMailLogRecipients(log.to_emails);
-              const campName =
-                campaigns.find((c) => c.id === log.campaign_id)?.name || "";
-              return (
-                <li
-                  key={log.id}
-                  className="rounded-[6px] border border-[var(--line)]"
-                >
-                  <button
-                    type="button"
-                    aria-expanded={open}
-                    onClick={() => setOpenLogId(open ? null : log.id)}
-                    className="w-full px-3 py-2 text-left"
-                  >
-                    <p className="font-medium">
-                      {log.kind}
-                      <span className="ml-2 text-[11px] font-normal text-[var(--muted)]">
-                        {log.sent_at ? "발송" : "실패"}
-                      </span>
-                    </p>
-                    <p className="truncate text-[12px] text-[var(--muted)]">
-                      {log.subject}
-                    </p>
-                    <p className="text-[11px] text-[var(--muted)]">
-                      {recips.to.join(", ") || "—"}
-                      {recips.bcc.length
-                        ? ` · 숨은참조 ${recips.bcc.length}`
-                        : ""}{" "}
-                      · {fmtDt(log.created_at)}
-                    </p>
-                  </button>
-                  {open ? (
-                    <div className="space-y-2 border-t border-[var(--line)] px-3 py-3 text-[12px]">
-                      {companyName ? (
-                        <p>
-                          <span className="text-[var(--muted)]">회원사 </span>
-                          {companyName}
-                        </p>
-                      ) : null}
-                      {campName ? (
-                        <p>
-                          <span className="text-[var(--muted)]">캠페인 </span>
-                          {campName}
-                        </p>
-                      ) : null}
-                      <p>
-                        <span className="text-[var(--muted)]">받는 사람 </span>
-                        {recips.to.join(", ") || "—"}
-                      </p>
-                      {recips.bcc.length ? (
-                        <p>
-                          <span className="text-[var(--muted)]">숨은참조 </span>
-                          {recips.bcc.join(", ")}
-                        </p>
-                      ) : null}
-                      {log.created_by ? (
-                        <p>
-                          <span className="text-[var(--muted)]">발송자 </span>
-                          {log.created_by}
-                        </p>
-                      ) : null}
-                      <p>
-                        <span className="text-[var(--muted)]">제목 </span>
-                        {log.subject || "—"}
-                      </p>
-                      <div>
-                        <p className="mb-1 text-[var(--muted)]">본문</p>
-                        <pre className="whitespace-pre-wrap rounded-[6px] bg-[var(--accent-soft)]/50 px-2.5 py-2 font-sans text-[12px] leading-relaxed text-[var(--ink)]">
-                          {log.body?.trim() || "본문이 없습니다."}
-                        </pre>
-                      </div>
-                      {log.attachment_names?.length ? (
-                        <p>
-                          <span className="text-[var(--muted)]">첨부 </span>
-                          {log.attachment_names.join(", ")}
-                        </p>
-                      ) : null}
-                      {log.error ? (
-                        <p className="text-[var(--danger)]">{log.error}</p>
-                      ) : null}
-                    </div>
-                  ) : log.error ? (
-                    <p className="px-3 pb-2 text-[11px] text-[var(--danger)]">
-                      {log.error}
-                    </p>
-                  ) : null}
+        <MailLogList
+          logs={manualLogs}
+          companies={companies}
+          campaigns={campaigns}
+          openLogId={openLogId}
+          setOpenLogId={setOpenLogId}
+          emptyText="이력이 없습니다."
+        />
+      </div>
+
+      <div className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-4">
+        <p className="mb-1 text-sm font-semibold">자동발송내역 및 발송예정내역</p>
+        <p className="mb-3 text-[11px] text-[var(--muted)]">
+          회원사가 /com에서 직접 켜고 끄는 자동 알림(주간 리포트·발행 알림·고인게이지 알림)입니다.
+        </p>
+        {company ? (
+          <div className="mb-3 rounded-[6px] border border-[var(--line)] bg-[var(--surface-hover)]/40 p-3 text-[12px]">
+            <p className="mb-1 font-medium text-[var(--ink)]">발송예정내역</p>
+            {autoSettingsLoading ? (
+              <p className="text-[var(--muted)]">불러오는 중…</p>
+            ) : (
+              <ul className="space-y-1 text-[var(--muted)]">
+                <li>
+                  {NOTIFICATION_SETTING_LABELS.weekly_report.title}:{" "}
+                  {autoSettings.weekly_report ? (
+                    <span className="text-[var(--ink)]">
+                      다음 발송 {fmtDt(nextWeeklyReportAt().toISOString())}
+                    </span>
+                  ) : (
+                    "회원사가 꺼둠"
+                  )}
                 </li>
-              );
-            })
-          )}
-        </ul>
+                <li>
+                  {NOTIFICATION_SETTING_LABELS.on_publish.title}:{" "}
+                  {autoSettings.on_publish ? "발행 즉시 발송" : "회원사가 꺼둠"}
+                </li>
+                <li>
+                  {NOTIFICATION_SETTING_LABELS.high_engagement.title}:{" "}
+                  {autoSettings.high_engagement ? "매일 지표 수집 시 확인" : "회원사가 꺼둠"}
+                </li>
+              </ul>
+            )}
+          </div>
+        ) : null}
+        <MailLogList
+          logs={autoLogs}
+          companies={companies}
+          campaigns={campaigns}
+          openLogId={openLogId}
+          setOpenLogId={setOpenLogId}
+          emptyText="자동 발송 이력이 없습니다."
+        />
       </div>
       </div>
 

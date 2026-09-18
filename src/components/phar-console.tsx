@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { PHAR_COUNTER_ROOT_ID } from "@/components/phar-header-actions";
 import { PharListWithModal } from "@/components/phar-list-with-modal";
+import { PharTopProducts } from "@/components/phar-top-products";
 import { PharVisitCalendar } from "@/components/phar-visit-calendar";
 import { todayYmdKst } from "@/lib/inf-visit";
 import {
@@ -14,7 +15,7 @@ import {
 } from "@/lib/phar-calendar";
 import type { AllocationWithRelations } from "@/lib/types";
 
-type Tab = "calendar" | "counter";
+type Tab = "calendar" | "counter" | "topProducts";
 
 export function PharConsole({
   items,
@@ -33,7 +34,7 @@ export function PharConsole({
     summarizeVisitDays(items).get(today)?.visitorCount ?? 0;
 
   const [tab, setTab] = useState<Tab>(() =>
-    initialTab === "counter" || initialTab === "calendar"
+    initialTab === "counter" || initialTab === "calendar" || initialTab === "topProducts"
       ? initialTab
       : defaultPharTab(todayVisitors),
   );
@@ -114,6 +115,7 @@ export function PharConsole({
           [
             ["calendar", "방문 달력"],
             ["counter", "전체 리스트"],
+            ["topProducts", "인기 상품"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -143,6 +145,8 @@ export function PharConsole({
             setTab("counter");
           }}
         />
+      ) : tab === "topProducts" ? (
+        <PharTopProducts items={liveItems} />
       ) : (
         <PharListWithModal
           items={liveItems}
