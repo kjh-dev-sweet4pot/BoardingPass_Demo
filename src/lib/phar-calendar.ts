@@ -203,13 +203,11 @@ export function kstHourNow(now = new Date()) {
   );
 }
 
-/** URL에 tab이 없을 때만: 영업시간 + 오늘 방문자면 카운터 */
+/** URL에 tab이 없을 때: 항상 방문 달력 */
 export function defaultPharTab(
-  todayVisitorCount: number,
-  now = new Date(),
+  _todayVisitorCount?: number,
+  _now?: Date,
 ): "calendar" | "counter" {
-  const hour = kstHourNow(now);
-  if (hour >= 9 && hour < 19 && todayVisitorCount >= 1) return "counter";
   return "calendar";
 }
 
