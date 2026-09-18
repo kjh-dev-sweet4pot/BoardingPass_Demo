@@ -11,6 +11,7 @@ type BudgetItemBody = {
   slot_count?: number | string;
   expected_publish_per_slot?: number | string;
   sort_order?: number;
+  memo?: string | null;
 };
 
 function expectedPublishPerSlot(v: unknown) {
@@ -34,6 +35,7 @@ function readBody(body: BudgetItemBody) {
       slot_count: slotCount,
       expected_publish_per_slot: Math.max(0, Math.round(expectedPublishPerSlot(body.expected_publish_per_slot))),
       sort_order: Math.round(Number(body.sort_order) || 0),
+      memo: body.memo || null,
     },
   };
 }

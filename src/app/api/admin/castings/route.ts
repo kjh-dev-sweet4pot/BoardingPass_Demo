@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
     handle?: string;
     name?: string;
     sns_url?: string;
+    budget_plan_item_id?: string;
   };
   try {
     body = await request.json();
@@ -188,6 +189,7 @@ export async function POST(request: NextRequest) {
       company_id: campaign.company_id,
       influencer_id,
       status: "Pending",
+      budget_plan_item_id: body.budget_plan_item_id || null,
     })
     .select(CASTING_SELECT)
     .single();

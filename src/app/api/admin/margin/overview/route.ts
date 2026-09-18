@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdminManager } from "@/lib/access";
+import { isAdminTestCompany } from "@/lib/company";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 import { marginState, type CampaignMarginRow } from "@/lib/types";
 
@@ -28,16 +29,23 @@ export async function GET(request: NextRequest) {
 
   let campaignsQuery = supabase
     .from("campaigns")
-    .select("id, name, status, company_id, budget_amount, companies(id, name)")
+    .select("id, name, status, company_id, budget_amount, companies(id, name, login_id)")
     .neq("status", "취소");
   if (companyId) campaignsQuery = campaignsQuery.eq("company_id", companyId);
   if (status) campaignsQuery = campaignsQuery.eq("status", status);
   if (q) campaignsQuery = campaignsQuery.ilike("name", `%${q}%`);
 
-  const { data: campaigns, error: campErr } = await campaignsQuery;
+  const { data: campaignsRaw, error: campErr } = await campaignsQuery;
   if (campErr) return NextResponse.json({ error: campErr.message }, { status: 500 });
 
-  const campaignIds = (campaigns ?? []).map((c) => c.id);
+  type CompanyRow = { id: string; name: string; login_id: string };
+  const campaigns = (campaignsRaw ?? []).filter((c) => {
+    const companiesRaw = c.companies as unknown as CompanyRow | CompanyRow[] | null;
+    const company = Array.isArray(companiesRaw) ? companiesRaw[0] : companiesRaw;
+    return !company || !isAdminTestCompany(company);
+  });
+
+  const campaignIds = campaigns.map((c) => c.id);
   const { data: marginRows, error: marginErr } = await supabase
     .from("v_campaign_margin")
     .select("*")
@@ -48,9 +56,9 @@ export async function GET(request: NextRequest) {
     (marginRows ?? []).map((r) => [r.campaign_id as string, r as CampaignMarginRow]),
   );
 
-  let rows = (campaigns ?? []).map((c) => {
+  let rows = campaigns.map((c) => {
     const margin = marginByCampaign.get(c.id) ?? null;
-    const companyRaw = c.companies as { id: string; name: string } | { id: string; name: string }[] | null;
+    const companyRaw = c.companies as unknown as CompanyRow | CompanyRow[] | null;
     const company = Array.isArray(companyRaw) ? companyRaw[0] : companyRaw;
     return {
       campaign_id: c.id as string,

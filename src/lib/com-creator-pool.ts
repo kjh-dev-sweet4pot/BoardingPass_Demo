@@ -156,6 +156,11 @@ export function poolCreatorFromInfluencer(
   const followers = Number(inf.followers) || 0;
   const channel = channelFromUrl(sns);
   const campaign = averageRecentPosts(opts?.links || []);
+  const lastPublishedAt = (opts?.links || [])
+    .filter((l) => isPublishedLink(l) && l.submitted_at)
+    .map((l) => l.submitted_at as string)
+    .sort()
+    .at(-1) ?? null;
   const fromProfile = campaign.count === 0 ? opts?.profileAvg : null;
   const avg = fromProfile
     ? {
@@ -183,6 +188,7 @@ export function poolCreatorFromInfluencer(
     product: opts?.productName ?? null,
     posts: avg.posts,
     uploadYmd: null,
+    lastPublishedAt,
     visitYmd: opts?.visitYmd ?? null,
     metrics: {
       views: avg.views,

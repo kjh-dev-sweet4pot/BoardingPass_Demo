@@ -144,7 +144,8 @@ begin
     update public.campaigns c
     set status = public.compute_campaign_rollup_status(campaign_uuid)
     where c.id = campaign_uuid
-      and c.status not in ('보류', '취소');
+      and c.status not in ('보류', '취소')
+      and c.status is distinct from public.compute_campaign_rollup_status(campaign_uuid);
   end if;
 end;
 $$;
@@ -155,10 +156,13 @@ language plpgsql
 security definer
 as $$
 begin
+  -- ponytail: status가 실제로 바뀔 때만 UPDATE해야 함 — 그렇지 않으면
+  -- "update of status" 트리거가 무조건 재발화되어 trg_campaigns_rollup과 무한 재귀(stack depth limit exceeded)에 빠진다.
   update public.campaigns c
   set status = public.compute_campaign_rollup_status(campaign_uuid)
   where c.id = campaign_uuid
-    and c.status not in ('보류', '취소');
+    and c.status not in ('보류', '취소')
+    and c.status is distinct from public.compute_campaign_rollup_status(campaign_uuid);
 end;
 $$;
 

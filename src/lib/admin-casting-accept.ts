@@ -17,9 +17,9 @@ export type AcceptCastingInput = {
   actor?: string;
 };
 
+// 마진율이 60% 이상이면(과다 마진 포함) 경고하지 않는다 — 낮은 마진만 확인이 필요하다.
 function marginWarnType(rate: number | null): WarnType | null {
   const state = marginState(rate);
-  if (state === "over") return "margin_high";
   if (state === "caution" || state === "risk") return "margin_low";
   return null;
 }
@@ -27,7 +27,7 @@ function marginWarnType(rate: number | null): WarnType | null {
 if (
   marginWarnType(null) !== null ||
   marginWarnType(70) !== null ||
-  marginWarnType(90) !== "margin_high" ||
+  marginWarnType(90) !== null ||
   marginWarnType(58) !== "margin_low" ||
   marginWarnType(40) !== "margin_low"
 ) {

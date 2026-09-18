@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CreatorPhoto } from "@/components/creator-photo";
+import { HomeViewsCurve } from "@/components/company-home-landing";
 import { formatMetric, formatViews } from "@/lib/content-insights";
 import { resolveCreatorPlatform } from "@/lib/creator-link";
 import {
@@ -17,7 +18,7 @@ import {
   type WeekPoint,
   visitProfileHref,
 } from "@/lib/company-home";
-import { resolvePoolCreator } from "@/lib/creator-pool-mock";
+import { elapsedSincePublishParts, resolvePoolCreator } from "@/lib/creator-pool-mock";
 import { formatMd } from "@/lib/types";
 
 function CumulativeChart({
@@ -565,6 +566,34 @@ function ForecastPanel({
   );
 }
 
+function CardViewsCurve({ influencerId }: { influencerId: string }) {
+  const [points, setPoints] = useState<{ day: number; views: number }[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/com/creator-pool/${influencerId}/views-curve`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setPoints(data.points ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setPoints([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [influencerId]);
+
+  if (!points || points.length < 2) return null;
+
+  return (
+    <div className="mt-2.5 border-t border-[var(--line)] pt-2">
+      <p className="text-[10px] text-[var(--muted)]">조회수 증가 추이</p>
+      <HomeViewsCurve points={points} />
+    </div>
+  );
+}
+
 export function CompanyHomePerformanceBoard({
   links,
   loading,
@@ -923,6 +952,20 @@ export function CompanyHomePerformanceBoard({
                       </p>
                     </div>
                   </div>
+                  {(() => {
+                    const elapsed = elapsedSincePublishParts(c.publishedAt);
+                    if (!elapsed) return null;
+                    return (
+                      <p className="mt-2 text-[10.5px] text-[var(--muted)]">
+                        업로드 이후{" "}
+                        <span className="font-bold text-[var(--ink)]">
+                          {elapsed.amount}{elapsed.unit}
+                        </span>{" "}
+                        {elapsed.suffix}
+                      </p>
+                    );
+                  })()}
+                  <CardViewsCurve influencerId={c.id} />
                 </article>
               ))}
             </div>

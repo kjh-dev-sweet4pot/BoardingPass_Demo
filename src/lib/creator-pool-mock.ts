@@ -36,6 +36,8 @@ export type PoolCreator = {
   product: string | null;
   posts: CreatorPost[];
   uploadYmd: string | null;
+  /** 가장 최근 발행 콘텐츠의 발행 시각 (ISO) — "발행 후 N일/시간 경과" 표시용 */
+  lastPublishedAt?: string | null;
   /** 가장 늦은 방문일 YYYY-MM-DD */
   visitYmd?: string | null;
   metrics: {
@@ -319,6 +321,54 @@ export function formatMetric(n: number | null | undefined) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
   return String(n);
+}
+
+/** 발행 후 경과 시간 — 1일 이하는 시간 단위, 그 이상은 일 단위. amount+unit을 분리해 강조 표시에 쓴다. */
+export function elapsedSincePublishParts(iso: string | null | undefined, nowMs = Date.now()) {
+  if (!iso) return null;
+  const at = Date.parse(iso);
+  if (!Number.isFinite(at)) return null;
+  const ms = Math.max(0, nowMs - at);
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours < 1) {
+    const minutes = Math.max(1, Math.floor(ms / 60_000));
+    return { amount: minutes, unit: "분", suffix: "경과" as const };
+  }
+  if (hours < 24) return { amount: hours, unit: "시간", suffix: "경과" as const };
+  const days = Math.floor(hours / 24);
+  // 2주(14일) 넘으면 정확한 일수 대신 "2주 초과"로 뭉뚱그린다
+  if (days >= 14) return { amount: 2, unit: "주", suffix: "초과" as const };
+  return { amount: days, unit: "일", suffix: "경과" as const };
+}
+
+/** 발행 후 경과 시간 — 1일 이하는 시간 단위, 그 이상은 일 단위 */
+export function formatElapsedSincePublish(
+  iso: string | null | undefined,
+  nowMs = Date.now(),
+  prefix = "발행 후",
+) {
+  const parts = elapsedSincePublishParts(iso, nowMs);
+  if (!parts) return null;
+  return `${prefix} ${parts.amount}${parts.unit} ${parts.suffix}`;
+}
+
+if (process.env.RUN_CREATOR_POOL_SELF_CHECK === "1") {
+  const base = Date.parse("2026-09-18T12:00:00+09:00");
+  const cases: [string, string][] = [
+    ["2026-09-18T11:59:00+09:00", "발행 후 1분 경과"],
+    ["2026-09-18T09:00:00+09:00", "발행 후 3시간 경과"],
+    ["2026-09-17T11:00:00+09:00", "발행 후 1일 경과"],
+    ["2026-09-15T12:00:00+09:00", "발행 후 3일 경과"],
+    ["2026-09-01T12:00:00+09:00", "발행 후 2주 초과"],
+  ];
+  for (const [iso, expected] of cases) {
+    const got = formatElapsedSincePublish(iso, base);
+    if (got !== expected) {
+      throw new Error(`formatElapsedSincePublish(${iso}) = ${got}, expected ${expected}`);
+    }
+  }
+  // eslint-disable-next-line no-console
+  console.log("formatElapsedSincePublish self-check ok");
 }
 
 const FORMATS_BY_CHANNEL: Record<CreatorChannel, string[]> = {

@@ -235,7 +235,7 @@ function StripPlain({
   return <div className={cls}>{inner}</div>;
 }
 
-function formatCurveAxis(day: number, useHours: boolean) {
+export function formatCurveAxis(day: number, useHours: boolean) {
   if (useHours) {
     const h = Math.max(0, Math.round(day * 24));
     return `${h}시간`;
@@ -243,7 +243,7 @@ function formatCurveAxis(day: number, useHours: boolean) {
   return `D+${Math.max(0, Math.floor(day))}`;
 }
 
-function HomeViewsCurve({ points }: { points: { day: number; views: number }[] }) {
+export function HomeViewsCurve({ points }: { points: { day: number; views: number }[] }) {
   if (points.length < 2) {
     return (
       <p className="text-[10px] leading-snug text-[var(--muted)]">

@@ -17,11 +17,6 @@ export type SharedVisitAlloc = {
   creator_links?: unknown[] | null;
 };
 
-function productName(raw: RelName | undefined) {
-  const one = Array.isArray(raw) ? raw[0] : raw;
-  return (one?.name || "").trim();
-}
-
 function storeName(raw: RelName | undefined) {
   const one = Array.isArray(raw) ? raw[0] : raw;
   return (one?.name || "").trim();
@@ -30,12 +25,9 @@ function storeName(raw: RelName | undefined) {
 function visitKey(row: SharedVisitAlloc) {
   const branch =
     canonicalBranchName(storeName(row.stores)) || row.store_id || "";
-  return [
-    row.influencer_id,
-    branch,
-    String(row.visit_date || "").slice(0, 10),
-    productName(row.products),
-  ].join("|");
+  // ponytail: product는 회사마다 자기 소유 product row(이름도 제각각)를 가리키므로
+  // 공유 방문 키에서 제외한다 — influencer+지점+날짜만으로 같은 방문을 식별한다.
+  return [row.influencer_id, branch, String(row.visit_date || "").slice(0, 10)].join("|");
 }
 
 function statusRank(row: SharedVisitAlloc) {
@@ -430,6 +422,14 @@ if (process.env.RUN_ALLOC_DUP_SELF_CHECK === "1") {
     grouped[0]?.primary.id !== "c2"
   ) {
     throw new Error("groupSharedVisitAllocations company split");
+  }
+  // 회사마다 자기 소유 product row(이름 다름)를 갖는 같은 방문 — product 이름이 달라도 하나로 묶여야 한다
+  const multiCompanyGrouped = groupSharedVisitAllocations([
+    { id: "m1", influencer_id: "i", store_id: "s", visit_date: "2026-09-07", status: "pending", products: { name: "rxme" } },
+    { id: "m2", influencer_id: "i", store_id: "s", visit_date: "2026-09-07", status: "pending", products: { name: "닥터리앤장" } },
+  ]);
+  if (multiCompanyGrouped.length !== 1 || multiCompanyGrouped[0]?.members.length !== 2) {
+    throw new Error("groupSharedVisitAllocations must ignore per-company product name");
   }
   const synced = visitSyncPatch({
     id: "c2",

@@ -149,6 +149,19 @@ export async function POST(request: Request) {
     );
   }
 
+  let campaignWarning: string | null = null;
+  const productId = String(body.product_id || "").trim();
+  if (named.kind === "입금" && named.company_id && productId) {
+    const { error: campaignErr } = await supabase.from("campaigns").insert({
+      company_id: named.company_id,
+      product_id: productId,
+      name: null,
+      status: "견적수립",
+      budget_amount: named.amount_krw,
+    });
+    if (campaignErr) campaignWarning = "캠페인 개설 실패: " + campaignErr.message;
+  }
+
   let budgets: { company_id: string; budget_amount: number | null }[] = [];
   try {
     budgets = await syncDepositedBudgets(supabase, [named.company_id]);
@@ -156,7 +169,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         round: data ? normalizeBudgetRound(data as unknown as BudgetRound) : data,
-        warning: err instanceof Error ? err.message : "배정 예산 반영 실패",
+        warning: campaignWarning || (err instanceof Error ? err.message : "배정 예산 반영 실패"),
       },
       { status: 200 },
     );
@@ -164,5 +177,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     round: data ? normalizeBudgetRound(data as unknown as BudgetRound) : data,
     budgets,
+    warning: campaignWarning || undefined,
   });
 }

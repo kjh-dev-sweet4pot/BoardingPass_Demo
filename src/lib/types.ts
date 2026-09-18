@@ -96,7 +96,10 @@ export type Product = {
   name: string;
   sku: string | null;
   description: string | null;
+  company_id?: string | null;
   created_at: string;
+  /** false면 보관됨 — 배정 이력이 있어 하드 삭제가 막혀 목록에서만 숨긴 상태 */
+  is_active?: boolean;
 };
 
 export type CampaignStatus = "견적수립" | "시행" | "결과" | "보류" | "취소";
@@ -301,13 +304,16 @@ export interface CampaignTarget {
 export interface BudgetPlanItem {
   id: string;
   campaign_id: string;
-  tier: Tier;
+  /** "unclassified" = 인보이스 설명에서 등급을 못 알아낸 경우 */
+  tier: Tier | "unclassified";
   content_type: ContentType | null;
   platform: Platform | null;
   unit_cost: number;
   slot_count: number;
   expected_publish_per_slot: number;
   sort_order: number;
+  /** 원문 메모 (예: 인보이스 항목 설명을 그대로 옮겨둔 것) */
+  memo?: string | null;
   created_at: string;
   updated_at: string;
   // derived, not stored — compute in API layer

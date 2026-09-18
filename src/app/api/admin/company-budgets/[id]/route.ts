@@ -180,6 +180,14 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  const budgets = await syncDepositedBudgets(supabase, [existing.data.company_id]);
-  return NextResponse.json({ ok: true, budgets });
+
+  try {
+    const budgets = await syncDepositedBudgets(supabase, [existing.data.company_id]);
+    return NextResponse.json({ ok: true, budgets });
+  } catch (err) {
+    return NextResponse.json({
+      ok: true,
+      warning: err instanceof Error ? err.message : "배정 예산 반영 실패",
+    });
+  }
 }

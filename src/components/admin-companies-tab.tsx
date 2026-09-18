@@ -20,10 +20,49 @@ import {
 import { AdminCompanyDocsPanel } from "@/components/admin-company-docs-tab";
 import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { AdminCompanyBudgetPanel } from "@/components/admin-company-budget-tab";
+import { AdminCompanyProductsPanel } from "@/components/admin-company-products-tab";
 import { AdminCompanyOverview } from "@/components/admin-company-overview";
+import { AdminMarginCampaignPanel } from "@/components/admin-margin-campaign";
+import { AdminMarginOverviewPanel } from "@/components/admin-margin-overview";
+import { EmptyState } from "@/components/ui";
 import { formatKrw } from "@/lib/creator-pool-mock";
 import { docHtml, type CompanyDocRow } from "@/lib/company-docs";
-import { type Company } from "@/lib/types";
+import { type Company, type Product, type Store } from "@/lib/types";
+
+function AdminCompanyCampaignsPanel({
+  companies,
+  products,
+  stores,
+  presetCompanyId,
+}: {
+  companies: Company[];
+  products: Product[];
+  stores: Store[];
+  presetCompanyId: string;
+}) {
+  const [campaignId, setCampaignId] = useState<string | null>(null);
+
+  useEffect(() => setCampaignId(null), [presetCompanyId]);
+
+  if (!presetCompanyId) {
+    return <EmptyState title="회원사를 먼저 선택하세요." message="요약에서 회사를 고르고 캠페인으로 오세요." positive />;
+  }
+
+  if (campaignId) {
+    return (
+      <AdminMarginCampaignPanel campaignId={campaignId} stores={stores} onBack={() => setCampaignId(null)} />
+    );
+  }
+
+  return (
+    <AdminMarginOverviewPanel
+      companies={companies}
+      products={products}
+      lockCompanyId={presetCompanyId}
+      onSelectCampaign={setCampaignId}
+    />
+  );
+}
 
 export type CompaniesSub =
   | "companies"
@@ -31,7 +70,9 @@ export type CompaniesSub =
   | "companiesRegister"
   | "companiesMail"
   | "companiesDocs"
-  | "companiesBudget";
+  | "companiesBudget"
+  | "companiesProducts"
+  | "companiesCampaigns";
 
 type MailLog = {
   id: string;
@@ -1320,11 +1361,15 @@ function MailPanel({
 
 export function AdminCompaniesTab({
   companies,
+  products,
+  stores,
   isManager,
   sub,
   onSubChange,
 }: {
   companies: Company[];
+  products: Product[];
+  stores: Store[];
   isManager: boolean;
   sub: CompaniesSub;
   onSubChange: (s: CompaniesSub) => void;
@@ -1416,6 +1461,7 @@ export function AdminCompaniesTab({
         {sub === "companiesBudget" ? (
           <AdminCompanyBudgetPanel
             companies={visible}
+            products={products}
             presetCompanyId={focusCompanyId}
             isManager={isManager}
             onBudgetsApplied={(patches) =>
@@ -1434,6 +1480,26 @@ export function AdminCompaniesTab({
               )
             }
           />
+        ) : null}
+        {sub === "companiesProducts" ? (
+          <AdminCompanyProductsPanel
+            companies={visible}
+            products={products}
+            presetCompanyId={focusCompanyId}
+            isManager={isManager}
+          />
+        ) : null}
+        {sub === "companiesCampaigns" ? (
+          isManager ? (
+            <AdminCompanyCampaignsPanel
+              companies={visible}
+              products={products}
+              stores={stores}
+              presetCompanyId={focusCompanyId}
+            />
+          ) : (
+            <p className="text-sm text-[var(--muted)]">캠페인 관리는 운영관리자만 볼 수 있습니다.</p>
+          )
         ) : null}
       </div>
     </div>

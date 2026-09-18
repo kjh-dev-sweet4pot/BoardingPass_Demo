@@ -75,12 +75,27 @@ export async function GET(
     };
   });
 
+  // 슬롯(budget_plan_item)에 묶이지 않은 채 확정된 배정 — 배치 탭 표에서 누락되지 않도록 별도로 집계
+  const { data: unassigned } = await supabase
+    .from("castings")
+    .select("id, influencers ( name )")
+    .eq("campaign_id", id)
+    .eq("status", "Accept")
+    .is("budget_plan_item_id", null);
+
   return NextResponse.json({
     campaign,
     margin: (marginRow as CampaignMarginRow) || null,
     target: target || null,
     budgetItems: items,
     otherCosts: otherCosts || [],
+    unassignedAllocations: (unassigned ?? []).map((c) => {
+      const inf = c.influencers as unknown as { name: string } | { name: string }[] | null;
+      return {
+        id: c.id as string,
+        influencer_name: (Array.isArray(inf) ? inf[0]?.name : inf?.name) ?? "—",
+      };
+    }),
   });
 }
 
