@@ -90,44 +90,46 @@ export function AdminBankdaTab() {
       <div className="min-h-0 flex-1 overflow-auto px-4 sm:px-7">
         {rows === null ? (
           <p className="text-sm text-[var(--muted)]">기간을 선택하고 조회하세요.</p>
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">거래 내역이 없음.</p>
         ) : (
           <>
-            <table className="w-full min-w-[560px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-[var(--line)] text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  <th className="py-2 pr-4">거래일시</th>
-                  <th className="py-2 pr-4">적요</th>
-                  <th className="py-2 pr-4 text-right">입금</th>
-                  <th className="py-2 pr-4 text-right">출금</th>
-                  <th className="py-2 text-right">잔액</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-[var(--line)] last:border-0 hover:bg-[var(--surface-hover)]"
-                  >
-                    <td className="py-2 pr-4 text-[var(--muted)]">{r.tran_date}</td>
-                    <td className="py-2 pr-4 text-[var(--ink)]">{r.remark || "-"}</td>
-                    <td className="py-2 pr-4 text-right text-blue-600">{fmt(r.in_amt)}</td>
-                    <td className="py-2 pr-4 text-right text-red-500">{fmt(r.out_amt)}</td>
-                    <td className="py-2 text-right text-[var(--ink)]">{fmt(r.balance)}</td>
+            {rows.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">거래 내역이 없음.</p>
+            ) : (
+              <table className="w-full min-w-[560px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--line)] text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                    <th className="py-2 pr-4">거래일시</th>
+                    <th className="py-2 pr-4">적요</th>
+                    <th className="py-2 pr-4 text-right">입금</th>
+                    <th className="py-2 pr-4 text-right">출금</th>
+                    <th className="py-2 text-right">잔액</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {/* 원본 응답 디버그 — 스키마 확인용 */}
-            {raw && (
-              <details className="mt-6">
-                <summary className="cursor-pointer text-xs text-[var(--muted)]">원본 응답 (beta 디버그)</summary>
-                <pre className="mt-2 max-h-60 overflow-auto rounded-[6px] bg-[var(--surface)] p-3 text-[11px] text-[var(--muted)]">
-                  {JSON.stringify(raw, null, 2)}
-                </pre>
-              </details>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => (
+                    <tr
+                      key={i}
+                      className="border-b border-[var(--line)] last:border-0 hover:bg-[var(--surface-hover)]"
+                    >
+                      <td className="py-2 pr-4 text-[var(--muted)]">{r.tran_date}</td>
+                      <td className="py-2 pr-4 text-[var(--ink)]">{r.remark || "-"}</td>
+                      <td className="py-2 pr-4 text-right text-blue-600">{fmt(r.in_amt)}</td>
+                      <td className="py-2 pr-4 text-right text-red-500">{fmt(r.out_amt)}</td>
+                      <td className="py-2 text-right text-[var(--ink)]">{fmt(r.balance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
+            {/* 원본 응답 항상 표시 — 스키마 확인용 */}
+            <details className="mt-6" open={rows.length === 0}>
+              <summary className="cursor-pointer text-xs text-[var(--muted)]">
+                원본 응답 (beta 디버그) — parsed rows: {rows.length}개
+              </summary>
+              <pre className="mt-2 max-h-80 overflow-auto rounded-[6px] bg-[var(--surface)] p-3 text-[11px] text-[var(--muted)]">
+                {JSON.stringify(raw, null, 2)}
+              </pre>
+            </details>
           </>
         )}
       </div>
