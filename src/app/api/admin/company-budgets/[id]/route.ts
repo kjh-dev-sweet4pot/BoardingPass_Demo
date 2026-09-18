@@ -12,6 +12,7 @@ import {
   normalizeBudgetRound,
   readRoundBody,
   stripBudgetOptionalColumns,
+  syncCampaignBudgetFromRounds,
   syncDepositedBudgets,
   withLegacyBudgetStatuses,
   type BudgetRound,
@@ -47,7 +48,7 @@ export async function PATCH(
 
   const existing = await supabase
     .from("company_budget_rounds")
-    .select("id, company_id")
+    .select("id, company_id, campaign_id")
     .eq("id", id)
     .maybeSingle();
   if (existing.error) {
@@ -134,20 +135,26 @@ export async function PATCH(
   }
 
   let budgets: { company_id: string; budget_amount: number | null }[] = [];
+  let warning: string | undefined;
   try {
     budgets = await syncDepositedBudgets(supabase, [
       existing.data.company_id,
       named.company_id,
     ]);
   } catch (err) {
-    return NextResponse.json({
-      round: data ? normalizeBudgetRound(data as unknown as BudgetRound) : data,
-      warning: err instanceof Error ? err.message : "배정 예산 반영 실패",
-    });
+    warning = err instanceof Error ? err.message : "배정 예산 반영 실패";
+  }
+  if (existing.data.campaign_id) {
+    try {
+      await syncCampaignBudgetFromRounds(supabase, existing.data.campaign_id);
+    } catch (err) {
+      warning = warning || (err instanceof Error ? err.message : "캠페인 예산 반영 실패");
+    }
   }
   return NextResponse.json({
     round: data ? normalizeBudgetRound(data as unknown as BudgetRound) : data,
     budgets,
+    warning,
   });
 }
 
@@ -163,7 +170,7 @@ export async function DELETE(
 
   const existing = await supabase
     .from("company_budget_rounds")
-    .select("id, company_id")
+    .select("id, company_id, campaign_id")
     .eq("id", id)
     .maybeSingle();
   if (existing.error) {
@@ -181,13 +188,19 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  let warning: string | undefined;
+  let budgets: { company_id: string; budget_amount: number | null }[] = [];
   try {
-    const budgets = await syncDepositedBudgets(supabase, [existing.data.company_id]);
-    return NextResponse.json({ ok: true, budgets });
+    budgets = await syncDepositedBudgets(supabase, [existing.data.company_id]);
   } catch (err) {
-    return NextResponse.json({
-      ok: true,
-      warning: err instanceof Error ? err.message : "배정 예산 반영 실패",
-    });
+    warning = err instanceof Error ? err.message : "배정 예산 반영 실패";
   }
+  if (existing.data.campaign_id) {
+    try {
+      await syncCampaignBudgetFromRounds(supabase, existing.data.campaign_id);
+    } catch (err) {
+      warning = warning || (err instanceof Error ? err.message : "캠페인 예산 반영 실패");
+    }
+  }
+  return NextResponse.json({ ok: true, budgets, warning });
 }

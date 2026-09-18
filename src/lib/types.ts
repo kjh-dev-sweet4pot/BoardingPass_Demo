@@ -147,36 +147,6 @@ export type PlacementGuide = {
   updated_at: string;
 };
 
-export type CastingStatus = "Pending" | "Nego" | "Accept" | "결렬";
-
-export type Casting = {
-  id: string;
-  campaign_id: string;
-  company_id: string;
-  influencer_id: string;
-  status: CastingStatus;
-  allocation_id: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type NegotiationLog = {
-  id: string;
-  casting_id: string;
-  proposed_amount: number | null;
-  memo: string | null;
-  proposer: "company" | "operator";
-  operator_label: string | null;
-  created_at: string;
-};
-
-export const CASTING_STATUS_LABEL: Record<CastingStatus, string> = {
-  Pending: "Pending",
-  Nego: "Nego",
-  Accept: "Accept",
-  결렬: "결렬",
-};
-
 export type Allocation = {
   id: string;
   influencer_id: string;
@@ -348,23 +318,12 @@ export interface CreatorRateCard {
 export interface MarginOverrideLog {
   id: string;
   campaign_id: string;
-  casting_id: string | null;
   margin_before: number | null;
   margin_after: number | null;
   warn_type: WarnType;
   reason: string;
   actor: string;
   created_at: string;
-}
-
-export interface CastingCostSplit {
-  id: string;
-  casting_id: string;
-  campaign_id: string;
-  amount: number;
-  is_manual: boolean;
-  created_at: string;
-  updated_at: string;
 }
 
 /** v_campaign_margin 뷰 반환 행 */

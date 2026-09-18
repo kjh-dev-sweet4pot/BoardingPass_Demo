@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Field, fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
-import { formatManwon, parseManwon } from "@/lib/company-budget-rounds";
+import {
+  combineSpreadsheetHandles,
+  SpreadsheetTable,
+  type SpreadsheetColumn,
+  type SpreadsheetTableHandle,
+} from "@/components/spreadsheet-table";
+import { formatManwon, krwToManwon, parseManwon } from "@/lib/company-budget-rounds";
 import {
   defaultInvoicePayload,
   type DocLine,
@@ -59,7 +65,14 @@ type Detail = {
   target: { target_publish_count: number; memo: string | null } | null;
   budgetItems: BudgetPlanItem[];
   otherCosts: OtherCost[];
-  unassignedAllocations: { id: string; influencer_name: string }[];
+  unassignedAllocations: {
+    id: string;
+    influencer_name: string;
+    cost_amount: number | null;
+    display_price: number | null;
+    quote_total_amount: number | null;
+    split_company_count: number;
+  }[];
 };
 
 function one<T>(v: T | T[] | null): T | null {
@@ -76,6 +89,15 @@ export function AdminMarginCampaignPanel({
   onBack: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("개요");
+  const activeTableRef = useRef<SpreadsheetTableHandle | null>(null);
+  function switchTab(next: Tab) {
+    if (activeTableRef.current) activeTableRef.current.confirmLeave(() => setTab(next));
+    else setTab(next);
+  }
+  function back() {
+    if (activeTableRef.current) activeTableRef.current.confirmLeave(onBack);
+    else onBack();
+  }
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -158,7 +180,7 @@ export function AdminMarginCampaignPanel({
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4 sm:p-7">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <button type="button" onClick={onBack} className="text-xs text-[var(--muted)] hover:underline">
+          <button type="button" onClick={back} className="text-xs text-[var(--muted)] hover:underline">
             ← 마진 현황으로
           </button>
           <h2 className="text-lg font-semibold">{detail.campaign.name || "(제목 없음)"}</h2>
@@ -179,7 +201,7 @@ export function AdminMarginCampaignPanel({
           <button
             key={t}
             type="button"
-            onClick={() => setTab(t)}
+            onClick={() => switchTab(t)}
             className={`px-3 py-2 text-sm font-medium ${
               tab === t ? "border-b-2 border-[var(--accent)] text-[var(--ink)]" : "text-[var(--muted)]"
             }`}
@@ -194,7 +216,7 @@ export function AdminMarginCampaignPanel({
           <OverviewTab detail={detail} projectedCost={projectedCost} projectedMarginRate={projectedMarginRate} />
         ) : null}
         {tab === "예산·계획" ? (
-          <BudgetPlanTab campaignId={campaignId} items={detail.budgetItems} onChanged={load} />
+          <BudgetPlanTab campaignId={campaignId} items={detail.budgetItems} onChanged={load} tableRef={activeTableRef} />
         ) : null}
         {tab === "배치" ? (
           <SlotFillTab
@@ -203,12 +225,13 @@ export function AdminMarginCampaignPanel({
             companyName={company?.name}
             items={detail.budgetItems}
             unassignedAllocations={detail.unassignedAllocations}
+            tableRef={activeTableRef}
             stores={stores}
             onChanged={load}
           />
         ) : null}
         {tab === "기타 소요비용" ? (
-          <OtherCostsTab campaignId={campaignId} costs={detail.otherCosts} onChanged={load} />
+          <OtherCostsTab campaignId={campaignId} costs={detail.otherCosts} onChanged={load} tableRef={activeTableRef} />
         ) : null}
       </div>
 
@@ -353,10 +376,12 @@ function BudgetPlanTab({
   campaignId,
   items,
   onChanged,
+  tableRef,
 }: {
   campaignId: string;
   items: BudgetPlanItem[];
   onChanged: () => void;
+  tableRef: React.RefObject<SpreadsheetTableHandle | null>;
 }) {
   const [tier, setTier] = useState<Tier>("micro");
   const [unitCostManwon, setUnitCostManwon] = useState("");
@@ -390,6 +415,29 @@ function BudgetPlanTab({
     await fetch(`/api/admin/margin/campaign/${campaignId}/budget-items?item_id=${itemId}`, {
       method: "DELETE",
     });
+    onChanged();
+  }
+
+  async function saveEdits(
+    edits: { row: BudgetPlanItem; rowKey: string; values: Record<string, string> }[],
+  ) {
+    for (const { row, values } of edits) {
+      const res = await fetch(`/api/admin/margin/campaign/${campaignId}/budget-items`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: row.id,
+          tier: values.tier ?? row.tier,
+          unit_cost: values.unit_cost != null ? (parseManwon(values.unit_cost) ?? 0) : row.unit_cost,
+          slot_count: values.slot_count != null ? Number(values.slot_count) || 0 : row.slot_count,
+          expected_publish_per_slot: row.expected_publish_per_slot,
+          sort_order: row.sort_order,
+          memo: values.memo ?? row.memo,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+    }
     onChanged();
   }
 
@@ -433,34 +481,59 @@ function BudgetPlanTab({
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      <table className="w-full text-sm">
-        <thead className="text-left text-[var(--muted)]">
-          <tr className="border-b border-[var(--line)]">
-            <th className="px-2 py-2">티어</th>
-            <th className="px-2 py-2 text-right">단가</th>
-            <th className="px-2 py-2 text-right">슬롯</th>
-            <th className="px-2 py-2 text-right">계획 금액</th>
-            <th className="px-2 py-2">메모</th>
-            <th className="px-2 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((i) => (
-            <tr key={i.id} className="border-b border-[var(--line)] last:border-0">
-              <td className="px-2 py-2">{i.tier === "unclassified" ? "구분 없음" : i.tier}</td>
-              <td className="px-2 py-2 text-right">{formatManwon(i.unit_cost)}</td>
-              <td className="px-2 py-2 text-right">{i.slot_count}</td>
-              <td className="px-2 py-2 text-right">{formatManwon(i.planned_amount)}</td>
-              <td className="px-2 py-2 text-[var(--muted)]">{i.memo || "—"}</td>
-              <td className="px-2 py-2 text-right">
-                <button type="button" className="text-xs text-red-600" onClick={() => remove(i.id)}>
-                  삭제
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <SpreadsheetTable
+        ref={tableRef}
+        storageKey="admin-margin-budget-plan"
+        rowKey={(i) => i.id}
+        rowLabel={(i) => (i.tier === "unclassified" ? "구분 없음" : i.tier)}
+        rows={items}
+        emptyText="등록된 예산 계획이 없습니다."
+        onSave={saveEdits}
+        columns={[
+          {
+            key: "tier",
+            label: "티어",
+            width: 100,
+            render: (i) => (i.tier === "unclassified" ? "구분 없음" : i.tier),
+            edit: { kind: "select", options: TIERS, getValue: (i) => i.tier },
+          },
+          {
+            key: "unit_cost",
+            label: "단가",
+            width: 100,
+            align: "right",
+            render: (i) => formatManwon(i.unit_cost),
+            edit: { kind: "number", getValue: (i) => String(krwToManwon(i.unit_cost) ?? 0), formatValue: (v) => `${v}만원` },
+          },
+          {
+            key: "slot_count",
+            label: "슬롯",
+            width: 70,
+            align: "right",
+            render: (i) => i.slot_count,
+            edit: { kind: "number", getValue: (i) => String(i.slot_count) },
+          },
+          { key: "planned_amount", label: "계획 금액", width: 110, align: "right", render: (i) => formatManwon(i.planned_amount) },
+          {
+            key: "memo",
+            label: "메모",
+            width: 200,
+            render: (i) => i.memo || "—",
+            edit: { kind: "text", getValue: (i) => i.memo ?? "" },
+          },
+          {
+            key: "actions",
+            label: "",
+            width: 60,
+            align: "right",
+            render: (i) => (
+              <button type="button" className="text-xs text-red-600" onClick={() => remove(i.id)}>
+                삭제
+              </button>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -817,246 +890,6 @@ function DirectAssignInfluencer({
   );
 }
 
-type PendingCasting = {
-  id: string;
-  status: string;
-  influencers: { id: string; name: string; instagram_handle: string; phone?: string | null; email?: string | null } | null;
-};
-
-function PendingCastingReview({
-  campaignId,
-  companyId,
-  companyName,
-  stores,
-  onChanged,
-}: {
-  campaignId: string;
-  companyId?: string;
-  companyName?: string;
-  stores: Store[];
-  onChanged: () => void;
-}) {
-  const [list, setList] = useState<PendingCasting[]>([]);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [marginReason, setMarginReason] = useState("");
-  const [needsMarginReason, setNeedsMarginReason] = useState(false);
-  const [form, setForm] = useState({
-    display_price: "",
-    cost_amount: "",
-    target_content_count: "1",
-    phone: "",
-    email: "",
-    store_id: "",
-    visit_date: "",
-  });
-
-  async function load() {
-    const res = await fetch(`/api/admin/castings?campaign_id=${campaignId}`);
-    const data = await res.json();
-    if (!res.ok) return;
-    setList((data.castings ?? []).filter((c: PendingCasting) => c.status === "Pending" || c.status === "Nego"));
-  }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaignId]);
-
-  async function patch(id: string, body: Record<string, unknown>) {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/castings/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.error) {
-        if (data.error.includes("경고 구간")) setNeedsMarginReason(true);
-        throw new Error(data.error);
-      }
-      setNeedsMarginReason(false);
-      setMarginReason("");
-      await load();
-      onChanged();
-      return true;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function openConfirm(c: PendingCasting) {
-    setOpenId(c.id);
-    setNeedsMarginReason(false);
-    setMarginReason("");
-    setForm({
-      display_price: "",
-      cost_amount: "",
-      target_content_count: "1",
-      phone: c.influencers?.phone || "",
-      email: c.influencers?.email || "",
-      store_id: stores[0]?.id ?? "",
-      visit_date: "",
-    });
-  }
-
-  if (list.length === 0) return null;
-
-  return (
-    <div className="rounded-[8px] border border-[var(--line)] p-3">
-      <h3 className="text-sm font-semibold">대기 중인 섭외 제안</h3>
-      <p className="mt-1 text-xs text-[var(--muted)]">
-        엑셀 업로드로 확정된 인플루언서가 아니라, 회원사가 직접 제안한 섭외입니다. 확인 또는 거절하세요.
-      </p>
-      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-      <ul className="mt-2 space-y-2 text-sm">
-        {list.map((c) => (
-          <li key={c.id} className="rounded-[6px] border border-[var(--line)] p-2">
-            <div className="flex items-center justify-between gap-2">
-              <span>
-                {c.influencers?.name ?? "—"} (@{c.influencers?.instagram_handle ?? "—"})
-              </span>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="text-xs text-[var(--accent)]"
-                  disabled={busy}
-                  onClick={() =>
-                    openId === c.id ? setOpenId(null) : c.status === "Pending" ? patch(c.id, { action: "start_nego" }).then(() => openConfirm(c)) : openConfirm(c)
-                  }
-                >
-                  {openId === c.id ? "닫기" : "확인"}
-                </button>
-                <button
-                  type="button"
-                  className="text-xs text-red-600"
-                  disabled={busy}
-                  onClick={() => patch(c.id, { action: "reject" })}
-                >
-                  거절
-                </button>
-              </div>
-            </div>
-            {openId === c.id ? (
-              <form
-                className="mt-2 grid gap-2 sm:grid-cols-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void patch(c.id, {
-                    action: "accept",
-                    display_price: Number(form.display_price),
-                    cost_amount: Number(form.cost_amount),
-                    target_content_count: Number(form.target_content_count),
-                    phone: form.phone,
-                    email: form.email,
-                    store_id: form.store_id,
-                    visit_date: form.visit_date,
-                    margin_reason: marginReason,
-                  }).then((ok) => {
-                    if (ok) setOpenId(null);
-                  });
-                }}
-              >
-                <Field label="노출가 (원)">
-                  <input
-                    className={fieldClass}
-                    type="number"
-                    min={0}
-                    required
-                    value={form.display_price}
-                    onChange={(e) => setForm((f) => ({ ...f, display_price: e.target.value }))}
-                  />
-                </Field>
-                <Field label="원가 (원)">
-                  <input
-                    className={fieldClass}
-                    type="number"
-                    min={0}
-                    required
-                    value={form.cost_amount}
-                    onChange={(e) => setForm((f) => ({ ...f, cost_amount: e.target.value }))}
-                  />
-                </Field>
-                <Field label="목표 콘텐츠 수">
-                  <input
-                    className={fieldClass}
-                    type="number"
-                    min={1}
-                    required
-                    value={form.target_content_count}
-                    onChange={(e) => setForm((f) => ({ ...f, target_content_count: e.target.value }))}
-                  />
-                </Field>
-                <Field label="전화">
-                  <input
-                    className={fieldClass}
-                    required
-                    value={form.phone}
-                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  />
-                </Field>
-                <Field label="이메일">
-                  <input
-                    className={fieldClass}
-                    type="email"
-                    required
-                    value={form.email}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  />
-                </Field>
-                <Field label="방문 지점">
-                  <select
-                    className={fieldClass}
-                    required
-                    value={form.store_id}
-                    onChange={(e) => setForm((f) => ({ ...f, store_id: e.target.value }))}
-                  >
-                    <option value="">선택</option>
-                    {stores.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="방문 예정일">
-                  <input
-                    className={fieldClass}
-                    type="date"
-                    required
-                    value={form.visit_date}
-                    onChange={(e) => setForm((f) => ({ ...f, visit_date: e.target.value }))}
-                  />
-                </Field>
-                <CompanyMarginPreview companyId={companyId} companyName={companyName} extraCost={Number(form.cost_amount) || 0} />
-                {needsMarginReason ? (
-                  <Field label="마진율 경고 사유 (확정하려면 필수)">
-                    <input
-                      className={fieldClass}
-                      required
-                      value={marginReason}
-                      onChange={(e) => setMarginReason(e.target.value)}
-                    />
-                  </Field>
-                ) : null}
-                <button className={`${primaryBtnClass} sm:col-span-2`} type="submit" disabled={busy}>
-                  섭외 확정
-                </button>
-              </form>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 type SlotCandidate = {
   influencer_id: string;
   name: string;
@@ -1070,6 +903,7 @@ function SlotFillTab({
   companyName,
   items,
   unassignedAllocations,
+  tableRef,
   stores,
   onChanged,
 }: {
@@ -1077,7 +911,15 @@ function SlotFillTab({
   companyId?: string;
   companyName?: string;
   items: BudgetPlanItem[];
-  unassignedAllocations: { id: string; influencer_name: string }[];
+  unassignedAllocations: {
+    id: string;
+    influencer_name: string;
+    cost_amount: number | null;
+    display_price: number | null;
+    quote_total_amount: number | null;
+    split_company_count: number;
+  }[];
+  tableRef: React.RefObject<SpreadsheetTableHandle | null>;
   stores: Store[];
   onChanged: () => void;
 }) {
@@ -1085,7 +927,6 @@ function SlotFillTab({
   const [candidates, setCandidates] = useState<SlotCandidate[]>([]);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [assigning, setAssigning] = useState<string | null>(null);
 
   async function toggleCandidates(itemId: string) {
     if (openItemId === itemId) {
@@ -1107,25 +948,56 @@ function SlotFillTab({
     }
   }
 
-  async function assign(itemId: string, influencerId: string) {
-    setAssigning(influencerId);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/castings", {
-        method: "POST",
+  async function savePricingEdits(
+    edits: {
+      row: { id: string };
+      rowKey: string;
+      values: Record<string, string>;
+    }[],
+  ) {
+    for (const { row, values } of edits) {
+      const patch: Record<string, number> = {};
+      if (values.cost_amount != null) patch.cost_amount = parseManwon(values.cost_amount) ?? 0;
+      if (values.display_price != null) patch.display_price = parseManwon(values.display_price) ?? 0;
+      const res = await fetch(`/api/admin/allocations/${row.id}/pricing`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaign_id: campaignId, influencer_id: influencerId, budget_plan_item_id: itemId }),
+        body: JSON.stringify(patch),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setOpenItemId(null);
-      onChanged();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setAssigning(null);
     }
+    onChanged();
   }
+
+  async function saveItemEdits(
+    edits: { row: BudgetPlanItem; rowKey: string; values: Record<string, string> }[],
+  ) {
+    for (const { row, values } of edits) {
+      const res = await fetch(`/api/admin/margin/campaign/${campaignId}/budget-items`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: row.id,
+          tier: values.tier ?? row.tier,
+          unit_cost: row.unit_cost,
+          slot_count: values.slot_count != null ? Number(values.slot_count) || 0 : row.slot_count,
+          expected_publish_per_slot: row.expected_publish_per_slot,
+          sort_order: row.sort_order,
+          memo: row.memo,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+    }
+    onChanged();
+  }
+
+  const itemsTableRef = useRef<SpreadsheetTableHandle | null>(null);
+  const allocTableRef = useRef<SpreadsheetTableHandle | null>(null);
+  useEffect(() => {
+    tableRef.current = combineSpreadsheetHandles(itemsTableRef.current, allocTableRef.current);
+  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -1136,60 +1008,98 @@ function SlotFillTab({
         stores={stores}
         onChanged={onChanged}
       />
-      <PendingCastingReview
-        campaignId={campaignId}
-        companyId={companyId}
-        companyName={companyName}
-        stores={stores}
-        onChanged={onChanged}
-      />
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <table className="w-full text-sm">
-        <thead className="text-left text-[var(--muted)]">
-          <tr className="border-b border-[var(--line)]">
-            <th className="px-2 py-2">티어</th>
-            <th className="px-2 py-2 text-right">전체 슬롯</th>
-            <th className="px-2 py-2 text-right">배치 완료</th>
-            <th className="px-2 py-2 text-right">잔여</th>
-            <th className="px-2 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((i) => (
-            <tr key={i.id} className="border-b border-[var(--line)] last:border-0">
-              <td className="px-2 py-2">{i.tier === "unclassified" ? "구분 없음" : i.tier}</td>
-              <td className="px-2 py-2 text-right">{i.slot_count}</td>
-              <td className="px-2 py-2 text-right">{i.filled_count}</td>
-              <td className="px-2 py-2 text-right">{i.remaining_count}</td>
-              <td className="px-2 py-2 text-right">
-                {i.remaining_count > 0 ? (
-                  <button
-                    type="button"
-                    className="text-xs text-[var(--accent)]"
-                    onClick={() => void toggleCandidates(i.id)}
-                  >
-                    {openItemId === i.id ? "닫기" : "슬롯 추천"}
-                  </button>
-                ) : null}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <SpreadsheetTable
+        ref={itemsTableRef}
+        storageKey="admin-margin-slots"
+        rowKey={(i) => i.id}
+        rowLabel={(i) => (i.tier === "unclassified" ? "구분 없음" : i.tier)}
+        rows={items}
+        emptyText="등록된 슬롯이 없습니다."
+        onSave={saveItemEdits}
+        columns={[
+          {
+            key: "tier",
+            label: "티어",
+            width: 100,
+            render: (i) => (i.tier === "unclassified" ? "구분 없음" : i.tier),
+            edit: { kind: "select", options: TIERS, getValue: (i) => i.tier },
+          },
+          {
+            key: "slot_count",
+            label: "전체 슬롯",
+            width: 90,
+            align: "right",
+            render: (i) => i.slot_count,
+            edit: { kind: "number", getValue: (i) => String(i.slot_count) },
+          },
+          { key: "filled_count", label: "배치 완료", width: 90, align: "right", render: (i) => i.filled_count },
+          { key: "remaining_count", label: "잔여", width: 80, align: "right", render: (i) => i.remaining_count },
+          {
+            key: "actions",
+            label: "",
+            width: 90,
+            render: (i) =>
+              i.remaining_count > 0 ? (
+                <button
+                  type="button"
+                  className="text-xs text-[var(--accent)]"
+                  onClick={() => void toggleCandidates(i.id)}
+                >
+                  {openItemId === i.id ? "닫기" : "슬롯 추천"}
+                </button>
+              ) : null,
+          },
+        ]}
+      />
 
       {unassignedAllocations.length > 0 ? (
-        <div className="rounded-[8px] border border-[var(--line)] p-3">
-          <p className="text-xs font-semibold text-[var(--muted)]">
-            슬롯 미지정 확정 배정 {unassignedAllocations.length}건
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-[var(--muted)]">
+            예산·계획 슬롯 연결은 별개(보류)이며, 위 표의 잔여 수량에는 반영되지 않습니다.
           </p>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">
-            예산·계획 슬롯에 연결되지 않은 채 확정된 배정입니다. 위 표의 잔여 수량에는 반영되지 않습니다.
-          </p>
-          <ul className="mt-2 space-y-1 text-sm">
-            {unassignedAllocations.map((a) => (
-              <li key={a.id}>{a.influencer_name}</li>
-            ))}
-          </ul>
+          <SpreadsheetTable
+            ref={allocTableRef}
+            storageKey="admin-margin-unassigned-allocations"
+            rowKey={(a) => a.id}
+            rowLabel={(a) => a.influencer_name}
+            rows={unassignedAllocations}
+            emptyText="확정된 배정이 없습니다."
+            onSave={savePricingEdits}
+            columns={[
+              { key: "influencer_name", label: "인플루언서", width: 160, render: (a) => a.influencer_name },
+              {
+                key: "cost_amount",
+                label: "원가",
+                width: 110,
+                align: "right",
+                render: (a) => (a.cost_amount == null ? "—" : formatManwon(a.cost_amount)),
+                edit: { kind: "number", getValue: (a) => String(krwToManwon(a.cost_amount ?? 0) ?? 0), formatValue: (v) => `${v}만원` },
+              },
+              {
+                key: "quote_total_amount",
+                label: "분배 전 원가",
+                width: 120,
+                align: "right",
+                render: (a) => (a.quote_total_amount == null ? "—" : formatManwon(a.quote_total_amount)),
+              },
+              {
+                key: "split_company_count",
+                label: "분배 회사 수",
+                width: 100,
+                align: "right",
+                render: (a) => `${a.split_company_count}개사`,
+              },
+              {
+                key: "display_price",
+                label: "노출가",
+                width: 110,
+                align: "right",
+                render: (a) => (a.display_price == null ? "—" : formatManwon(a.display_price)),
+                edit: { kind: "number", getValue: (a) => String(krwToManwon(a.display_price ?? 0) ?? 0), formatValue: (v) => `${v}만원` },
+              },
+            ]}
+          />
         </div>
       ) : null}
 
@@ -1201,34 +1111,26 @@ function SlotFillTab({
           </p>
           {loadingCandidates ? (
             <p className="mt-2 text-sm text-[var(--muted)]">불러오는 중…</p>
-          ) : candidates.length === 0 ? (
-            <p className="mt-2 text-sm text-[var(--muted)]">추천할 인플루언서가 없습니다.</p>
           ) : (
-            <ul className="mt-2 space-y-2 text-sm">
-              {candidates.map((c) => (
-                <li
-                  key={c.influencer_id}
-                  className="flex items-center justify-between gap-2 rounded-[6px] border border-[var(--line)] px-3 py-2"
-                >
-                  <span>
-                    {c.name} (@{c.instagram_handle}) ·{" "}
-                    {c.already_cast_in
-                      .map((a) => a.company_name ?? "—")
-                      .filter(Boolean)
-                      .join(", ")}
-                    에 확정됨
-                  </span>
-                  <button
-                    type="button"
-                    className="shrink-0 text-xs font-semibold text-[var(--accent)]"
-                    disabled={assigning === c.influencer_id}
-                    onClick={() => void assign(openItemId, c.influencer_id)}
-                  >
-                    이 슬롯에 배정
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-2">
+              <SpreadsheetTable
+                storageKey="admin-margin-slot-candidates"
+                rowKey={(c) => c.influencer_id}
+                rows={candidates}
+                emptyText="추천할 인플루언서가 없습니다."
+                columns={[
+                  { key: "name", label: "이름", width: 140, render: (c) => c.name },
+                  { key: "handle", label: "핸들", width: 140, render: (c) => `@${c.instagram_handle}` },
+                  {
+                    key: "already_cast_in",
+                    label: "확정된 회사",
+                    width: 220,
+                    render: (c) =>
+                      c.already_cast_in.map((a) => a.company_name ?? "—").filter(Boolean).join(", "),
+                  },
+                ]}
+              />
+            </div>
           )}
         </div>
       ) : null}
@@ -1240,10 +1142,12 @@ function OtherCostsTab({
   campaignId,
   costs,
   onChanged,
+  tableRef,
 }: {
   campaignId: string;
   costs: OtherCost[];
   onChanged: () => void;
+  tableRef: React.RefObject<SpreadsheetTableHandle | null>;
 }) {
   const [costType, setCostType] = useState<OtherCostType>("광고비");
   const [amountManwon, setAmountManwon] = useState("");
@@ -1277,6 +1181,24 @@ function OtherCostsTab({
     await fetch(`/api/admin/margin/campaign/${campaignId}/other-costs?cost_id=${costId}`, {
       method: "DELETE",
     });
+    onChanged();
+  }
+
+  async function saveEdits(edits: { row: OtherCost; rowKey: string; values: Record<string, string> }[]) {
+    for (const { row, values } of edits) {
+      const res = await fetch(`/api/admin/margin/campaign/${campaignId}/other-costs`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: row.id,
+          cost_type: values.cost_type ?? row.cost_type,
+          amount: values.amount != null ? (parseManwon(values.amount) ?? 0) : row.amount,
+          memo: values.memo ?? row.memo,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+    }
     onChanged();
   }
 
@@ -1319,30 +1241,50 @@ function OtherCostsTab({
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      <table className="w-full text-sm">
-        <thead className="text-left text-[var(--muted)]">
-          <tr className="border-b border-[var(--line)]">
-            <th className="px-2 py-2">종류</th>
-            <th className="px-2 py-2 text-right">금액</th>
-            <th className="px-2 py-2">메모</th>
-            <th className="px-2 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {costs.map((c) => (
-            <tr key={c.id} className="border-b border-[var(--line)] last:border-0">
-              <td className="px-2 py-2">{c.cost_type}</td>
-              <td className="px-2 py-2 text-right">{formatManwon(c.amount)}</td>
-              <td className="px-2 py-2">{c.memo || "—"}</td>
-              <td className="px-2 py-2 text-right">
-                <button type="button" className="text-xs text-red-600" onClick={() => remove(c.id)}>
-                  삭제
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <SpreadsheetTable
+        ref={tableRef}
+        storageKey="admin-margin-other-costs"
+        rowKey={(c) => c.id}
+        rowLabel={(c) => c.cost_type}
+        rows={costs}
+        emptyText="등록된 기타 소요비용이 없습니다."
+        onSave={saveEdits}
+        columns={[
+          {
+            key: "cost_type",
+            label: "종류",
+            width: 110,
+            render: (c) => c.cost_type,
+            edit: { kind: "select", options: OTHER_COST_TYPES, getValue: (c) => c.cost_type },
+          },
+          {
+            key: "amount",
+            label: "금액",
+            width: 110,
+            align: "right",
+            render: (c) => formatManwon(c.amount),
+            edit: { kind: "number", getValue: (c) => String(krwToManwon(c.amount) ?? 0), formatValue: (v) => `${v}만원` },
+          },
+          {
+            key: "memo",
+            label: "메모",
+            width: 220,
+            render: (c) => c.memo || "—",
+            edit: { kind: "text", getValue: (c) => c.memo ?? "" },
+          },
+          {
+            key: "actions",
+            label: "",
+            width: 60,
+            align: "right",
+            render: (c) => (
+              <button type="button" className="text-xs text-red-600" onClick={() => remove(c.id)}>
+                삭제
+              </button>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

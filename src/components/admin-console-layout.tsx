@@ -137,6 +137,7 @@ function AdminConsoleLayoutBody({
       : "reviewPending",
   );
   const [marginCampaignId, setMarginCampaignId] = useState<string | null>(initialCampaignId || null);
+  const [companiesFocusId, setCompaniesFocusId] = useState<string | null>(null);
   const [performanceMeta, setPerformanceMeta] = useState<{
     asOf: string;
     lastCollected: string | null;
@@ -164,10 +165,12 @@ function AdminConsoleLayoutBody({
   function navigate(next: {
     section: AdminSection;
     campaignId?: string | null;
+    companyId?: string | null;
     reviewQueue?: AdminReviewTab;
   }) {
     setSection(next.section);
     if ("campaignId" in next) setMarginCampaignId(next.campaignId ?? null);
+    if ("companyId" in next) setCompaniesFocusId(next.companyId ?? null);
     if (next.reviewQueue) setReviewQueue(next.reviewQueue);
 
     const params = new URLSearchParams();
@@ -182,10 +185,6 @@ function AdminConsoleLayoutBody({
   }
 
   function openQueue(queue: AdminQueueKey) {
-    if (queue === "castingStale") {
-      navigate({ section: "marginOverview" });
-      return;
-    }
     if (queue === "published") {
       navigate({ section: "performance" });
       return;
@@ -279,6 +278,7 @@ function AdminConsoleLayoutBody({
             isManager={isManager}
             sub={section}
             onSubChange={(next) => navigate({ section: next })}
+            initialFocusCompanyId={companiesFocusId}
           />
         </div>
       ) : null}
@@ -305,6 +305,7 @@ function AdminConsoleLayoutBody({
           companies={visibleCompanies}
           products={productList}
           onSelectCampaign={(campaignId) => navigate({ section: "marginCampaign", campaignId })}
+          onManageBudget={(companyId) => navigate({ section: "companiesBudget", companyId })}
         />
       ) : null}
 

@@ -211,6 +211,76 @@ export function invoiceFromContract(
   };
 }
 
+/**
+ * 브랜드슬램 인보이스 양식(printShell/invoiceBodyHtml 그대로 인쇄한 PDF)에서 뽑아낸 텍스트를
+ * 다시 InvoicePayload로 되돌린다. 이 양식이 아닌 PDF(스캔본, 다른 회사 양식 등)는 못 읽는다.
+ *
+ * ponytail: 줄 단위 라벨 매칭 + 정규식뿐이라 표 레이아웃이 조금만 달라도(다단 줄바꿈, 열 순서 변경)
+ * 깨질 수 있는 단순 휴리스틱. 인식 결과는 항상 인보이스 작성 폼에 그대로 채워 사람이 확인 후
+ * 수정·저장하므로 잘못 읽어도 데이터가 바로 반영되진 않는다. 상한: 이 고정 양식 1종.
+ * 업그레이드하려면 pdfjs-dist로 글자 좌표를 읽어 열 단위로 파싱해야 한다.
+ */
+export function parseInvoiceText(raw: string): Partial<InvoicePayload> {
+  const lines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const markerIdx = lines.findIndex((l) => /^INVOICE$/i.test(l));
+  const body = markerIdx >= 0 ? lines.slice(markerIdx + 1) : lines;
+
+  const result: Partial<InvoicePayload> = {};
+
+  const field = (label: RegExp) => {
+    for (const l of body) {
+      const m = l.match(label);
+      if (m) return m[1].replace(/^:\s*/, "").trim();
+    }
+    return "";
+  };
+
+  const invoiceNo = field(/^INVOICE\s*NO\s*:\s*(.+)$/i);
+  if (invoiceNo) result.invoiceNo = invoiceNo;
+
+  const dateRaw = field(/^DATE\s*:\s*(.+)$/i);
+  const dmy = dateRaw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) result.issuedOn = `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  else if (dateRaw) result.issuedOn = dateRaw;
+
+  const toName = field(/^TO\s*:*\s*(.+)$/i);
+  if (toName) result.toName = toName;
+  const toAddress = field(/^ADD\s*:*\s*(.+)$/i);
+  if (toAddress) result.toAddress = toAddress;
+  const toTel = field(/^TELP\s*:*\s*(.+)$/i);
+  if (toTel) result.toTel = toTel;
+  const toEmail = field(/^EMAIL\s*:*\s*(.+)$/i);
+  if (toEmail) result.toEmail = toEmail;
+
+  const totalIdx = body.findIndex((l) => /^TOTAL\b/i.test(l));
+  const itemLines = (totalIdx >= 0 ? body.slice(0, totalIdx) : body).filter((l) =>
+    /^\d+[.\s]/.test(l),
+  );
+
+  const lineItems: DocLine[] = [];
+  for (const l of itemLines) {
+    const amounts = [...l.matchAll(/[₩\\]\s*([\d][\d,]*)/g)].map((m) => Number(m[1].replace(/,/g, "")));
+    if (amounts.length < 2) continue;
+    const unitPrice = amounts[amounts.length - 2];
+    let description = l
+      .replace(/^\d+[.\s]+/, "")
+      .replace(/[₩\\]\s*[\d][\d,]*/g, "")
+      .replace(/[-\s]+$/, "")
+      .trim();
+    const qtyMatch = description.match(/(\d+)\s*[-\s]*$/);
+    const qty = qtyMatch ? Number(qtyMatch[1]) : 1;
+    if (qtyMatch) description = description.slice(0, qtyMatch.index).trim();
+    lineItems.push({ description, qty, unitPrice, remark: "" });
+  }
+  if (lineItems.length) result.lines = lineItems;
+
+  return result;
+}
+
 function esc(s: string) {
   return s
     .replace(/&/g, "&amp;")
@@ -498,6 +568,38 @@ if (process.env.RUN_COMPANY_DOCS_SELF_CHECK === "1") {
   }
   if (mailDocFilename("인보이스", "x", inv) !== "slam260908cd.pdf") {
     throw new Error("mailDocFilename");
+  }
+  const parsedPdf = parseInvoiceText(`BRANDSLAM inc.
+ADD : 902, 9F, Handeok Bldg, 11, Teheran-ro 7-gil, Gangnam-gu, Seoul, KOR
+TELP : +821042924294
+EMAIL : jhw@slam-global.com
+INVOICE
+INVOICE NO : slam2608lsp02
+DATE : 19/08/2026
+TO : : ㈜ 뉴디어
+ADD: : 서울특별시 성동구 성수일로12길 26, 4층 408호
+TELP : : +821055329281
+EMAIL : : ceo@newdea.kr
+No. Description Qty Unit Price
+(KRW)
+ Amount
+(KRW) REMARK
+1 클리어디어 OWM마케팅 : 1000만원 - -  - \\0 \\0
+2 약사 콘텐츠 4개(150*4=600) - 4- \\1,500,000 \\6,000,000
+3 미국 방문 PPL 콘텐츠 메가 1명(300*1=300) - 1- \\3,000,000 \\3,000,000
+4 미국 방문 PPL 콘텐츠 미들 1명(100*1=100) - 1- \\1,000,000 \\1,000,000
+TOTAL \\5,500,000 \\10,000,000
+VAT 10% \\550,000 \\1,000,000
+GRAND TOTAL \\6,050,000 \\11,000,000`);
+  if (
+    parsedPdf.invoiceNo !== "slam2608lsp02" ||
+    parsedPdf.issuedOn !== "2026-08-19" ||
+    parsedPdf.toName !== "㈜ 뉴디어" ||
+    parsedPdf.toEmail !== "ceo@newdea.kr" ||
+    !parsedPdf.lines ||
+    invoiceTotals(parsedPdf.lines).subtotal !== 10_000_000
+  ) {
+    throw new Error(`parseInvoiceText ${JSON.stringify(parsedPdf)}`);
   }
   console.log("company-docs self-check ok");
 }

@@ -20,22 +20,19 @@ async function attachSpend(
 ) {
   if (campaigns.length === 0) return campaigns;
   const ids = campaigns.map((c) => c.id);
-  const { data: castings } = await supabase
-    .from("castings")
-    .select(
-      "campaign_id, status, allocations ( allocation_pricing ( display_price ) )",
-    )
+  const { data: allocRows } = await supabase
+    .from("allocations")
+    .select("campaign_id, status, allocation_pricing ( display_price )")
     .in("campaign_id", ids)
-    .eq("status", "Accept");
+    .neq("status", "cancelled");
 
   const spent = new Map<string, number>();
-  for (const row of castings ?? []) {
-    const alloc = Array.isArray(row.allocations) ? row.allocations[0] : row.allocations;
-    const pricing = alloc?.allocation_pricing;
+  for (const row of allocRows ?? []) {
+    const pricing = row.allocation_pricing;
     const priceRow = Array.isArray(pricing) ? pricing[0] : pricing;
     const price = Number(priceRow?.display_price ?? 0);
     if (!Number.isFinite(price)) continue;
-    spent.set(row.campaign_id, (spent.get(row.campaign_id) ?? 0) + price);
+    spent.set(row.campaign_id as string, (spent.get(row.campaign_id as string) ?? 0) + price);
   }
 
   return campaigns.map((c) => {

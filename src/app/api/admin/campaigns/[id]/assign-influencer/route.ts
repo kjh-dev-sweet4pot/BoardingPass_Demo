@@ -5,17 +5,17 @@ import { getAdminLoginId } from "@/lib/session";
 import { isMoneyOk, parseMoney } from "@/lib/money";
 import { createAuthedDbClient, supabaseConfigError } from "@/lib/supabase/api-client";
 
-const CASTING_SELECT = `
-  id, campaign_id, company_id, influencer_id, status, allocation_id,
+const ALLOCATION_SELECT = `
+  id, campaign_id, company_id, influencer_id, visit_date, target_content_count,
   created_at, updated_at,
   influencers ( id, name, instagram_handle ),
-  allocations ( id, visit_date, target_content_count, allocation_pricing ( display_price, cost_amount, accepted_at ) )
+  allocation_pricing ( display_price, cost_amount, accepted_at )
 `;
 
 /**
  * POST /api/admin/campaigns/[id]/assign-influencer
  * 사이트에서 확정된 인플루언서를 이 캠페인(회원사)에 바로 배정한다 —
- * 협상 없이 Nego 캐스팅을 만들고 곧바로 Accept 처리한다 (배정까지 한 번에).
+ * 섭외(casting) 없이 곧바로 allocations를 만든다.
  */
 export async function POST(
   request: NextRequest,
@@ -58,25 +58,22 @@ export async function POST(
   if (!campaign) return NextResponse.json({ error: "캠페인을 찾을 수 없습니다." }, { status: 404 });
 
   const { data: existing } = await supabase
-    .from("castings")
+    .from("allocations")
     .select("id")
     .eq("campaign_id", campaignId)
     .eq("influencer_id", influencerId)
+    .neq("status", "cancelled")
     .maybeSingle();
   if (existing) {
     return NextResponse.json({ error: "이미 이 캠페인에 배정된 인플루언서입니다." }, { status: 409 });
   }
 
-  const { data: casting, error: castErr } = await supabase
-    .from("castings")
-    .insert({ campaign_id: campaignId, company_id: campaign.company_id, influencer_id: influencerId, status: "Nego" })
-    .select("id")
-    .single();
-  if (castErr) return NextResponse.json({ error: castErr.message }, { status: 500 });
-
+  let allocationId: string;
   try {
-    await acceptCasting(supabase, {
-      castingId: casting.id,
+    const result = await acceptCasting(supabase, {
+      campaignId,
+      companyId: campaign.company_id,
+      influencerId,
       displayPrice,
       costAmount,
       targetContentCount,
@@ -87,13 +84,16 @@ export async function POST(
       marginReason,
       actor: (await getAdminLoginId()) || "unknown",
     });
+    allocationId = result.allocationId;
   } catch (e) {
-    // 확정 실패 시 방금 만든 캐스팅도 되돌린다.
-    await supabase.from("castings").delete().eq("id", casting.id);
     return NextResponse.json({ error: e instanceof Error ? e.message : "배정 확정 실패" }, { status: 400 });
   }
 
-  const { data, error } = await supabase.from("castings").select(CASTING_SELECT).eq("id", casting.id).single();
+  const { data, error } = await supabase
+    .from("allocations")
+    .select(ALLOCATION_SELECT)
+    .eq("id", allocationId)
+    .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ casting: data });
+  return NextResponse.json({ allocation: data });
 }

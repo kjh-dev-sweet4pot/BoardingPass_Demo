@@ -10,7 +10,7 @@ const INFLUENCER_SELECT =
 
 /**
  * GET /api/admin/influencers?unassigned=1&q=검색어
- * unassigned=1: 어떤 회사에도 캐스팅된 적 없는 인플루언서만 (사이트 배정용 로스터).
+ * unassigned=1: 어떤 회사에도 배정된 적 없는 인플루언서만 (사이트 배정용 로스터).
  */
 export async function GET(request: NextRequest) {
   const auth = await requireAnyAdmin();
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   const unassigned = searchParams.get("unassigned") === "1";
   const q = searchParams.get("q")?.trim().toLowerCase() || "";
 
-  // q 없이 최대 500명을 한꺼번에 조인하면 castings/allocations 쪽 매칭 행이
+  // q 없이 최대 500명을 한꺼번에 조인하면 allocations 쪽 매칭 행이
   // PostgREST 기본 상한(1000행)에 걸려 일부만 세어지는 문제가 있었다.
   // 검색어가 없을 땐(드롭다운을 그냥 열었을 때) 소수만 보여줘 후보군을 작게 유지한다.
   let query = supabase
@@ -43,27 +43,18 @@ export async function GET(request: NextRequest) {
 
   if (influencers.length) {
     const ids = influencers.map((i) => i.id);
-    // 인플루언서-회사 연결은 castings(사이트 배정)와 allocations(엑셀 업로드) 두 경로 모두에서 생긴다.
-    const [{ data: castRows, error: castErr }, { data: allocRows, error: allocErr }] = await Promise.all([
-      supabase
-        .from("castings")
-        .select("influencer_id, company_id, companies ( name, login_id )")
-        .in("influencer_id", ids)
-        .range(0, 9999),
-      supabase
-        .from("allocations")
-        .select("influencer_id, company_id, companies ( name, login_id )")
-        .in("influencer_id", ids)
-        .range(0, 9999),
-    ]);
-    if (castErr) return NextResponse.json({ error: castErr.message }, { status: 500 });
+    const { data: allocRows, error: allocErr } = await supabase
+      .from("allocations")
+      .select("influencer_id, company_id, companies ( name, login_id )")
+      .in("influencer_id", ids)
+      .range(0, 9999);
     if (allocErr) return NextResponse.json({ error: allocErr.message }, { status: 500 });
 
     type CompanyRow = { name: string; login_id: string };
     const testCastSet = new Set<string>();
     const realCastSet = new Set<string>();
     const realCompaniesByInf = new Map<string, Set<string>>();
-    for (const row of [...(castRows ?? []), ...(allocRows ?? [])]) {
+    for (const row of allocRows ?? []) {
       const companiesRaw = row.companies as unknown as CompanyRow | CompanyRow[] | null;
       const company = Array.isArray(companiesRaw) ? companiesRaw[0] : companiesRaw;
       const infId = row.influencer_id as string;

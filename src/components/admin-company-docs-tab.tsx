@@ -175,10 +175,12 @@ export function AdminCompanyDocsPanel({
   companies,
   isManager,
   presetCompanyId = "",
+  onGoToBudget,
 }: {
   companies: Company[];
   isManager: boolean;
   presetCompanyId?: string;
+  onGoToBudget?: (companyId: string, docId: string) => void;
 }) {
   const [companyId, setCompanyId] = useState(presetCompanyId || companies[0]?.id || "");
   const [docs, setDocs] = useState<CompanyDocRow[]>([]);
@@ -196,6 +198,28 @@ export function AdminCompanyDocsPanel({
     defaultContractPayload(companies[0] || { name: "" }),
   );
   const [importInvoiceId, setImportInvoiceId] = useState("");
+  const [pdfImporting, setPdfImporting] = useState(false);
+  const [pdfImportError, setPdfImportError] = useState<string | null>(null);
+
+  async function importInvoicePdf(file: File) {
+    setPdfImporting(true);
+    setPdfImportError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/admin/company-docs/parse-invoice-pdf", {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "PDF를 읽지 못했습니다.");
+      setInvoice((prev) => ({ ...prev, ...data.payload }));
+    } catch (e) {
+      setPdfImportError(e instanceof Error ? e.message : "PDF를 읽지 못했습니다.");
+    } finally {
+      setPdfImporting(false);
+    }
+  }
 
   const company = useMemo(
     () => companies.find((c) => c.id === companyId) || null,
@@ -343,6 +367,9 @@ export function AdminCompanyDocsPanel({
       if (!res.ok) throw new Error(json.error || "저장 실패");
       setEditingId(json.id);
       await load(companyId);
+      if (kind === "인보이스" && onGoToBudget && confirm("예산을 등록하시겠습니까?")) {
+        onGoToBudget(companyId, json.id);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "저장 실패");
     } finally {
@@ -491,6 +518,28 @@ export function AdminCompanyDocsPanel({
 
         {kind === "인보이스" ? (
           <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-[6px] border border-dashed border-[var(--line)] px-3 py-2">
+              <label className={`${secondaryBtnClass} cursor-pointer`}>
+                {pdfImporting ? "읽는 중…" : "발행된 인보이스 PDF 불러오기"}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  disabled={!isManager || pdfImporting}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void importInvoicePdf(file);
+                  }}
+                />
+              </label>
+              <p className="text-[11px] text-[var(--muted)]">
+                브랜드슬램 양식으로 발행된 인보이스 PDF에서 항목을 읽어옵니다. 읽은 뒤엔 아래에서 확인·수정하세요.
+              </p>
+              {pdfImportError ? (
+                <p className="w-full text-[11px] text-[var(--danger)]">{pdfImportError}</p>
+              ) : null}
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="INVOICE NO">
                 <input

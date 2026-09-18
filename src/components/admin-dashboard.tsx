@@ -9,7 +9,6 @@ type Queues = {
   verifyFailed: number;
   collectFailed: number;
   publishStale: number;
-  castingStale: number;
 };
 
 type Performance = {
@@ -49,7 +48,6 @@ export type AdminQueueKey =
   | "verifyFailed"
   | "collectFailed"
   | "publishStale"
-  | "castingStale"
   | "published";
 
 function QueueCard({
@@ -172,11 +170,6 @@ export function AdminDashboard({
               count={queues?.publishStale ?? 0}
               onOpen={() => onOpenQueue("publishStale")}
             />
-            <QueueCard
-              label="섭외 정체"
-              count={queues?.castingStale ?? 0}
-              onOpen={() => onOpenQueue("castingStale")}
-            />
             <button
               type="button"
               onClick={() => onOpenQueue("published")}
@@ -262,7 +255,7 @@ export function AdminDashboard({
       {budget && (budget.exposureFee > 0 || hasMargin) && (
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            예산 (섭외 확정일 기준)
+            예산 (배정 확정일 기준)
           </p>
           <div className={`grid gap-2 ${hasMargin ? "grid-cols-3" : "grid-cols-1"}`}>
             <Kpi label="노출가 합계" value={`${fmtKrw(budget.exposureFee)}원`} />

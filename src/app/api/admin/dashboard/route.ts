@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
 
   const now = new Date();
   const threeDaysAgo = new Date(now.getTime() - 3 * 86400000).toISOString();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
 
   // ── 큐 3: 수집 3회 연속 실패 (운영자 알림 대상) ─────────────────────────
   const { data: recentCollectJobs } = await supabase
@@ -81,7 +80,6 @@ export async function GET(request: NextRequest) {
     { count: reviewPending },
     { count: verifyFailed },
     { count: publishStale },
-    { count: castingStale },
     { count: publishedCount },
   ] = await Promise.all([
     (() => {
@@ -122,16 +120,6 @@ export async function GET(request: NextRequest) {
       return q;
     })(),
 
-    (() => {
-      let q = supabase
-        .from("castings")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "Pending")
-        .lt("created_at", sevenDaysAgo);
-      if (excludeIds.length) q = q.not("company_id", "in", notInList(excludeIds));
-      return q;
-    })(),
-
     publishedQuery,
   ]);
 
@@ -166,39 +154,27 @@ export async function GET(request: NextRequest) {
     totalPosts += 1;
   }
 
-  // 예산: 섭외 Accept 확정일 기준 — castings.accepted_at 기준 노출가·원가 합산
+  // 예산: 배정 확정일(allocation_pricing.accepted_at) 기준 노출가·원가 합산
   // (운영관리자만 원가·마진 접근 가능, 운영담당자는 노출가만)
   const isManager = await canViewCostAmount();
 
-  // 노출가·원가는 allocation_pricing에만 있다 (castings에는 없음). allocations를 거쳐 조인.
   let budgetQuery = supabase
-    .from("castings")
+    .from("allocation_pricing")
     .select(`
-      id, company_id,
-      allocations!inner (
-        allocation_pricing ( display_price, cost_amount, accepted_at )
-      )
+      display_price, cost_amount, accepted_at,
+      allocations!inner ( company_id, status )
     `)
-    .eq("status", "Accept");
+    .not("allocations.status", "eq", "cancelled");
 
-  if (companyId) budgetQuery = budgetQuery.eq("company_id", companyId);
+  if (companyId) budgetQuery = budgetQuery.eq("allocations.company_id", companyId);
   else if (excludeIds.length) {
-    budgetQuery = budgetQuery.not("company_id", "in", notInList(excludeIds));
+    budgetQuery = budgetQuery.not("allocations.company_id", "in", notInList(excludeIds));
   }
 
-  const { data: castings } = await budgetQuery;
+  const { data: pricingRows } = await budgetQuery;
 
   let exposureFeeTotal = 0, costFeeTotal = 0;
-  for (const c of castings ?? []) {
-    const allocRaw = c.allocations as { allocation_pricing?: unknown } | { allocation_pricing?: unknown }[] | null;
-    const alloc = Array.isArray(allocRaw) ? allocRaw[0] : allocRaw;
-    const pricingRaw = alloc?.allocation_pricing as
-      | { display_price?: number | null; cost_amount?: number | null; accepted_at?: string | null }
-      | { display_price?: number | null; cost_amount?: number | null; accepted_at?: string | null }[]
-      | null
-      | undefined;
-    const pricing = Array.isArray(pricingRaw) ? pricingRaw[0] : pricingRaw;
-    if (!pricing) continue;
+  for (const pricing of pricingRows ?? []) {
     if (from && (!pricing.accepted_at || pricing.accepted_at < from)) continue;
     if (to && (!pricing.accepted_at || pricing.accepted_at > `${to}T23:59:59`)) continue;
     exposureFeeTotal += pricing.display_price ?? 0;
@@ -219,7 +195,6 @@ export async function GET(request: NextRequest) {
       verifyFailed: verifyFailed ?? 0,
       collectFailed: collectFailed ?? 0,
       publishStale: publishStale ?? 0,
-      castingStale: castingStale ?? 0,
     },
     publishedCount: publishedCount ?? 0,
     performance: {

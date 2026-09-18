@@ -35,43 +35,22 @@ export async function GET(
   if (campErr) return NextResponse.json({ error: campErr.message }, { status: 500 });
   if (!campaign) return NextResponse.json({ error: "캠페인을 찾을 수 없습니다." }, { status: 404 });
 
-  // 이 캠페인에 이미 배정된 인플루언서(캐스팅 또는 엑셀 업로드 배정 모두)는 제외한다.
-  // 엑셀 업로드 배정(allocations)은 campaign_id가 거의 안 채워져 있어 company_id로 판단한다.
-  const [{ data: castInThis, error: castInThisErr }, { data: allocInThis, error: allocInThisErr }] = await Promise.all(
-    [
-      supabase.from("castings").select("influencer_id").eq("campaign_id", item.campaign_id),
-      supabase.from("allocations").select("influencer_id").eq("company_id", campaign.company_id),
-    ],
-  );
-  if (castInThisErr) return NextResponse.json({ error: castInThisErr.message }, { status: 500 });
+  // 이 캠페인에 이미 배정된 인플루언서는 제외한다.
+  const { data: allocInThis, error: allocInThisErr } = await supabase
+    .from("allocations")
+    .select("influencer_id")
+    .eq("company_id", campaign.company_id);
   if (allocInThisErr) return NextResponse.json({ error: allocInThisErr.message }, { status: 500 });
-  const excluded = new Set([
-    ...(castInThis ?? []).map((c) => c.influencer_id as string),
-    ...(allocInThis ?? []).map((a) => a.influencer_id as string),
-  ]);
+  const excluded = new Set((allocInThis ?? []).map((a) => a.influencer_id as string));
 
-  // 다른 회사에 이미 실제로 활동 중인 인플루언서 — 캐스팅(Accept)과 엑셀 업로드 배정 둘 다 본다.
-  const [{ data: acceptedElsewhere, error: acceptErr }, { data: allocatedElsewhere, error: allocErr }] =
-    await Promise.all([
-      supabase
-        .from("castings")
-        .select("influencer_id, campaign_id, campaigns ( id, name, companies ( id, name, login_id ) )")
-        .eq("status", "Accept")
-        .neq("campaign_id", item.campaign_id),
-      supabase
-        .from("allocations")
-        .select("influencer_id, campaign_id, companies ( id, name, login_id ), campaigns ( id, name )")
-        .not("company_id", "is", null)
-        .neq("company_id", campaign.company_id),
-    ]);
-  if (acceptErr) return NextResponse.json({ error: acceptErr.message }, { status: 500 });
+  // 다른 회사에 이미 실제로 활동 중인 인플루언서.
+  const { data: allocatedElsewhere, error: allocErr } = await supabase
+    .from("allocations")
+    .select("influencer_id, campaign_id, companies ( id, name, login_id ), campaigns ( id, name )")
+    .not("company_id", "is", null)
+    .neq("company_id", campaign.company_id);
   if (allocErr) return NextResponse.json({ error: allocErr.message }, { status: 500 });
 
-  type CampaignJoin = {
-    id: string;
-    name: string | null;
-    companies: { id: string; name: string; login_id: string } | { id: string; name: string; login_id: string }[] | null;
-  };
   type CompanyRow = { id: string; name: string; login_id: string };
   const byInfluencer = new Map<string, { campaign_name: string | null; company_name: string | null }[]>();
 
@@ -84,11 +63,6 @@ export async function GET(
     byInfluencer.set(infId, list);
   }
 
-  for (const row of acceptedElsewhere ?? []) {
-    const campaign = row.campaigns as unknown as CampaignJoin;
-    const company = Array.isArray(campaign?.companies) ? campaign.companies[0] : campaign?.companies;
-    addRow(row.influencer_id as string, campaign?.name ?? null, company ?? null);
-  }
   for (const row of allocatedElsewhere ?? []) {
     const campaignRaw = row.campaigns as unknown as { id: string; name: string | null } | { id: string; name: string | null }[] | null;
     const campaign = Array.isArray(campaignRaw) ? campaignRaw[0] : campaignRaw;

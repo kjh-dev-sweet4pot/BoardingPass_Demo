@@ -30,13 +30,13 @@ const DEPOSIT_STATUS_RANK: Record<BudgetDepositStatus, number> = {
 };
 
 export const BUDGET_ROUND_SELECT =
-  "id, company_id, company_name, label, period_month, amount_krw, deposit_status, usage_status, usage_period_month, source_deposit_id, kind, created_at, updated_at";
+  "id, company_id, company_name, label, period_month, amount_krw, deposit_status, usage_status, usage_period_month, source_deposit_id, kind, campaign_id, created_at, updated_at";
 
 export const BUDGET_ROUND_SELECT_NO_SOURCE =
-  "id, company_id, company_name, label, period_month, amount_krw, deposit_status, usage_status, usage_period_month, kind, created_at, updated_at";
+  "id, company_id, company_name, label, period_month, amount_krw, deposit_status, usage_status, usage_period_month, kind, campaign_id, created_at, updated_at";
 
 export const BUDGET_ROUND_SELECT_NO_USAGE_PERIOD =
-  "id, company_id, company_name, label, period_month, amount_krw, deposit_status, usage_status, kind, created_at, updated_at";
+  "id, company_id, company_name, label, period_month, amount_krw, deposit_status, usage_status, kind, campaign_id, created_at, updated_at";
 
 export type BudgetRound = {
   id: string;
@@ -52,6 +52,8 @@ export type BudgetRound = {
   /** 사용 분할이 속한 입금 행 id */
   source_deposit_id?: string | null;
   kind?: BudgetRoundKind | null;
+  /** 이 입금 라운드가 반영되는 캠페인(회사×상품 1건). 없으면 campaigns.budget_amount에 반영 안 됨. */
+  campaign_id?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -143,7 +145,7 @@ export function krwToManwon(krw: number | null | undefined): number | null {
 export function formatManwon(krw: number | null | undefined) {
   const n = krwToManwon(krw);
   if (n == null) return "—";
-  return `${new Intl.NumberFormat("ko-KR").format(n)}만원`;
+  return `${new Intl.NumberFormat("ko-KR").format(Math.round(n))}만원`;
 }
 
 /** YYYY-MM 또는 YYYY-MM-DD → 그달 1일. 실패면 null. */
@@ -337,6 +339,30 @@ export async function syncDepositedBudgets(
     });
   }
   return patches;
+}
+
+/**
+ * 캠페인 예산(campaigns.budget_amount)을 이 캠페인에 연결된 입금 라운드의
+ * "입금 완료" 합계로 맞춘다 — 마진에서 쓰는 예산은 회원사 예산 관리에서만 바뀌어야 한다.
+ */
+export async function syncCampaignBudgetFromRounds(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
+  campaignId: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("company_budget_rounds")
+    .select("kind, deposit_status, amount_krw")
+    .eq("campaign_id", campaignId);
+  if (error) throw new Error(error.message);
+
+  const budget_amount = rollupDepositedBudgetKrw(data || []);
+  const { error: upErr } = await supabase
+    .from("campaigns")
+    .update({ budget_amount, updated_at: new Date().toISOString() })
+    .eq("id", campaignId);
+  if (upErr) throw new Error(upErr.message);
+  return budget_amount;
 }
 
 export function budgetTableMissing(message: string) {

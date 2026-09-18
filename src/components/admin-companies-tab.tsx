@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Field, fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
 import { COMPANY_CONTRACT_STAGES, CONTRACT_STAGES_AFTER_DEPOSIT, CONTRACT_STAGES_SYNCED_TO_DEPOSIT, canEditContractStageIndependently, isAdminTestCompany } from "@/lib/company";
 import {
@@ -34,11 +34,13 @@ function AdminCompanyCampaignsPanel({
   products,
   stores,
   presetCompanyId,
+  onManageBudget,
 }: {
   companies: Company[];
   products: Product[];
   stores: Store[];
   presetCompanyId: string;
+  onManageBudget: () => void;
 }) {
   const [campaignId, setCampaignId] = useState<string | null>(null);
 
@@ -60,6 +62,7 @@ function AdminCompanyCampaignsPanel({
       products={products}
       lockCompanyId={presetCompanyId}
       onSelectCampaign={setCampaignId}
+      onManageBudget={onManageBudget}
     />
   );
 }
@@ -1366,6 +1369,7 @@ export function AdminCompaniesTab({
   isManager,
   sub,
   onSubChange,
+  initialFocusCompanyId,
 }: {
   companies: Company[];
   products: Product[];
@@ -1373,11 +1377,23 @@ export function AdminCompaniesTab({
   isManager: boolean;
   sub: CompaniesSub;
   onSubChange: (s: CompaniesSub) => void;
+  /** 다른 화면(마진 등)에서 "이 회사 관리 화면으로" 이동할 때 지정 */
+  initialFocusCompanyId?: string | null;
 }) {
   const { includeCompany } = useAdminTestVisibility();
   const [list, setList] = useState(companies);
   const [mailCompanyId, setMailCompanyId] = useState("");
   const [focusCompanyId, setFocusCompanyId] = useState("");
+  const [focusInvoiceDocId, setFocusInvoiceDocId] = useState("");
+  // 다른 화면(마진 등)에서 회사를 지정해 넘어올 때, effect(다음 렌더)를 기다리지 않고
+  // 렌더 중에 바로 반영한다 — 그래야 첫 렌더부터 회사가 선택된 채로 보인다.
+  // (한 번 적용한 값은 lastAppliedFocusRef로 기억해 이후 내부에서 다른 회사를 고르면
+  // 그 선택이 되살아나지 않도록 한다.)
+  const lastAppliedFocusRef = useRef<string | null>(null);
+  if (initialFocusCompanyId && initialFocusCompanyId !== lastAppliedFocusRef.current) {
+    lastAppliedFocusRef.current = initialFocusCompanyId;
+    if (focusCompanyId !== initialFocusCompanyId) setFocusCompanyId(initialFocusCompanyId);
+  }
   const visible = useMemo(() => list.filter(includeCompany), [list, includeCompany]);
 
   useEffect(() => setList(companies), [companies]);
@@ -1456,6 +1472,11 @@ export function AdminCompaniesTab({
             companies={visible}
             isManager={isManager}
             presetCompanyId={focusCompanyId}
+            onGoToBudget={(id, docId) => {
+              setFocusCompanyId(id);
+              setFocusInvoiceDocId(docId);
+              onSubChange("companiesBudget");
+            }}
           />
         ) : null}
         {sub === "companiesBudget" ? (
@@ -1463,6 +1484,7 @@ export function AdminCompaniesTab({
             companies={visible}
             products={products}
             presetCompanyId={focusCompanyId}
+            presetInvoiceDocId={focusInvoiceDocId}
             isManager={isManager}
             onBudgetsApplied={(patches) =>
               setList((prev) =>
@@ -1496,6 +1518,7 @@ export function AdminCompaniesTab({
               products={products}
               stores={stores}
               presetCompanyId={focusCompanyId}
+              onManageBudget={() => onSubChange("companiesBudget")}
             />
           ) : (
             <p className="text-sm text-[var(--muted)]">캠페인 관리는 운영관리자만 볼 수 있습니다.</p>
