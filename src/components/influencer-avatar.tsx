@@ -14,20 +14,23 @@ export function InfluencerAvatar({
   size = "avatar",
   cacheBust = 0,
   onLoadError,
+  apiBase = "/api/admin/influencers",
 }: {
   influencerId: string;
   name?: string | null;
   size?: "avatar" | "thumb" | "md";
   cacheBust?: number;
   onLoadError?: () => void;
+  /** avatar API 경로 prefix. 기본: /api/admin/influencers (phar용: /api/phar/influencer) */
+  apiBase?: string;
 }) {
   const [failed, setFailed] = useState(false);
   const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
   const box = sizeClass(size);
   const src =
     cacheBust > 0
-      ? `/api/admin/influencers/${influencerId}/avatar?v=${cacheBust}`
-      : `/api/admin/influencers/${influencerId}/avatar`;
+      ? `${apiBase}/${influencerId}/avatar?v=${cacheBust}`
+      : `${apiBase}/${influencerId}/avatar`;
 
   if (failed) {
     return (

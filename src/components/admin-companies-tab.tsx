@@ -21,13 +21,28 @@ import { AdminCompanyDocsPanel } from "@/components/admin-company-docs-tab";
 import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { AdminCompanyBudgetPanel } from "@/components/admin-company-budget-tab";
 import { AdminCompanyProductsPanel } from "@/components/admin-company-products-tab";
-import { AdminCompanyOverview } from "@/components/admin-company-overview";
 import { AdminMarginCampaignPanel } from "@/components/admin-margin-campaign";
 import { AdminMarginOverviewPanel } from "@/components/admin-margin-overview";
 import { EmptyState } from "@/components/ui";
+import {
+  SpreadsheetTable,
+  type SpreadsheetColumn,
+  type SpreadsheetTableHandle,
+} from "@/components/spreadsheet-table";
 import { formatKrw } from "@/lib/creator-pool-mock";
 import { docHtml, type CompanyDocRow } from "@/lib/company-docs";
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NOTIFICATION_SETTING_LABELS,
+  nextWeeklyReportAt,
+  type NotificationSettings,
+} from "@/lib/company-notifications";
 import { type Company, type Product, type Store } from "@/lib/types";
+
+const AUTO_MAIL_SENDER_PREFIX = "system";
+function isAutoMailLog(log: { created_by: string | null }) {
+  return (log.created_by || "").startsWith(AUTO_MAIL_SENDER_PREFIX);
+}
 
 function AdminCompanyCampaignsPanel({
   companies,
@@ -631,20 +646,139 @@ function matchesCompanyQuery(c: Company, key: string) {
     .some((v) => String(v).toLowerCase().includes(key));
 }
 
+type CompanyManageDest = "companiesBudget" | "companiesDocs" | "companiesMail" | "companiesCampaigns";
+
+function CompanyStat({
+  label,
+  value,
+  unit,
+  sub,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  sub?: string;
+}) {
+  return (
+    <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
+      <p className="text-xs text-[var(--muted)]">{label}</p>
+      <p className="mt-1 text-xl font-bold tabular-nums text-[var(--ink)]">
+        {value}
+        {unit ? <span className="ml-1 text-xs font-normal text-[var(--muted)]">{unit}</span> : null}
+      </p>
+      {sub ? <p className="mt-0.5 truncate text-[11px] text-[var(--muted)]">{sub}</p> : null}
+    </div>
+  );
+}
+
+function buildCompanyListColumns(
+  isManager: boolean,
+  onManage: (companyId: string, dest: CompanyManageDest) => void,
+): SpreadsheetColumn<Company>[] {
+  function editable(
+    kind: "text" | "number" | "select",
+    getValue: (c: Company) => string,
+    options?: string[],
+  ): SpreadsheetColumn<Company>["edit"] {
+    return isManager ? { kind, getValue, options } : undefined;
+  }
+  return [
+    {
+      key: "name",
+      label: "회원사",
+      width: 140,
+      render: (c) => c.name,
+      edit: editable("text", (c) => c.name),
+    },
+    {
+      key: "login_id",
+      label: "로그인",
+      width: 120,
+      render: (c) => c.login_id,
+      edit: editable("text", (c) => c.login_id),
+    },
+    {
+      key: "contract_stage",
+      label: "계약 단계",
+      width: 110,
+      render: (c) => c.contract_stage || "—",
+      edit: editable("select", (c) => c.contract_stage || COMPANY_CONTRACT_STAGES[0], [...COMPANY_CONTRACT_STAGES]),
+    },
+    {
+      key: "budget_amount",
+      label: "배정 예산",
+      width: 120,
+      align: "right",
+      render: (c) => (c.budget_amount != null ? `${formatKrw(c.budget_amount)}원` : "—"),
+      edit: isManager
+        ? {
+            kind: "number",
+            getValue: (c) => String(c.budget_amount ?? 0),
+            formatValue: (v) => `${formatKrw(Number(v) || 0)}원`,
+          }
+        : undefined,
+    },
+    {
+      key: "contact",
+      label: "담당",
+      width: 140,
+      render: (c) => c.contact || "—",
+      edit: editable("text", (c) => c.contact || ""),
+    },
+    {
+      key: "contact_email",
+      label: "수신 메일",
+      width: 180,
+      render: (c) => c.contact_email || resolveCompanyMailTo(c) || "—",
+      edit: editable("text", (c) => c.contact_email || ""),
+    },
+    {
+      key: "is_active",
+      label: "상태",
+      width: 80,
+      render: (c) => (c.is_active === false ? "비활성" : "활성"),
+      edit: editable("select", (c) => (c.is_active === false ? "비활성" : "활성"), ["활성", "비활성"]),
+    },
+    {
+      key: "actions",
+      label: "",
+      width: 190,
+      align: "right",
+      render: (c) => (
+        <span className="inline-flex flex-wrap justify-end gap-2 whitespace-nowrap text-xs text-[var(--accent)]">
+          <button type="button" onClick={(e) => { e.stopPropagation(); onManage(c.id, "companiesBudget"); }}>
+            예산
+          </button>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onManage(c.id, "companiesCampaigns"); }}>
+            캠페인
+          </button>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onManage(c.id, "companiesDocs"); }}>
+            계약
+          </button>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onManage(c.id, "companiesMail"); }}>
+            메일
+          </button>
+        </span>
+      ),
+    },
+  ];
+}
+
 function CompanyList({
   companies,
   isManager,
   onChanged,
-  onMail,
+  onManage,
+  tableRef,
 }: {
   companies: Company[];
   isManager: boolean;
   onChanged: (list: Company[]) => void;
-  onMail: (companyId: string) => void;
+  onManage: (companyId: string, dest: CompanyManageDest) => void;
+  tableRef?: React.RefObject<SpreadsheetTableHandle | null>;
 }) {
   const { showTest, setShowTest } = useAdminTestVisibility();
   const [q, setQ] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const testCount = useMemo(
     () => companies.filter((c) => isAdminTestCompany(c)).length,
@@ -664,22 +798,53 @@ function CompanyList({
     return companies.filter((c) => isAdminTestCompany(c) && matchesCompanyQuery(c, key)).length;
   }, [companies, q, showTest]);
 
-  async function toggleActive(company: Company) {
-    const res = await fetch(`/api/admin/companies/${company.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ is_active: !company.is_active }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(body.error || "상태 변경 실패");
-      return;
+  const activeCount = filtered.filter((c) => c.is_active !== false).length;
+  const budgetSum = filtered.reduce((s, c) => s + (c.budget_amount || 0), 0);
+  const stageCounts = COMPANY_CONTRACT_STAGES.map((stage) => ({
+    stage,
+    n: filtered.filter((c) => c.contract_stage === stage).length,
+  })).filter((row) => row.n > 0);
+
+  async function saveEdits(edits: { row: Company; rowKey: string; values: Record<string, string> }[]) {
+    let nextList = companies;
+    for (const { row, values } of edits) {
+      const patch: Record<string, unknown> = {};
+      if (values.name !== undefined) patch.name = values.name;
+      if (values.login_id !== undefined) patch.login_id = values.login_id;
+      if (values.contract_stage !== undefined) patch.contract_stage = values.contract_stage;
+      if (values.budget_amount !== undefined) patch.budget_amount = Number(values.budget_amount) || 0;
+      if (values.contact !== undefined) patch.contact = values.contact;
+      if (values.contact_email !== undefined) patch.contact_email = values.contact_email;
+      if (values.is_active !== undefined) patch.is_active = values.is_active === "활성";
+
+      const res = await fetch(`/api/admin/companies/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "저장 실패");
+      nextList = nextList.map((c) => (c.id === row.id ? (body.company as Company) : c));
     }
-    onChanged(companies.map((c) => (c.id === company.id ? (body.company as Company) : c)));
+    onChanged(nextList);
   }
 
   return (
     <div className="space-y-3">
+      <div className="grid gap-2 sm:grid-cols-3">
+        <CompanyStat label="회원사" value={`${filtered.length}`} unit="곳" sub={`활성 ${activeCount}`} />
+        <CompanyStat
+          label="배정 예산 합"
+          value={filtered.length ? formatKrw(budgetSum) : "—"}
+          unit={filtered.length ? "원" : undefined}
+        />
+        <CompanyStat
+          label="계약 단계"
+          value={stageCounts[0] ? `${stageCounts[0].n}` : "—"}
+          unit={stageCounts[0]?.stage}
+          sub={stageCounts.slice(1).map((r) => `${r.stage} ${r.n}`).join(" · ") || "기록 없음"}
+        />
+      </div>
       <div className="flex flex-wrap items-center gap-3">
         <input
           className={`${fieldClass} w-full max-w-sm`}
@@ -698,72 +863,24 @@ function CompanyList({
           </label>
         ) : null}
       </div>
-      {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
-      <div className="overflow-x-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
-        <table className="w-full min-w-[960px] text-left text-sm">
-          <thead className="border-b border-[var(--line)] text-[11px] font-medium text-[var(--muted)]">
-            <tr>
-              <th className="px-3 py-2">회원사</th>
-              <th className="px-3 py-2">로그인</th>
-              <th className="px-3 py-2">계약 단계</th>
-              <th className="px-3 py-2">배정 예산</th>
-              <th className="px-3 py-2">수신 메일</th>
-              <th className="px-3 py-2">상태</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td className="px-3 py-6 text-[var(--muted)]" colSpan={7}>
-                  {hiddenTestHits > 0
-                    ? "테스트 회원사에만 있습니다. 위 보기를 켜세요."
-                    : q.trim()
-                      ? "검색 결과가 없습니다."
-                      : testCount > 0 && !showTest
-                        ? "테스트 회원사를 숨겼습니다."
-                        : "등록된 회원사가 없습니다."}
-                </td>
-              </tr>
-            ) : (
-              filtered.map((c) => (
-                <tr key={c.id} className="border-b border-[var(--line)] last:border-0">
-                  <td className="px-3 py-2.5 font-semibold">{c.name}</td>
-                  <td className="px-3 py-2.5 text-[var(--muted)]">{c.login_id}</td>
-                  <td className="px-3 py-2.5">{c.contract_stage || "—"}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-[var(--muted)]">
-                    {c.budget_amount != null
-                      ? `${formatKrw(c.budget_amount)}원`
-                      : "—"}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {c.contact_email || resolveCompanyMailTo(c) || "—"}
-                  </td>
-                  <td className="px-3 py-2.5">{c.is_active ? "활성" : "비활성"}</td>
-                  <td className="px-3 py-2.5 text-right">
-                    <button
-                      type="button"
-                      className="mr-2 text-xs text-[var(--accent)]"
-                      onClick={() => onMail(c.id)}
-                    >
-                      메일
-                    </button>
-                    {isManager ? (
-                      <button
-                        type="button"
-                        className="text-xs text-[var(--muted)]"
-                        onClick={() => void toggleActive(c)}
-                      >
-                        {c.is_active ? "비활성" : "활성"}
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <SpreadsheetTable
+        ref={tableRef}
+        storageKey="admin-company-list"
+        columns={buildCompanyListColumns(isManager, onManage)}
+        rows={filtered}
+        rowKey={(c) => c.id}
+        rowLabel={(c) => c.name}
+        onSave={isManager ? saveEdits : undefined}
+        emptyText={
+          hiddenTestHits > 0
+            ? "테스트 회원사에만 있습니다. 위 보기를 켜세요."
+            : q.trim()
+              ? "검색 결과가 없습니다."
+              : testCount > 0 && !showTest
+                ? "테스트 회원사를 숨겼습니다."
+                : "등록된 회원사가 없습니다."
+        }
+      />
     </div>
   );
 }
@@ -783,6 +900,110 @@ function MailRecipientList({ raw }: { raw: string }) {
           형식이 아님 · {e}
         </li>
       ))}
+    </ul>
+  );
+}
+
+function MailLogList({
+  logs,
+  companies,
+  campaigns,
+  openLogId,
+  setOpenLogId,
+  emptyText,
+}: {
+  logs: MailLog[];
+  companies: Company[];
+  campaigns: CampaignOpt[];
+  openLogId: string | null;
+  setOpenLogId: (id: string | null) => void;
+  emptyText: string;
+}) {
+  return (
+    <ul className="max-h-[420px] space-y-2 overflow-auto text-sm">
+      {logs.length === 0 ? (
+        <li className="text-[var(--muted)]">{emptyText}</li>
+      ) : (
+        logs.map((log) => {
+          const open = openLogId === log.id;
+          const companyName = companies.find((c) => c.id === log.company_id)?.name || "";
+          const recips = unpackMailLogRecipients(log.to_emails);
+          const campName = campaigns.find((c) => c.id === log.campaign_id)?.name || "";
+          return (
+            <li key={log.id} className="rounded-[6px] border border-[var(--line)]">
+              <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpenLogId(open ? null : log.id)}
+                className="w-full px-3 py-2 text-left"
+              >
+                <p className="font-medium">
+                  {log.kind}
+                  <span className="ml-2 text-[11px] font-normal text-[var(--muted)]">
+                    {log.sent_at ? "발송" : "실패"}
+                  </span>
+                </p>
+                <p className="truncate text-[12px] text-[var(--muted)]">{log.subject}</p>
+                <p className="text-[11px] text-[var(--muted)]">
+                  {recips.to.join(", ") || "—"}
+                  {recips.bcc.length ? ` · 숨은참조 ${recips.bcc.length}` : ""} · {fmtDt(log.created_at)}
+                </p>
+              </button>
+              {open ? (
+                <div className="space-y-2 border-t border-[var(--line)] px-3 py-3 text-[12px]">
+                  {companyName ? (
+                    <p>
+                      <span className="text-[var(--muted)]">회원사 </span>
+                      {companyName}
+                    </p>
+                  ) : null}
+                  {campName ? (
+                    <p>
+                      <span className="text-[var(--muted)]">캠페인 </span>
+                      {campName}
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="text-[var(--muted)]">받는 사람 </span>
+                    {recips.to.join(", ") || "—"}
+                  </p>
+                  {recips.bcc.length ? (
+                    <p>
+                      <span className="text-[var(--muted)]">숨은참조 </span>
+                      {recips.bcc.join(", ")}
+                    </p>
+                  ) : null}
+                  {log.created_by ? (
+                    <p>
+                      <span className="text-[var(--muted)]">발송자 </span>
+                      {log.created_by}
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="text-[var(--muted)]">제목 </span>
+                    {log.subject || "—"}
+                  </p>
+                  <div>
+                    <p className="mb-1 text-[var(--muted)]">본문</p>
+                    <pre className="whitespace-pre-wrap rounded-[6px] bg-[var(--accent-soft)]/50 px-2.5 py-2 font-sans text-[12px] leading-relaxed text-[var(--ink)]">
+                      {log.body?.trim() || "본문이 없습니다."}
+                    </pre>
+                  </div>
+                  {log.attachment_names?.length ? (
+                    <p>
+                      <span className="text-[var(--muted)]">첨부 </span>
+                      {log.attachment_names.join(", ")}
+                    </p>
+                  ) : null}
+                  {log.error ? <p className="text-[var(--danger)]">{log.error}</p> : null}
+                </div>
+              ) : log.error ? (
+                <p className="px-3 pb-2 text-[11px] text-[var(--danger)]">{log.error}</p>
+              ) : null}
+            </li>
+          );
+        })
+      )}
     </ul>
   );
 }
@@ -819,7 +1040,11 @@ function MailPanel({
     () => logs.filter((log) => includeCompany({ id: log.company_id })),
     [logs, includeCompany],
   );
+  const manualLogs = useMemo(() => visibleLogs.filter((log) => !isAutoMailLog(log)), [visibleLogs]);
+  const autoLogs = useMemo(() => visibleLogs.filter(isAutoMailLog), [visibleLogs]);
   const [openLogId, setOpenLogId] = useState<string | null>(null);
+  const [autoSettings, setAutoSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
+  const [autoSettingsLoading, setAutoSettingsLoading] = useState(false);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [mailFrom, setMailFrom] = useState<string>("");
   const [resendHint, setResendHint] = useState<string>("");
@@ -951,6 +1176,19 @@ function MailPanel({
   useEffect(() => {
     void loadLogs();
   }, [loadLogs]);
+
+  useEffect(() => {
+    if (!companyId) {
+      setAutoSettings(DEFAULT_NOTIFICATION_SETTINGS);
+      return;
+    }
+    setAutoSettingsLoading(true);
+    fetch(`/api/admin/companies/${companyId}/notification-settings`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setAutoSettings(j.settings || DEFAULT_NOTIFICATION_SETTINGS))
+      .catch(() => setAutoSettings(DEFAULT_NOTIFICATION_SETTINGS))
+      .finally(() => setAutoSettingsLoading(false));
+  }, [companyId]);
 
   async function saveMailProfile() {
     if (!isManager) return;
@@ -1219,105 +1457,58 @@ function MailPanel({
 
       <div className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-4">
         <p className="mb-3 text-sm font-semibold">발송 이력</p>
-        <ul className="max-h-[420px] space-y-2 overflow-auto text-sm">
-          {visibleLogs.length === 0 ? (
-            <li className="text-[var(--muted)]">이력이 없습니다.</li>
-          ) : (
-            visibleLogs.map((log) => {
-              const open = openLogId === log.id;
-              const companyName =
-                companies.find((c) => c.id === log.company_id)?.name || "";
-              const recips = unpackMailLogRecipients(log.to_emails);
-              const campName =
-                campaigns.find((c) => c.id === log.campaign_id)?.name || "";
-              return (
-                <li
-                  key={log.id}
-                  className="rounded-[6px] border border-[var(--line)]"
-                >
-                  <button
-                    type="button"
-                    aria-expanded={open}
-                    onClick={() => setOpenLogId(open ? null : log.id)}
-                    className="w-full px-3 py-2 text-left"
-                  >
-                    <p className="font-medium">
-                      {log.kind}
-                      <span className="ml-2 text-[11px] font-normal text-[var(--muted)]">
-                        {log.sent_at ? "발송" : "실패"}
-                      </span>
-                    </p>
-                    <p className="truncate text-[12px] text-[var(--muted)]">
-                      {log.subject}
-                    </p>
-                    <p className="text-[11px] text-[var(--muted)]">
-                      {recips.to.join(", ") || "—"}
-                      {recips.bcc.length
-                        ? ` · 숨은참조 ${recips.bcc.length}`
-                        : ""}{" "}
-                      · {fmtDt(log.created_at)}
-                    </p>
-                  </button>
-                  {open ? (
-                    <div className="space-y-2 border-t border-[var(--line)] px-3 py-3 text-[12px]">
-                      {companyName ? (
-                        <p>
-                          <span className="text-[var(--muted)]">회원사 </span>
-                          {companyName}
-                        </p>
-                      ) : null}
-                      {campName ? (
-                        <p>
-                          <span className="text-[var(--muted)]">캠페인 </span>
-                          {campName}
-                        </p>
-                      ) : null}
-                      <p>
-                        <span className="text-[var(--muted)]">받는 사람 </span>
-                        {recips.to.join(", ") || "—"}
-                      </p>
-                      {recips.bcc.length ? (
-                        <p>
-                          <span className="text-[var(--muted)]">숨은참조 </span>
-                          {recips.bcc.join(", ")}
-                        </p>
-                      ) : null}
-                      {log.created_by ? (
-                        <p>
-                          <span className="text-[var(--muted)]">발송자 </span>
-                          {log.created_by}
-                        </p>
-                      ) : null}
-                      <p>
-                        <span className="text-[var(--muted)]">제목 </span>
-                        {log.subject || "—"}
-                      </p>
-                      <div>
-                        <p className="mb-1 text-[var(--muted)]">본문</p>
-                        <pre className="whitespace-pre-wrap rounded-[6px] bg-[var(--accent-soft)]/50 px-2.5 py-2 font-sans text-[12px] leading-relaxed text-[var(--ink)]">
-                          {log.body?.trim() || "본문이 없습니다."}
-                        </pre>
-                      </div>
-                      {log.attachment_names?.length ? (
-                        <p>
-                          <span className="text-[var(--muted)]">첨부 </span>
-                          {log.attachment_names.join(", ")}
-                        </p>
-                      ) : null}
-                      {log.error ? (
-                        <p className="text-[var(--danger)]">{log.error}</p>
-                      ) : null}
-                    </div>
-                  ) : log.error ? (
-                    <p className="px-3 pb-2 text-[11px] text-[var(--danger)]">
-                      {log.error}
-                    </p>
-                  ) : null}
+        <MailLogList
+          logs={manualLogs}
+          companies={companies}
+          campaigns={campaigns}
+          openLogId={openLogId}
+          setOpenLogId={setOpenLogId}
+          emptyText="이력이 없습니다."
+        />
+      </div>
+
+      <div className="owm-panel border border-[var(--line)] bg-[var(--surface)] p-4">
+        <p className="mb-1 text-sm font-semibold">자동발송내역 및 발송예정내역</p>
+        <p className="mb-3 text-[11px] text-[var(--muted)]">
+          회원사가 /com에서 직접 켜고 끄는 자동 알림(주간 리포트·발행 알림·고인게이지 알림)입니다.
+        </p>
+        {company ? (
+          <div className="mb-3 rounded-[6px] border border-[var(--line)] bg-[var(--surface-hover)]/40 p-3 text-[12px]">
+            <p className="mb-1 font-medium text-[var(--ink)]">발송예정내역</p>
+            {autoSettingsLoading ? (
+              <p className="text-[var(--muted)]">불러오는 중…</p>
+            ) : (
+              <ul className="space-y-1 text-[var(--muted)]">
+                <li>
+                  {NOTIFICATION_SETTING_LABELS.weekly_report.title}:{" "}
+                  {autoSettings.weekly_report ? (
+                    <span className="text-[var(--ink)]">
+                      다음 발송 {fmtDt(nextWeeklyReportAt().toISOString())}
+                    </span>
+                  ) : (
+                    "회원사가 꺼둠"
+                  )}
                 </li>
-              );
-            })
-          )}
-        </ul>
+                <li>
+                  {NOTIFICATION_SETTING_LABELS.on_publish.title}:{" "}
+                  {autoSettings.on_publish ? "발행 즉시 발송" : "회원사가 꺼둠"}
+                </li>
+                <li>
+                  {NOTIFICATION_SETTING_LABELS.high_engagement.title}:{" "}
+                  {autoSettings.high_engagement ? "매일 지표 수집 시 확인" : "회원사가 꺼둠"}
+                </li>
+              </ul>
+            )}
+          </div>
+        ) : null}
+        <MailLogList
+          logs={autoLogs}
+          companies={companies}
+          campaigns={campaigns}
+          openLogId={openLogId}
+          setOpenLogId={setOpenLogId}
+          emptyText="자동 발송 이력이 없습니다."
+        />
       </div>
       </div>
 
@@ -1385,6 +1576,7 @@ export function AdminCompaniesTab({
   const [mailCompanyId, setMailCompanyId] = useState("");
   const [focusCompanyId, setFocusCompanyId] = useState("");
   const [focusInvoiceDocId, setFocusInvoiceDocId] = useState("");
+  const companyListTableRef = useRef<SpreadsheetTableHandle | null>(null);
   // 다른 화면(마진 등)에서 회사를 지정해 넘어올 때, effect(다음 렌더)를 기다리지 않고
   // 렌더 중에 바로 반영한다 — 그래야 첫 렌더부터 회사가 선택된 채로 보인다.
   // (한 번 적용한 값은 lastAppliedFocusRef로 기억해 이후 내부에서 다른 회사를 고르면
@@ -1411,28 +1603,20 @@ export function AdminCompaniesTab({
         </div>
       </div>
       <div className="px-4 pb-8 sm:px-7">
-        {sub === "companies" ? (
+        {sub === "companies" || sub === "companiesOverview" ? (
           <CompanyList
+            tableRef={companyListTableRef}
             companies={list}
             isManager={isManager}
             onChanged={setList}
-            onMail={(id) => {
-              setMailCompanyId(id);
-              onSubChange("companiesMail");
-            }}
-          />
-        ) : null}
-        {sub === "companiesOverview" ? (
-          <AdminCompanyOverview
-            companies={visible}
-            isManager={isManager}
-            onChanged={(c) =>
-              setList((prev) => prev.map((x) => (x.id === c.id ? c : x)))
-            }
             onManage={(id, dest) => {
-              setFocusCompanyId(id);
-              if (dest === "companiesMail") setMailCompanyId(id);
-              onSubChange(dest);
+              const go = () => {
+                setFocusCompanyId(id);
+                if (dest === "companiesMail") setMailCompanyId(id);
+                onSubChange(dest);
+              };
+              if (companyListTableRef.current) companyListTableRef.current.confirmLeave(go);
+              else go();
             }}
           />
         ) : null}

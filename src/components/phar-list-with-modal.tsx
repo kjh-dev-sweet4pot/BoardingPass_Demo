@@ -12,6 +12,7 @@ import {
   PHAR_COUNTER_ROOT_ID,
   PharFloorBox,
 } from "@/components/phar-header-actions";
+import { InfluencerAvatar } from "@/components/influencer-avatar";
 import { StateBadge } from "@/components/state-badge";
 import { AdminAllocationEditForm } from "@/components/admin-allocation-edit";
 import {
@@ -519,8 +520,16 @@ function CounterDetailPanel({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex items-start gap-3">
+        {item.influencers?.id ? (
+          <InfluencerAvatar
+            influencerId={item.influencers.id}
+            name={item.influencers.name}
+            size="md"
+            apiBase="/api/phar/influencer"
+          />
+        ) : null}
+        <div className="min-w-0 flex-1">
           <p className="text-xs tracking-[0.18em] text-[var(--muted)] uppercase">
             Detail
           </p>
@@ -1007,22 +1016,34 @@ function AllocationRow({
         ) : null}
       </td>
       <td className={cell}>
-        {name ? (
-          <span
-            className={`block font-semibold text-[var(--ink)] ${
-              counter ? "text-base" : ""
-            }`}
-          >
-            {name}
-          </span>
-        ) : null}
-        <span
-          className={`font-medium text-[var(--accent)] ${
-            counter ? "text-base" : ""
-          }`}
-        >
-          {handle || "—"}
-        </span>
+        <div className="flex items-center gap-2">
+          {item.influencers?.id ? (
+            <InfluencerAvatar
+              influencerId={item.influencers.id}
+              name={item.influencers.name}
+              size="avatar"
+              apiBase="/api/phar/influencer"
+            />
+          ) : null}
+          <div className="min-w-0">
+            {name ? (
+              <span
+                className={`block font-semibold text-[var(--ink)] ${
+                  counter ? "text-base" : ""
+                }`}
+              >
+                {name}
+              </span>
+            ) : null}
+            <span
+              className={`font-medium text-[var(--accent)] ${
+                counter ? "text-base" : ""
+              }`}
+            >
+              {handle || "—"}
+            </span>
+          </div>
+        </div>
       </td>
       <td className={cell}>
         <span

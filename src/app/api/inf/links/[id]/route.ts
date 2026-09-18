@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { createApiClientIfConfigured, supabaseConfigError } from "@/lib/supabase/api-client";
 import { collectOnPublishUrl } from "@/lib/collect-content-metrics";
+import { notifyOnPublish } from "@/lib/company-notify-send";
 import { validateCreatorUrl, detectPlatform } from "@/lib/creator-link";
 import { propagateSharedVisitCreatorLink } from "@/lib/alloc-dup";
 import { getInfluencerSessionId } from "@/lib/session";
@@ -143,6 +144,14 @@ export async function PATCH(
       }
     });
   }
+
+  after(async () => {
+    try {
+      await notifyOnPublish(supabase, updated.allocation_id || link.allocation_id);
+    } catch {
+      // 알림 실패해도 발행 등록 자체는 유지
+    }
+  });
 
   return NextResponse.json({ link: updated });
 }

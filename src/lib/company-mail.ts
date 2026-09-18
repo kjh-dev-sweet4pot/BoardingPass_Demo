@@ -4,6 +4,8 @@ export const COMPANY_MAIL_KINDS = [
   "청구서",
   "컨텐츠 가이드라인",
   "리포트",
+  "발행 알림",
+  "고인게이지 알림",
 ] as const;
 
 export type CompanyMailKind = (typeof COMPANY_MAIL_KINDS)[number];
@@ -128,6 +130,14 @@ export function buildCompanyMailTemplate(input: {
     리포트: {
       subject: `[${SENDER_COMPANY}] ${client} 캠페인 리포트`,
       body: `${client} 담당자님께\n\n${hello}\n${campaignLine}캠페인 성과 리포트를 보내드립니다. 지표는 조회 시점 기준 누적값입니다.\n\n발송일: ${date}\n`,
+    },
+    "발행 알림": {
+      subject: `[${SENDER_COMPANY}] ${client} 신규 콘텐츠 발행`,
+      body: `${client} 담당자님께\n\n${hello}\n${campaignLine}새 콘텐츠가 발행되었습니다.\n\n발송일: ${date}\n`,
+    },
+    "고인게이지 알림": {
+      subject: `[${SENDER_COMPANY}] ${client} 콘텐츠 반응 급상승`,
+      body: `${client} 담당자님께\n\n${hello}\n${campaignLine}평소보다 반응이 좋은 콘텐츠가 있어 알려드립니다.\n\n발송일: ${date}\n`,
     },
   };
   return bodies[input.kind];

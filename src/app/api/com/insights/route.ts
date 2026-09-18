@@ -115,66 +115,64 @@ export async function fetchInsights(
     excludeCompanyIds = [],
   }: { productId?: string | null; days?: number; excludeCompanyIds?: string[] } = {},
 ): Promise<InsightsPayload> {
-  // 1단계: allocation ids (companyId null = 전체 회원사)
-  const allocSelect =
+  // 발행된 콘텐츠(creator_links)에서 시작해 allocations를 조인한다 — 예전엔
+  // 회사 전체 allocations를 먼저 다 긁어온 뒤 그 id로 creator_links를 다시
+  // 청크 조회했는데(admin "전체" 뷰는 사실상 풀스캔), 실제로 필요한 건
+  // "발행된 것"뿐이라 그걸 기준으로 좁혀서 한 번에 조인 조회한다.
+  const allocEmbed =
     "id, company_id, influencer_id, target_content_count, influencers(id, name, instagram_handle_normalized, instagram_handle, region), products(id, name), companies(id, name), allocation_pricing(display_price)";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allocs: any[] = [];
-  for (let from = 0; ; from += ALLOC_PAGE) {
-    let allocQuery = supabase
-      .from("allocations")
-      .select(allocSelect)
-      .range(from, from + ALLOC_PAGE - 1);
-    if (companyId) allocQuery = allocQuery.eq("company_id", companyId);
-    else if (excludeCompanyIds.length) {
-      allocQuery = allocQuery.not("company_id", "in", `(${excludeCompanyIds.join(",")})`);
-    }
-    if (productId) allocQuery = allocQuery.eq("product_id", productId);
-    const { data, error: allocErr } = await allocQuery;
-    if (allocErr) throw new Error(allocErr.message);
-    allocs.push(...(data || []));
-    if (!data || data.length < ALLOC_PAGE) break;
-  }
-  if (allocs.length === 0)
-    return { links: [], metrics: [], collectedAt: null, source: "apify" };
 
-  const allocMap = new Map(allocs.map((a) => [a.id, a]));
-  const allocIds = allocs.map((a) => a.id as string);
-
-  const rawLinks: {
-    id: string;
-    url: string | null;
-    publish_url: string | null;
-    status: string;
-    submitted_at: string | null;
-    published_at: string | null;
-    views: number | null;
-    likes: number | null;
-    comments: number | null;
-    saves: number | null;
-    shares: number | null;
-    reposts: number | null;
-    metrics_collected_at: string | null;
-    allocation_id: string;
-  }[] = [];
-  for (const part of chunkIds(allocIds)) {
-    const { data, error: linksErr } = await supabase
+  function baseLinksQuery() {
+    let q = supabase
       .from("creator_links")
       .select(
-        "id, url, publish_url, status, submitted_at, published_at, views, likes, comments, saves, shares, reposts, metrics_collected_at, allocation_id",
+        `id, url, publish_url, status, submitted_at, published_at, views, likes, comments, saves, shares, reposts, metrics_collected_at, allocation_id,
+         allocations!inner ( ${allocEmbed} )`,
       )
-      .in("allocation_id", part)
       .or(
         "content_status.eq.발행완료,publish_url.not.is.null,and(content_status.is.null,status.eq.approved)",
-      );
-    if (linksErr) throw new Error(linksErr.message);
-    rawLinks.push(...(data || []));
+      )
+      .order("id", { ascending: true });
+    if (companyId) q = q.eq("allocations.company_id", companyId);
+    else if (excludeCompanyIds.length) {
+      q = q.not("allocations.company_id", "in", `(${excludeCompanyIds.join(",")})`);
+    }
+    if (productId) q = q.eq("allocations.product_id", productId);
+    return q;
   }
-  if (!rawLinks || rawLinks.length === 0) return { links: [], metrics: [], collectedAt: null, source: "apify" };
+
+  let countQuery = supabase
+    .from("creator_links")
+    .select("id, allocations!inner(company_id, product_id)", { count: "exact", head: true })
+    .or(
+      "content_status.eq.발행완료,publish_url.not.is.null,and(content_status.is.null,status.eq.approved)",
+    );
+  if (companyId) countQuery = countQuery.eq("allocations.company_id", companyId);
+  else if (excludeCompanyIds.length) {
+    countQuery = countQuery.not("allocations.company_id", "in", `(${excludeCompanyIds.join(",")})`);
+  }
+  if (productId) countQuery = countQuery.eq("allocations.product_id", productId);
+  const { count: linkCount, error: countErr } = await countQuery;
+  if (countErr) throw new Error(countErr.message);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawLinks: any[] = [];
+  if (linkCount && linkCount > 0) {
+    const pageStarts: number[] = [];
+    for (let from = 0; from < linkCount; from += ALLOC_PAGE) pageStarts.push(from);
+    const pages = await Promise.all(
+      pageStarts.map((from) => baseLinksQuery().range(from, from + ALLOC_PAGE - 1)),
+    );
+    for (const { data, error: linksErr } of pages) {
+      if (linksErr) throw new Error(linksErr.message);
+      rawLinks.push(...(data || []));
+    }
+  }
+  if (rawLinks.length === 0) return { links: [], metrics: [], collectedAt: null, source: "apify" };
 
   // 관계 데이터 병합 (노출가만 — 원가·마진 미포함)
   const links = rawLinks.map((l) => {
-    const alloc = allocMap.get(l.allocation_id) ?? null;
+    const alloc = Array.isArray(l.allocations) ? l.allocations[0] : l.allocations;
     const link_url = (l.publish_url || l.url || "").trim() || null;
     const views =
       resolveCreatorPlatform(link_url) === "xiaohongshu"
@@ -226,15 +224,19 @@ export async function fetchInsights(
     shares: number | null;
     reposts: number | null;
   }[] = [];
-  for (const part of chunkIds(linkIds)) {
-    const { data, error: metricsErr } = await supabase
-      .from("content_metrics")
-      .select(
-        "creator_link_id, collected_at, views, likes, comments, saves, shares, reposts",
-      )
-      .in("creator_link_id", part)
-      .gte("collected_at", since)
-      .order("collected_at", { ascending: true });
+  const metricPages = await Promise.all(
+    chunkIds(linkIds).map((part) =>
+      supabase
+        .from("content_metrics")
+        .select(
+          "creator_link_id, collected_at, views, likes, comments, saves, shares, reposts",
+        )
+        .in("creator_link_id", part)
+        .gte("collected_at", since)
+        .order("collected_at", { ascending: true }),
+    ),
+  );
+  for (const { data, error: metricsErr } of metricPages) {
     if (metricsErr) throw new Error(metricsErr.message);
     metrics.push(...(data || []));
   }

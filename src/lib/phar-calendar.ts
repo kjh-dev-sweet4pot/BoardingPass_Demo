@@ -253,6 +253,49 @@ export function upcomingPlacement(
     .sort((a, b) => b.qty - a.qty);
 }
 
+export type ProductRankingRow = {
+  rank: number;
+  name: string;
+  brand: string | null;
+  visitorCount: number;
+  qty: number;
+};
+
+/**
+ * 향후 N일 방문 예정 배정 건수 기준 상품 Top 랭킹.
+ * "트래픽"의 실측 지표가 없어 배정된 인플루언서 수(visitorCount)를 프록시로 쓴다 —
+ * 진짜 방문객 예측 모델이 아니라 "이미 잡힌 일정" 집계다.
+ */
+export function upcomingProductRanking(
+  items: AllocationWithRelations[],
+  todayYmd: string,
+  days = 14,
+  limit = 10,
+) {
+  const end = addDaysYmd(todayYmd, days - 1);
+  const byProduct = new Map<
+    string,
+    { name: string; brand: string | null; qty: number; people: Set<string> }
+  >();
+  for (const item of items) {
+    if (item.status === "cancelled" || item.status === "picked_up") continue;
+    const d = item.visit_date;
+    if (!d || d < todayYmd || d > end) continue;
+    const name = item.products?.name || "상품";
+    const brand = item.companies?.name || null;
+    const key = `${name}|${brand ?? ""}`;
+    const row = byProduct.get(key) || { name, brand, qty: 0, people: new Set<string>() };
+    row.qty += item.quantity;
+    row.people.add(item.influencer_id);
+    byProduct.set(key, row);
+  }
+  return [...byProduct.values()]
+    .map((r) => ({ name: r.name, brand: r.brand, qty: r.qty, visitorCount: r.people.size }))
+    .sort((a, b) => b.visitorCount - a.visitorCount || b.qty - a.qty)
+    .slice(0, limit)
+    .map((r, i) => ({ rank: i + 1, ...r }));
+}
+
 export function monthHeatCells(
   monthYm: string,
   byDay: Map<string, VisitDaySummary>,
@@ -279,4 +322,22 @@ if (process.env.NODE_ENV !== "production") {
   const cells = monthHeatCells("2026-08", new Map());
   console.assert(cells[0]?.ymd === "2026-07-26");
   console.assert(addDaysYmd("2026-09-08", 6) === "2026-09-14");
+  {
+    // 인플루언서 수(visitorCount) 기준 정렬, qty로 동점 처리, 취소/반출완료 제외
+    const base = { quantity: 1, influencer_id: "" } as unknown as AllocationWithRelations;
+    const rows = upcomingProductRanking(
+      [
+        { ...base, influencer_id: "a", products: { name: "A" } as never, companies: { id: "c1", name: "브랜드A" } as never, visit_date: "2026-09-08", status: "pending" },
+        { ...base, influencer_id: "b", products: { name: "A" } as never, companies: { id: "c1", name: "브랜드A" } as never, visit_date: "2026-09-09", status: "pending" },
+        { ...base, influencer_id: "c", products: { name: "B" } as never, visit_date: "2026-09-10", status: "pending" },
+        { ...base, influencer_id: "d", products: { name: "C" } as never, visit_date: "2026-09-10", status: "cancelled" },
+        { ...base, influencer_id: "e", products: { name: "D" } as never, visit_date: "2026-09-30", status: "pending" },
+      ],
+      "2026-09-08",
+      14,
+    );
+    console.assert(rows.length === 2, "cancelled/기간 밖 제외");
+    console.assert(rows[0]?.name === "A" && rows[0]?.rank === 1 && rows[0]?.visitorCount === 2);
+    console.assert(rows[1]?.name === "B" && rows[1]?.brand === null);
+  }
 }

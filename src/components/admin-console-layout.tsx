@@ -14,6 +14,7 @@ import { AdminMarginRateCardPanel } from "@/components/admin-margin-rate-card";
 import { AdminPerformanceLookupTab, AdminPerformanceTab } from "@/components/admin-performance-tab";
 import { type AdminReviewTab } from "@/components/admin-review-queue";
 import { ADMIN_SECTIONS, AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
+import { AdminBankdaTab } from "@/components/admin-bankda-tab";
 import {
   AdminTestVisibilityProvider,
   useAdminTestVisibility,
@@ -323,6 +324,12 @@ function AdminConsoleLayoutBody({
         ) : (
           <EmptyState title="캠페인을 먼저 선택하세요." message="마진 현황에서 캠페인을 클릭하면 상세로 이동합니다." positive />
         )
+      ) : null}
+
+      {section === "bankda" ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <AdminBankdaTab />
+        </div>
       ) : null}
       </div>
     </AdminConsoleShell>

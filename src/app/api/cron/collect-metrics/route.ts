@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runMetricsScheduler } from "@/lib/run-metrics-scheduler";
+import { checkHighEngagementAndNotify } from "@/lib/company-notify-send";
 import { createServiceClient, hasServiceRoleKey } from "@/lib/supabase/service";
 
 /**
@@ -35,7 +36,8 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServiceClient();
     const result = await runMetricsScheduler(supabase, { maxJobs });
-    return NextResponse.json({ ok: true, ...result });
+    const engagement = await checkHighEngagementAndNotify(supabase).catch(() => null);
+    return NextResponse.json({ ok: true, ...result, engagement });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "스케줄러 실패" },
