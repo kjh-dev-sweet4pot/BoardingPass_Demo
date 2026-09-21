@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
 import { AdminConsoleLayout } from "@/components/admin-console-layout";
 import { AppShell } from "@/components/ui";
-import { isAdminSession, getAdminRole } from "@/lib/session";
+import { isAdminSession, getAdminRole, isSuperAdminSession } from "@/lib/session";
 import {
   COMPANY_SELECT,
   COMPANY_SELECT_BASE,
@@ -32,6 +32,7 @@ export default async function AdminPage({
   const supabase = await createAuthedDbClient();
   if (!supabase) redirect("/admin/login");
   const adminRole = await getAdminRole();
+  const isSuper = await isSuperAdminSession();
   const companiesQuery = supabase
     .from("companies")
     .select(COMPANY_SELECT)
@@ -88,7 +89,8 @@ export default async function AdminPage({
         companyList={companyList}
         productList={productList}
         list={list}
-        isManager={adminRole === "admin_manager"}
+        isManager={adminRole === "admin_manager" || isSuper}
+        isSuperAdmin={isSuper}
         error={params.error || error?.message}
         message={params.message}
         initialSection={params.section}

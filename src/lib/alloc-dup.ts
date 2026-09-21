@@ -89,16 +89,27 @@ export function groupSharedVisitAllocations<T extends SharedVisitAlloc>(
   });
 }
 
-/** 인플·약사 목록용. 묶음의 primary만 남기고 콘텐츠 링크는 합친다. */
+/** 인플·약사 목록용. 묶음의 primary만 남기고 콘텐츠 링크는 합친다.
+ * primary에 _allProducts를 주입해 같은 방문의 전 상품 목록을 보존한다. */
 export function collapseSharedVisitAllocations<T extends SharedVisitAlloc>(
   rows: T[],
-): T[] {
+): (T & { _allProducts: { id: string; name: string; quantity: number }[] })[] {
   return groupSharedVisitAllocations(rows).map((group) => {
     let links: unknown[] = [];
     for (const row of group.members) {
       links = mergeLinks(links, row.creator_links);
     }
-    return { ...group.primary, creator_links: links };
+    const _allProducts = group.members
+      .filter((m) => m.status !== "cancelled")
+      .map((m) => {
+        const p = Array.isArray(m.products) ? m.products[0] : m.products;
+        return {
+          id: m.id,
+          name: (p as { name?: string | null } | null)?.name || "상품",
+          quantity: (m as { quantity?: number }).quantity ?? 1,
+        };
+      });
+    return { ...group.primary, creator_links: links, _allProducts };
   });
 }
 

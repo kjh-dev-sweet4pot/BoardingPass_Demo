@@ -89,7 +89,8 @@ export function summarizeVisitDays(
       byDate.get(date) ||
       { ids: new Set<string>(), pending: 0, visited: 0, picked: 0, n: 0 };
     row.ids.add(item.influencer_id);
-    row.n += 1;
+    const allocCount = item._allProducts?.length || 1;
+    row.n += allocCount;
     if (item.status === "pending") row.pending += 1;
     else if (item.status === "picked_up") row.picked += 1;
     else row.visited += 1;
@@ -170,17 +171,35 @@ export function groupVisitors(items: AllocationWithRelations[]): DayVisitor[] {
         campaigns?: { name: string | null } | null;
       }
     ).campaigns?.name;
+    const products: { id: string; name: string; quantity: number }[] = [];
+    const seenProductIds = new Set<string>();
+    for (const item of list) {
+      if (item._allProducts && item._allProducts.length > 0) {
+        for (const p of item._allProducts) {
+          if (!seenProductIds.has(p.id)) {
+            seenProductIds.add(p.id);
+            products.push(p);
+          }
+        }
+      } else {
+        if (!seenProductIds.has(item.id)) {
+          seenProductIds.add(item.id);
+          products.push({
+            id: item.id,
+            name: item.products?.name || "상품",
+            quantity: item.quantity,
+          });
+        }
+      }
+    }
+
     cards.push({
       influencerId,
       name,
       handle,
       initial: name.slice(0, 1),
       campaignName: campaign || null,
-      products: list.map((item) => ({
-        id: item.id,
-        name: item.products?.name || "상품",
-        quantity: item.quantity,
-      })),
+      products,
       badgeStatus: badgeItem.status,
       badgeItem,
     });
@@ -193,11 +212,12 @@ export function groupVisitors(items: AllocationWithRelations[]): DayVisitor[] {
   });
 }
 
-export function kstHourNow(now = new Date()) {
+/** KST 기준 현재 시각의 hour (0~23) */
+export function kstHourNow(now = new Date()): number {
   return Number(
-    new Intl.DateTimeFormat("en-GB", {
+    new Intl.DateTimeFormat("en-US", {
       timeZone: "Asia/Seoul",
-      hour: "2-digit",
+      hour: "numeric",
       hour12: false,
     }).format(now),
   );
@@ -232,15 +252,27 @@ export function upcomingPlacement(
     if (item.status === "cancelled" || item.status === "picked_up") continue;
     const d = item.visit_date;
     if (!d || d < todayYmd || d > end) continue;
-    const name = item.products?.name || "상품";
-    const row = byProduct.get(name) || {
-      name,
-      qty: 0,
-      people: new Set<string>(),
-    };
-    row.qty += item.quantity;
-    row.people.add(item.influencer_id);
-    byProduct.set(name, row);
+    const list =
+      item._allProducts && item._allProducts.length > 0
+        ? item._allProducts
+        : [
+            {
+              id: item.id,
+              name: item.products?.name || "상품",
+              quantity: item.quantity,
+            },
+          ];
+    for (const p of list) {
+      const name = p.name;
+      const row = byProduct.get(name) || {
+        name,
+        qty: 0,
+        people: new Set<string>(),
+      };
+      row.qty += p.quantity;
+      row.people.add(item.influencer_id);
+      byProduct.set(name, row);
+    }
   }
   return [...byProduct.values()]
     .map((r) => ({
@@ -279,13 +311,25 @@ export function upcomingProductRanking(
     if (item.status === "cancelled" || item.status === "picked_up") continue;
     const d = item.visit_date;
     if (!d || d < todayYmd || d > end) continue;
-    const name = item.products?.name || "상품";
-    const brand = item.companies?.name || null;
-    const key = `${name}|${brand ?? ""}`;
-    const row = byProduct.get(key) || { name, brand, qty: 0, people: new Set<string>() };
-    row.qty += item.quantity;
-    row.people.add(item.influencer_id);
-    byProduct.set(key, row);
+    const list =
+      item._allProducts && item._allProducts.length > 0
+        ? item._allProducts
+        : [
+            {
+              id: item.id,
+              name: item.products?.name || "상품",
+              quantity: item.quantity,
+            },
+          ];
+    for (const p of list) {
+      const name = p.name;
+      const brand = item.companies?.name || null;
+      const key = `${name}|${brand ?? ""}`;
+      const row = byProduct.get(key) || { name, brand, qty: 0, people: new Set<string>() };
+      row.qty += p.quantity;
+      row.people.add(item.influencer_id);
+      byProduct.set(key, row);
+    }
   }
   return [...byProduct.values()]
     .map((r) => ({ name: r.name, brand: r.brand, qty: r.qty, visitorCount: r.people.size }))

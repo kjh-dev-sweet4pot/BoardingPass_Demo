@@ -1,8 +1,8 @@
 /**
  * Xiaohongshu (RedNote) via Apify
- * - note metrics: scrapesage/rednote-xiaohongshu-scraper (note-detail, atomus 대비 1/10 가격)
- * - profile(팔로워): funny_ground/xiaohongshu-profile-scraper (atomus 대비 훨씬 저렴, 토큰 불필요)
- * - 프로필의 "최근 게시물 목록"만 atomus 유지 (더 저렴한 액터 3종 실측 테스트 결과 모두 실패)
+ * - note metrics: atomus~xiaohongshu-scraper (note-detail)
+ *   → scrapesage는 빈 결과 반환 문제로 atomus로 교체
+ * - profile(팔로워): funny_ground/xiaohongshu-profile-scraper
  * 조회·좋아요·댓글·저장·공유. 리포스트는 소스 미제공 → null
  */
 import { apifyErrorMessage } from "@/lib/apify-errors";
@@ -11,7 +11,6 @@ import { parsePostedAtIso } from "@/lib/metrics-schedule";
 import { estimateXiaohongshuViews } from "@/lib/xiaohongshu-views";
 
 const ACTOR_ID = "atomus~xiaohongshu-scraper";
-const NOTE_ACTOR_ID = "scrapesage~rednote-xiaohongshu-scraper";
 const PROFILE_ACTOR_ID = "funny_ground~xiaohongshu-profile-scraper";
 const APIFY_BASE = "https://api.apify.com/v2";
 const NOTE_ID_RE = /[0-9a-f]{24}/i;
@@ -86,62 +85,58 @@ function pickCount(...vals: unknown[]) {
   return null;
 }
 
-type ScrapeSageNote = {
-  noteId?: string;
+/** atomus 액터 응답 구조 */
+type AtomicNote = {
+  id?: string;
   url?: string;
-  likes?: unknown;
-  comments?: unknown;
-  collects?: unknown;
-  shares?: unknown;
-  coverUrl?: string;
-  authorName?: string;
-  authorRedId?: string | null;
-  publishedAt?: string;
-  publishedTimestamp?: unknown;
+  liked_count?: unknown;
+  comments_count?: unknown;
+  collected_count?: unknown;
+  shared_count?: unknown;
+  view_count?: unknown;
+  cover?: string;
+  user?: { red_id?: string; nickname?: string };
+  timestamp?: number;
 };
 
-function mapScrapeSageNote(item: ScrapeSageNote, inputUrl?: string): XiaohongshuScraperResult {
-  const id = (item.noteId || "").toLowerCase() || null;
-  const url = item.url || inputUrl || "";
-  const likes = pickCount(item.likes) ?? 0;
-  const comments = pickCount(item.comments) ?? 0;
-  const saves = pickCount(item.collects);
-  const shares = pickCount(item.shares);
+function mapAtomicNote(item: AtomicNote, inputUrl?: string): XiaohongshuScraperResult {
+  const likes = pickCount(item.liked_count) ?? 0;
+  const comments = pickCount(item.comments_count) ?? 0;
+  const saves = pickCount(item.collected_count);
+  const shares = pickCount(item.shared_count);
+  const viewRaw = pickCount(item.view_count);
+  const id = (item.id || "").toLowerCase() || null;
   return {
     id,
-    url,
+    url: item.url || inputUrl || "",
     inputUrl,
-    // 이 액터도 실측 조회수는 안 줌(샤오홍슈가 공개 페이지에 노출 안 함) → 항상 추정치
-    views: estimateXiaohongshuViews({ views: null, likes, comments, saves, shares }),
+    views: viewRaw ?? estimateXiaohongshuViews({ views: null, likes, comments, saves, shares }),
     likes,
     comments,
     saves,
     shares,
-    coverUrl: item.coverUrl || null,
-    authorHandle: item.authorRedId || item.authorName || null,
-    postedAt: parsePostedAtIso(item.publishedTimestamp ?? item.publishedAt),
+    coverUrl: item.cover || null,
+    authorHandle: item.user?.red_id || item.user?.nickname || null,
+    postedAt: item.timestamp ? parsePostedAtIso(item.timestamp) : null,
   };
 }
 
 export async function scrapeXiaohongshuPosts(
   noteUrls: string[],
-  memoryMbytes = 512,
+  memoryMbytes = 1024,
 ): Promise<XiaohongshuScraperResult[]> {
   const token = getApifyToken();
   const urls = noteUrls.map((u) => u.trim()).filter(Boolean);
   if (urls.length === 0) return [];
 
   const res = await fetch(
-    `${APIFY_BASE}/acts/${NOTE_ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
+    `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${token}&memoryMbytes=${memoryMbytes}&timeout=180`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mode: "notes",
-        noteUrls: urls,
-        enrichNoteDetails: true,
-        includeAuthorProfile: true,
-        // 샤오홍슈가 동일 IP 반복 요청을 레이트리밋함 — RESIDENTIAL 프록시 필수(비용은 액터 단가에 포함, 별도 청구 없음)
+        startUrls: urls.map((url) => ({ url })),
+        resultsType: "posts",
         proxyConfiguration: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
       }),
     },
@@ -152,11 +147,11 @@ export async function scrapeXiaohongshuPosts(
     throw new Error(await apifyErrorMessage(res.status, text));
   }
 
-  const raw = (await res.json()) as ScrapeSageNote[];
+  const raw = (await res.json()) as AtomicNote[];
   if (!Array.isArray(raw)) return [];
   return raw
-    .filter((item) => item.noteId || item.url)
-    .map((item, i) => mapScrapeSageNote(item, urls[i]));
+    .filter((item) => item.id || item.url)
+    .map((item, i) => mapAtomicNote(item, urls[i]));
 }
 
 export function findXiaohongshuResultForUrl(

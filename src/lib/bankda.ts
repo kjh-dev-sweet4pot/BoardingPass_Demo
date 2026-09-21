@@ -1,61 +1,69 @@
-const BANKDA_BASE = "https://a.bankda.com/dtsvc/hub_merchant.php";
+const BANKDA_BASE = "https://a.bankda.com/dtsvc/bank_tr.php";
 
-function headers() {
+function getAuthHeader() {
   const token = process.env.BANKDA_ACCESS_TOKEN;
   if (!token) throw new Error("BANKDA_ACCESS_TOKEN not set");
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+  return `Bearer ${token.trim()}`;
 }
 
 export interface BankdaTransaction {
-  /** 거래일시 */
-  tran_date: string;
-  /** 적요 */
-  remark: string;
-  /** 입금액 */
-  in_amt: number;
-  /** 출금액 */
-  out_amt: number;
-  /** 잔액 */
-  balance: number;
+  bkcode?: number | string;
+  accountnum?: string;
+  bkname?: string;
+  bkdate?: string;
+  bktime?: string;
+  bkjukyo?: string;
+  bkcontent?: string;
+  bketc?: string;
+  bkinput?: string | number;
+  bkoutput?: string | number;
+  bkjango?: string | number;
   [key: string]: unknown;
 }
 
 export interface BankdaTransactionsResult {
   transactions: BankdaTransaction[];
-  /** 원본 응답 (파싱 참고용) */
   raw?: unknown;
 }
 
-/** 거래내역 조회
- * from_date / to_date: "YYYYMMDD" 형식
- * ponytail: 실제 파라미터명은 Bankda 문서 수령 후 맞춰야 함 */
-export async function fetchTransactions(
-  from_date: string,
-  to_date: string,
-): Promise<BankdaTransactionsResult> {
-  const url = new URL(BANKDA_BASE);
-  url.searchParams.set("from_date", from_date);
-  url.searchParams.set("to_date", to_date);
+/** 
+ * 뱅크다 입출금 거래내역 조회 (POST https://a.bankda.com/dtsvc/bank_tr.php)
+ * datefrom/dateto: YYYYMMDD
+ * istest: y일 경우 5분 요청제한 없이 최근 2건 반환
+ */
+export async function fetchTransactions(params: {
+  datefrom: string;
+  dateto: string;
+  accountnum?: string;
+  istest?: boolean;
+}): Promise<BankdaTransactionsResult> {
+  const formData = new FormData();
+  formData.append("datefrom", params.datefrom);
+  formData.append("dateto", params.dateto);
+  formData.append("datatype", "json");
+  formData.append("charset", "utf8");
+  if (params.accountnum) formData.append("accountnum", params.accountnum);
+  if (params.istest) formData.append("istest", "y");
 
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    headers: headers(),
+  const res = await fetch(BANKDA_BASE, {
+    method: "POST",
+    headers: {
+      Authorization: getAuthHeader(),
+    },
+    body: formData,
     cache: "no-store",
   });
 
   if (!res.ok) {
-    throw new Error(`Bankda ${res.status}: ${await res.text()}`);
+    throw new Error(`Bankda HTTP ${res.status}: ${await res.text()}`);
   }
 
   const raw = await res.json();
 
-  // ponytail: 응답 스키마 미확인 — 키 이름 수령 후 파싱 조정
+  // 뱅크다 실제 응답 키: raw.response.bank
   const list: BankdaTransaction[] = Array.isArray(raw)
     ? raw
-    : (raw?.transactions ?? raw?.data ?? raw?.list ?? []);
+    : (raw?.response?.bank ?? raw?.bank ?? raw?.data ?? raw?.list ?? raw?.transactions ?? []);
 
   return { transactions: list, raw };
 }

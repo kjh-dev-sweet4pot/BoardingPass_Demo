@@ -9,6 +9,7 @@ import {
   clearStoreSession,
   isValidAdminManagerCredentials,
   isValidAdminOperatorCredentials,
+  isValidSuperAdminCredentials,
   isValidStorePassword,
   mintAndSetAuthToken,
   setAdminSession,
@@ -26,7 +27,8 @@ export async function signInAdmin(formData: FormData) {
   const username = String(formData.get("username") || "");
   const password = String(formData.get("password") || "");
 
-  const isManager = isValidAdminManagerCredentials(username, password);
+  const isSuper = isValidSuperAdminCredentials(username, password);
+  const isManager = isSuper || isValidAdminManagerCredentials(username, password);
   const isOperator = isValidAdminOperatorCredentials(username, password);
 
   if (!isManager && !isOperator) {
@@ -36,8 +38,9 @@ export async function signInAdmin(formData: FormData) {
   }
 
   const role = isManager ? "admin_manager" : "admin_operator";
-  await setAdminSession(role, username);
-  await mintAndSetAuthToken({ role });
+  const loginId = username.trim().toLowerCase();
+  await setAdminSession(role, loginId);
+  await mintAndSetAuthToken({ role, login_id: loginId });
   redirect("/admin");
 }
 

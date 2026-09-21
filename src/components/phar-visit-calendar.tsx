@@ -70,16 +70,19 @@ function VisitorCard({
               @{visitor.handle}
             </p>
           ) : null}
-          {!selected
-            ? visitor.products.map((p) => (
-                <p key={p.id} className="mt-0.5 text-[13px] text-[var(--ink)]">
+          {!selected ? (
+            <p className="mt-0.5 truncate text-[13px] text-[var(--ink)]">
+              {visitor.products.map((p, idx) => (
+                <span key={p.id}>
+                  {idx > 0 && <span className="mx-1 text-[var(--muted)]">·</span>}
                   {p.name}
                   {p.quantity > 1 ? (
-                    <b className="ml-1 font-semibold">×{p.quantity}</b>
+                    <b className="ml-0.5 font-semibold">×{p.quantity}</b>
                   ) : null}
-                </p>
-              ))
-            : null}
+                </span>
+              ))}
+            </p>
+          ) : null}
         </div>
         <StateBadge value={visitor.badgeStatus} />
       </button>
@@ -98,14 +101,17 @@ function VisitorCard({
           {visitor.campaignName ? (
             <p className="text-[12px] text-[var(--muted)]">{visitor.campaignName}</p>
           ) : null}
-          <ul className="text-[13px] text-[var(--ink)]">
-            {visitor.products.map((p) => (
-              <li key={p.id}>
-                {p.name}{" "}
-                <b className="font-semibold">×{p.quantity}</b>
-              </li>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[var(--ink)]">
+            {visitor.products.map((p, idx) => (
+              <span key={p.id} className="inline-flex items-center">
+                {idx > 0 && <span className="mr-2 text-[var(--muted)]">·</span>}
+                <span>{p.name}</span>
+                {p.quantity > 1 ? (
+                  <b className="ml-1 font-semibold text-[var(--accent)]">×{p.quantity}</b>
+                ) : null}
+              </span>
             ))}
-          </ul>
+          </div>
           {inf?.notes ? (
             <p className="whitespace-pre-wrap text-[12px] text-[var(--muted)]">
               {inf.notes}
@@ -195,23 +201,23 @@ export function PharVisitCalendar({
       : `${formatMd(selectedKey)} (${WEEKDAYS_KO[weekdayIndex(selectedKey)]}) · ${summary?.visitorCount ?? 0}명 / ${summary?.allocationCount ?? 0}건`;
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)]">
-      <section className="flex min-h-0 flex-col gap-2 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3 sm:p-4">
+    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 min-[900px]:grid-cols-[minmax(0,0.82fr)_minmax(320px,1.18fr)]">
+      <section className="flex min-h-0 flex-col gap-1.5 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-2.5 sm:p-3">
         <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
-            className="rounded-[6px] px-2.5 py-1.5 text-xs text-[var(--accent)] disabled:opacity-30"
+            className="rounded-[6px] px-2 py-1 text-xs text-[var(--accent)] disabled:opacity-30"
             disabled={!nav.canPrev}
             onClick={() => goMonth(-1)}
           >
             ◀
           </button>
-          <h2 className="min-w-[120px] text-center text-sm font-bold text-[var(--ink)]">
+          <h2 className="min-w-[110px] text-center text-sm font-bold text-[var(--ink)]">
             {monthLabelKo(viewYm)}
           </h2>
           <button
             type="button"
-            className="rounded-[6px] px-2.5 py-1.5 text-xs text-[var(--accent)] disabled:opacity-30"
+            className="rounded-[6px] px-2 py-1 text-xs text-[var(--accent)] disabled:opacity-30"
             disabled={!nav.canNext}
             onClick={() => goMonth(1)}
           >
@@ -219,7 +225,7 @@ export function PharVisitCalendar({
           </button>
           <button
             type="button"
-            className="ml-1 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-bold text-[var(--accent)]"
+            className="ml-1 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-xs font-bold text-[var(--accent)]"
             onClick={() => onSelect(today)}
           >
             오늘
@@ -290,7 +296,7 @@ export function PharVisitCalendar({
                 style={{ background: heat.bg, color: heat.fg }}
               >
                 <span
-                  className={`absolute left-1.5 top-1 text-xs font-bold ${
+                  className={`absolute left-1 top-0.5 text-[11px] font-bold ${
                     dow === 0
                       ? "text-[#9B2C2C]"
                       : dow === 6
@@ -301,18 +307,18 @@ export function PharVisitCalendar({
                   {cell.num}
                 </span>
                 {isToday ? (
-                  <span className="absolute right-1.5 top-1 text-[9px]" aria-hidden>
+                  <span className="absolute right-1 top-0.5 text-[8px]" aria-hidden>
                     ●
                   </span>
                 ) : lv >= 3 ? (
-                  <span className="absolute right-1.5 top-1 text-[8px]" aria-hidden>
+                  <span className="absolute right-1 top-0.5 text-[7px]" aria-hidden>
                     {lv === 4 ? "●●" : "●"}
                   </span>
                 ) : null}
-                <span className="mt-5 text-lg font-bold leading-none">
+                <span className="mt-3.5 text-base font-bold leading-none">
                   {n > 0 ? n : ""}
                 </span>
-                <span className="mt-0.5 h-3.5 shrink-0 text-[10px] leading-none opacity-80">
+                <span className="mt-0.5 h-3 shrink-0 text-[9px] leading-none opacity-80">
                   {n > 0 ? `${alloc}건` : ""}
                 </span>
               </button>
