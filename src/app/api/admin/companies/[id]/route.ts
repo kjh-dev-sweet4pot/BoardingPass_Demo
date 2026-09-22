@@ -66,6 +66,9 @@ export async function PATCH(
   if ("is_active" in body) {
     patch.is_active = Boolean(body.is_active);
   }
+  if ("auto_collect_enabled" in body) {
+    patch.auto_collect_enabled = Boolean(body.auto_collect_enabled);
+  }
 
   const crm = companyCrmFieldsFromBody(body, "patch");
   if (crm.error) {

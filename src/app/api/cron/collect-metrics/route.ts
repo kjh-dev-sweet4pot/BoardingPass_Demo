@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
   }
 
   const maxJobs = Math.min(
-    parseInt(new URL(request.url).searchParams.get("limit") || "5", 10),
+    parseInt(new URL(request.url).searchParams.get("limit") || "8", 10),
     20,
   );
 

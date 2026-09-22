@@ -21,6 +21,7 @@ import { AdminCompanyDocsPanel } from "@/components/admin-company-docs-tab";
 import { useAdminTestVisibility } from "@/components/admin-test-visibility";
 import { AdminCompanyBudgetPanel } from "@/components/admin-company-budget-tab";
 import { AdminCompanyProductsPanel } from "@/components/admin-company-products-tab";
+import { AdminCompanyAutoCollectPanel } from "@/components/admin-company-auto-collect-tab";
 import { AdminMarginCampaignPanel } from "@/components/admin-margin-campaign";
 import { AdminMarginOverviewPanel } from "@/components/admin-margin-overview";
 import { EmptyState } from "@/components/ui";
@@ -90,7 +91,8 @@ export type CompaniesSub =
   | "companiesDocs"
   | "companiesBudget"
   | "companiesProducts"
-  | "companiesCampaigns";
+  | "companiesCampaigns"
+  | "companiesAutoCollect";
 
 type MailLog = {
   id: string;
@@ -1693,6 +1695,18 @@ export function AdminCompaniesTab({
             products={products}
             presetCompanyId={focusCompanyId}
             isManager={isManager}
+          />
+        ) : null}
+        {sub === "companiesAutoCollect" ? (
+          <AdminCompanyAutoCollectPanel
+            companies={list}
+            isManager={isManager}
+            onChanged={(updated) =>
+              setList((prev) => {
+                const map = new Map(updated.map((c) => [c.id, c]));
+                return prev.map((c) => map.get(c.id) || c);
+              })
+            }
           />
         ) : null}
         {sub === "companiesCampaigns" ? (
