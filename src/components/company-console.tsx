@@ -659,7 +659,7 @@ export function CompanyConsole({
         </div>
       ) : (
       <div className="com-view-enter grid min-h-0 flex-1 gap-4 overflow-auto px-4 pt-3 pb-3 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.85fr)] lg:px-8 lg:py-6">
-        <div className="flex min-h-0 flex-col gap-3">
+        <div className="flex flex-col gap-3">
       <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">
         배정 현황
       </h2>
@@ -761,7 +761,7 @@ export function CompanyConsole({
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
+      <div className="overflow-x-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
         {filtered.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-[var(--muted)]">
             조건에 맞는 배정이 없습니다.
@@ -946,7 +946,7 @@ export function CompanyConsole({
         </div>
 
         <aside
-          className={`min-w-0 overflow-y-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 lg:min-h-0 lg:p-6 ${
+          className={`min-w-0 overflow-y-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-5 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:min-h-0 lg:p-6 ${
             selected ? "min-h-[40vh]" : "hidden min-h-[50vh] lg:block"
           }`}
         >

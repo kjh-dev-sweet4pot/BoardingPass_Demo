@@ -320,7 +320,7 @@ export function CompanyCreatorPool({
           </div>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3">
+        <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3">
           {poolLoading ? (
             <p className="com-loading px-4 py-10 text-center text-sm text-[var(--muted)]">
               크리에이터를 불러오는 중…
