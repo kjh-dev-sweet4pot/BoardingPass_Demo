@@ -335,7 +335,7 @@ function EfficiencyPlaceholder() {
     <section className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-4">
       <h3 className="text-sm font-bold text-[var(--ink)]">가성비 리스트</h3>
       <p className="mb-3 mt-0.5 text-[11.5px] text-[var(--muted)]">
-        노출가 대비 성과 · 지표 산식 준비 중
+        준비중이에요 !
       </p>
       <div className="mb-3 flex flex-wrap gap-1.5">
         {pills.map((p, i) => (
@@ -1080,7 +1080,7 @@ export function CompanyHomeLanding({
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
-      <div className="px-0 pb-8 pt-0 sm:px-0">
+      <div className="px-0 pb-3 pt-0 sm:pb-8 sm:px-0">
         {loading && !data ? (
           <p className="com-loading px-5 py-5 text-sm text-[var(--muted)] sm:px-8">
             불러오는 중…
@@ -1267,7 +1267,7 @@ export function CompanyHomeLanding({
               />
             </div>
 
-            <div className="com-home-ranks grid grid-cols-1 gap-4 px-5 py-5 sm:px-8 md:grid-cols-2 xl:grid-cols-4">
+            <div className="com-home-ranks grid grid-cols-1 gap-4 px-5 pt-4 pb-3 sm:py-5 sm:px-8 md:grid-cols-2 xl:grid-cols-4">
               <EfficiencyPlaceholder />
               <RankCard
                 title="주간 랭킹 TOP 10"

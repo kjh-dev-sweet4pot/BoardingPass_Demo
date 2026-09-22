@@ -658,7 +658,7 @@ export function CompanyConsole({
           배정 불러오는 중…
         </div>
       ) : (
-      <div className="com-view-enter grid min-h-0 flex-1 gap-4 overflow-auto px-4 py-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.85fr)] lg:px-8 lg:py-6">
+      <div className="com-view-enter grid min-h-0 flex-1 gap-4 overflow-auto px-4 pt-3 pb-3 lg:grid-cols-[minmax(0,1.75fr)_minmax(320px,0.85fr)] lg:px-8 lg:py-6">
         <div className="flex min-h-0 flex-col gap-3">
       <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">
         배정 현황
