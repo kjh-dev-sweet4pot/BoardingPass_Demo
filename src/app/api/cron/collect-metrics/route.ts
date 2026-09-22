@@ -58,10 +58,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const maxJobs = Math.min(
-    parseInt(new URL(request.url).searchParams.get("limit") || "8", 10),
-    20,
-  );
+  const limitParam = new URL(request.url).searchParams.get("limit");
+  const maxJobs = limitParam ? parseInt(limitParam, 10) : Number.MAX_SAFE_INTEGER;
 
   const supabase = createServiceClient();
   try {
