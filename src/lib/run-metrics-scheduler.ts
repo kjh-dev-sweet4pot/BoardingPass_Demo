@@ -18,13 +18,20 @@ type SchedulerResult = {
   errors: string[];
 };
 
+// ponytail: Vercel 타임아웃 등으로 죽은 job은 대기/실행중 상태로 영원히 남아 그 링크를
+// 자동수집에서 영구 차단시킨다 — staleAfter 지나면 좀비로 보고 새 job을 다시 큐에 넣는다.
+const STALE_JOB_MS = 10 * 60 * 1000;
+
 async function hasActiveJob(supabase: SupabaseClient, linkId: string) {
-  const { count } = await supabase
+  const { data } = await supabase
     .from("collection_jobs")
-    .select("*", { count: "exact", head: true })
+    .select("created_at")
     .eq("creator_link_id", linkId)
     .in("status", ["대기", "실행중"]);
-  return (count ?? 0) > 0;
+  const now = Date.now();
+  return (data ?? []).some(
+    (r) => now - new Date(r.created_at).getTime() < STALE_JOB_MS,
+  );
 }
 
 async function enqueueScheduledCollect(
@@ -124,11 +131,18 @@ export async function runMetricsScheduler(
     }
   }
 
-  // ponytail: 순차 실행이면 건당 ~6-8초 × maxJobs가 그대로 누적돼 60초 타임아웃에 걸린다.
-  // 서로 다른 링크의 독립적인 Apify 호출이라 병렬로 돌려도 안전 — 같은 예산으로 더 많이 처리한다.
-  const outcomes = await Promise.allSettled(
-    jobQueue.map((job) => runCollectionJob(supabase, job.id, job.creator_link_id)),
-  );
+  // ponytail: Apify 계정 동시 actor run 한도가 28개(안전마진, 실측 한도 32개) —
+  // 그 이상 한꺼번에 쏘면 나머지는 402 concurrent-limit 에러로 실패한다.
+  const APIFY_CONCURRENCY = 28;
+  const outcomes: PromiseSettledResult<unknown>[] = [];
+  for (let i = 0; i < jobQueue.length; i += APIFY_CONCURRENCY) {
+    const batch = jobQueue.slice(i, i + APIFY_CONCURRENCY);
+    outcomes.push(
+      ...(await Promise.allSettled(
+        batch.map((job) => runCollectionJob(supabase, job.id, job.creator_link_id)),
+      )),
+    );
+  }
   for (const [i, outcome] of outcomes.entries()) {
     result.processed += 1;
     if (outcome.status === "fulfilled") {
