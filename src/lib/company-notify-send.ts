@@ -7,9 +7,24 @@ import {
 import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from "@/lib/company-notifications";
 import { engagementRate } from "@/lib/content-insights";
 import { CREATOR_PLATFORM_LABEL, resolveCreatorPlatform } from "@/lib/creator-link";
+import profileMetrics from "@/lib/data/pool-profile-metrics.json";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any>;
+
+export const COMPANY_CONSOLE_URL = "https://boarding-pass-demo.vercel.app/com";
+
+export function formatShortCount(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || n <= 0) return "—";
+  if (n >= 100_000_000) {
+    return `${(n / 100_000_000).toFixed(1)}억`;
+  }
+  if (n >= 10_000) {
+    const v = (n / 10_000).toFixed(1).replace(/\.0$/, "");
+    return `${v}만`;
+  }
+  return n.toLocaleString("ko-KR");
+}
 
 async function loadSettings(supabase: Db, companyId: string): Promise<NotificationSettings> {
   const { data } = await supabase
@@ -61,8 +76,21 @@ export function buildPublishNotificationHtml(input: {
   productName?: string | null;
   platform: string;
   url?: string | null;
+  followers?: number | null;
+  avgViews?: number | null;
+  avgLikes?: number | null;
 }) {
-  const { companyName, influencerName, campaignName, storeName, productName, platform, url } = input;
+  const {
+    companyName,
+    influencerName,
+    storeName,
+    productName,
+    platform,
+    url,
+    followers,
+    avgViews,
+    avgLikes,
+  } = input;
   const storeProd = [storeName, productName].filter(Boolean).join(" · ");
 
   return `<!DOCTYPE html>
@@ -72,22 +100,22 @@ export function buildPublishNotificationHtml(input: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${companyName} 신규 콘텐츠 발행</title>
 </head>
-<body style="margin:0;padding:24px 16px;background-color:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#1e293b;">
-  <div style="max-width:620px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+<body style="margin:0;padding:24px 16px;background-color:#f1ece4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#2f231d;">
+  <div style="max-width:620px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e0d7ca;box-shadow:0 2px 8px rgba(47,35,29,0.06);">
     
-    <div style="background-color:#1e293b;padding:28px 24px;color:#ffffff;">
-      <div style="font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">BrandSlam Publish Alert</div>
+    <div style="background-color:#2f231d;background:linear-gradient(135deg, #3d1f0a 0%, #2f231d 100%);padding:28px 24px;color:#ffffff;border-bottom:2px solid #c4956a;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#c4956a;margin-bottom:6px;">Boarding Pass · Publish Alert</div>
       <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">[${companyName}] 신규 콘텐츠 발행 알림</h1>
-      <p style="margin:8px 0 0 0;font-size:13px;color:#cbd5e1;">크리에이터 <strong>${influencerName}</strong> 님의 콘텐츠가 정상 발행되었습니다.</p>
+      <p style="margin:8px 0 0 0;font-size:13px;color:#e0d7ca;">크리에이터 <strong>${influencerName}</strong> 님의 콘텐츠가 정상 발행되었습니다.</p>
     </div>
 
     <div style="padding:24px;">
       <p style="font-size:14px;line-height:1.6;color:#334155;margin:0 0 20px 0;">
         <strong>${companyName}</strong> 담당자님 안녕하세요.<br/>
-        진행 중인 캠페인의 새로운 인플루언서 콘텐츠가 업로드되어 안내드립니다.
+        새로운 인플루언서 콘텐츠가 업로드되어 안내드립니다.
       </p>
 
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:18px 20px;margin-bottom:24px;">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:18px 20px;margin-bottom:20px;">
         <h2 style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 14px 0;border-bottom:1px solid #e2e8f0;padding-bottom:8px;">
           📌 발행 콘텐츠 정보
         </h2>
@@ -99,17 +127,9 @@ export function buildPublishNotificationHtml(input: {
           <tr>
             <td style="padding:6px 0;color:#64748b;font-weight:600;">발행 채널</td>
             <td style="padding:6px 0;">
-              <span style="display:inline-block;padding:3px 8px;font-size:11px;font-weight:600;border-radius:4px;background:#e2e8f0;color:#334155;">${platform}</span>
+              <span style="display:inline-block;padding:3px 8px;font-size:11px;font-weight:600;border-radius:4px;background:#fee2e2;color:#b91c1c;">${platform}</span>
             </td>
           </tr>
-          ${
-            campaignName
-              ? `<tr>
-            <td style="padding:6px 0;color:#64748b;font-weight:600;">캠페인</td>
-            <td style="padding:6px 0;color:#334155;">${campaignName}</td>
-          </tr>`
-              : ""
-          }
           ${
             storeProd
               ? `<tr>
@@ -126,10 +146,39 @@ export function buildPublishNotificationHtml(input: {
               <a href="${url}" target="_blank" style="display:inline-block;background:#eff6ff;color:#2563eb;padding:5px 12px;border-radius:6px;font-weight:600;font-size:12px;text-decoration:none;border:1px solid #bfdbfe;">
                 업로드된 게시물 보러가기 →
               </a>
+              <div style="font-size:11.5px;color:#94a3b8;margin-top:6px;line-height:1.4;">
+                * 샤오홍슈 정책상 모바일 환경에서 화면 터치 또는 &lsquo;앱에서 열기&rsquo; 시 영상이 재생됩니다.
+              </div>
             </td>
           </tr>`
               : ""
           }
+        </table>
+      </div>
+
+      <!-- 크리에이터 기본 지표 -->
+      <div style="margin-bottom:24px;">
+        <h2 style="font-size:14px;font-weight:700;color:#0f172a;margin:0 0 10px 0;">
+          👤 크리에이터 기본 지표
+        </h2>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;border-spacing:8px;">
+          <tr>
+            <td width="33.3%" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 10px;text-align:center;">
+              <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px;">팔로워수</div>
+              <div style="font-size:17px;font-weight:800;color:#0f172a;">${formatShortCount(followers)}</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${followers ? `${followers.toLocaleString("ko-KR")}명` : "—"}</div>
+            </td>
+            <td width="33.3%" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 10px;text-align:center;">
+              <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px;">평균 조회수</div>
+              <div style="font-size:17px;font-weight:800;color:#2563eb;">${formatShortCount(avgViews)}</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${avgViews ? `${avgViews.toLocaleString("ko-KR")}회` : "—"}</div>
+            </td>
+            <td width="33.3%" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 10px;text-align:center;">
+              <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px;">평균 좋아요</div>
+              <div style="font-size:17px;font-weight:800;color:#dc2626;">${formatShortCount(avgLikes)}</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${avgLikes ? `${avgLikes.toLocaleString("ko-KR")}개` : "—"}</div>
+            </td>
+          </tr>
         </table>
       </div>
 
@@ -138,16 +187,16 @@ export function buildPublishNotificationHtml(input: {
       </div>
 
       <div style="text-align:center;padding:8px 0;">
-        <a href="https://boarding-pass-meeting.vercel.app/com" target="_blank" style="display:inline-block;background-color:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+        <a href="${COMPANY_CONSOLE_URL}" target="_blank" style="display:inline-block;background-color:#56433a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;box-shadow:0 2px 6px rgba(86,67,58,0.25);">
           회원사 대시보드에서 성과 확인하기
         </a>
       </div>
     </div>
 
-    <div style="background-color:#f8fafc;padding:20px 24px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;line-height:1.5;">
-      본 메일은 BrandSlam 자동 알림 시스템에 의해 발송되었습니다.<br/>
+    <div style="background-color:#faf9f7;padding:20px 24px;border-top:1px solid #e0d7ca;font-size:12px;color:#83786f;line-height:1.5;">
+      본 메일은 Boarding Pass 자동 알림 시스템에 의해 발송되었습니다.<br/>
       알림 수신 설정 변경은 회원사 사이트 설정 페이지에서 가능합니다.<br/>
-      <strong style="color:#64748b;">BrandSlam</strong> · <a href="mailto:manager@slam-global.com" style="color:#64748b;text-decoration:none;">manager@slam-global.com</a>
+      <strong style="color:#56433a;">Boarding Pass</strong> · <a href="mailto:manager@slam-global.com" style="color:#83786f;text-decoration:none;">manager@slam-global.com</a>
     </div>
 
   </div>
@@ -159,6 +208,8 @@ export function buildHighEngagementNotificationHtml(input: {
   companyName: string;
   influencerName: string;
   campaignName?: string | null;
+  storeName?: string | null;
+  productName?: string | null;
   platform: string;
   url?: string | null;
   rate: number;
@@ -168,8 +219,9 @@ export function buildHighEngagementNotificationHtml(input: {
   comments: number;
   saves?: number | null;
 }) {
-  const { companyName, influencerName, campaignName, platform, url, rate, avgRate, views, likes, comments, saves } =
+  const { companyName, influencerName, storeName, productName, platform, url, rate, avgRate, views, likes, comments, saves } =
     input;
+  const storeProd = [storeName, productName].filter(Boolean).join(" · ");
   const ratio = avgRate > 0 ? (rate / avgRate).toFixed(1) : "2.0";
 
   return `<!DOCTYPE html>
@@ -179,30 +231,30 @@ export function buildHighEngagementNotificationHtml(input: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${companyName} 콘텐츠 반응 급상승 알림</title>
 </head>
-<body style="margin:0;padding:24px 16px;background-color:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#1e293b;">
-  <div style="max-width:620px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+<body style="margin:0;padding:24px 16px;background-color:#f1ece4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#2f231d;">
+  <div style="max-width:620px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e0d7ca;box-shadow:0 2px 8px rgba(47,35,29,0.06);">
     
-    <div style="background-color:#1e293b;padding:28px 24px;color:#ffffff;">
-      <div style="display:inline-block;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:#ea580c;color:#ffffff;border-radius:20px;margin-bottom:10px;">
+    <div style="background-color:#2f231d;background:linear-gradient(135deg, #3d1f0a 0%, #2f231d 100%);padding:28px 24px;color:#ffffff;border-bottom:2px solid #c4956a;">
+      <div style="display:inline-block;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:#c4956a;color:#2f231d;border-radius:20px;margin-bottom:10px;">
         🔥 High Engagement Alert
       </div>
       <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">[${companyName}] 콘텐츠 반응 급상승 감지!</h1>
-      <p style="margin:8px 0 0 0;font-size:13px;color:#cbd5e1;">크리에이터 <strong>${influencerName}</strong> 님의 콘텐츠가 평균 대비 <strong>${ratio}배</strong>의 반응을 얻고 있습니다.</p>
+      <p style="margin:8px 0 0 0;font-size:13px;color:#e0d7ca;">크리에이터 <strong>${influencerName}</strong> 님의 콘텐츠가 평균 대비 <strong>${ratio}배</strong>의 반응을 얻고 있습니다.</p>
     </div>
 
     <div style="padding:24px;">
       <p style="font-size:14px;line-height:1.6;color:#334155;margin:0 0 20px 0;">
         <strong>${companyName}</strong> 담당자님 안녕하세요.<br/>
-        진행 중인 캠페인에서 일반 콘텐츠 대비 유독 반응(좋아요/댓글)이 폭발적인 고성과 콘텐츠가 감지되어 긴급 공유드립니다.
+        진행 중인 인플루언서 콘텐츠 중 일반 콘텐츠 대비 유독 반응(좋아요/댓글)이 폭발적인 고성과 콘텐츠가 감지되어 긴급 공유드립니다.
       </p>
 
       <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:16px 20px;margin-bottom:20px;text-align:center;">
-        <div style="font-size:12px;font-weight:600;color:#c2410c;margin-bottom:4px;">캠페인 평균 대비 참여율 성과</div>
+        <div style="font-size:12px;font-weight:600;color:#c2410c;margin-bottom:4px;">평균 대비 참여율 성과</div>
         <div style="font-size:28px;font-weight:900;color:#ea580c;">
           ${ratio}<span style="font-size:18px;font-weight:700;">배 급상승</span>
         </div>
         <div style="font-size:12.5px;color:#7c2d12;margin-top:6px;">
-          해당 콘텐츠 참여율(ER): <strong>${rate.toFixed(2)}%</strong> (캠페인 평균: ${avgRate.toFixed(2)}%)
+          해당 콘텐츠 참여율(ER): <strong>${rate.toFixed(2)}%</strong> (평균: ${avgRate.toFixed(2)}%)
         </div>
       </div>
 
@@ -236,30 +288,33 @@ export function buildHighEngagementNotificationHtml(input: {
             ${influencerName}
             <span style="display:inline-block;margin-left:6px;padding:2px 6px;font-size:11px;border-radius:4px;background:#e2e8f0;color:#334155;font-weight:500;">${platform}</span>
           </div>
-          ${campaignName ? `<div style="font-size:12px;color:#64748b;margin-top:2px;">${campaignName}</div>` : ""}
+          ${storeProd ? `<div style="font-size:12px;color:#334155;margin-top:3px;font-weight:500;">${storeProd}</div>` : ""}
         </div>
         ${
           url
-            ? `<div style="margin-top:10px;">
+            ? `<div style="margin-top:10px;text-align:right;">
           <a href="${url}" target="_blank" style="display:inline-block;background:#eff6ff;color:#2563eb;padding:5px 12px;border-radius:6px;font-weight:600;font-size:12px;text-decoration:none;border:1px solid #bfdbfe;">
             게시물 원본 바로가기 →
           </a>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">
+            * 모바일 터치 또는 &lsquo;앱에서 열기&rsquo; 시 재생
+          </div>
         </div>`
             : ""
         }
       </div>
 
       <div style="text-align:center;padding:8px 0;">
-        <a href="https://boarding-pass-meeting.vercel.app/com" target="_blank" style="display:inline-block;background-color:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+        <a href="${COMPANY_CONSOLE_URL}" target="_blank" style="display:inline-block;background-color:#56433a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;box-shadow:0 2px 6px rgba(86,67,58,0.25);">
           회원사 대시보드에서 상세 추이 확인하기
         </a>
       </div>
     </div>
 
-    <div style="background-color:#f8fafc;padding:20px 24px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;line-height:1.5;">
-      본 메일은 BrandSlam 자동 감지 시스템에 의해 발송되었습니다.<br/>
+    <div style="background-color:#faf9f7;padding:20px 24px;border-top:1px solid #e0d7ca;font-size:12px;color:#83786f;line-height:1.5;">
+      본 메일은 Boarding Pass 자동 감지 시스템에 의해 발송되었습니다.<br/>
       알림 수신 설정 변경은 회원사 사이트 설정 페이지에서 가능합니다.<br/>
-      <strong style="color:#64748b;">BrandSlam</strong> · <a href="mailto:manager@slam-global.com" style="color:#64748b;text-decoration:none;">manager@slam-global.com</a>
+      <strong style="color:#56433a;">Boarding Pass</strong> · <a href="mailto:manager@slam-global.com" style="color:#83786f;text-decoration:none;">manager@slam-global.com</a>
     </div>
 
   </div>
@@ -268,12 +323,16 @@ export function buildHighEngagementNotificationHtml(input: {
 }
 
 export type PublishNotificationItem = {
+  influencerId?: string | null;
   influencerName: string;
   campaignName?: string | null;
   storeName?: string | null;
   productName?: string | null;
   platform: string;
   url?: string | null;
+  followers?: number | null;
+  avgViews?: number | null;
+  avgLikes?: number | null;
 };
 
 export function buildBatchPublishNotificationHtml(input: {
@@ -290,6 +349,9 @@ export function buildBatchPublishNotificationHtml(input: {
       productName: items[0].productName,
       platform: items[0].platform,
       url: items[0].url,
+      followers: items[0].followers,
+      avgViews: items[0].avgViews,
+      avgLikes: items[0].avgLikes,
     });
   }
 
@@ -311,8 +373,12 @@ export function buildBatchPublishNotificationHtml(input: {
                 ${item.influencerName}
                 <span style="display:inline-block;margin-left:6px;padding:2px 8px;font-size:11px;font-weight:600;border-radius:4px;background:${platBg};color:${platColor};">${item.platform}</span>
               </div>
-              ${item.campaignName ? `<div style="font-size:12.5px;color:#64748b;margin-bottom:2px;">${item.campaignName}</div>` : ""}
               ${storeProd ? `<div style="font-size:12.5px;color:#334155;font-weight:500;">${storeProd}</div>` : ""}
+              <div style="margin-top:8px;font-size:11.5px;color:#475569;line-height:1.6;">
+                <span style="display:inline-block;background:#f1f5f9;padding:2px 8px;border-radius:4px;margin-right:4px;">팔로워 <strong>${formatShortCount(item.followers)}</strong></span>
+                <span style="display:inline-block;background:#f1f5f9;padding:2px 8px;border-radius:4px;margin-right:4px;">평균 조회 <strong>${formatShortCount(item.avgViews)}</strong></span>
+                <span style="display:inline-block;background:#f1f5f9;padding:2px 8px;border-radius:4px;margin-right:4px;">평균 좋아요 <strong>${formatShortCount(item.avgLikes)}</strong></span>
+              </div>
             </td>
             ${
               item.url
@@ -337,21 +403,21 @@ export function buildBatchPublishNotificationHtml(input: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${companyName} 신규 콘텐츠 발행 알림</title>
 </head>
-<body style="margin:0;padding:24px 16px;background-color:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#1e293b;">
-  <div style="max-width:620px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+<body style="margin:0;padding:24px 16px;background-color:#f1ece4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#2f231d;">
+  <div style="max-width:620px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e0d7ca;box-shadow:0 2px 8px rgba(47,35,29,0.06);">
     
-    <div style="background-color:#1e293b;padding:28px 24px;color:#ffffff;">
-      <div style="display:inline-block;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:#2563eb;color:#ffffff;border-radius:20px;margin-bottom:10px;">
+    <div style="background-color:#2f231d;background:linear-gradient(135deg, #3d1f0a 0%, #2f231d 100%);padding:28px 24px;color:#ffffff;border-bottom:2px solid #c4956a;">
+      <div style="display:inline-block;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:#c4956a;color:#2f231d;border-radius:20px;margin-bottom:10px;">
         신규 발행 알림 (${items.length}건)
       </div>
       <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">[${companyName}] 신규 콘텐츠 발행 알림</h1>
-      <p style="margin:8px 0 0 0;font-size:13px;color:#cbd5e1;">새로운 인플루언서 콘텐츠 <strong>${items.length}건</strong>이 등록되었습니다.</p>
+      <p style="margin:8px 0 0 0;font-size:13px;color:#e0d7ca;">새로운 인플루언서 콘텐츠 <strong>${items.length}건</strong>이 등록되었습니다.</p>
     </div>
 
     <div style="padding:24px;">
       <p style="font-size:14px;line-height:1.6;color:#334155;margin:0 0 20px 0;">
         <strong>${companyName}</strong> 담당자님 안녕하세요.<br/>
-        진행 중인 캠페인의 새로운 인플루언서 콘텐츠가 업로드되어 안내드립니다.
+        새로운 인플루언서 콘텐츠가 업로드되어 안내드립니다.
       </p>
 
       <div style="margin-bottom:24px;">
@@ -359,6 +425,9 @@ export function buildBatchPublishNotificationHtml(input: {
           📌 발행 콘텐츠 목록 (${items.length}건)
         </h2>
         ${itemsHtml}
+        <div style="font-size:11.5px;color:#94a3b8;margin-top:10px;line-height:1.4;">
+          * 샤오홍슈 영상은 모바일 브라우저에서 화면을 터치하거나 &lsquo;앱에서 열기&rsquo; 시 바로 재생됩니다.
+        </div>
       </div>
 
       <div style="background:#f1f5f9;border-radius:8px;padding:14px 16px;margin-bottom:24px;font-size:12.5px;color:#475569;line-height:1.5;">
@@ -366,16 +435,16 @@ export function buildBatchPublishNotificationHtml(input: {
       </div>
 
       <div style="text-align:center;padding:8px 0;">
-        <a href="https://boarding-pass-meeting.vercel.app/com" target="_blank" style="display:inline-block;background-color:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+        <a href="${COMPANY_CONSOLE_URL}" target="_blank" style="display:inline-block;background-color:#56433a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;box-shadow:0 2px 6px rgba(86,67,58,0.25);">
           회원사 대시보드에서 성과 확인하기
         </a>
       </div>
     </div>
 
-    <div style="background-color:#f8fafc;padding:20px 24px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;line-height:1.5;">
-      본 메일은 BrandSlam 자동 알림 시스템에 의해 발송되었습니다.<br/>
+    <div style="background-color:#faf9f7;padding:20px 24px;border-top:1px solid #e0d7ca;font-size:12px;color:#83786f;line-height:1.5;">
+      본 메일은 Boarding Pass 자동 알림 시스템에 의해 발송되었습니다.<br/>
       알림 수신 설정 변경은 회원사 사이트 설정 페이지에서 가능합니다.<br/>
-      <strong style="color:#64748b;">BrandSlam</strong> · <a href="mailto:manager@slam-global.com" style="color:#64748b;text-decoration:none;">manager@slam-global.com</a>
+      <strong style="color:#56433a;">Boarding Pass</strong> · <a href="mailto:manager@slam-global.com" style="color:#83786f;text-decoration:none;">manager@slam-global.com</a>
     </div>
 
   </div>
@@ -383,25 +452,8 @@ export function buildBatchPublishNotificationHtml(input: {
 </html>`;
 }
 
-export const PUBLISH_BATCH_DELAY_MS = 60 * 60 * 1000; // 1시간 delay
-
-type PendingPublishBatch = {
-  companyId: string;
-  allocationIds: Set<string>;
-  timer: NodeJS.Timeout;
-  firstQueuedAt: number;
-};
-
-const pendingPublishBatches = new Map<string, PendingPublishBatch>();
-
-/** 1시간 대기 후 모인 콘텐츠들을 회원사로 발송 */
-export async function flushPublishBatch(supabase: Db, companyId: string) {
-  const batch = pendingPublishBatches.get(companyId);
-  if (!batch) return;
-  pendingPublishBatches.delete(companyId);
-  clearTimeout(batch.timer);
-
-  const allocationIds = Array.from(batch.allocationIds);
+/** 발행 등록된 콘텐츠를 회원사로 즉시 발송 */
+export async function flushPublishBatch(supabase: Db, companyId: string, allocationIds: string[]) {
   if (!allocationIds.length) return;
 
   const settings = await loadSettings(supabase, companyId);
@@ -416,25 +468,57 @@ export async function flushPublishBatch(supabase: Db, companyId: string) {
 
   const { data: allocs } = await supabase
     .from("allocations")
-    .select("id, campaign_id, influencer_id, campaigns(name), influencers(name), stores(name), products(name)")
+    .select("id, campaign_id, influencer_id, campaigns(name), influencers(id, name, followers), stores(name), products(name)")
     .in("id", allocationIds);
 
   const { data: links } = await supabase
     .from("creator_links")
-    .select("allocation_id, url, publish_url, platform")
+    .select("allocation_id, url, publish_url, platform, content_status, published_at, updated_at")
     .in("allocation_id", allocationIds)
-    .order("submitted_at", { ascending: false });
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false });
 
   const linkMap = new Map<string, { url: string; platform: string }>();
   for (const l of links || []) {
+    const candidateUrl = (l.publish_url || l.url || "").trim();
+    if (!candidateUrl) continue;
     if (!linkMap.has(l.allocation_id)) {
       linkMap.set(l.allocation_id, {
-        url: (l.publish_url || l.url || "").trim(),
+        url: candidateUrl,
         platform: l.platform || "SNS",
       });
+    } else {
+      const prev = linkMap.get(l.allocation_id)!;
+      if (!prev.url.includes("xsec_token") && candidateUrl.includes("xsec_token")) {
+        linkMap.set(l.allocation_id, {
+          url: candidateUrl,
+          platform: l.platform || prev.platform,
+        });
+      }
     }
   }
 
+  const infIds = Array.from(
+    new Set((allocs || []).map((a) => a.influencer_id).filter((id): id is string => Boolean(id))),
+  );
+
+  const linksByInf = new Map<string, { views: number; likes: number }[]>();
+  if (infIds.length > 0) {
+    const { data: infLinks } = await supabase
+      .from("creator_links")
+      .select("influencer_id, views, likes")
+      .in("influencer_id", infIds)
+      .eq("content_status", "발행완료")
+      .gt("views", 0);
+    for (const il of infLinks || []) {
+      if (!il.influencer_id) continue;
+      const list = linksByInf.get(il.influencer_id) || [];
+      list.push({ views: Number(il.views) || 0, likes: Number(il.likes) || 0 });
+      linksByInf.set(il.influencer_id, list);
+    }
+  }
+
+  const profileMap = profileMetrics as Record<string, { views?: number; likes?: number }>;
   const items: PublishNotificationItem[] = [];
   const seenUrls = new Set<string>();
 
@@ -447,8 +531,27 @@ export async function flushPublishBatch(supabase: Db, companyId: string) {
 
     const campaignRel = alloc.campaigns as { name: string | null } | { name: string | null }[] | null;
     const campaignName = (Array.isArray(campaignRel) ? campaignRel[0]?.name : campaignRel?.name) || "";
-    const infRel = alloc.influencers as { name: string } | { name: string }[] | null;
-    const influencerName = (Array.isArray(infRel) ? infRel[0]?.name : infRel?.name) || "인플루언서";
+    const infRel = alloc.influencers as
+      | { id?: string; name: string; followers?: number | null }
+      | { id?: string; name: string; followers?: number | null }[]
+      | null;
+    const infObj = Array.isArray(infRel) ? infRel[0] : infRel;
+    const influencerId = infObj?.id || alloc.influencer_id || "";
+    const influencerName = infObj?.name || "인플루언서";
+    const followers = infObj?.followers != null ? Number(infObj.followers) : null;
+
+    const pm = profileMap[influencerId];
+    const infLinkList = linksByInf.get(influencerId) || [];
+    let avgViews: number | null = null;
+    let avgLikes: number | null = null;
+    if (pm?.views != null) {
+      avgViews = pm.views;
+      avgLikes = pm.likes ?? null;
+    } else if (infLinkList.length > 0) {
+      avgViews = Math.round(infLinkList.reduce((s, l) => s + l.views, 0) / infLinkList.length);
+      avgLikes = Math.round(infLinkList.reduce((s, l) => s + l.likes, 0) / infLinkList.length);
+    }
+
     const storeRel = alloc.stores as { name: string } | { name: string }[] | null;
     const storeName = (Array.isArray(storeRel) ? storeRel[0]?.name : storeRel?.name) || "";
     const productRel = alloc.products as { name: string } | { name: string }[] | null;
@@ -457,12 +560,16 @@ export async function flushPublishBatch(supabase: Db, companyId: string) {
     const platform = CREATOR_PLATFORM_LABEL[resolveCreatorPlatform(linkUrl, l?.platform)] || l?.platform || "SNS";
 
     items.push({
+      influencerId,
       influencerName,
       platform,
       campaignName,
       storeName,
       productName,
       url: linkUrl,
+      followers,
+      avgViews,
+      avgLikes,
     });
   }
 
@@ -474,15 +581,15 @@ export async function flushPublishBatch(supabase: Db, companyId: string) {
     : `[BrandSlam] ${company.name} 신규 콘텐츠 발행 — ${items[0].influencerName}`;
 
   const plainBody = isMulti
-    ? `${company.name} 담당자님께\n\n진행 중인 캠페인의 새로운 인플루언서 콘텐츠 ${items.length}건이 발행되었습니다.\n\n` +
+    ? `${company.name} 담당자님께\n\n새로운 인플루언서 콘텐츠 ${items.length}건이 발행되었습니다.\n\n` +
       items
         .map(
           (it, idx) =>
-            `${idx + 1}. [${it.platform}] ${it.influencerName} - ${it.campaignName || ""} ${[it.storeName, it.productName].filter(Boolean).join(" · ")}\n   링크: ${it.url || "미제공"}`,
+            `${idx + 1}. [${it.platform}] ${it.influencerName} - ${[it.storeName, it.productName].filter(Boolean).join(" · ")}\n   지표: 팔로워 ${formatShortCount(it.followers)} · 평균 조회 ${formatShortCount(it.avgViews)} · 평균 좋아요 ${formatShortCount(it.avgLikes)}\n   링크: ${it.url || "미제공"}`,
         )
         .join("\n\n") +
-      `\n\n회원사 사이트 성과 탭에서 확인하실 수 있습니다: https://boarding-pass-meeting.vercel.app/com\n`
-    : `${company.name} 담당자님께\n\n${items[0].campaignName ? `캠페인: ${items[0].campaignName}\n` : ""}${items[0].influencerName} 님이 ${items[0].platform} 콘텐츠를 발행했습니다.\n\n${items[0].url ? `게시물 링크: ${items[0].url}\n\n` : ""}회원사 사이트 성과 탭에서 확인하실 수 있습니다.\n`;
+      `\n\n회원사 사이트 성과 탭에서 확인하실 수 있습니다: ${COMPANY_CONSOLE_URL}\n`
+    : `${company.name} 담당자님께\n\n${items[0].influencerName} 님이 ${items[0].platform} 콘텐츠를 발행했습니다.\n\n${[items[0].storeName, items[0].productName].filter(Boolean).join(" · ")}\n크리에이터 지표: 팔로워 ${formatShortCount(items[0].followers)} · 평균 조회 ${formatShortCount(items[0].avgViews)} · 평균 좋아요 ${formatShortCount(items[0].avgLikes)}\n\n${items[0].url ? `게시물 링크: ${items[0].url}\n\n` : ""}회원사 사이트 성과 탭에서 확인하실 수 있습니다: ${COMPANY_CONSOLE_URL}\n`;
 
   const html = buildBatchPublishNotificationHtml({
     companyName: company.name,
@@ -499,15 +606,8 @@ export async function flushPublishBatch(supabase: Db, companyId: string) {
   });
 }
 
-/**
- * 콘텐츠 발행 URL 등록 직후 호출.
- * 1시간 delay 동안 동일 회원사로 추가 발행된 건이 있으면 1통의 메일로 묶어서 발송한다.
- */
-export async function notifyOnPublish(
-  supabase: Db,
-  allocationId: string | null,
-  options?: { delayMs?: number; immediate?: boolean },
-) {
+/** 콘텐츠 발행 URL 등록 직후 호출. 회원사로 즉시 발행 알림 메일을 보낸다. */
+export async function notifyOnPublish(supabase: Db, allocationId: string | null) {
   if (!allocationId) return;
   const { data: alloc } = await supabase
     .from("allocations")
@@ -516,48 +616,7 @@ export async function notifyOnPublish(
     .maybeSingle();
   if (!alloc?.company_id) return;
 
-  const companyId = alloc.company_id;
-  const delay = options?.immediate ? 0 : (options?.delayMs ?? PUBLISH_BATCH_DELAY_MS);
-
-  if (delay <= 0) {
-    const existing = pendingPublishBatches.get(companyId);
-    if (existing) {
-      existing.allocationIds.add(allocationId);
-      await flushPublishBatch(supabase, companyId);
-      return;
-    }
-    const set = new Set<string>([allocationId]);
-    pendingPublishBatches.set(companyId, {
-      companyId,
-      allocationIds: set,
-      timer: setTimeout(() => {}, 0),
-      firstQueuedAt: Date.now(),
-    });
-    await flushPublishBatch(supabase, companyId);
-    return;
-  }
-
-  const existing = pendingPublishBatches.get(companyId);
-  if (existing) {
-    existing.allocationIds.add(allocationId);
-    return;
-  }
-
-  const set = new Set<string>([allocationId]);
-  const timer = setTimeout(() => {
-    void flushPublishBatch(supabase, companyId);
-  }, delay);
-
-  if (typeof timer.unref === "function") {
-    timer.unref();
-  }
-
-  pendingPublishBatches.set(companyId, {
-    companyId,
-    allocationIds: set,
-    timer,
-    firstQueuedAt: Date.now(),
-  });
+  await flushPublishBatch(supabase, alloc.company_id, [allocationId]);
 }
 
 /**
@@ -572,7 +631,7 @@ export async function checkHighEngagementAndNotify(supabase: Db) {
   const { data: links } = await supabase
     .from("creator_links")
     .select(
-      "id, allocation_id, url, publish_url, platform, views, likes, comments, saves, high_engagement_alerted, allocations!inner(company_id, campaign_id, influencer_id, influencers(name), campaigns(name))",
+      "id, allocation_id, url, publish_url, platform, views, likes, comments, saves, high_engagement_alerted, allocations!inner(company_id, campaign_id, influencer_id, influencers(name), campaigns(name), stores(name), products(name))",
     )
     .eq("content_status", "발행완료")
     .not("views", "is", null)
@@ -620,23 +679,28 @@ export async function checkHighEngagementAndNotify(supabase: Db) {
         campaign_id: string | null;
         influencers: { name: string } | { name: string }[] | null;
         campaigns: { name: string } | { name: string }[] | null;
+        stores: { name: string } | { name: string }[] | null;
+        products: { name: string } | { name: string }[] | null;
       };
       const infRel = rel.influencers;
       const influencerName = (Array.isArray(infRel) ? infRel[0]?.name : infRel?.name) || "인플루언서";
-      const campRel = rel.campaigns;
-      const campaignName = (Array.isArray(campRel) ? campRel[0]?.name : campRel?.name) || "";
+      const storeRel = rel.stores;
+      const storeName = (Array.isArray(storeRel) ? storeRel[0]?.name : storeRel?.name) || "";
+      const productRel = rel.products;
+      const productName = (Array.isArray(productRel) ? productRel[0]?.name : productRel?.name) || "";
 
       const linkUrl = (r.publish_url || r.url || "").trim();
       const platform = CREATOR_PLATFORM_LABEL[resolveCreatorPlatform(linkUrl, r.platform)] || r.platform || "SNS";
 
-      const plainBody = `${company.name} 담당자님께\n\n${influencerName} 님의 콘텐츠 참여율이 이 캠페인 평균(${avg.toFixed(
+      const plainBody = `${company.name} 담당자님께\n\n${influencerName} 님의 콘텐츠 참여율이 평균(${avg.toFixed(
         1,
-      )}%)의 ${(rate / (avg || 1)).toFixed(1)}배 이상(${rate.toFixed(1)}%)입니다.\n\n회원사 사이트 성과 탭에서 확인해 보세요.\n`;
+      )}%)의 ${(rate / (avg || 1)).toFixed(1)}배 이상(${rate.toFixed(1)}%)입니다.\n\n${[storeName, productName].filter(Boolean).join(" · ")}\n\n회원사 사이트 성과 탭에서 확인해 보세요: ${COMPANY_CONSOLE_URL}\n`;
 
       const html = buildHighEngagementNotificationHtml({
         companyName: company.name,
         influencerName,
-        campaignName,
+        storeName,
+        productName,
         platform,
         url: linkUrl,
         rate,
@@ -723,13 +787,13 @@ export function buildWeeklyReportHtml(input: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${companyName} 주간 리포트</title>
 </head>
-<body style="margin:0;padding:24px 16px;background-color:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#1e293b;">
-  <div style="max-width:620px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+<body style="margin:0;padding:24px 16px;background-color:#f1ece4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#2f231d;">
+  <div style="max-width:620px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e0d7ca;box-shadow:0 2px 8px rgba(47,35,29,0.06);">
     
-    <div style="background-color:#1e293b;padding:28px 24px;color:#ffffff;">
-      <div style="font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">BrandSlam Weekly Report</div>
+    <div style="background-color:#2f231d;background:linear-gradient(135deg, #3d1f0a 0%, #2f231d 100%);padding:28px 24px;color:#ffffff;border-bottom:2px solid #c4956a;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#c4956a;margin-bottom:6px;">Boarding Pass · Weekly Report</div>
       <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">[${companyName}] 주간 성과 리포트</h1>
-      <p style="margin:8px 0 0 0;font-size:13px;color:#cbd5e1;">최근 7일간 발행된 인플루언서 콘텐츠 성과 요약입니다.</p>
+      <p style="margin:8px 0 0 0;font-size:13px;color:#e0d7ca;">최근 7일간 발행된 인플루언서 콘텐츠 성과 요약입니다.</p>
     </div>
 
     <div style="padding:24px;">
@@ -801,16 +865,16 @@ export function buildWeeklyReportHtml(input: {
       </div>
 
       <div style="text-align:center;padding:16px 0;">
-        <a href="https://boarding-pass-meeting.vercel.app/com" target="_blank" style="display:inline-block;background-color:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+        <a href="${COMPANY_CONSOLE_URL}" target="_blank" style="display:inline-block;background-color:#56433a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;box-shadow:0 2px 6px rgba(86,67,58,0.25);">
           회원사 대시보드에서 전체 성과 확인하기
         </a>
       </div>
     </div>
 
-    <div style="background-color:#f8fafc;padding:20px 24px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;line-height:1.5;">
-      본 메일은 BrandSlam 자동 리포트 시스템에 의해 발송되었습니다.<br/>
+    <div style="background-color:#faf9f7;padding:20px 24px;border-top:1px solid #e0d7ca;font-size:12px;color:#83786f;line-height:1.5;">
+      본 메일은 Boarding Pass 자동 리포트 시스템에 의해 발송되었습니다.<br/>
       알림 수신 설정 변경은 회원사 사이트 설정 페이지에서 가능합니다.<br/>
-      <strong style="color:#64748b;">BrandSlam</strong> · <a href="mailto:manager@slam-global.com" style="color:#64748b;text-decoration:none;">manager@slam-global.com</a>
+      <strong style="color:#56433a;">Boarding Pass</strong> · <a href="mailto:manager@slam-global.com" style="color:#83786f;text-decoration:none;">manager@slam-global.com</a>
     </div>
 
   </div>

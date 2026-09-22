@@ -15,6 +15,57 @@ import type { ContentPeriod } from "@/lib/content-insights";
 import { addDaysYmd, formatMd, ymdKst } from "@/lib/types";
 import { buildViewsCurvePoints, monotoneCurvePath } from "@/lib/company-home";
 
+function formatKstDateTime(iso: string) {
+  const d = new Date(iso);
+  const time = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+  return `${formatMd(ymdKst(d))} ${time}`;
+}
+
+function CollectionScheduleInfo({
+  metricsCollectedAt,
+  cronNextRunAt,
+}: {
+  metricsCollectedAt: string | null;
+  cronNextRunAt: string | null;
+}) {
+  if (!cronNextRunAt) return null;
+  return (
+    <span className="mt-1 block rounded-[4px] bg-[var(--surface-hover)] px-2 py-1">
+      <span className="block text-[11px] font-bold text-[var(--accent)]">
+        다음 수집 {formatKstDateTime(cronNextRunAt)}
+      </span>
+      <span className="mt-0.5 block text-[9.5px] text-[var(--muted)]">
+        최종 수집{" "}
+        {metricsCollectedAt ? formatKstDateTime(metricsCollectedAt) : "—"} ·{" "}
+        {formatMd(ymdKst(new Date()))} 조회 시점 기준
+      </span>
+    </span>
+  );
+}
+
+/** Supabase pg_cron이 실제로 기록한 마지막/다음 실행 시각 (scripts/sql/cron-run-status.sql) */
+function useCronNextRunAt(job = "collect-metrics") {
+  const [nextRunAt, setNextRunAt] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/cron/status?job=${encodeURIComponent(job)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setNextRunAt(d?.status?.next_run_at ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [job]);
+  return nextRunAt;
+}
+
 type LinkRow = {
   id: string;
   link_url: string | null;
@@ -407,12 +458,14 @@ function TopContentPanel({
   metric,
   items,
   aside,
+  cronNextRunAt,
 }: {
   title: string;
   why: string;
   metric: TopMetric;
   items: Array<LinkRow & { earlyViews?: number }>;
   aside?: string;
+  cronNextRunAt: string | null;
 }) {
   return (
     <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
@@ -454,7 +507,11 @@ function TopContentPanel({
                       <span className="block truncate text-[13px] font-semibold text-[var(--ink)]">
                         {inf?.name || "—"}
                       </span>
-                      <span className="mt-0.5 block truncate text-[11.5px] text-[var(--muted)]">
+                      <CollectionScheduleInfo
+                        metricsCollectedAt={row.metrics_collected_at}
+                        cronNextRunAt={cronNextRunAt}
+                      />
+                      <span className="mt-1 block truncate text-[11.5px] text-[var(--muted)]">
                         {[company, product, platformLabel(row.link_url)]
                           .filter(Boolean)
                           .join(" · ")}
@@ -722,6 +779,7 @@ export function CompanyPerformanceTab({
   const [productExpanded, setProductExpanded] = useState(false);
   const asOfYmd = ymdKst(new Date());
   const canRecollect = enableRecollect && source !== "mock";
+  const cronNextRunAt = useCronNextRunAt();
 
   function applyPayload(data: {
     links?: LinkRow[];
@@ -1316,12 +1374,14 @@ export function CompanyPerformanceTab({
                 why={METRIC_WHY.views}
                 metric={{ kind: "views" }}
                 items={topByViews}
+                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="좋아요 TOP"
                 why={METRIC_WHY.likes}
                 metric={{ kind: "likes" }}
                 items={topByLikes}
+                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="조회수 대비 좋아요 TOP"
@@ -1329,6 +1389,7 @@ export function CompanyPerformanceTab({
                 metric={{ kind: "likeRate" }}
                 items={topByLikeRate}
                 aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
+                cronNextRunAt={cronNextRunAt}
               />
             </div>
 
@@ -1338,18 +1399,21 @@ export function CompanyPerformanceTab({
                 why={METRIC_WHY.saves}
                 metric={{ kind: "saves" }}
                 items={topBySaves}
+                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="공유 TOP"
                 why={METRIC_WHY.shares}
                 metric={{ kind: "shares" }}
                 items={topByShares}
+                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="리포스트 TOP"
                 why={METRIC_WHY.reposts}
                 metric={{ kind: "reposts" }}
                 items={topByReposts}
+                cronNextRunAt={cronNextRunAt}
               />
             </div>
 
@@ -1360,6 +1424,7 @@ export function CompanyPerformanceTab({
                 metric={{ kind: "commentRate" }}
                 items={topByCommentRate}
                 aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
+                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="참여율(ER) TOP"
@@ -1367,6 +1432,7 @@ export function CompanyPerformanceTab({
                 metric={{ kind: "er" }}
                 items={topByEr}
                 aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
+                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="초기 반응"
@@ -1374,6 +1440,7 @@ export function CompanyPerformanceTab({
                 metric={{ kind: "earlyViews" }}
                 items={topByEarly}
                 aside={earlyAside}
+                cronNextRunAt={cronNextRunAt}
               />
             </div>
           </div>
