@@ -95,8 +95,28 @@ export async function scrapeLinkMetrics(
   }
 
   if (platform === "xiaohongshu") {
-    const items = await scrapeXiaohongshuPosts([url]);
-    const result = findXiaohongshuResultForUrl(items, url);
+    // ponytail: xhslink.com 단축 URL → 리다이렉트 resolve해서 실제 note URL 추출
+    let resolvedUrl = url;
+    if (/xhslink\.com/i.test(url)) {
+      try {
+        const r = await fetch(url, { method: "GET", redirect: "follow", signal: AbortSignal.timeout(8000) });
+        const parsed = new URL(r.url);
+        // 리다이렉트 최종 URL에서 /discovery/item/{noteId} 추출
+        const m = parsed.pathname.match(/\/discovery\/item\/([0-9a-f]{24})/i);
+        if (m) {
+          resolvedUrl = `https://www.xiaohongshu.com/discovery/item/${m[1]}`;
+        } else if (parsed.searchParams.get("redirectPath")) {
+          // login redirect → redirectPath 파라미터에서 note URL 추출
+          const inner = decodeURIComponent(parsed.searchParams.get("redirectPath")!);
+          const m2 = inner.match(/\/discovery\/item\/([0-9a-f]{24})/i);
+          if (m2) resolvedUrl = `https://www.xiaohongshu.com/discovery/item/${m2[1]}`;
+        }
+      } catch {
+        // 리다이렉트 실패 시 원본 URL로 시도
+      }
+    }
+    const items = await scrapeXiaohongshuPosts([resolvedUrl]);
+    const result = findXiaohongshuResultForUrl(items, resolvedUrl);
     if (!result) throw new Error("Apify에서 샤오홍슈 결과를 찾지 못했습니다.");
     return {
       views: estimateXiaohongshuViews(result),

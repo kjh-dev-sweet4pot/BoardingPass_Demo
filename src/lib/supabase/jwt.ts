@@ -10,6 +10,7 @@ export type AppAuthRole =
 
 export type AppAuthClaims = {
   role: AppAuthRole;
+  login_id?: string;
   company_id?: string;
   store_id?: string;
   influencer_id?: string;
@@ -33,6 +34,7 @@ export function signSessionJwt(
     claims.company_id ||
     claims.store_id ||
     claims.influencer_id ||
+    claims.login_id ||
     claims.role ||
     randomUUID();
 
@@ -44,8 +46,10 @@ export function signSessionJwt(
     iss: "supabase",
     sub,
     role: "authenticated",
+    login_id: claims.login_id ?? null,
     app_metadata: {
       role: claims.role,
+      login_id: claims.login_id ?? null,
       company_id: claims.company_id ?? null,
       store_id: claims.store_id ?? null,
       influencer_id: claims.influencer_id ?? null,

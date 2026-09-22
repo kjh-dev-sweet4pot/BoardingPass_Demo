@@ -554,21 +554,57 @@ function CounterDetailPanel({
       <div className="space-y-4 rounded-[6px] bg-[var(--accent-soft)]/50 px-5 py-5">
         <div>
           <p className="text-xs tracking-wide text-[var(--muted)]">배정 상품</p>
-          <p className="mt-1.5 text-2xl font-bold text-[var(--ink)]">
-            {item.products?.name || "상품"}
-          </p>
-          {item.products?.sku ? (
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              SKU {item.products.sku}
-            </p>
-          ) : null}
+          {(() => {
+            const all = (item as AllocationWithRelations & { _allProducts?: { id: string; name: string; quantity: number }[] })._allProducts;
+            if (all && all.length > 1) {
+              const totalQty = all.reduce((s, p) => s + p.quantity, 0);
+              return (
+                <>
+                  <ul className="mt-2 space-y-1">
+                    {all.map((p) => (
+                      <li key={p.id} className="flex items-baseline justify-between gap-2">
+                        <span className="text-base font-bold text-[var(--ink)]">{p.name}</span>
+                        <span className="shrink-0 text-base font-semibold tabular-nums text-[var(--accent)]">
+                          {p.quantity}<span className="ml-0.5 text-sm font-medium text-[var(--muted)]">개</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 border-t border-[var(--line)] pt-2 text-right text-sm text-[var(--muted)]">
+                    합계 <b className="text-[var(--ink)]">{totalQty}개</b>
+                  </p>
+                </>
+              );
+            }
+            return (
+              <>
+                <p className="mt-1.5 text-2xl font-bold text-[var(--ink)]">
+                  {item.products?.name || "상품"}
+                </p>
+                {item.products?.sku ? (
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    SKU {item.products.sku}
+                  </p>
+                ) : null}
+              </>
+            );
+          })()}
         </div>
-        <p className="text-4xl font-semibold tabular-nums text-[var(--accent)]">
-          {item.quantity}
-          <span className="ml-1.5 text-lg font-medium text-[var(--muted)]">
-            개
-          </span>
-        </p>
+        {(() => {
+          const all = (item as AllocationWithRelations & { _allProducts?: { id: string; name: string; quantity: number }[] })._allProducts;
+          const totalQty = all && all.length > 1
+            ? all.reduce((s, p) => s + p.quantity, 0)
+            : item.quantity;
+          if (all && all.length > 1) return null; // 이미 위에서 합계 표시
+          return (
+            <p className="text-4xl font-semibold tabular-nums text-[var(--accent)]">
+              {totalQty}
+              <span className="ml-1.5 text-lg font-medium text-[var(--muted)]">
+                개
+              </span>
+            </p>
+          );
+        })()}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] pt-4">
           <p className="text-base tabular-nums text-[var(--ink)]">
             {d || "날짜 미정"}
@@ -592,6 +628,7 @@ function CounterDetailPanel({
               : "아직 수령 확인 전 — 손님 휴대폰 에서 수령 확인 버튼을 눌러주세요 ! "}
         </p>
       </div>
+
 
       {sns ? (
         <a
@@ -1046,22 +1083,48 @@ function AllocationRow({
         </div>
       </td>
       <td className={cell}>
-        <span
-          className={`font-semibold text-[var(--ink)] ${
-            counter ? "text-lg" : "text-base"
-          }`}
-        >
-          {item.products?.name || "상품"}
-        </span>
-        {item.products?.sku ? (
-          <span
-            className={`mt-0.5 block text-[var(--muted)] ${
-              counter ? "text-sm" : "text-xs"
-            }`}
-          >
-            SKU {item.products.sku}
-          </span>
-        ) : null}
+        {(() => {
+          const all = (item as AllocationWithRelations & { _allProducts?: { id: string; name: string; quantity: number }[] })._allProducts;
+          if (all && all.length > 1) {
+            return (
+              <>
+                {all.map((p, i) => (
+                  <span
+                    key={p.id}
+                    className={`block font-semibold text-[var(--ink)] ${
+                      counter ? "text-base" : "text-sm"
+                    }${i > 0 ? " mt-0.5" : ""}`}
+                  >
+                    {p.name}
+                    {p.quantity > 1 ? (
+                      <b className="ml-1 font-bold text-[var(--accent)]">×{p.quantity}</b>
+                    ) : null}
+                  </span>
+                ))}
+              </>
+            );
+          }
+          return (
+            <>
+              <span
+                className={`font-semibold text-[var(--ink)] ${
+                  counter ? "text-lg" : "text-base"
+                }`}
+              >
+                {item.products?.name || "상품"}
+              </span>
+              {item.products?.sku ? (
+                <span
+                  className={`mt-0.5 block text-[var(--muted)] ${
+                    counter ? "text-sm" : "text-xs"
+                  }`}
+                >
+                  SKU {item.products.sku}
+                </span>
+              ) : null}
+            </>
+          );
+        })()}
       </td>
       {!hideStore ? (
         <td className={`${cell} text-[var(--muted)]`}>

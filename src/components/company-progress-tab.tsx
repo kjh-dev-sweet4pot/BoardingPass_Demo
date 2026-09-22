@@ -648,7 +648,7 @@ export function CompanyProgressTab({
   }, [focusInfluencerId, cards, grouped]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-4 lg:px-[26px] lg:py-5">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 pt-3 pb-3 lg:px-[26px] lg:py-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">

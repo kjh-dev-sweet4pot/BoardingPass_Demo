@@ -171,12 +171,12 @@ export function CompanyConsoleShell({
         </div>
       ) : null}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {children}
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] lg:hidden"
+        className="shrink-0 border-t border-[var(--line)] bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] lg:hidden"
         role="tablist"
         aria-label="회원사 메뉴"
       >
@@ -193,7 +193,7 @@ export function CompanyConsoleShell({
                 aria-label={tab.full}
                 aria-selected={active}
                 onClick={() => onViewChange(tab.id)}
-                className={`flex min-h-12 flex-col items-center justify-center px-1 text-[11px] font-semibold transition-colors duration-300 ease-out ${
+                className={`flex min-h-12 flex-col items-center justify-center px-0.5 text-[11px] font-semibold whitespace-nowrap transition-colors duration-300 ease-out ${
                   active ? "text-[var(--accent)]" : "text-[var(--muted)]"
                 }`}
               >

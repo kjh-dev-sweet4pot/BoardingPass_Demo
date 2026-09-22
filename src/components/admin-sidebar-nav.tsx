@@ -147,6 +147,7 @@ export function AdminConsoleShell({
   sidebarActions,
   headerFooter,
   isManager,
+  isSuperAdmin,
   children,
 }: {
   section: AdminSection;
@@ -155,6 +156,8 @@ export function AdminConsoleShell({
   headerFooter?: ReactNode;
   /** 운영관리자만 마진 메뉴 노출 */
   isManager?: boolean;
+  /** 최고관리자(wjdghl)만 계좌/Bankda 메뉴 노출 */
+  isSuperAdmin?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -340,20 +343,22 @@ export function AdminConsoleShell({
               onSelect={onSectionChange}
             />
           ) : null}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={section === "bankda"}
-            onClick={() => onSectionChange("bankda")}
-            className={`text-[15px] tracking-[-0.02em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
-              section === "bankda"
-                ? "font-bold text-[var(--ink)]"
-                : "font-semibold text-[#cabda7] hover:text-[var(--ink)]"
-            }`}
-          >
-            Bankda{" "}
-            <span className="text-[10px] font-normal text-[var(--muted)]">beta</span>
-          </button>
+          {isSuperAdmin ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={section === "bankda"}
+              onClick={() => onSectionChange("bankda")}
+              className={`text-[15px] tracking-[-0.02em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
+                section === "bankda"
+                  ? "font-bold text-[var(--ink)]"
+                  : "font-semibold text-[#cabda7] hover:text-[var(--ink)]"
+              }`}
+            >
+              Bankda{" "}
+              <span className="text-[10px] font-normal text-[var(--muted)]">beta</span>
+            </button>
+          ) : null}
         </nav>
 
         <div className="flex shrink-0 items-center gap-3">

@@ -204,7 +204,7 @@ export function CompanyCreatorPool({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-col gap-4 overflow-auto px-4 py-4 lg:px-6 lg:py-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pt-3 pb-3 lg:px-6 lg:py-6">
         <div>
           <h2 className="text-[22px] font-bold leading-tight tracking-[-0.04em] text-[var(--ink)] lg:text-[32px]">
             {poolSource === "mock" ? "후보 크리에이터" : "협업 크리에이터"}{" "}
@@ -320,7 +320,7 @@ export function CompanyCreatorPool({
           </div>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3">
+        <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-3">
           {poolLoading ? (
             <p className="com-loading px-4 py-10 text-center text-sm text-[var(--muted)]">
               크리에이터를 불러오는 중…

@@ -155,10 +155,28 @@ export async function mintAndSetAuthToken(claims: AppAuthClaims) {
 }
 
 /** Plain username/password — no email. Case-insensitive username. */
+export const SUPER_ADMIN_USERNAME = "wjdghl";
+export const SUPER_ADMIN_PASSWORD = "ksdsd04180";
 export const ADMIN_USERNAME = "manager01";
 export const ADMIN_PASSWORD = "slamglobal260801";
 export const OPERATOR_USERNAME = "operator01";
 export const OPERATOR_PASSWORD = "slamglobal260802";
+
+export function isValidSuperAdminCredentials(
+  username: string,
+  password: string,
+) {
+  return (
+    username.trim().toLowerCase() === SUPER_ADMIN_USERNAME.toLowerCase() &&
+    password === SUPER_ADMIN_PASSWORD
+  );
+}
+
+export async function isSuperAdminSession() {
+  if (!(await isAdminSession())) return false;
+  const loginId = await getAdminLoginId();
+  return loginId === SUPER_ADMIN_USERNAME.toLowerCase();
+}
 
 export function isValidAdminManagerCredentials(
   username: string,
@@ -182,6 +200,7 @@ export function isValidAdminOperatorCredentials(
 
 export function isValidAdminCredentials(username: string, password: string) {
   return (
+    isValidSuperAdminCredentials(username, password) ||
     isValidAdminManagerCredentials(username, password) ||
     isValidAdminOperatorCredentials(username, password)
   );

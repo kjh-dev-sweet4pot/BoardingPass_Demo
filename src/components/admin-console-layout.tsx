@@ -74,6 +74,7 @@ export function AdminConsoleLayout(props: {
   productList: Product[];
   list: AllocationWithRelations[];
   isManager: boolean;
+  isSuperAdmin?: boolean;
   error?: string;
   message?: string;
   sidebarActions?: ReactNode;
@@ -94,6 +95,7 @@ function AdminConsoleLayoutBody({
   productList,
   list,
   isManager,
+  isSuperAdmin,
   error,
   message,
   sidebarActions,
@@ -106,6 +108,7 @@ function AdminConsoleLayoutBody({
   productList: Product[];
   list: AllocationWithRelations[];
   isManager: boolean;
+  isSuperAdmin?: boolean;
   error?: string;
   message?: string;
   sidebarActions?: ReactNode;
@@ -224,6 +227,7 @@ function AdminConsoleLayoutBody({
       sidebarActions={sidebarActions}
       headerFooter={headerFooter}
       isManager={isManager}
+      isSuperAdmin={isSuperAdmin}
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       {error || message ? (
@@ -327,9 +331,16 @@ function AdminConsoleLayoutBody({
       ) : null}
 
       {section === "bankda" ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <AdminBankdaTab />
-        </div>
+        isSuperAdmin ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <AdminBankdaTab />
+          </div>
+        ) : (
+          <EmptyState
+            title="접근 권한이 없습니다."
+            message="Bankda 거래내역은 최고 관리자 계정만 열람할 수 있습니다."
+          />
+        )
       ) : null}
       </div>
     </AdminConsoleShell>

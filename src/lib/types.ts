@@ -180,6 +180,8 @@ export type AllocationWithRelations = Allocation & {
   influencers?: Influencer | null;
   campaigns?: Pick<Campaign, "id" | "name"> | null;
   creator_links?: CreatorLink[];
+  /** 같은 방문(동일 인플루언서+매장+일자)의 전체 배정 상품 목록 */
+  _allProducts?: { id: string; name: string; quantity: number }[];
 };
 
 export const ALLOCATION_STATUS_LABEL: Record<AllocationStatus, string> = {
