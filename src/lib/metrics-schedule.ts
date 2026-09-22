@@ -1,6 +1,6 @@
 import { detectPlatform } from "@/lib/creator-link";
 
-const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+const ONE_HOUR_MS = 60 * 60 * 1000;
 const SEVENTY_TWO_HOURS_MS = 72 * 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -65,9 +65,38 @@ export function isCollectionDue(
     : Infinity;
 
   if (elapsed <= SEVENTY_TWO_HOURS_MS) {
-    return sinceLast >= SIX_HOURS_MS;
+    return sinceLast >= ONE_HOUR_MS;
   }
   return sinceLast >= ONE_DAY_MS;
+}
+
+/** Supabase pg_cron 스케줄(매시 정각, scripts/sql/supabase-cron-collect-metrics.sql) */
+export const CRON_TICK_MS = ONE_HOUR_MS;
+
+function ceilToNextTick(ms: number) {
+  return Math.ceil(ms / CRON_TICK_MS) * CRON_TICK_MS;
+}
+
+/**
+ * 다음 수집 예정 시각 (표시용).
+ * 콘텐츠별 목표 간격(isCollectionDue와 동일 규칙)에 도달한 뒤, 실제로는
+ * pg_cron이 다음으로 도는 정각에야 수집되므로 그 시각으로 올림한다.
+ */
+export function nextCollectionAt(
+  publishedAtIso: string,
+  lastCollectedAtIso: string | null | undefined,
+  now = Date.now(),
+): string | null {
+  const publishedAt = new Date(publishedAtIso).getTime();
+  if (!Number.isFinite(publishedAt)) return null;
+
+  const last = lastCollectedAtIso
+    ? new Date(lastCollectedAtIso).getTime()
+    : publishedAt;
+  const elapsed = now - publishedAt;
+  const interval = elapsed <= SEVENTY_TWO_HOURS_MS ? ONE_HOUR_MS : ONE_DAY_MS;
+  const target = Math.max(last + interval, now);
+  return new Date(ceilToNextTick(target)).toISOString();
 }
 
 /** 실패 재시도 대기 (ponytail: 고정 1시간, 백오프는 T6+에서) */
@@ -81,12 +110,12 @@ export function nextRetryAt(from = Date.now()) {
 if (process.env.NODE_ENV !== "production") {
   const anchor = "2026-08-01T00:00:00.000Z";
   console.assert(
-    isCollectionDue(anchor, null, new Date("2026-08-01T06:00:00.000Z").getTime()),
-    "metrics-schedule: first collect due after 6h",
+    isCollectionDue(anchor, null, new Date("2026-08-01T01:00:00.000Z").getTime()),
+    "metrics-schedule: first collect due after 1h",
   );
   console.assert(
-    !isCollectionDue(anchor, "2026-08-01T05:00:00.000Z", new Date("2026-08-01T06:00:00.000Z").getTime()),
-    "metrics-schedule: not due before 6h interval",
+    !isCollectionDue(anchor, "2026-08-01T00:30:00.000Z", new Date("2026-08-01T01:00:00.000Z").getTime()),
+    "metrics-schedule: not due before 1h interval",
   );
   if (parsePostedAtIso(1756403075) !== "2025-08-28T17:44:35.000Z") {
     throw new Error("parsePostedAtIso unix seconds");

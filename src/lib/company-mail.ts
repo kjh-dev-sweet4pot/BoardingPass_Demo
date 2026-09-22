@@ -280,6 +280,10 @@ export async function sendCompanyMailViaResend(input: {
       subject: input.subject,
       text: input.body,
       html: input.html || mailTextToHtml(input.body),
+      headers: {
+        "List-Unsubscribe": "<mailto:manager@slam-global.com?subject=수신거부>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
       attachments: input.attachments?.map((a) => ({
         filename: a.filename,
         content: a.content,

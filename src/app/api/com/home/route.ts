@@ -196,6 +196,8 @@ export async function GET() {
   let homeLinks: HomeInsightLink[] = [];
 
   for (const l of rawLinks) {
+    const link_url = (l.publish_url || l.url || "").trim() || null;
+    if (!link_url) continue; // 승인만 되고 아직 발행 안 된 건 — 예산 계산용일 뿐, 카드로 노출하지 않음
     const alloc = allocMap.get(l.allocation_id);
     const inf = one(alloc?.influencers);
     const product = one(alloc?.products);
@@ -204,7 +206,6 @@ export async function GET() {
     const handle = handleRaw
       ? `@${String(handleRaw).replace(/^@+/, "")}`
       : "—";
-    const link_url = (l.publish_url || l.url || "").trim() || null;
     const views =
       resolveCreatorPlatform(link_url) === "xiaohongshu"
         ? estimateXiaohongshuViews({
