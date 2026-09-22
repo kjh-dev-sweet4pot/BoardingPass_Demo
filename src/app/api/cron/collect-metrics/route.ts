@@ -58,8 +58,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // 기본 28: Apify 동시 actor run 한도(28~32) 안에서 한 배치로 60초 내 끝나는 양.
+  // 더 크게 주면 여러 배치로 나눠 순차 처리하지만 60초를 넘길 수 있다.
   const limitParam = new URL(request.url).searchParams.get("limit");
-  const maxJobs = limitParam ? parseInt(limitParam, 10) : Number.MAX_SAFE_INTEGER;
+  const maxJobs = limitParam ? parseInt(limitParam, 10) : 28;
 
   const supabase = createServiceClient();
   try {
@@ -74,4 +76,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export const maxDuration = 120;
+export const maxDuration = 300;
