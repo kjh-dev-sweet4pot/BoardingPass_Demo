@@ -26,28 +26,6 @@ function formatKstDateTime(iso: string) {
   return `${formatMd(ymdKst(d))} ${time}`;
 }
 
-function CollectionScheduleInfo({
-  metricsCollectedAt,
-  cronNextRunAt,
-}: {
-  metricsCollectedAt: string | null;
-  cronNextRunAt: string | null;
-}) {
-  if (!cronNextRunAt) return null;
-  return (
-    <span className="mt-1 block rounded-[4px] bg-[var(--surface-hover)] px-2 py-1">
-      <span className="block text-[11px] font-bold text-[var(--accent)]">
-        다음 수집 {formatKstDateTime(cronNextRunAt)}
-      </span>
-      <span className="mt-0.5 block text-[9.5px] text-[var(--muted)]">
-        최종 수집{" "}
-        {metricsCollectedAt ? formatKstDateTime(metricsCollectedAt) : "—"} ·{" "}
-        {formatMd(ymdKst(new Date()))} 조회 시점 기준
-      </span>
-    </span>
-  );
-}
-
 /** Supabase pg_cron이 실제로 기록한 마지막/다음 실행 시각 (scripts/sql/cron-run-status.sql) */
 function useCronNextRunAt(job = "collect-metrics") {
   const [nextRunAt, setNextRunAt] = useState<string | null>(null);
@@ -458,14 +436,12 @@ function TopContentPanel({
   metric,
   items,
   aside,
-  cronNextRunAt,
 }: {
   title: string;
   why: string;
   metric: TopMetric;
   items: Array<LinkRow & { earlyViews?: number }>;
   aside?: string;
-  cronNextRunAt: string | null;
 }) {
   return (
     <div className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
@@ -507,11 +483,7 @@ function TopContentPanel({
                       <span className="block truncate text-[13px] font-semibold text-[var(--ink)]">
                         {inf?.name || "—"}
                       </span>
-                      <CollectionScheduleInfo
-                        metricsCollectedAt={row.metrics_collected_at}
-                        cronNextRunAt={cronNextRunAt}
-                      />
-                      <span className="mt-1 block truncate text-[11.5px] text-[var(--muted)]">
+                      <span className="mt-0.5 block truncate text-[11.5px] text-[var(--muted)]">
                         {[company, product, platformLabel(row.link_url)]
                           .filter(Boolean)
                           .join(" · ")}
@@ -1260,6 +1232,11 @@ export function CompanyPerformanceTab({
         </div>
       </div>
 
+      {cronNextRunAt ? (
+        <p className="text-[13px] font-bold text-[var(--accent)]">
+          다음 수집 {formatKstDateTime(cronNextRunAt)}
+        </p>
+      ) : null}
       <p className="text-[11.5px] leading-relaxed text-[var(--muted)]">{metaLine}</p>
       {recollectMsg ? (
         <p className="text-[12px] text-[var(--accent)]">{recollectMsg}</p>
@@ -1374,14 +1351,12 @@ export function CompanyPerformanceTab({
                 why={METRIC_WHY.views}
                 metric={{ kind: "views" }}
                 items={topByViews}
-                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="좋아요 TOP"
                 why={METRIC_WHY.likes}
                 metric={{ kind: "likes" }}
                 items={topByLikes}
-                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="조회수 대비 좋아요 TOP"
@@ -1389,7 +1364,6 @@ export function CompanyPerformanceTab({
                 metric={{ kind: "likeRate" }}
                 items={topByLikeRate}
                 aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
-                cronNextRunAt={cronNextRunAt}
               />
             </div>
 
@@ -1399,21 +1373,18 @@ export function CompanyPerformanceTab({
                 why={METRIC_WHY.saves}
                 metric={{ kind: "saves" }}
                 items={topBySaves}
-                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="공유 TOP"
                 why={METRIC_WHY.shares}
                 metric={{ kind: "shares" }}
                 items={topByShares}
-                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="리포스트 TOP"
                 why={METRIC_WHY.reposts}
                 metric={{ kind: "reposts" }}
                 items={topByReposts}
-                cronNextRunAt={cronNextRunAt}
               />
             </div>
 
@@ -1424,7 +1395,6 @@ export function CompanyPerformanceTab({
                 metric={{ kind: "commentRate" }}
                 items={topByCommentRate}
                 aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
-                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="참여율(ER) TOP"
@@ -1432,7 +1402,6 @@ export function CompanyPerformanceTab({
                 metric={{ kind: "er" }}
                 items={topByEr}
                 aside={`조회 ${RATIO_MIN_VIEWS.toLocaleString("ko-KR")}+`}
-                cronNextRunAt={cronNextRunAt}
               />
               <TopContentPanel
                 title="초기 반응"
@@ -1440,7 +1409,6 @@ export function CompanyPerformanceTab({
                 metric={{ kind: "earlyViews" }}
                 items={topByEarly}
                 aside={earlyAside}
-                cronNextRunAt={cronNextRunAt}
               />
             </div>
           </div>

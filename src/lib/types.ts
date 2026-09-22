@@ -31,6 +31,8 @@ export type Company = {
   spent_amount?: number | null;
   /** 콘텐츠 가이드라인 URL */
   guideline_url?: string | null;
+  /** 자동 지표 수집 대상 여부 (기본 true) */
+  auto_collect_enabled?: boolean;
 };
 
 export type CreatorLinkStatus = "submitted" | "approved" | "rejected";

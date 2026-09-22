@@ -50,7 +50,7 @@ export const COMPANY_SELECT_BASE =
 export const COMPANY_SELECT_MAIL =
   "id, name, login_id, aliases, contact, contact_email, is_active, created_at, updated_at";
 export const COMPANY_SELECT =
-  "id, name, login_id, aliases, contact, contact_email, is_active, created_at, updated_at, first_meet_on, planned_start_on, planned_end_on, contract_stage, budget_amount, spent_amount, guideline_url";
+  "id, name, login_id, aliases, contact, contact_email, is_active, auto_collect_enabled, created_at, updated_at, first_meet_on, planned_start_on, planned_end_on, contract_stage, budget_amount, spent_amount, guideline_url";
 
 const COMPANY_CRM_COLUMNS = [
   "first_meet_on",
@@ -60,6 +60,7 @@ const COMPANY_CRM_COLUMNS = [
   "budget_amount",
   "spent_amount",
   "guideline_url",
+  "auto_collect_enabled",
 ] as const;
 
 export function isMissingColumnError(message: string, column: string) {

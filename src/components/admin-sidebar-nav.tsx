@@ -24,6 +24,7 @@ export type AdminSection =
   | "companiesBudget"
   | "companiesProducts"
   | "companiesCampaigns"
+  | "companiesAutoCollect"
   | "influencersRegister"
   | "influencersReview"
   | "influencersAlloc"
@@ -46,6 +47,7 @@ export const ADMIN_SECTIONS: AdminSection[] = [
   "companiesBudget",
   "companiesProducts",
   "companiesCampaigns",
+  "companiesAutoCollect",
   "influencersRegister",
   "influencersReview",
   "influencersAlloc",
@@ -66,6 +68,7 @@ export const COMPANIES_NAV: NavDropdownItem<
   | "companiesBudget"
   | "companiesProducts"
   | "companiesCampaigns"
+  | "companiesAutoCollect"
 >[] = [
   { id: "companies", label: "목록", hint: "조회·요약·정보 수정" },
   { id: "companiesRegister", label: "등록", hint: "회원사 개설" },
@@ -74,6 +77,7 @@ export const COMPANIES_NAV: NavDropdownItem<
   { id: "companiesProducts", label: "제품", hint: "회사별 제품 조회·수정" },
   { id: "companiesDocs", label: "계약·인보이스", hint: "양식 작성·인쇄" },
   { id: "companiesMail", label: "메일 발송", hint: "계약서·견적서·가이드라인" },
+  { id: "companiesAutoCollect", label: "자동 수집", hint: "회사별 자동 지표 수집 on/off" },
 ];
 
 export const INFLUENCERS_NAV: NavDropdownItem<
@@ -119,7 +123,8 @@ function isCompanies(s: AdminSection) {
     s === "companiesDocs" ||
     s === "companiesBudget" ||
     s === "companiesProducts" ||
-    s === "companiesCampaigns"
+    s === "companiesCampaigns" ||
+    s === "companiesAutoCollect"
   );
 }
 
@@ -219,6 +224,7 @@ export function AdminConsoleShell({
                 | "companiesBudget"
                 | "companiesProducts"
                 | "companiesCampaigns"
+                | "companiesAutoCollect"
             }
             onViewChange={onSectionChange}
           />
@@ -306,7 +312,8 @@ export function AdminConsoleShell({
                     | "companiesDocs"
                     | "companiesBudget"
                     | "companiesProducts"
-                    | "companiesCampaigns")
+                    | "companiesCampaigns"
+                    | "companiesAutoCollect")
                 : undefined
             }
             onSelect={onSectionChange}

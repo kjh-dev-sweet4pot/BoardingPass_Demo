@@ -78,21 +78,30 @@ export async function runMetricsScheduler(
         id, url, publish_url, platform, content_status,
         published_at, updated_at, submitted_at, metrics_collected_at,
         allocations (
-          campaigns ( status )
+          campaigns ( status ),
+          companies ( auto_collect_enabled )
         )
       `)
-      .or("content_status.eq.발행완료,publish_url.not.is.null,and(content_status.is.null,status.eq.approved)");
+      .or("content_status.eq.발행완료,publish_url.not.is.null,and(content_status.is.null,status.eq.approved)")
+      .order("metrics_collected_at", { ascending: true, nullsFirst: true });
 
     for (const row of links ?? []) {
       if (jobQueue.length >= maxJobs) break;
 
-      const campaignRaw = row.allocations as
-        | { campaigns?: { status?: string } | null }
-        | { campaigns?: { status?: string } | null }[]
+      const allocRaw = row.allocations as
+        | {
+            campaigns?: { status?: string } | null;
+            companies?: { auto_collect_enabled?: boolean | null } | null;
+          }
+        | {
+            campaigns?: { status?: string } | null;
+            companies?: { auto_collect_enabled?: boolean | null } | null;
+          }[]
         | null;
-      const alloc = Array.isArray(campaignRaw) ? campaignRaw[0] : campaignRaw;
+      const alloc = Array.isArray(allocRaw) ? allocRaw[0] : allocRaw;
       const campaignStatus = alloc?.campaigns?.status;
       if (!isCampaignCollectActive(campaignStatus)) continue;
+      if (alloc?.companies?.auto_collect_enabled === false) continue;
 
       const url = (row.publish_url || row.url || "").trim();
       const needsPostedAt =
@@ -115,15 +124,20 @@ export async function runMetricsScheduler(
     }
   }
 
-  for (const job of jobQueue) {
+  // ponytail: 순차 실행이면 건당 ~6-8초 × maxJobs가 그대로 누적돼 60초 타임아웃에 걸린다.
+  // 서로 다른 링크의 독립적인 Apify 호출이라 병렬로 돌려도 안전 — 같은 예산으로 더 많이 처리한다.
+  const outcomes = await Promise.allSettled(
+    jobQueue.map((job) => runCollectionJob(supabase, job.id, job.creator_link_id)),
+  );
+  for (const [i, outcome] of outcomes.entries()) {
     result.processed += 1;
-    try {
-      await runCollectionJob(supabase, job.id, job.creator_link_id);
+    if (outcome.status === "fulfilled") {
       result.succeeded += 1;
-    } catch (e) {
+    } else {
       result.failed += 1;
+      const e = outcome.reason;
       result.errors.push(
-        e instanceof Error ? e.message : `job ${job.id} failed`,
+        e instanceof Error ? e.message : `job ${jobQueue[i].id} failed`,
       );
     }
   }
