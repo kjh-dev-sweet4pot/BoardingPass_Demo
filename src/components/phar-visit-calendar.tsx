@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import { StateBadge } from "@/components/state-badge";
+import { CreatorPhoto } from "@/components/creator-photo";
 import { PharTopProducts } from "@/components/phar-top-products";
+import { resolvePoolCreator } from "@/lib/creator-pool-mock";
 import { todayYmdKst } from "@/lib/inf-visit";
 import {
   LOAD_HEAT,
@@ -29,104 +31,73 @@ function formatSnsHref(url?: string | null) {
   return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 }
 
-function VisitorCard({
+function VisitorRow({
   visitor,
-  selected,
-  onSelect,
   onOpenDetail,
 }: {
   visitor: DayVisitor;
-  selected?: boolean;
-  onSelect: () => void;
   onOpenDetail: () => void;
 }) {
   const inf = visitor.badgeItem.influencers;
   const sns = formatSnsHref(inf?.sns_url);
+  const creator = resolvePoolCreator({
+    id: visitor.influencerId,
+    name: visitor.name,
+    handle: visitor.handle ? `@${visitor.handle}` : "—",
+    url: inf?.sns_url,
+  });
   return (
-    <div
-      className={`border-b border-[var(--line)] last:border-b-0 ${
-        selected ? "bg-[var(--accent-soft)]" : ""
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onSelect}
-        className={`flex w-full items-start gap-3 px-3 py-3 text-left ${
-          selected ? "" : "hover:bg-[var(--accent-soft)]/50"
-        }`}
-      >
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8D5BE] text-sm font-bold text-[#3D1F0A]"
-          aria-hidden
-        >
-          {visitor.initial}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-[var(--ink)]">
-            {visitor.name}
-          </p>
-          {visitor.handle ? (
-            <p className="truncate text-[11px] text-[var(--muted)]">
-              @{visitor.handle}
-            </p>
-          ) : null}
-          {!selected ? (
-            <p className="mt-0.5 truncate text-[13px] text-[var(--ink)]">
-              {visitor.products.map((p, idx) => (
-                <span key={p.id}>
-                  {idx > 0 && <span className="mx-1 text-[var(--muted)]">·</span>}
-                  {p.name}
-                  {p.quantity > 1 ? (
-                    <b className="ml-0.5 font-semibold">×{p.quantity}</b>
-                  ) : null}
-                </span>
-              ))}
-            </p>
-          ) : null}
-        </div>
-        <StateBadge value={visitor.badgeStatus} />
-      </button>
-      {selected ? (
-        <div className="space-y-2 px-3 pb-3 pl-[3.75rem]">
-          {sns ? (
-            <a
-              href={sns}
-              target="_blank"
-              rel="noreferrer"
-              className="block truncate text-[12px] text-[var(--accent)] underline"
-            >
-              {sns}
-            </a>
-          ) : null}
-          {visitor.campaignName ? (
-            <p className="text-[12px] text-[var(--muted)]">{visitor.campaignName}</p>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[var(--ink)]">
-            {visitor.products.map((p, idx) => (
-              <span key={p.id} className="inline-flex items-center">
-                {idx > 0 && <span className="mr-2 text-[var(--muted)]">·</span>}
-                <span>{p.name}</span>
-                {p.quantity > 1 ? (
-                  <b className="ml-1 font-semibold text-[var(--accent)]">×{p.quantity}</b>
-                ) : null}
-              </span>
-            ))}
+    <tr className="border-b border-[var(--line)] last:border-0 hover:bg-[var(--accent-soft)]/40">
+      <td className="py-2 pl-3 pr-2">
+        <div className="flex items-center gap-2.5">
+          <CreatorPhoto creator={creator} size="thumb" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-[var(--ink)]">{visitor.name}</p>
+            {visitor.handle ? (
+              <p className="truncate text-[11px] text-[var(--muted)]">@{visitor.handle}</p>
+            ) : null}
           </div>
-          {inf?.notes ? (
-            <p className="whitespace-pre-wrap text-[12px] text-[var(--muted)]">
-              {inf.notes}
-            </p>
-          ) : null}
-          <button
-            type="button"
-            onClick={onOpenDetail}
-            className="w-full rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--accent)]"
-          >
-            리스트에서 상세 보기
-          </button>
         </div>
-      ) : null}
-    </div>
+      </td>
+      <td className="px-2 py-2 text-[13px] text-[var(--ink)]">
+        {visitor.products.map((p, idx) => (
+          <span key={p.id}>
+            {idx > 0 && <span className="mx-1 text-[var(--muted)]">·</span>}
+            {p.name}
+            {p.quantity > 1 ? <b className="ml-0.5 font-semibold">×{p.quantity}</b> : null}
+          </span>
+        ))}
+      </td>
+      <td className="px-2 py-2 text-[12px] text-[var(--muted)]">
+        {visitor.companies.join(" · ") || "—"}
+      </td>
+      <td className="px-2 py-2">
+        {sns ? (
+          <a
+            href={sns}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[12px] font-semibold text-[var(--accent)] underline"
+          >
+            프로필 →
+          </a>
+        ) : (
+          <span className="text-[12px] text-[var(--muted)]">—</span>
+        )}
+      </td>
+      <td className="px-2 py-2">
+        <StateBadge value={visitor.badgeStatus} />
+      </td>
+      <td className="py-2 pl-2 pr-3 text-right">
+        <button
+          type="button"
+          onClick={onOpenDetail}
+          className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-[12px] font-semibold text-[var(--accent)]"
+        >
+          상세
+        </button>
+      </td>
+    </tr>
   );
 }
 
@@ -142,7 +113,6 @@ export function PharVisitCalendar({
   onOpenCounter: (allocationId?: string) => void;
 }) {
   const today = todayYmdKst();
-  const [detailId, setDetailId] = useState<string | null>(null);
   const todayYm = today.slice(0, 7);
   const monthYm = selectedKey === UNDATED || !isValidYmd(selectedKey)
     ? todayYm
@@ -192,7 +162,6 @@ export function PharVisitCalendar({
     viewYmRef.current = next;
     if (next === todayYm) onSelect(today);
     else onSelect(`${next}-01`);
-    setDetailId(null);
   }
 
   const header =
@@ -201,8 +170,9 @@ export function PharVisitCalendar({
       : `${formatMd(selectedKey)} (${WEEKDAYS_KO[weekdayIndex(selectedKey)]}) · ${summary?.visitorCount ?? 0}명 / ${summary?.allocationCount ?? 0}건`;
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 min-[900px]:grid-cols-[minmax(0,0.82fr)_minmax(320px,1.18fr)]">
-      <section className="flex min-h-0 flex-col gap-1.5 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-2.5 sm:p-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="grid shrink-0 grid-cols-1 gap-3 min-[900px]:grid-cols-[minmax(0,2fr)_minmax(220px,1fr)]">
+      <section className="flex flex-col gap-1.5 rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-2.5 sm:p-3">
         <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
@@ -232,7 +202,7 @@ export function PharVisitCalendar({
           </button>
         </div>
 
-        <div className="grid shrink-0 grid-cols-7 gap-1">
+        <div className="grid w-full grid-cols-7 gap-1">
           {WEEKDAYS_KO.map((w, i) => (
             <div
               key={w}
@@ -249,7 +219,7 @@ export function PharVisitCalendar({
           ))}
         </div>
         <div
-          className="grid min-h-0 flex-1 grid-cols-7 auto-rows-fr gap-1"
+          className="grid w-full grid-cols-7 gap-1"
           onTouchStart={(e) => {
             swipeX.current = e.changedTouches[0]?.clientX ?? null;
           }}
@@ -274,7 +244,7 @@ export function PharVisitCalendar({
               return (
                 <div
                   key={cell.ymd}
-                  className="flex min-h-0 flex-col rounded-[6px] border border-transparent p-1"
+                  className="flex aspect-square flex-col rounded-[6px] border border-transparent p-1"
                 >
                   <span className="text-xs text-[#A07050]/40">{cell.num}</span>
                 </div>
@@ -284,13 +254,10 @@ export function PharVisitCalendar({
               <button
                 key={cell.ymd}
                 type="button"
-                onClick={() => {
-                  onSelect(cell.ymd);
-                  setDetailId(null);
-                }}
+                onClick={() => onSelect(cell.ymd)}
                 aria-label={`${cell.num}일 ${n}명 ${alloc}건`}
                 aria-pressed={selected}
-                className={`relative flex min-h-0 min-w-0 flex-col items-center overflow-hidden rounded-[6px] border p-1 text-center transition ${
+                className={`relative flex aspect-square min-w-0 flex-col items-center overflow-hidden rounded-[6px] border p-1 text-center transition ${
                   isToday ? "border-2 border-[#6B3B1F]" : "border-[#E8D5BE]"
                 } ${selected ? "ring-[3px] ring-[#6B3B1F]/25" : ""}`}
                 style={{ background: heat.bg, color: heat.fg }}
@@ -357,11 +324,12 @@ export function PharVisitCalendar({
         ) : null}
       </section>
 
-      <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
-        <div className="max-h-[40%] shrink-0 overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-2.5">
-          <PharTopProducts items={items} compact />
-        </div>
-        <aside className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
+      <div className="overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)] p-2.5">
+        <PharTopProducts items={items} compact />
+      </div>
+    </div>
+
+      <aside className="flex min-h-[220px] flex-1 flex-col overflow-hidden rounded-[6px] border border-[var(--line)] bg-[var(--surface)]">
         <div className="shrink-0 border-b border-[var(--line)] px-4 py-3">
           <h3 className="text-[15px] font-bold text-[var(--ink)]">{header}</h3>
           {summary && (summary.pendingCount || summary.visitedCount || summary.pickedUpCount) ? (
@@ -390,17 +358,27 @@ export function PharVisitCalendar({
               이 날은 방문 예정이 없습니다.
             </p>
           ) : (
-            visitors.map((v) => (
-              <VisitorCard
-                key={v.influencerId}
-                visitor={v}
-                selected={v.influencerId === detailId}
-                onSelect={() =>
-                  setDetailId((id) => (id === v.influencerId ? null : v.influencerId))
-                }
-                onOpenDetail={() => onOpenCounter(v.badgeItem.id)}
-              />
-            ))
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-[var(--line)] text-[11px] text-[var(--muted)]">
+                  <th className="py-2 pl-3 pr-2 font-medium">크리에이터</th>
+                  <th className="px-2 py-2 font-medium">상품</th>
+                  <th className="px-2 py-2 font-medium">소속</th>
+                  <th className="px-2 py-2 font-medium">SNS</th>
+                  <th className="px-2 py-2 font-medium">상태</th>
+                  <th className="py-2 pl-2 pr-3 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visitors.map((v) => (
+                  <VisitorRow
+                    key={v.influencerId}
+                    visitor={v}
+                    onOpenDetail={() => onOpenCounter(v.badgeItem.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
         {selectedKey === today && (summary?.visitorCount ?? 0) > 0 ? (
@@ -414,8 +392,7 @@ export function PharVisitCalendar({
             </button>
           </div>
         ) : null}
-        </aside>
-      </div>
+      </aside>
     </div>
   );
 }

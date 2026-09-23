@@ -145,6 +145,7 @@ export type DayVisitor = {
   initial: string;
   campaignName: string | null;
   products: { id: string; name: string; quantity: number }[];
+  companies: string[];
   badgeStatus: AllocationStatus;
   badgeItem: AllocationWithRelations;
 };
@@ -173,6 +174,15 @@ export function groupVisitors(items: AllocationWithRelations[]): DayVisitor[] {
     ).campaigns?.name;
     const products: { id: string; name: string; quantity: number }[] = [];
     const seenProductIds = new Set<string>();
+    const companies: string[] = [];
+    const seenCompanies = new Set<string>();
+    for (const item of list) {
+      const companyName = item.companies?.name;
+      if (companyName && !seenCompanies.has(companyName)) {
+        seenCompanies.add(companyName);
+        companies.push(companyName);
+      }
+    }
     for (const item of list) {
       if (item._allProducts && item._allProducts.length > 0) {
         for (const p of item._allProducts) {
@@ -200,6 +210,7 @@ export function groupVisitors(items: AllocationWithRelations[]): DayVisitor[] {
       initial: name.slice(0, 1),
       campaignName: campaign || null,
       products,
+      companies,
       badgeStatus: badgeItem.status,
       badgeItem,
     });
@@ -289,12 +300,27 @@ export type ProductRankingRow = {
   brand: string | null;
   visitorCount: number;
   qty: number;
+  views: number;
+  likes: number;
+  er: number;
+  topLink: { url: string; platform: string; influencerName: string; views: number } | null;
 };
 
+const PERF_WINDOW_DAYS = 40;
+
+/** 0~100 min-max. views/likes는 log1p로 완화해 대형 바이럴 1건이 나머지를 다 눌러버리지 않게 한다. */
+function normalize(values: number[], log = false) {
+  const v = log ? values.map((n) => Math.log1p(n)) : values;
+  const min = Math.min(...v);
+  const max = Math.max(...v);
+  if (max === min) return v.map(() => 0);
+  return v.map((n) => ((n - min) / (max - min)) * 100);
+}
+
 /**
- * 향후 N일 방문 예정 배정 건수 기준 상품 Top 랭킹.
- * "트래픽"의 실측 지표가 없어 배정된 인플루언서 수(visitorCount)를 프록시로 쓴다 —
- * 진짜 방문객 예측 모델이 아니라 "이미 잡힌 일정" 집계다.
+ * 향후 N일 방문 예정 상품 중, 최근 PERF_WINDOW_DAYS일 콘텐츠 성과(조회수·좋아요·참여율)
+ * 기준으로 랭킹한다. 성과 데이터가 아예 없으면(전부 0점 동점) 방문 예정 인플루언서 수
+ * (visitorCount)로 자연히 대체된다.
  */
 export function upcomingProductRanking(
   items: AllocationWithRelations[],
@@ -303,10 +329,24 @@ export function upcomingProductRanking(
   limit = 10,
 ) {
   const end = addDaysYmd(todayYmd, days - 1);
+  const perfSince = addDaysYmd(todayYmd, -PERF_WINDOW_DAYS);
+
+  type TopLink = { url: string; platform: string; influencerName: string; views: number };
   const byProduct = new Map<
     string,
-    { name: string; brand: string | null; qty: number; people: Set<string> }
+    {
+      name: string;
+      brand: string | null;
+      qty: number;
+      people: Set<string>;
+      views: number;
+      likes: number;
+      comments: number;
+      topLink: TopLink | null;
+    }
   >();
+
+  // 1) 후보 상품: 향후 days일 내 방문 예정인 것만 (기존과 동일한 후보 집합)
   for (const item of items) {
     if (item.status === "cancelled" || item.status === "picked_up") continue;
     const d = item.visit_date;
@@ -322,20 +362,81 @@ export function upcomingProductRanking(
             },
           ];
     for (const p of list) {
-      const name = p.name;
       const brand = item.companies?.name || null;
-      const key = `${name}|${brand ?? ""}`;
-      const row = byProduct.get(key) || { name, brand, qty: 0, people: new Set<string>() };
+      const key = `${p.name}|${brand ?? ""}`;
+      const row =
+        byProduct.get(key) ||
+        {
+          name: p.name,
+          brand,
+          qty: 0,
+          people: new Set<string>(),
+          views: 0,
+          likes: 0,
+          comments: 0,
+          topLink: null,
+        };
       row.qty += p.quantity;
       row.people.add(item.influencer_id);
       byProduct.set(key, row);
     }
   }
-  return [...byProduct.values()]
-    .map((r) => ({ name: r.name, brand: r.brand, qty: r.qty, visitorCount: r.people.size }))
-    .sort((a, b) => b.visitorCount - a.visitorCount || b.qty - a.qty)
+
+  // 2) 성과 집계: 후보 상품에 한해, 전체 배정 이력에서 최근 40일 발행완료 콘텐츠만 합산
+  for (const item of items) {
+    const brand = item.companies?.name || null;
+    const list =
+      item._allProducts && item._allProducts.length > 0
+        ? item._allProducts
+        : [{ id: item.id, name: item.products?.name || "상품", quantity: item.quantity }];
+    for (const p of list) {
+      const key = `${p.name}|${brand ?? ""}`;
+      const row = byProduct.get(key);
+      if (!row) continue; // 후보 상품이 아니면 성과 집계 불필요
+      for (const link of item.creator_links || []) {
+        if (link.content_status !== "발행완료") continue;
+        const anchor = link.published_at || link.submitted_at;
+        if (!anchor || anchor.slice(0, 10) < perfSince) continue;
+        const views = link.views || 0;
+        row.views += views;
+        row.likes += link.likes || 0;
+        row.comments += link.comments || 0;
+        const linkUrl = link.publish_url || link.url;
+        if (linkUrl && (!row.topLink || views > row.topLink.views)) {
+          row.topLink = {
+            url: linkUrl,
+            platform: link.platform || "etc",
+            influencerName: item.influencers?.name || "크리에이터",
+            views,
+          };
+        }
+      }
+    }
+  }
+
+  const rows = [...byProduct.values()].map((r) => ({
+    name: r.name,
+    brand: r.brand,
+    qty: r.qty,
+    visitorCount: r.people.size,
+    views: r.views,
+    likes: r.likes,
+    er: r.views > 0 ? ((r.likes + r.comments) / r.views) * 100 : 0,
+    topLink: r.topLink,
+  }));
+
+  const viewsNorm = normalize(rows.map((r) => r.views), true);
+  const likesNorm = normalize(rows.map((r) => r.likes), true);
+  const erNorm = normalize(rows.map((r) => r.er));
+  const score = rows.map((_, i) => (viewsNorm[i] + likesNorm[i] + erNorm[i]) / 3);
+
+  return rows
+    .map((r, i) => ({ ...r, score: score[i] }))
+    .sort(
+      (a, b) => b.score - a.score || b.visitorCount - a.visitorCount || b.qty - a.qty,
+    )
     .slice(0, limit)
-    .map((r, i) => ({ rank: i + 1, ...r }));
+    .map(({ score: _score, ...r }, i) => ({ rank: i + 1, ...r }));
 }
 
 export function monthHeatCells(

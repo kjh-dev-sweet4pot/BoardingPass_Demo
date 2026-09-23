@@ -4,7 +4,8 @@ import { collapseSharedVisitAllocations } from "@/lib/alloc-dup";
 import { canonicalBranchName, isBranchStoreName } from "@/lib/store-name";
 
 const PAGE = 1000;
-const SELECT = "*, products(*), stores(*), influencers(*)";
+const SELECT =
+  "*, products(*), stores(*), influencers(*), companies(id, name), creator_links(id, url, publish_url, platform, views, likes, comments, content_status, published_at, submitted_at, updated_at)";
 
 async function branchStoreIds(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
