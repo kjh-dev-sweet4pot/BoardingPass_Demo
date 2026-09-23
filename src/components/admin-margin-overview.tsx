@@ -26,6 +26,8 @@ type MarginRow = {
   slot_total: number;
   slot_filled: number;
   margin_state: "over" | "ok" | "caution" | "risk" | "unknown";
+  has_contract: boolean;
+  has_invoice: boolean;
 };
 
 const MARGIN_STATE_LABEL: Record<MarginRow["margin_state"], string> = {
@@ -53,6 +55,28 @@ function buildMarginOverviewColumns(
     edit: { kind: "text", getValue: (r) => r.campaign_name ?? "" },
   },
   { key: "status", label: "상태", width: 90, render: (r) => r.campaign_status },
+  {
+    key: "has_contract",
+    label: "계약서",
+    width: 80,
+    align: "center",
+    render: (r) => (
+      <span className={r.has_contract ? "font-semibold text-emerald-600" : "text-[var(--muted)]"}>
+        {r.has_contract ? "있음" : "없음"}
+      </span>
+    ),
+  },
+  {
+    key: "has_invoice",
+    label: "인보이스",
+    width: 80,
+    align: "center",
+    render: (r) => (
+      <span className={r.has_invoice ? "font-semibold text-emerald-600" : "text-[var(--muted)]"}>
+        {r.has_invoice ? "있음" : "없음"}
+      </span>
+    ),
+  },
   {
     key: "revenue",
     label: "예산(매출)",

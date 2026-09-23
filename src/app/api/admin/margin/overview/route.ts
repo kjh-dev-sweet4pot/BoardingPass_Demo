@@ -45,6 +45,18 @@ export async function GET(request: NextRequest) {
     return !company || !isAdminTestCompany(company);
   });
 
+  const companyIds = [...new Set(campaigns.map((c) => c.company_id).filter(Boolean))];
+  const { data: docsRaw } = await supabase
+    .from("company_docs")
+    .select("company_id, kind")
+    .in("company_id", companyIds.length ? companyIds : [EMPTY_ID]);
+  const contractCompanyIds = new Set(
+    (docsRaw ?? []).filter((d) => d.kind === "계약서").map((d) => d.company_id as string),
+  );
+  const invoiceCompanyIds = new Set(
+    (docsRaw ?? []).filter((d) => d.kind === "인보이스").map((d) => d.company_id as string),
+  );
+
   const campaignIds = campaigns.map((c) => c.id);
   const { data: marginRows, error: marginErr } = await supabase
     .from("v_campaign_margin")
@@ -66,6 +78,8 @@ export async function GET(request: NextRequest) {
       campaign_status: c.status as string,
       company_id: c.company_id as string,
       company_name: company?.name ?? null,
+      has_contract: contractCompanyIds.has(c.company_id as string),
+      has_invoice: invoiceCompanyIds.has(c.company_id as string),
       revenue: margin?.revenue ?? (c.budget_amount as number | null) ?? null,
       planned_cost: margin?.planned_cost ?? 0,
       committed_cost: margin?.committed_cost ?? 0,
