@@ -82,8 +82,9 @@ export async function POST(request: NextRequest) {
   let failed = 0;
   const errors: string[] = [];
 
-  for (const id of linkIds) {
-    try {
+  // ponytail: 서로 다른 링크의 독립적인 Apify 호출 — 병렬로 돌려도 안전.
+  const outcomes = await Promise.allSettled(
+    linkIds.map(async (id) => {
       const link = (await loadCollectLink(supabase, id)) as CollectLinkRow;
       const { data: job } = await supabase
         .from("collection_jobs")
@@ -97,10 +98,15 @@ export async function POST(request: NextRequest) {
       await collectLinkMetrics(supabase, link, {
         jobId: job?.id as string | undefined,
       });
+    }),
+  );
+  for (const [i, outcome] of outcomes.entries()) {
+    if (outcome.status === "fulfilled") {
       ok += 1;
-    } catch (e) {
+    } else {
       failed += 1;
-      errors.push(e instanceof Error ? e.message : `${id} 실패`);
+      const e = outcome.reason;
+      errors.push(e instanceof Error ? e.message : `${linkIds[i]} 실패`);
     }
   }
 
