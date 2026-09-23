@@ -14,6 +14,8 @@ export type SpreadsheetColumn<T> = {
   width?: number;
   align?: "left" | "right" | "center";
   render: (row: T) => React.ReactNode;
+  /** 정렬 기준값. 생략하면 render() 결과를 숫자/문자로 변환해 정렬한다. */
+  sortValue?: (row: T) => string | number;
   /** 지정하면 셀 클릭으로 바로 수정할 수 있다. */
   edit?: {
     kind: "text" | "number" | "select";
@@ -75,6 +77,24 @@ function savePrefs(storageKey: string, hidden: Set<string>, widths: Record<strin
   }
 }
 
+/** sortValue 없는 컬럼은 render() 결과를 숫자로 시도하고, 안 되면 문자열로 비교한다. */
+function defaultSortValue<T>(row: T, col: SpreadsheetColumn<T>): string | number {
+  const rendered = col.render(row);
+  if (typeof rendered === "number") return rendered;
+  if (typeof rendered === "string") {
+    // "1,234만원" "12.5%" 같은 단위 붙은 숫자에서 숫자만 뽑아 크기순으로 비교한다.
+    const digits = rendered.replace(/[^0-9.-]/g, "");
+    const num = Number(digits);
+    return digits !== "" && !Number.isNaN(num) ? num : rendered;
+  }
+  return "";
+}
+
+function compareSortValues(a: string | number, b: string | number): number {
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a).localeCompare(String(b), "ko");
+}
+
 function SpreadsheetTableInner<T>(
   {
     storageKey,
@@ -102,6 +122,7 @@ function SpreadsheetTableInner<T>(
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [widths, setWidths] = useState<Record<string, number>>({});
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const dragRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
 
   const [editingCell, setEditingCell] = useState<{ rowKey: string; columnKey: string } | null>(null);
@@ -227,6 +248,22 @@ function SpreadsheetTableInner<T>(
   const visible = columns.filter((c) => !hidden.has(c.key));
   const dirtyCount = drafts.size;
 
+  const sortedRows = (() => {
+    if (!sort) return rows;
+    const col = columns.find((c) => c.key === sort.key);
+    if (!col) return rows;
+    const getValue = col.sortValue ?? ((r: T) => defaultSortValue(r, col));
+    return [...rows].sort((a, b) => sort.dir * compareSortValues(getValue(a), getValue(b)));
+  })();
+
+  function toggleSort(key: string) {
+    setSort((prev) => {
+      if (!prev || prev.key !== key) return { key, dir: 1 };
+      if (prev.dir === 1) return { key, dir: -1 };
+      return null;
+    });
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-end gap-2">
@@ -284,7 +321,17 @@ function SpreadsheetTableInner<T>(
                   key={c.key}
                   className={`relative select-none border border-[var(--line)] px-3 py-2 ${ALIGN_CLASS[c.align ?? "left"]}`}
                 >
-                  <span className="block truncate">{c.label}</span>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-1 truncate text-left hover:text-[var(--accent)]"
+                    onClick={() => toggleSort(c.key)}
+                    title="정렬"
+                  >
+                    <span className="truncate">{c.label}</span>
+                    <span className="shrink-0 text-[10px]">
+                      {sort?.key === c.key ? (sort.dir === 1 ? "▲" : "▼") : ""}
+                    </span>
+                  </button>
                   <div
                     className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-[var(--accent-soft)]"
                     onMouseDown={(e) => onResizeStart(e, c.key)}
@@ -294,7 +341,7 @@ function SpreadsheetTableInner<T>(
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => {
+            {sortedRows.map((row, i) => {
               const rk = rowKey(row);
               return (
                 <tr
@@ -479,3 +526,24 @@ export const SpreadsheetTable = forwardRef(SpreadsheetTableInner) as <T>(
     emptyText?: string;
   } & { ref?: React.ForwardedRef<SpreadsheetTableHandle> },
 ) => ReturnType<typeof SpreadsheetTableInner>;
+
+if (process.env.RUN_SPREADSHEET_SELF_CHECK === "1") {
+  type StubCol = SpreadsheetColumn<Record<string, never>>;
+  const col = (render: () => React.ReactNode): StubCol => ({ key: "x", label: "x", render });
+  if (defaultSortValue({}, col(() => "1,234만원")) !== 1234) {
+    throw new Error("defaultSortValue should parse 만원 amounts");
+  }
+  if (
+    (defaultSortValue({}, col(() => "9,000만원")) as number) >=
+    (defaultSortValue({}, col(() => "10,000만원")) as number)
+  ) {
+    throw new Error("defaultSortValue should compare by magnitude, not string");
+  }
+  if (defaultSortValue({}, col(() => "@handle")) !== "@handle") {
+    throw new Error("defaultSortValue should fall back to string for non-numeric text");
+  }
+  if (compareSortValues(1, 2) >= 0 || compareSortValues("나", "가") <= 0) {
+    throw new Error("compareSortValues failed");
+  }
+  console.log("spreadsheet-table self-check ok");
+}
