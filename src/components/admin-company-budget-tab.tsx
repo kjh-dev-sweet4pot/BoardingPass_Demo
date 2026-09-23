@@ -955,6 +955,7 @@ function UsageSplitLine({
   }, [round.id, round.period_month, round.amount_krw, round.usage_status]);
 
   const dirty =
+    fresh ||
     period !== round.period_month.slice(0, 7) ||
     amount !== (krwToManwon(round.amount_krw)?.toString() ?? "") ||
     status !== normalizeUsageStatus(round.usage_status);

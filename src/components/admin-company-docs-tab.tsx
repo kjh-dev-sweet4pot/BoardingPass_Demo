@@ -469,6 +469,16 @@ export function AdminCompanyDocsPanel({
                     >
                       인쇄
                     </button>
+                    {d.kind === "인보이스" && isManager && onGoToBudget ? (
+                      <button
+                        type="button"
+                        className="mr-2 text-[var(--accent)]"
+                        title="자동으로 예산 탭에 넘어가지 않은 경우, 이 인보이스 기준으로 바로 예산을 편성합니다"
+                        onClick={() => onGoToBudget(companyId, d.id)}
+                      >
+                        예산 편성하기
+                      </button>
+                    ) : null}
                     {isManager ? (
                       <button
                         type="button"
