@@ -45,7 +45,8 @@ export default async function AdminPage({
   const needsAllocations =
     section === "influencersRegister" ||
     section === "influencersReview" ||
-    section === "influencersAlloc";
+    section === "influencersAlloc" ||
+    section === "influencersCompany";
   const [{ data: stores }, companiesRes, { data: products }, allocResult] =
     await Promise.all([
       supabase.from("stores").select("*").order("name", { ascending: true }),
@@ -55,7 +56,7 @@ export default async function AdminPage({
         ? supabase
             .from("allocations")
             .select(
-              "*, products(*), stores(*), influencers(*), companies(id, name), creator_links(id, status)",
+              "*, products(*), stores(*), influencers(*), companies(id, name), creator_links(id, status, url, publish_url)",
             )
             .order("visit_date", { ascending: false })
             .order("created_at", { ascending: false })

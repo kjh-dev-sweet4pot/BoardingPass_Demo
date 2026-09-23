@@ -291,7 +291,8 @@ function AdminConsoleLayoutBody({
 
       {section === "influencersRegister" ||
       section === "influencersReview" ||
-      section === "influencersAlloc" ? (
+      section === "influencersAlloc" ||
+      section === "influencersCompany" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AdminInfluencersTab
             sub={section}

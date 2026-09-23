@@ -28,6 +28,7 @@ export type AdminSection =
   | "influencersRegister"
   | "influencersReview"
   | "influencersAlloc"
+  | "influencersCompany"
   | "marginOverview"
   | "marginCampaign"
   | "marginQuote"
@@ -51,6 +52,7 @@ export const ADMIN_SECTIONS: AdminSection[] = [
   "influencersRegister",
   "influencersReview",
   "influencersAlloc",
+  "influencersCompany",
   "marginOverview",
   "marginCampaign",
   "marginQuote",
@@ -81,11 +83,12 @@ export const COMPANIES_NAV: NavDropdownItem<
 ];
 
 export const INFLUENCERS_NAV: NavDropdownItem<
-  "influencersRegister" | "influencersReview" | "influencersAlloc"
+  "influencersRegister" | "influencersReview" | "influencersAlloc" | "influencersCompany"
 >[] = [
   { id: "influencersRegister", label: "등록", hint: "인플루언서 개설·수정" },
   { id: "influencersReview", label: "검수", hint: "콘텐츠 승인·반려" },
   { id: "influencersAlloc", label: "배정·매장", hint: "방문 배정·지점" },
+  { id: "influencersCompany", label: "회사별 리스트", hint: "회사별 조회·스프레드시트 수정" },
 ];
 
 export const MARGIN_NAV: NavDropdownItem<
@@ -132,7 +135,8 @@ function isInfluencers(s: AdminSection) {
   return (
     s === "influencersRegister" ||
     s === "influencersReview" ||
-    s === "influencersAlloc"
+    s === "influencersAlloc" ||
+    s === "influencersCompany"
   );
 }
 
@@ -237,6 +241,7 @@ export function AdminConsoleShell({
                 | "influencersRegister"
                 | "influencersReview"
                 | "influencersAlloc"
+                | "influencersCompany"
             }
             onViewChange={onSectionChange}
           />
@@ -327,7 +332,8 @@ export function AdminConsoleShell({
                 ? (section as
                     | "influencersRegister"
                     | "influencersReview"
-                    | "influencersAlloc")
+                    | "influencersAlloc"
+                    | "influencersCompany")
                 : undefined
             }
             onSelect={onSectionChange}

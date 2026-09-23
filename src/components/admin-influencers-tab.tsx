@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createManualAllocation } from "@/app/actions/admin";
 import { AdminAllocSchedule } from "@/components/admin-alloc-schedule";
 import { AdminImportPanel } from "@/components/admin-import-panel";
+import { AdminInfluencerCompanyPanel } from "@/components/admin-influencer-company-tab";
 import { AdminReviewQueue, type AdminReviewTab } from "@/components/admin-review-queue";
 import { InfluencerAvatar } from "@/components/influencer-avatar";
 import { Field, fieldClass, primaryBtnClass, secondaryBtnClass } from "@/components/ui";
@@ -12,7 +13,8 @@ import { type AllocationWithRelations, type Company, type Influencer, type Produ
 export type InfluencersSub =
   | "influencersRegister"
   | "influencersReview"
-  | "influencersAlloc";
+  | "influencersAlloc"
+  | "influencersCompany";
 
 function InfluencerRegister({
   isManager,
@@ -434,6 +436,10 @@ export function AdminInfluencersTab({
             onQueueChange={onReviewQueueChange}
           />
         </div>
+      ) : null}
+
+      {sub === "influencersCompany" ? (
+        <AdminInfluencerCompanyPanel allocations={allocations} companies={companyList} />
       ) : null}
 
       {sub === "influencersAlloc" ? (
