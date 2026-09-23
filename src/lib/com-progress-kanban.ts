@@ -2,6 +2,7 @@ import { polishDemoMetrics } from "@/lib/demo-metrics";
 import { buildCreatorPool } from "@/lib/creator-pool-mock";
 import { creatorPlatformLabelOf, extractSnsHandle } from "@/lib/creator-link";
 import { creatorLinkHref } from "@/lib/publish-demo-data";
+import { todayYmdKst } from "@/lib/inf-visit";
 import type { AllocationWithRelations, CreatorLink } from "@/lib/types";
 
 export const KANBAN_COLUMNS = [
@@ -74,7 +75,10 @@ function rollupStatus(item: AllocationWithRelations, links: CreatorLink[]): Kanb
   if (published >= target) return "발행완료";
   if (submitted > 0) return "검수중";
   if (item.status === "picked_up" || item.picked_up_at) return "제작중";
-  if (item.status === "visited" || item.status === "ready") return "수령완료";
+  // 방문예정일이 지났으면 수령 처리 안 됐어도 수령완료로 간주 (inf-allocation-list와 동일 규칙)
+  const visitPassed = Boolean(item.visit_date && String(item.visit_date).slice(0, 10) < todayYmdKst());
+  if (item.status === "visited" || item.status === "ready" || (visitPassed && item.status !== "cancelled"))
+    return "수령완료";
   return "대기";
 }
 
@@ -318,6 +322,9 @@ if (process.env.RUN_KANBAN_SELF_CHECK === "1") {
   ) {
     throw new Error("mergeKanbanByInfluencer failed");
   }
+  const past = { status: "pending", visit_date: "2000-01-01" } as AllocationWithRelations;
+  if (rollupStatus(past, []) !== "수령완료") throw new Error("past visit_date should be 수령완료");
+  if (rollupStatus({ ...past, visit_date: "2999-01-01" }, []) !== "대기") throw new Error("future visit should be 대기");
   console.log("com-progress-kanban self-check ok");
 }
 

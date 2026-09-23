@@ -61,6 +61,12 @@ function isVisitToday(item: AllocationWithRelations) {
   return Boolean(v && v === todayYmdKst());
 }
 
+/** 방문예정일이 지났는데도 수령 처리가 안 된 건 — 수령완료로 간주 */
+function isVisitDatePassed(item: AllocationWithRelations) {
+  const v = visitDateYmd(item);
+  return Boolean(v && v < todayYmdKst());
+}
+
 function formatStoreName(
   store?: { name?: string | null; address?: string | null } | null,
   fallback = "매장",
@@ -136,9 +142,9 @@ function LinkRegisterAction({
 function sortItems(items: AllocationWithRelations[]) {
   return [...items].sort((a, b) => {
     const rank = (i: AllocationWithRelations) => {
-      if (isPickedUp(i)) return 0; // 반출완료 최상단
-      if (i.status === "visited" || i.status === "ready") return 1; // 방문완료
       if (i.status === "cancelled") return 3;
+      if (isPickedUp(i) || isVisitDatePassed(i)) return 0; // 반출완료·기한경과 최상단
+      if (i.status === "visited" || i.status === "ready") return 1; // 방문완료
       return 2; // 대기(pending 등)
     };
     const d = rank(a) - rank(b);
@@ -162,8 +168,8 @@ function AllocationCard({
   t: InfMessages;
   locale: "ko" | "en" | "ja" | "zh";
 }) {
-  const done = isPickedUp(item);
   const isCancelled = item.status === "cancelled";
+  const done = isPickedUp(item) || (!isCancelled && isVisitDatePassed(item));
   const today = isVisitToday(item);
   /** 오늘 수령 가능 — 브랜드 웜톤 / 그 외는 스톤 톤으로 구분 */
   const isTodayPickup = today && !done && !isCancelled;
