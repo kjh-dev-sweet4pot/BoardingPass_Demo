@@ -33,9 +33,36 @@ export async function GET(req: NextRequest) {
   const dateto = searchParams.get("to") ?? "";
   const accountnum = searchParams.get("accountnum") ?? undefined;
   const istest = searchParams.get("istest") === "y";
+  const source = searchParams.get("source") ?? "api";
 
   if (!datefrom || !dateto) {
     return NextResponse.json({ error: "from, to 파라미터 필요 (YYYYMMDD)" }, { status: 400 });
+  }
+
+  // DB에 이미 동기화된 데이터만 조회 (뱅크다 API 호출 없음 — 5분 제한/외부 장애와 무관)
+  if (source === "db") {
+    if (!hasServiceRoleKey()) {
+      return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY가 필요합니다." }, { status: 500 });
+    }
+    const fmt = (ymd: string) => `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`;
+    const supabase = createServiceClient();
+    let query = supabase
+      .from("bankda_transactions")
+      .select("*")
+      .gte("tran_date", fmt(datefrom))
+      .lte("tran_date", fmt(dateto) + " 23:59:59")
+      .order("tran_date", { ascending: true });
+    if (accountnum) query = query.ilike("account_num", `%${accountnum}%`);
+
+    const { data, error } = await query;
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    return NextResponse.json({
+      transactions: (data ?? []).map((row) => row.raw_json ?? row),
+      raw: null,
+      savedToDbCount: null,
+      dbError: null,
+    });
   }
 
   try {

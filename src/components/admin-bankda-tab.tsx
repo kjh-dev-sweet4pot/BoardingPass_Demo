@@ -75,7 +75,7 @@ export function AdminBankdaTab() {
   const [filterType, setFilterType] = useState<"ALL" | "IN" | "OUT">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
-  async function load() {
+  async function load(source: "api" | "db" = "api") {
     setLoading(true);
     setError(null);
     setSavedCount(null);
@@ -87,6 +87,7 @@ export function AdminBankdaTab() {
       });
       if (accountNum.trim()) q.set("accountnum", accountNum.trim());
       if (isTest) q.set("istest", "y");
+      if (source === "db") q.set("source", "db");
 
       const res = await fetch(`/api/bankda/transactions?${q.toString()}`);
       const json = await res.json();
@@ -271,11 +272,20 @@ export function AdminBankdaTab() {
 
             <button
               type="button"
-              onClick={load}
+              onClick={() => load("api")}
               disabled={loading}
               className="rounded-[6px] bg-[var(--accent)] px-4 py-1 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-50"
             >
               {loading ? "데이터 조회 중…" : "원장 조회"}
+            </button>
+            <button
+              type="button"
+              onClick={() => load("db")}
+              disabled={loading}
+              title="뱅크다 API를 다시 호출하지 않고, 이미 DB에 저장된 데이터만 불러옵니다"
+              className="rounded-[6px] border border-[var(--line)] bg-[var(--surface)] px-4 py-1 text-xs font-semibold text-[var(--ink)] shadow-sm transition hover:bg-[var(--surface-hover)] disabled:opacity-50"
+            >
+              {loading ? "불러오는 중…" : "DB에서 불러오기"}
             </button>
           </div>
 
