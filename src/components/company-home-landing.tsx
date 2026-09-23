@@ -31,6 +31,8 @@ import {
   type CompanyHomeInfluencerRow,
   type CompanyHomeNewsItem,
   type CompanyHomePayload,
+  type HomeChanges,
+  type HomeSnapshot,
   type HomeInsightLink,
 } from "@/lib/company-home";
 import { formatFollowers, resolvePoolCreator } from "@/lib/creator-pool-mock";
@@ -971,6 +973,146 @@ function NewsSidebar({
   );
 }
 
+const CHANGE_ROWS: { key: keyof HomeSnapshot; label: string; unit: string }[] = [
+  { key: "views", label: "누적 조회수", unit: "" },
+  { key: "likes", label: "좋아요", unit: "" },
+  { key: "comments", label: "댓글", unit: "" },
+  { key: "published", label: "발행 콘텐츠", unit: "건" },
+  { key: "visited", label: "방문 완료", unit: "명" },
+];
+
+/** 로그인(페이지 진입)마다 어제·1주 전 대비 변화 요약. "오늘 하루 보지 않기" 체크 시 그날은 숨김 (브라우저 기준). */
+function ChangeSummaryDialog({ changes, asOf, companyName }: { changes: HomeChanges; asOf: string; companyName: string }) {
+  const storageKey = `com-change-summary-hide:${companyName}:${asOf}`;
+  const [open, setOpen] = useState(false);
+  const [range, setRange] = useState<"day" | "week">("day");
+  const [hideToday, setHideToday] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(storageKey)) setOpen(true);
+    } catch {
+      setOpen(true);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  function close() {
+    setOpen(false);
+    if (!hideToday) return;
+    try {
+      localStorage.setItem(storageKey, "1");
+    } catch {
+      /* 저장 불가 환경은 매번 뜸 */
+    }
+  }
+
+  if (!open) return null;
+  const base = changes[range];
+  const rows = CHANGE_ROWS.map((r) => {
+    const now = changes.now[r.key];
+    const diff = now - base[r.key];
+    return { ...r, now, diff, pct: base[r.key] > 0 ? (diff / base[r.key]) * 100 : null };
+  });
+  const fmtPct = (pct: number | null, diff: number) =>
+    pct == null ? (diff > 0 ? "신규" : "—") : `${pct > 0 ? "+" : ""}${pct.toFixed(pct !== 0 && Math.abs(pct) < 10 ? 1 : 0)}%`;
+  const tone = (diff: number) =>
+    diff > 0 ? "text-[var(--accent)]" : diff < 0 ? "text-[var(--danger)]" : "text-[var(--muted)]";
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-[#2f231d]/40 p-4 backdrop-blur-[2px]"
+      onClick={close}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="change-summary-title"
+        className="w-full max-w-[420px] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative bg-gradient-to-br from-[var(--accent)] to-[#83786f] px-6 pb-6 pt-5 text-[#faf9f7]">
+          <button
+            type="button"
+            aria-label="닫기"
+            onClick={close}
+            className="absolute right-4 top-4 rounded-full p-1 text-white/75 transition hover:bg-white/15 hover:text-white"
+          >
+            <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden>
+              <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+            </svg>
+          </button>
+          <p className="text-[12px] font-medium text-white/70">{companyName} · {asOf}</p>
+          <h2 id="change-summary-title" className="mt-2 text-[20px] font-bold leading-snug">
+            안녕하세요!
+            <br />
+            {range === "day" ? "간밤에" : "지난 한 주간"} 어떤 일이 있었을까요?
+          </h2>
+          <div className="mt-4 inline-flex rounded-full bg-white/15 p-1 text-[12.5px] font-semibold">
+            {(["day", "week"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={range === k}
+                onClick={() => setRange(k)}
+                className={`rounded-full px-3.5 py-1 transition ${range === k ? "bg-[var(--surface)] text-[var(--accent)] shadow" : "text-white/85 hover:text-white"}`}
+              >
+                {k === "day" ? "어제 대비" : "1주 전 대비"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <ul className="divide-y divide-[var(--line)] px-6 py-1">
+          {rows.map((r) => (
+            <li key={r.key} className="flex items-center justify-between py-3.5">
+              <span>
+                <span className="block text-[13.5px] text-[var(--muted)]">{r.label}</span>
+                <span className="block text-[11.5px] tabular-nums text-[var(--muted)]/80">
+                  누적 {r.now.toLocaleString("ko-KR")}
+                  {r.unit}
+                </span>
+              </span>
+              <span className="flex items-baseline gap-2">
+                <span className={`text-[24px] font-bold leading-none tabular-nums ${tone(r.diff)}`}>
+                  {r.diff > 0 ? "+" : ""}
+                  {r.diff.toLocaleString("ko-KR")}
+                  <span className="ml-0.5 text-[14px] font-semibold">{r.unit}</span>
+                </span>
+                <span className="text-[12px] font-medium tabular-nums text-[var(--muted)]">{fmtPct(r.pct, r.diff)}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="border-t border-[var(--line)] px-6 pb-5 pt-4">
+          <label className="mb-3 flex cursor-pointer items-center gap-2 text-[12.5px] text-[var(--muted)]">
+            <input
+              type="checkbox"
+              checked={hideToday}
+              onChange={(e) => setHideToday(e.target.checked)}
+              className="h-4 w-4 accent-[var(--accent)]"
+            />
+            오늘 하루 보지 않기
+          </label>
+          <button
+            type="button"
+            onClick={close}
+            className="w-full rounded-xl bg-[var(--accent)] py-2.5 text-[14px] font-semibold text-[var(--surface)] transition hover:bg-[var(--ink)]"
+          >
+            확인
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function CompanyHomeLanding({
   companyName,
   active = true,
@@ -1094,6 +1236,9 @@ export function CompanyHomeLanding({
 
         {data ? (
           <div ref={homeEnterRef} className="com-home-enter">
+            {data.changes ? (
+              <ChangeSummaryDialog changes={data.changes} asOf={data.asOf} companyName={companyName} />
+            ) : null}
             <p className="px-5 pt-3 text-[11.5px] text-[var(--muted)] sm:px-8">
               {companyName} · {data.asOf} 조회 시점 기준
             </p>

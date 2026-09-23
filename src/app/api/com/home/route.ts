@@ -8,6 +8,7 @@ import { isPublishedComplete } from "@/lib/company-budget-performance";
 import { resolveCreatorPlatform } from "@/lib/creator-link";
 import {
   buildDerivedNews,
+  buildHomeChanges,
   buildHomeForecast,
   buildViewsCurvePoints,
   cumulativeViewsSeriesFromMetrics,
@@ -350,8 +351,9 @@ export async function GET() {
   weekSeries[6] = weekViewTotal;
   let weekWow: number | null = null;
   let weekCurve: { day: number; views: number }[] = [];
+  let metrics: Awaited<ReturnType<typeof fetchMetricsForLinks>> = [];
   try {
-    const metrics = await fetchMetricsForLinks(supabase, homeLinks, {
+    metrics = await fetchMetricsForLinks(supabase, homeLinks, {
       days: 90,
     });
     weekCurve = buildViewsCurvePoints(
@@ -471,6 +473,18 @@ export async function GET() {
     visits,
     links: homeLinks,
     forecast,
+    changes: buildHomeChanges({
+      asOf,
+      links: homeLinks.map((l) => ({
+        id: l.id,
+        published_at: l.published_at ?? null,
+        views: Number(l.views) || 0,
+        likes: Number(l.likes) || 0,
+        comments: Number(posts.find((p) => p.id === l.id)?.comments) || 0,
+      })),
+      metrics,
+      visitDates: activeAllocs.map((a) => (a.visit_date ? String(a.visit_date) : null)),
+    }),
   };
 
   return NextResponse.json(payload);

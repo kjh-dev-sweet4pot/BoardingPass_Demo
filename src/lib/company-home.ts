@@ -305,7 +305,59 @@ export type CompanyHomePayload = {
   visits: CompanyHomeVisits;
   links: HomeInsightLink[];
   forecast: HomeForecast;
+  changes: HomeChanges;
 };
+
+export type HomeSnapshot = { views: number; likes: number; comments: number; published: number; visited: number };
+export type HomeChanges = { now: HomeSnapshot; day: HomeSnapshot; week: HomeSnapshot };
+
+/**
+ * 어제/7일 전 말(KST 23:59) 시점 누적치 vs 현재. 과거 지표는 content_metrics 스냅샷의 해당 시점 이전 최신값.
+ * ponytail: 그 시점 이전 스냅샷이 없는 링크는 0으로 본다 — 수집 이력이 짧으면 증가폭이 과대. 정확히 하려면 일별 롤업 테이블.
+ */
+export function buildHomeChanges(input: {
+  asOf: string;
+  links: { id: string; published_at: string | null; views: number | null; likes: number | null; comments: number | null }[];
+  metrics: { creator_link_id: string; collected_at: string; views: number | null; likes: number | null; comments: number | null }[];
+  visitDates: (string | null)[];
+}): HomeChanges {
+  const at = (daysAgo: number): HomeSnapshot => {
+    const ymd = addDaysYmd(input.asOf, -daysAgo);
+    const end = new Date(`${ymd}T23:59:59+09:00`).getTime();
+    const latest = new Map<string, { t: number; m: (typeof input.metrics)[number] }>();
+    for (const m of input.metrics) {
+      const t = new Date(m.collected_at).getTime();
+      if (!(t <= end)) continue;
+      const prev = latest.get(m.creator_link_id);
+      if (!prev || t >= prev.t) latest.set(m.creator_link_id, { t, m });
+    }
+    let views = 0, likes = 0, comments = 0;
+    for (const { m } of latest.values()) {
+      views += Number(m.views) || 0;
+      likes += Number(m.likes) || 0;
+      comments += Number(m.comments) || 0;
+    }
+    return {
+      views,
+      likes,
+      comments,
+      published: input.links.filter((l) => l.published_at && new Date(l.published_at).getTime() <= end).length,
+      visited: input.visitDates.filter((d) => d && d.slice(0, 10) <= ymd).length,
+    };
+  };
+  const sum = (k: "views" | "likes" | "comments") => input.links.reduce((s, l) => s + (Number(l[k]) || 0), 0);
+  return {
+    now: {
+      views: sum("views"),
+      likes: sum("likes"),
+      comments: sum("comments"),
+      published: input.links.length,
+      visited: input.visitDates.filter((d) => d && d.slice(0, 10) <= input.asOf).length,
+    },
+    day: at(1),
+    week: at(7),
+  };
+}
 
 /** 미업로드 인원 × 관련 게시 3건 평균을 Ridge(α=10)로 조회수 보정. 평균 없는 인원은 합계에서 제외 */
 export function buildHomeForecast(
@@ -1205,4 +1257,20 @@ function assertRankBestPosts() {
 if (process.env.RUN_COMPANY_HOME_SELF_CHECK === "1") {
   assertRankBestPosts();
   console.log("company-home self-check ok");
+}
+
+if (process.env.RUN_HOME_CHANGES_SELF_CHECK === "1") {
+  const c = buildHomeChanges({
+    asOf: "2026-09-23",
+    links: [{ id: "a", published_at: "2026-09-10T00:00:00Z", views: 300, likes: 30, comments: 3 }],
+    metrics: [
+      { creator_link_id: "a", collected_at: "2026-09-15T00:00:00Z", views: 100, likes: 10, comments: 1 },
+      { creator_link_id: "a", collected_at: "2026-09-22T05:00:00Z", views: 250, likes: 20, comments: 2 },
+      { creator_link_id: "a", collected_at: "2026-09-23T05:00:00Z", views: 300, likes: 30, comments: 3 },
+    ],
+    visitDates: ["2026-09-01", "2026-09-22", "2026-09-30"],
+  });
+  if (c.now.views !== 300 || c.day.views !== 250 || c.week.views !== 100) throw new Error(`views ${JSON.stringify(c)}`);
+  if (c.now.visited !== 2 || c.day.visited !== 2 || c.week.visited !== 1) throw new Error(`visited ${JSON.stringify(c)}`);
+  console.log("home changes self-check ok");
 }
