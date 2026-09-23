@@ -15,6 +15,7 @@ import { AdminPerformanceLookupTab, AdminPerformanceTab } from "@/components/adm
 import { type AdminReviewTab } from "@/components/admin-review-queue";
 import { ADMIN_SECTIONS, AdminConsoleShell, type AdminSection } from "@/components/admin-sidebar-nav";
 import { AdminBankdaTab } from "@/components/admin-bankda-tab";
+import { AdminGoogleChatTab } from "@/components/admin-google-chat-tab";
 import {
   AdminTestVisibilityProvider,
   useAdminTestVisibility,
@@ -341,6 +342,19 @@ function AdminConsoleLayoutBody({
           <EmptyState
             title="접근 권한이 없습니다."
             message="Bankda 거래내역은 최고 관리자 계정만 열람할 수 있습니다."
+          />
+        )
+      ) : null}
+
+      {section === "googleChat" ? (
+        isSuperAdmin ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <AdminGoogleChatTab />
+          </div>
+        ) : (
+          <EmptyState
+            title="접근 권한이 없습니다."
+            message="Google Chat 수집 화면은 최고 관리자 계정만 열람할 수 있습니다."
           />
         )
       ) : null}

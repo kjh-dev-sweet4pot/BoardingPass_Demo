@@ -34,7 +34,8 @@ export type AdminSection =
   | "marginQuote"
   | "marginRateCard"
   | "marginRollup"
-  | "bankda";
+  | "bankda"
+  | "googleChat";
 
 export const ADMIN_SECTIONS: AdminSection[] = [
   "dashboard",
@@ -59,6 +60,7 @@ export const ADMIN_SECTIONS: AdminSection[] = [
   "marginRateCard",
   "marginRollup",
   "bankda",
+  "googleChat",
 ];
 
 export const COMPANIES_NAV: NavDropdownItem<
@@ -369,6 +371,22 @@ export function AdminConsoleShell({
               }`}
             >
               Bankda{" "}
+              <span className="text-[10px] font-normal text-[var(--muted)]">beta</span>
+            </button>
+          ) : null}
+          {isSuperAdmin ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={section === "googleChat"}
+              onClick={() => onSectionChange("googleChat")}
+              className={`text-[15px] tracking-[-0.02em] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${
+                section === "googleChat"
+                  ? "font-bold text-[var(--ink)]"
+                  : "font-semibold text-[#cabda7] hover:text-[var(--ink)]"
+              }`}
+            >
+              Google Chat{" "}
               <span className="text-[10px] font-normal text-[var(--muted)]">beta</span>
             </button>
           ) : null}
