@@ -160,8 +160,9 @@ export function findXiaohongshuResultForUrl(
 ): XiaohongshuScraperResult | undefined {
   const noteId = extractXiaohongshuNoteId(url);
   if (noteId) {
-    const hit = items.find((item) => item.id === noteId || item.url.toLowerCase().includes(noteId));
-    if (hit) return hit;
+    // note id를 아는 경우 id 일치만 인정 — inputUrl은 위치로 붙인 값이라 액터가 다른 노트를 돌려줘도
+    // 항상 "일치"해버려 남의 지표가 저장됐다(Winnie 167뷰 → 152,750뷰).
+    return items.find((item) => item.id === noteId || item.url.toLowerCase().includes(noteId));
   }
   const target = url.trim().toLowerCase();
   const exact = items.find(
@@ -316,6 +317,11 @@ if (process.env.RUN_XHS_SELF_CHECK === "1") {
   }
   if (!isXiaohongshuUrl("http://xhslink.com/o/1PMSLXJ4uOK")) {
     throw new Error("isXiaohongshuUrl xhslink failed");
+  }
+  const wrong = { id: "6a0000000000000000000000", url: "https://www.xiaohongshu.com/explore/6a0000000000000000000000" } as XiaohongshuScraperResult;
+  const target = "https://www.xiaohongshu.com/discovery/item/6a431f47000000001503e1af?source=webshare";
+  if (findXiaohongshuResultForUrl([{ ...wrong, inputUrl: target }], target)) {
+    throw new Error("findXiaohongshuResultForUrl accepted a different note");
   }
   console.log("apify-xiaohongshu self-check ok");
 }
